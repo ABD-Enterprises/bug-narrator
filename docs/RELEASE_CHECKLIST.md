@@ -8,6 +8,8 @@ Use this checklist before cutting a public test build or release candidate.
 - Build the app in the intended configuration and confirm the build succeeds.
 - Run `./scripts/build_dmg.sh` and confirm the DMG packaging step succeeds.
 - If shipping a signed build, verify the Apple signing team, bundle identifier, and entitlements are correct.
+- For a public download, use `Developer ID Application` signing rather than `Apple Development`.
+- If publishing broadly, notarize the DMG and staple the ticket before release.
 - Launch the built app and confirm the menu bar item appears.
 
 ## Core Product Workflow
@@ -55,5 +57,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Confirm no secrets, tokens, personal paths, or local-only files are tracked in git.
 - Review `.gitignore` for generated Xcode data and result bundles.
 - Upload `dist/BugNarrator-macOS.dmg` to the release and confirm the release asset name matches the README link strategy.
+- Run `xcrun stapler validate` on the final DMG.
+- Run `spctl -a -vv -t open` on the final DMG and confirm Gatekeeper accepts it.
 - Run the automated test suite and confirm it passes.
 - Note any known limitations in the release notes or changelog before publishing.

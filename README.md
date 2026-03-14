@@ -197,6 +197,7 @@ The script builds a Release app, creates a DMG with `BugNarrator.app` plus an `A
 Full packaging details live in [docs/Distribution.md](docs/Distribution.md).
 
 For public distribution, prefer a signed and notarized build. The packaging script supports signed local builds when you provide your Apple team in the environment.
+For a true public macOS release, use a `Developer ID Application` certificate plus notarization so Gatekeeper accepts the download on other Macs.
 
 ## Documentation
 

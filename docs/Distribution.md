@@ -67,9 +67,10 @@ This makes the packaging workflow reproducible on machines that do not have Appl
 
 For a public release, you should normally:
 
-1. configure your Apple signing team in Xcode
-2. build with signing enabled
-3. notarize the final release artifact if you plan to distribute it broadly
+1. install a `Developer ID Application` certificate for your Apple Developer account
+2. configure a notarization credential profile for `notarytool`
+3. build with Developer ID signing enabled
+4. notarize and staple the final DMG
 
 You can override the script behavior if needed. For a locally signed build using the configured Apple team:
 
@@ -83,7 +84,40 @@ ALLOW_PROVISIONING_UPDATES=YES \
 
 That produces a signed app inside the DMG if your local machine has a valid signing identity for that team.
 
-For broad public distribution outside your own Mac, prefer a `Developer ID Application` certificate and notarization. An `Apple Development` signature is better than unsigned for local validation, but it is not the final distribution-quality setup.
+For broad public distribution outside your own Mac, you should use `Developer ID Application` plus notarization. An `Apple Development` signature is better than unsigned for local validation, but Gatekeeper will still reject it for normal public download flows.
+
+### Developer ID And Notarization
+
+First, store a notarization credential profile in your keychain:
+
+```bash
+xcrun notarytool store-credentials ***REMOVED*** \
+  --apple-id YOUR_APPLE_ID \
+  --team-id YOUR_TEAM_ID \
+  --password YOUR_APP_SPECIFIC_PASSWORD
+```
+
+Then build, notarize, staple, and validate in one command:
+
+```bash
+CODE_SIGNING_ALLOWED=YES \
+CODE_SIGN_STYLE=Automatic \
+CODE_SIGN_IDENTITY=\"Developer ID Application\" \
+DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+ALLOW_PROVISIONING_UPDATES=YES \
+NOTARIZE=YES \
+NOTARY_PROFILE=***REMOVED*** \
+./scripts/build_dmg.sh
+```
+
+The packaging script will:
+
+1. build the Release app
+2. verify the app is signed
+3. create the DMG
+4. submit the DMG to Apple's notarization service
+5. staple the notarization ticket to the DMG
+6. run `stapler validate` and `spctl` checks
 
 ## Releasing On GitHub
 
@@ -104,6 +138,12 @@ After building:
 3. confirm the `Applications` shortcut is present
 4. drag the app into `Applications`
 5. launch the installed app and verify first-run behavior
+
+For a public release, also verify:
+
+1. `xcrun stapler validate dist/BugNarrator-vX.Y-macOS.dmg`
+2. `spctl -a -vv -t open dist/BugNarrator-vX.Y-macOS.dmg`
+3. Gatekeeper accepts the downloaded DMG on a second Mac that has never built the app locally
 
 ## Related Docs
 
