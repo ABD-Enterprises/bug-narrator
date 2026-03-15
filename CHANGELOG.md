@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.14 - 2026-03-15
+
+- Fixed a microphone permission state bug where BugNarrator could mix the older capture-device authorization API with the modern app-level microphone permission API and incorrectly conclude that access was denied before macOS had shown the prompt.
+- Switched microphone prompting and preflight state on macOS 14+ to the modern app-level permission API so first-run and post-reset permission requests behave more reliably for the signed app.
+
 ## 1.0.13 - 2026-03-15
 
 - Fixed a microphone permission prompt path bug for the menu bar app so BugNarrator now activates itself before requesting microphone access from macOS.
