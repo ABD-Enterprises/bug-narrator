@@ -19,8 +19,7 @@ It helps you:
 
 - record narrated testing sessions
 - create a transcript after the session ends
-- mark important moments with timeline markers
-- attach screenshots to the review session
+- attach screenshots to the review session and turn them into timeline markers automatically
 - generate a review summary
 - extract draft bugs, UX issues, enhancements, and follow-up questions
 - export selected issues to GitHub Issues or Jira Cloud
@@ -57,24 +56,23 @@ BugNarrator does not ship with a built-in OpenAI API key. Transcription and issu
 
 ### Start A Narrated Testing Session
 
-Start a session from the menu bar or by using your configured start hotkey. BugNarrator records in the background while you keep working in other apps. Starting a session opens a small recording controls window that stays available while you work.
+Start a session from the menu bar or by using your configured start hotkey if you assigned one. BugNarrator records in the background while you keep working in other apps. Starting a session opens a small recording controls window that stays available while you work.
 
 The recording controls window includes:
 
 - `Start Recording`
 - `Stop Recording`
-- `Insert Marker`
 - `Capture Screenshot`
 
-You can keep using the global hotkeys too, but the recording controls window is the main control surface during a live review.
+You can keep using global hotkeys if you assign them in Settings, but the recording controls window is the main control surface during a live review.
 
 ### Stop A Session
 
-When you finish, stop the session from the menu bar or hotkey. BugNarrator then uploads the recorded audio to OpenAI and waits for the transcript result.
+When you finish, stop the session from the control window or a stop hotkey you explicitly assigned. BugNarrator then uploads the recorded audio to OpenAI and waits for the transcript result.
 
 ### Review The Session
 
-After transcription completes, BugNarrator opens the session library so you can inspect the transcript, markers, screenshots, review summary, and extracted issues in one place.
+After transcription completes, BugNarrator opens the session library so you can inspect the transcript timeline, screenshots, review summary, and extracted issues in one place.
 
 The intended mental model is:
 
@@ -90,13 +88,9 @@ Recording is designed for real software review work. You can switch apps, click,
 
 BugNarrator generates the transcript only after the session ends. It does not try to type live dictation into the active app.
 
-### Markers
-
-Markers let you flag moments that matter while the session is still running. They help you jump to specific points in the transcript later and appear in transcript exports.
-
 ### Screenshot Capture
 
-Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit for this capture path. Each screenshot is attached to the current session and automatically inserts a marker at the same timestamp so the transcript and visual evidence stay aligned.
+Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit plus a drag-selection overlay that works like a lightweight macOS capture tool. Press `Capture Screenshot`, drag across the area you want, release to save it, or press `Esc` to cancel. Each screenshot is attached to the current session, automatically creates a timeline marker at the same timestamp, and appears in the `Screenshots` tab with a thumbnail, timestamp, and linked marker when available.
 
 ### Review Summary
 
@@ -164,7 +158,7 @@ You can:
 - use a custom date range
 - search transcript text, titles, and summaries
 - sort by newest first or oldest first
-- open a detail pane with transcript, markers, screenshots, summary, and extracted issues
+- open a detail pane with the transcript timeline, screenshots, summary, and extracted issues
 - delete sessions you no longer need
 
 BugNarrator keeps lightweight session-library metadata in memory so bigger histories remain more responsive when you switch filters, search, sort, or jump between sessions quickly.
@@ -173,11 +167,12 @@ Treat the session library as an archive of review sessions rather than a plain t
 
 The right-hand review workspace is organized around clear tabs so you can move between:
 
-- Raw Transcript
-- Review Summary
-- Markers
+- Transcript
 - Screenshots
 - Extracted Issues
+- Review Summary
+
+Older sessions that already contain standalone markers still render safely in the transcript timeline and exports.
 
 Deleting a session removes it from the library immediately and also removes local screenshot files that BugNarrator manages for that session. Exported files outside the app are not deleted.
 
@@ -240,6 +235,8 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 ### Screenshots Not Appearing
 
 - confirm the session was actively recording when the screenshot was requested
+- after pressing `Capture Screenshot`, drag to select a real on-screen region before releasing the mouse
+- press `Esc` if you want to cancel the selection without saving anything; BugNarrator keeps recording and shows a lightweight cancellation message instead of a blocking error
 - use BugNarrator's `Open Screen Recording Settings` button if it appears in the menu bar window
 - or open `System Settings > Privacy & Security > Screen & System Audio Recording`
 - confirm Screen Recording permission is granted if macOS prompted for it
@@ -258,7 +255,7 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 What stays local on your Mac:
 
 - saved session history
-- markers
+- screenshot-driven timeline markers and older marker data from existing sessions
 - screenshots and screenshot metadata
 - extracted issue drafts
 - exported session bundles

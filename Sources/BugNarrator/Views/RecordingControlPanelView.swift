@@ -5,7 +5,6 @@ struct RecordingControlPanelView: View {
 
     let onStartSession: () -> Void
     let onStopSession: () -> Void
-    let onInsertMarker: () -> Void
     let onCaptureScreenshot: () -> Void
     let onClose: () -> Void
 
@@ -19,6 +18,24 @@ struct RecordingControlPanelView: View {
         .padding(16)
         .frame(width: 332, alignment: .leading)
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .top) {
+            if let transientToast = appState.transientToast {
+                Label(transientToast.message, systemImage: transientToast.style.symbolName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(transientToast.style == .success ? .green : .secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(.quaternary.opacity(0.55), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: appState.transientToast)
         .accessibilityElement(children: .contain)
     }
 
@@ -78,7 +95,7 @@ struct RecordingControlPanelView: View {
             if showsRecoveryButton {
                 recoveryButton
             } else if appState.status.phase == .recording {
-                Text("\(appState.activeMarkerCount) markers • \(appState.activeScreenshotCount) screenshots")
+                Text("\(appState.activeTimelineMomentCount) timeline moments • \(appState.activeScreenshotCount) screenshots")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -93,7 +110,7 @@ struct RecordingControlPanelView: View {
             HStack(spacing: 12) {
                 actionButton(
                     title: "Start Recording",
-                    shortcut: appState.settingsStore.startRecordingHotkeyShortcut.displayString,
+                    shortcut: appState.settingsStore.startRecordingHotkeyShortcut.displayStringIfEnabled,
                     prominence: .primary,
                     enabled: canStartSession,
                     action: onStartSession
@@ -101,30 +118,20 @@ struct RecordingControlPanelView: View {
 
                 actionButton(
                     title: "Stop Recording",
-                    shortcut: appState.settingsStore.stopRecordingHotkeyShortcut.displayString,
+                    shortcut: appState.settingsStore.stopRecordingHotkeyShortcut.displayStringIfEnabled,
                     prominence: .secondary,
                     enabled: canStopSession,
                     action: onStopSession
                 )
             }
 
-            HStack(spacing: 12) {
-                actionButton(
-                    title: "Insert Marker",
-                    shortcut: appState.settingsStore.markerHotkeyShortcut.displayString,
-                    prominence: .secondary,
-                    enabled: canUseLiveControls,
-                    action: onInsertMarker
-                )
-
-                actionButton(
-                    title: "Capture Screenshot",
-                    shortcut: appState.settingsStore.screenshotHotkeyShortcut.displayString,
-                    prominence: .secondary,
-                    enabled: canUseLiveControls,
-                    action: onCaptureScreenshot
-                )
-            }
+            actionButton(
+                title: "Capture Screenshot",
+                shortcut: appState.settingsStore.screenshotHotkeyShortcut.displayStringIfEnabled,
+                prominence: .secondary,
+                enabled: canUseLiveControls,
+                action: onCaptureScreenshot
+            )
         }
     }
 
@@ -191,7 +198,7 @@ struct RecordingControlPanelView: View {
         case .idle:
             return "Start a feedback session when you are ready to narrate the current walkthrough."
         case .recording:
-            return "Use these controls or the global hotkeys to mark moments and capture screenshots as you test."
+            return "Use these controls or any global hotkeys you assigned to capture screenshots whenever you want to mark an important moment."
         case .transcribing:
             return "The recording is finished. BugNarrator is uploading audio and waiting for transcription."
         case .success:
@@ -273,7 +280,7 @@ struct RecordingControlPanelView: View {
     @ViewBuilder
     private func actionButton(
         title: String,
-        shortcut: String,
+        shortcut: String?,
         prominence: ButtonProminence,
         enabled: Bool,
         action: @escaping () -> Void
@@ -283,10 +290,12 @@ struct RecordingControlPanelView: View {
                 Text(title)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(shortcut)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)

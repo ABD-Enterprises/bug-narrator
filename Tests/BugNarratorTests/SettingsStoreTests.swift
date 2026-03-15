@@ -3,6 +3,19 @@ import XCTest
 @testable import BugNarrator
 
 final class SettingsStoreTests: XCTestCase {
+    func testFirstLaunchStartsWithAllHotkeysDisabled() {
+        let suiteName = "BugNarrator-SettingsNoHotkeyDefaultsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
+        XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
+        XCTAssertEqual(store.screenshotHotkeyShortcut, .disabled)
+    }
+
     func testSettingsPersistAcrossReloads() {
         let suiteName = "BugNarrator-SettingsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -28,8 +41,10 @@ final class SettingsStoreTests: XCTestCase {
             keyCode: 3,
             modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue
         )
-        firstStore.markerHotkeyShortcut = HotkeyAction.insertMarker.defaultShortcut
-        firstStore.screenshotHotkeyShortcut = HotkeyAction.captureScreenshot.defaultShortcut
+        firstStore.screenshotHotkeyShortcut = HotkeyShortcut(
+            keyCode: 1,
+            modifiers: NSEvent.ModifierFlags.command.union(.option).union(.control).rawValue
+        )
         firstStore.githubToken = "github-token"
         firstStore.githubRepositoryOwner = "acme"
         firstStore.githubRepositoryName = "bugnarrator"
@@ -60,6 +75,11 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(
             secondStore.stopRecordingHotkeyShortcut.modifiers,
             NSEvent.ModifierFlags.command.union(.option).rawValue
+        )
+        XCTAssertEqual(secondStore.screenshotHotkeyShortcut.keyCode, 1)
+        XCTAssertEqual(
+            secondStore.screenshotHotkeyShortcut.modifiers,
+            NSEvent.ModifierFlags.command.union(.option).union(.control).rawValue
         )
         XCTAssertEqual(secondStore.githubToken, "github-token")
         XCTAssertEqual(secondStore.githubRepositoryOwner, "acme")
@@ -159,7 +179,7 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
-    func testDuplicateHotkeyAssignmentsDisableOlderConflictingAction() {
+    func testDuplicateHotkeyAssignmentsAreRejectedAndKeepExistingAction() {
         let suiteName = "BugNarrator-SettingsHotkeyConflictTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -174,8 +194,55 @@ final class SettingsStoreTests: XCTestCase {
         store.startRecordingHotkeyShortcut = duplicateShortcut
         store.stopRecordingHotkeyShortcut = duplicateShortcut
 
-        XCTAssertEqual(store.stopRecordingHotkeyShortcut, duplicateShortcut)
+        XCTAssertEqual(store.startRecordingHotkeyShortcut, duplicateShortcut)
+        XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
+        XCTAssertEqual(
+            store.hotkeyConflictMessage,
+            "\(duplicateShortcut.displayString) is already assigned to Start Recording. Clear it first or choose a different shortcut."
+        )
+    }
+
+    func testLegacyBuiltInShortcutsAreClearedDuringMigration() throws {
+        let suiteName = "BugNarrator-SettingsHotkeyMigrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let encoder = JSONEncoder()
+        try defaults.set(
+            encoder.encode(try XCTUnwrap(HotkeyAction.startRecording.legacyBuiltInShortcut)),
+            forKey: "settings.startRecordingHotkeyShortcut"
+        )
+        try defaults.set(
+            encoder.encode(try XCTUnwrap(HotkeyAction.stopRecording.legacyBuiltInShortcut)),
+            forKey: "settings.stopRecordingHotkeyShortcut"
+        )
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
         XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
+        XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
+        XCTAssertEqual(defaults.bool(forKey: "settings.didMigrateLegacyBuiltInHotkeys"), true)
+    }
+
+    func testObsoleteMarkerHotkeyIsRemovedDuringLoad() throws {
+        let suiteName = "BugNarrator-SettingsObsoleteMarkerHotkeyTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        try defaults.set(
+            JSONEncoder().encode(
+                HotkeyShortcut(
+                    keyCode: 46,
+                    modifiers: NSEvent.ModifierFlags.command.union(.shift).rawValue
+                )
+            ),
+            forKey: "settings.markerHotkeyShortcut"
+        )
+
+        _ = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertNil(defaults.object(forKey: "settings.markerHotkeyShortcut"))
     }
 
     func testSettingsLoadLegacyKeychainServiceAndMigrateToBugNarratorNamespace() {

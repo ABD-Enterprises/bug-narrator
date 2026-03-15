@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.0.11 - 2026-03-15
+
+- Simplified the recording controls window by removing the standalone marker button and making screenshot capture the primary way to mark important moments during a session.
+- Tightened the right-hand review workspace so the header, actions, tabs, and content use less vertical space and start reading immediately.
+- Removed the separate `Markers` tab from the review workspace while keeping older marker-only sessions readable in the transcript timeline.
+- Unified screenshot and marker timeline entries so screenshot captures create one cleaner combined review event instead of duplicate marker and screenshot rows.
+- Removed built-in hotkey defaults so recording and screenshot shortcuts now start unassigned until the user explicitly chooses them.
+- Removed shortcut suggestions and the `Default` hotkey button, and changed duplicate-assignment behavior so conflicts are rejected with a clear message instead of silently overriding another action.
+- Removed the obsolete standalone marker hotkey runtime and settings path, and now clear any legacy stored marker shortcut during settings load.
+- Polished the drag-to-select screenshot overlay with clearer visual feedback, a lightweight hint, and a cleaner cancellation path.
+- Refined the `Screenshots` tab so captured images show cleaner thumbnails, timestamps, linked markers, and direct-open behavior.
+- Replaced full-display screenshot capture with a drag-to-select region overlay so BugNarrator saves only the area the tester chooses.
+- Kept screenshot captures attached to the active session with the same timestamp and automatic marker behavior, while treating `Esc` and zero-size selections as clean cancellations.
+- Added screenshot capture regression coverage for region cropping, off-display selections, and cancelled selections.
+- Refreshed the release and QA docs to match the compact screenshot-driven workflow, and revalidated the current workspace with passing debug tests, a clean Release build, and a successful local DMG package build.
+
 ## 1.0.10 - 2026-03-15
 
 - Centralized microphone and screenshot permission preflight so recording and screenshot actions validate permissions and real capture capability before starting.

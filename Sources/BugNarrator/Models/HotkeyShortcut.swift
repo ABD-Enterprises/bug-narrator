@@ -7,14 +7,6 @@ struct HotkeyShortcut: Codable, Equatable, Hashable {
     var modifiers: UInt
 
     static let disabled = HotkeyShortcut(keyCode: UInt32.max, modifiers: 0)
-    static let `default` = HotkeyShortcut(
-        keyCode: UInt32(kVK_ANSI_F),
-        modifiers: NSEvent.ModifierFlags.command
-            .union(.option)
-            .union(.control)
-            .rawValue
-    )
-
     static let supportedModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
 
     var isEnabled: Bool {
@@ -51,7 +43,7 @@ struct HotkeyShortcut: Codable, Equatable, Hashable {
 
     var displayString: String {
         guard isEnabled else {
-            return "Disabled"
+            return "Not Set"
         }
 
         var parts: [String] = []
@@ -72,6 +64,10 @@ struct HotkeyShortcut: Codable, Equatable, Hashable {
 
         parts.append(Self.keyName(for: keyCode))
         return parts.joined(separator: "+")
+    }
+
+    var displayStringIfEnabled: String? {
+        isEnabled ? displayString : nil
     }
 
     static func isModifierKeyCode(_ keyCode: UInt16) -> Bool {

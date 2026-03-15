@@ -76,6 +76,11 @@ enum ScreenshotCapturePreflightResult: Equatable {
     }
 }
 
+enum ScreenshotSelectionResult: Equatable {
+    case selected(CGRect)
+    case cancelled
+}
+
 @MainActor
 protocol AudioRecording: AnyObject {
     var currentDuration: TimeInterval { get }
@@ -137,7 +142,12 @@ protocol ScreenshotCapturing {
     @MainActor
     func validateCaptureAvailability() async -> AppError?
     @MainActor
-    func captureScreenshot(to url: URL) async throws
+    func captureScreenshot(in rect: CGRect, to url: URL) async throws
+}
+
+@MainActor
+protocol ScreenshotSelecting {
+    func selectRegion() async throws -> ScreenshotSelectionResult
 }
 
 protocol IssueExtracting: Sendable {

@@ -2,7 +2,7 @@ import Foundation
 
 enum ReviewWorkspace {
     static func availableTabs(for session: TranscriptSession) -> [ReviewWorkspaceTab] {
-        var tabs: [ReviewWorkspaceTab] = [.rawTranscript, .markers, .screenshots, .extractedIssues]
+        var tabs: [ReviewWorkspaceTab] = [.rawTranscript, .screenshots, .extractedIssues]
 
         if !session.summaryText.isEmpty || session.issueExtraction != nil {
             tabs.append(.reviewSummary)
@@ -51,7 +51,9 @@ enum ReviewWorkspace {
             })
         }
 
-        entries.append(contentsOf: session.markers.map { marker in
+        let screenshotLinkedMarkerIDs = Set(session.screenshots.compactMap(\.associatedMarkerID))
+
+        entries.append(contentsOf: session.markers.filter { !screenshotLinkedMarkerIDs.contains($0.id) }.map { marker in
             ReviewWorkspaceTimelineEntry(
                 id: marker.id,
                 timestamp: marker.elapsedTime,
@@ -65,14 +67,17 @@ enum ReviewWorkspace {
         })
 
         entries.append(contentsOf: session.screenshots.map { screenshot in
-            let relatedMarkerTitle = screenshot.associatedMarkerID.flatMap(session.marker(with:))?.title
+            let relatedMarker = screenshot.associatedMarkerID.flatMap(session.marker(with:))
+            let relatedMarkerTitle = relatedMarker?.title
+            let markerNote = relatedMarker?.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let secondaryText = (markerNote?.isEmpty == false) ? markerNote : nil
             return ReviewWorkspaceTimelineEntry(
                 id: screenshot.id,
                 timestamp: screenshot.elapsedTime,
                 kind: .screenshot,
                 title: nil,
-                text: "Screenshot captured",
-                secondaryText: relatedMarkerTitle ?? screenshot.fileName,
+                text: relatedMarkerTitle ?? "Screenshot marker",
+                secondaryText: secondaryText,
                 index: nil,
                 screenshotID: screenshot.id
             )
@@ -109,7 +114,6 @@ enum ReviewWorkspace {
 enum ReviewWorkspaceTab: Identifiable, CaseIterable {
     case rawTranscript
     case reviewSummary
-    case markers
     case screenshots
     case extractedIssues
 
@@ -121,8 +125,6 @@ enum ReviewWorkspaceTab: Identifiable, CaseIterable {
             return "Transcript"
         case .reviewSummary:
             return "Summary"
-        case .markers:
-            return "Markers"
         case .screenshots:
             return "Screenshots"
         case .extractedIssues:

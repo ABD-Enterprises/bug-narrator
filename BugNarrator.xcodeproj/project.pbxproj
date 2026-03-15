@@ -37,6 +37,7 @@
 		562BF7C0BF2A8D013BA2F63F /* BugNarratorMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */; };
 		57C3B6C3C646F1588CF4E45C /* JiraExportProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */; };
 		594983777A69A4D70F71653D /* GitHubExportProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */; };
+		5956B9999301BDED53F3B1EC /* TransientToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D753EF601F00C09C7FF276C /* TransientToast.swift */; };
 		5CB8DACFD986D905D03D0E6A /* ChangelogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8CB6ECBCE39874B5B432EF /* ChangelogView.swift */; };
 		5D4B8A830EA58AFC03AE9982 /* RecordingControlPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */; };
 		5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7322F6B6A58542DEDFC76CCA /* ExportService.swift */; };
@@ -48,6 +49,7 @@
 		6DD15D4989138430B1DB845E /* SingleInstanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCCB5C9DAEB3066CA8E30234 /* SingleInstanceController.swift */; };
 		6DDE29389B4D58A9BD6CD115 /* SessionMarker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D135AC919EF9A5E8C21235 /* SessionMarker.swift */; };
 		6E7D93B7718A9340695B3B76 /* TranscriptSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E2942C142197B34696946C /* TranscriptSection.swift */; };
+		6F0782ACEFF9342CFD3D6D87 /* ScreenshotSelectionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */; };
 		6F50D0E752BEA3CECA1517A4 /* HotkeyAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 598E006D3F529E46315F3585 /* HotkeyAction.swift */; };
 		7094EC90F13C99BA56871010 /* AppErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A627A3D91ED77FE7657BAD /* AppErrorTests.swift */; };
 		7251FD6A3C965C5D9A87805F /* OpenAIErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CD6EFC4CDBFE13C31BD38D /* OpenAIErrorMapper.swift */; };
@@ -68,6 +70,7 @@
 		9E2FEC30CC71E38CBD59106C /* ExtractedIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B361DA07CDFA2543A36258F /* ExtractedIssue.swift */; };
 		9F837FB17474EEB037FC01B4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EFF170BAD57E66A7CB20AB /* AppState.swift */; };
 		A6AF1CAA204EF971F9417E63 /* TranscriptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9009216340E4AF51C9EDBA /* TranscriptStore.swift */; };
+		B254C34FC1E013052F77EEA5 /* ScreenshotSelectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */; };
 		B3F726638452CBD7F5A4DC16 /* WindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */; };
 		B53060D07F7F2428BD78E807 /* ClipboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A663ED1B160E290FCFAC3AED /* ClipboardService.swift */; };
 		B7CF73E927D64502C998A0BC /* SessionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1605CDD1B7C6F848068F14 /* SessionLibrary.swift */; };
@@ -108,9 +111,11 @@
 		17EFDFC12818F99D04C93CC5 /* MicrophonePermissionResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophonePermissionResolver.swift; sourceTree = "<group>"; };
 		1ACC8A426CF0E64809970F2A /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		1D1805C56FBAED6588A225F0 /* AppRuntimeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeEnvironment.swift; sourceTree = "<group>"; };
+		20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionServiceTests.swift; sourceTree = "<group>"; };
 		22447E5581818B8003AA49F8 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraft.swift; sourceTree = "<group>"; };
 		277DC17D4084F918920CB8C5 /* URLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLHandler.swift; sourceTree = "<group>"; };
+		2D753EF601F00C09C7FF276C /* TransientToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToast.swift; sourceTree = "<group>"; };
 		2ED768FCA5D58A5E78F24A8D /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubExportProvider.swift; sourceTree = "<group>"; };
 		2FA72EF162C4C4AF53D2CB41 /* DebugBundleExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBundleExporter.swift; sourceTree = "<group>"; };
@@ -177,6 +182,7 @@
 		DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportProviderTests.swift; sourceTree = "<group>"; };
 		DFD698A35E065D940A06FB72 /* BugNarratorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorApp.swift; sourceTree = "<group>"; };
 		E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCoordinator.swift; sourceTree = "<group>"; };
+		EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionService.swift; sourceTree = "<group>"; };
 		EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusPresentationTests.swift; sourceTree = "<group>"; };
 		F03E1852A3D56F888E98739E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionClientTests.swift; sourceTree = "<group>"; };
@@ -215,6 +221,7 @@
 				34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */,
 				84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */,
 				94052C02271A22E78259D71B /* ScreenshotCaptureServiceTests.swift */,
+				20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */,
 				CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */,
 				67770387C5BA986EEB40382E /* SessionLibraryTests.swift */,
 				1ACC8A426CF0E64809970F2A /* SettingsStoreTests.swift */,
@@ -241,6 +248,7 @@
 				5B60FF3096207405A3ECB6D0 /* SessionScreenshot.swift */,
 				A8E2942C142197B34696946C /* TranscriptSection.swift */,
 				6B6A14B5D110D6E584678A83 /* TranscriptSession.swift */,
+				2D753EF601F00C09C7FF276C /* TransientToast.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -299,6 +307,7 @@
 				60CD6EFC4CDBFE13C31BD38D /* OpenAIErrorMapper.swift */,
 				811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */,
 				54A8F3C1B2AFF52FBD3D8703 /* ScreenshotCaptureService.swift */,
+				EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */,
 				6B6F8B0D0A9D777735FD3E44 /* ServiceProtocols.swift */,
 				9E5530F00F9B6ABE2F8E52B8 /* SessionArtifactsService.swift */,
 				2ED768FCA5D58A5E78F24A8D /* SettingsStore.swift */,
@@ -463,6 +472,7 @@
 				634C2CA46D17B6AA571D0771 /* ReviewWorkspaceTests.swift in Sources */,
 				9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */,
 				05491334A5AA806307646EE5 /* ScreenshotCaptureServiceTests.swift in Sources */,
+				6F0782ACEFF9342CFD3D6D87 /* ScreenshotSelectionServiceTests.swift in Sources */,
 				F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */,
 				8896B923DAB4B25053694061 /* SessionLibraryTests.swift in Sources */,
 				D8C580D925E807323208366D /* SettingsStoreTests.swift in Sources */,
@@ -517,6 +527,7 @@
 				DC0465161F26D6650C80F1CF /* ScreenCapturePermissionService.swift in Sources */,
 				6DC57655A6904ADCF5D41040 /* ScreenshotCaptureService.swift in Sources */,
 				CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */,
+				B254C34FC1E013052F77EEA5 /* ScreenshotSelectionService.swift in Sources */,
 				3893EB325B3915242FBD4BA6 /* ServiceProtocols.swift in Sources */,
 				6D4BF7BD49B33FC81FB5B4D5 /* SessionArtifactsService.swift in Sources */,
 				B7CF73E927D64502C998A0BC /* SessionLibrary.swift in Sources */,
@@ -533,6 +544,7 @@
 				A6AF1CAA204EF971F9417E63 /* TranscriptStore.swift in Sources */,
 				29C25E147DD0810A11C03502 /* TranscriptView.swift in Sources */,
 				33DB3B8F22BD0E75CFC65F10 /* TranscriptionClient.swift in Sources */,
+				5956B9999301BDED53F3B1EC /* TransientToast.swift in Sources */,
 				3B4F5CCC16AB9837DD0BD0F4 /* URLHandler.swift in Sources */,
 				B3F726638452CBD7F5A4DC16 /* WindowCoordinator.swift in Sources */,
 			);
@@ -555,7 +567,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -564,7 +576,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.10;
+				MARKETING_VERSION = 1.0.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator;
 				PRODUCT_NAME = BugNarrator;
 				SDKROOT = macosx;
@@ -577,7 +589,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -586,7 +598,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.10;
+				MARKETING_VERSION = 1.0.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator;
 				PRODUCT_NAME = BugNarrator;
 				SDKROOT = macosx;

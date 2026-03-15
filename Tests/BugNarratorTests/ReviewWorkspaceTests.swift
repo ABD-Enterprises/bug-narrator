@@ -13,15 +13,15 @@ final class ReviewWorkspaceTests: XCTestCase {
 
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: baseSession),
-            [.rawTranscript, .markers, .screenshots, .extractedIssues]
+            [.rawTranscript, .screenshots, .extractedIssues]
         )
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: summarySession),
-            [.rawTranscript, .markers, .screenshots, .extractedIssues, .reviewSummary]
+            [.rawTranscript, .screenshots, .extractedIssues, .reviewSummary]
         )
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: extractionSession),
-            [.rawTranscript, .markers, .screenshots, .extractedIssues, .reviewSummary]
+            [.rawTranscript, .screenshots, .extractedIssues, .reviewSummary]
         )
     }
 
@@ -42,7 +42,7 @@ final class ReviewWorkspaceTests: XCTestCase {
         )
     }
 
-    func testTimelineEntriesSortMarkerAndScreenshotAheadOfTranscriptAtSameTimestamp() {
+    func testTimelineEntriesCombineScreenshotAndLinkedMarkerAtSameTimestamp() {
         let screenshotID = UUID()
         let marker = SessionMarker(
             index: 1,
@@ -78,9 +78,33 @@ final class ReviewWorkspaceTests: XCTestCase {
 
         let entries = ReviewWorkspace.timelineEntries(for: session)
 
-        XCTAssertEqual(entries.map(\.kind), [.marker, .screenshot, .transcript])
-        XCTAssertEqual(entries.map(\.text), ["Login page confusing", "Screenshot captured", "The login page is confusing."])
-        XCTAssertEqual(entries[1].secondaryText, "Login page confusing")
+        XCTAssertEqual(entries.map(\.kind), [.screenshot, .transcript])
+        XCTAssertEqual(entries.map(\.text), ["Login page confusing", "The login page is confusing."])
+        XCTAssertEqual(entries.first?.screenshotID, screenshotID)
+    }
+
+    func testTimelineEntriesKeepLegacyMarkerWithoutScreenshot() {
+        let marker = SessionMarker(
+            index: 1,
+            elapsedTime: 2,
+            title: "Legacy marker",
+            note: "Created before screenshot markers.",
+            screenshotID: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            transcript: "Legacy marker session.",
+            duration: 5,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            markers: [marker]
+        )
+
+        let entries = ReviewWorkspace.timelineEntries(for: session)
+
+        XCTAssertEqual(entries.map(\.kind), [.transcript, .marker])
+        XCTAssertEqual(entries.last?.text, "Legacy marker")
     }
 
     func testSelectedIssueSummaryCountsOnlySelectedIssues() {

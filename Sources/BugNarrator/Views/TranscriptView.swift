@@ -202,7 +202,7 @@ struct TranscriptView: View {
                 ContentUnavailableView(
                     "Select a Session",
                     systemImage: "sidebar.right",
-                    description: Text("Choose a session from the list to inspect the full transcript, markers, screenshots, and extracted issues.")
+                    description: Text("Choose a session from the list to inspect the transcript timeline, screenshots, extracted issues, and summary.")
                 )
             }
         }
@@ -547,10 +547,6 @@ struct TranscriptView: View {
             HStack(spacing: 8) {
                 metricChip(systemImage: "clock", title: ElapsedTimeFormatter.string(from: entry.duration))
 
-                if entry.markerCount > 0 {
-                    metricChip(systemImage: "mappin.and.ellipse", title: "\(entry.markerCount)")
-                }
-
                 if entry.screenshotCount > 0 {
                     metricChip(systemImage: "photo", title: "\(entry.screenshotCount)")
                 }
@@ -601,7 +597,7 @@ struct TranscriptView: View {
             VStack(alignment: .leading, spacing: 16) {
                 reviewWorkspace(for: session)
             }
-            .padding(24)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -615,14 +611,15 @@ struct TranscriptView: View {
             workspaceTabs(session)
             dividerSection
             detailContent(for: session)
-                .padding(18)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func workspaceHeader(_ session: TranscriptSession) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(session.title)
                 .font(.title2.weight(.semibold))
 
@@ -671,7 +668,8 @@ struct TranscriptView: View {
                 .font(.footnote)
             }
         }
-        .padding(18)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     private var dividerSection: some View {
@@ -719,7 +717,8 @@ struct TranscriptView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .padding(18)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private func workspaceTabs(_ session: TranscriptSession) -> some View {
@@ -729,7 +728,8 @@ struct TranscriptView: View {
             }
         }
         .pickerStyle(.segmented)
-        .padding(18)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -739,8 +739,6 @@ struct TranscriptView: View {
             rawTranscriptSection(session)
         case .reviewSummary:
             reviewSummarySection(session)
-        case .markers:
-            markersSection(session)
         case .screenshots:
             screenshotsSection(session)
         case .extractedIssues:
@@ -806,45 +804,6 @@ struct TranscriptView: View {
         }
     }
 
-    @ViewBuilder
-    private func markersSection(_ session: TranscriptSession) -> some View {
-        if session.markers.isEmpty {
-            emptyDetailState(
-                title: "No markers yet",
-                message: "Insert markers during recording to flag moments worth revisiting."
-            )
-        } else {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                ForEach(session.markers) { marker in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Marker \(marker.index) — \(marker.timeLabel)")
-                            .font(.system(.subheadline, design: .monospaced))
-                            .foregroundStyle(.secondary)
-
-                        Text(marker.title)
-                            .font(.body.weight(.semibold))
-
-                        if let note = marker.note, !note.isEmpty {
-                            Text(note)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if let screenshotID = marker.screenshotID,
-                           let screenshot = session.screenshot(with: screenshotID) {
-                            Button("Open \(screenshot.fileName)") {
-                                appState.openScreenshot(screenshot)
-                            }
-                            .buttonStyle(.link)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-            }
-        }
-    }
-
     private func transcriptTimelineRow(_ entry: ReviewWorkspaceTimelineEntry, session: TranscriptSession) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Text(entry.timeLabel)
@@ -868,7 +827,7 @@ struct TranscriptView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                 case .marker:
-                    Text("Marker \(entry.index ?? 0)")
+                    Text("Timeline marker")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -876,7 +835,7 @@ struct TranscriptView: View {
                         .font(.body.weight(.semibold))
 
                 case .screenshot:
-                    Text("Screenshot")
+                    Text("Screenshot marker")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -910,7 +869,7 @@ struct TranscriptView: View {
         if session.screenshots.isEmpty {
             emptyDetailState(
                 title: "No screenshots yet",
-                message: "Captured screenshots appear here with their timeline position and related marker."
+                message: "Capture a screenshot during recording to review it here."
             )
         } else {
             LazyVStack(alignment: .leading, spacing: 14) {
@@ -922,45 +881,65 @@ struct TranscriptView: View {
     }
 
     private func screenshotTimelineRow(_ screenshot: SessionScreenshot, index: Int, session: TranscriptSession) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Screenshot")
-                    .font(.body.weight(.semibold))
+        let linkedMarker = screenshot.associatedMarkerID.flatMap { session.marker(with: $0) }
 
-                Text("\(index + 1)")
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.pink)
-            }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("Screenshot")
+                            .font(.body.weight(.semibold))
 
-            screenshotPreview(screenshot)
+                        Text("\(index + 1)")
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.pink)
+                    }
 
-            HStack(spacing: 10) {
-                Text(screenshot.timeLabel)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        metadataChip(label: screenshot.timeLabel, systemImage: "clock")
 
-                if let associatedMarkerID = screenshot.associatedMarkerID,
-                   let marker = session.marker(with: associatedMarkerID) {
-                    Text("•")
-                        .foregroundStyle(.secondary)
-
-                    Text(marker.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        if let linkedMarker {
+                            metadataChip(label: linkedMarker.title, systemImage: "mappin.and.ellipse")
+                        }
+                    }
                 }
 
                 Spacer()
 
-                Button("Open Screenshot") {
-                    appState.openScreenshot(screenshot)
+                HStack(spacing: 10) {
+                    Button("Show in Transcript") {
+                        selectedDetailTab = .rawTranscript
+                    }
+                    .buttonStyle(.link)
+
+                    Button("Open Screenshot") {
+                        appState.openScreenshot(screenshot)
+                    }
+                    .buttonStyle(.link)
                 }
-                .buttonStyle(.link)
             }
+
+            Button {
+                appState.openScreenshot(screenshot)
+            } label: {
+                screenshotPreview(screenshot)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open Screenshot \(index + 1)")
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func metadataChip(label: String, systemImage: String) -> some View {
+        return Label(label, systemImage: systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.32), in: Capsule())
     }
 
     @ViewBuilder

@@ -1,10 +1,10 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
 
 enum HotkeyAction: UInt32, Codable, CaseIterable, Identifiable {
     case startRecording = 1
     case stopRecording = 2
-    case insertMarker = 3
     case captureScreenshot = 4
 
     var id: UInt32 { rawValue }
@@ -15,31 +15,38 @@ enum HotkeyAction: UInt32, Codable, CaseIterable, Identifiable {
             return "Start Recording"
         case .stopRecording:
             return "Stop Recording"
-        case .insertMarker:
-            return "Insert Marker"
         case .captureScreenshot:
             return "Capture Screenshot"
         }
     }
 
-    var defaultShortcut: HotkeyShortcut {
+    var legacyBuiltInShortcut: HotkeyShortcut? {
         switch self {
         case .startRecording:
-            return .default
+            return HotkeyShortcut(
+                keyCode: UInt32(kVK_ANSI_F),
+                modifiers: NSEvent.ModifierFlags.command
+                    .union(.option)
+                    .union(.control)
+                    .rawValue
+            )
         case .stopRecording:
             return HotkeyShortcut(
                 keyCode: UInt32(kVK_ANSI_F),
-                modifiers: HotkeyShortcut.default.eventModifiers.union(.shift).rawValue
-            )
-        case .insertMarker:
-            return HotkeyShortcut(
-                keyCode: UInt32(kVK_ANSI_M),
-                modifiers: HotkeyShortcut.default.eventModifiers.union(.shift).rawValue
+                modifiers: NSEvent.ModifierFlags.command
+                    .union(.option)
+                    .union(.control)
+                    .union(.shift)
+                    .rawValue
             )
         case .captureScreenshot:
             return HotkeyShortcut(
                 keyCode: UInt32(kVK_ANSI_S),
-                modifiers: HotkeyShortcut.default.eventModifiers.union(.shift).rawValue
+                modifiers: NSEvent.ModifierFlags.command
+                    .union(.option)
+                    .union(.control)
+                    .union(.shift)
+                    .rawValue
             )
         }
     }

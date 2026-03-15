@@ -18,7 +18,7 @@ Use this checklist before cutting a public test build or release candidate.
 
 - Add or validate an OpenAI API key in Settings.
 - Start a recording session and confirm the app enters `Recording`.
-- Insert at least one marker and capture at least one screenshot during the session.
+- Capture at least one screenshot during the session and confirm it creates a visible timeline moment in review.
 - Stop the session and confirm transcription succeeds.
 - Confirm the transcript, review summary, screenshots, and extracted issues appear in the session library.
 - Export a session bundle and verify the expected files are created.

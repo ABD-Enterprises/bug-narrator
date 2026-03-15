@@ -171,6 +171,7 @@ final class MockScreenshotCaptureService: ScreenshotCapturing {
     var availabilityError: AppError?
     var delayNanoseconds: UInt64 = 0
     var onCaptureStart: (() -> Void)?
+    private(set) var capturedRects: [CGRect] = []
 
     init(error: Error? = nil, delayNanoseconds: UInt64 = 0, onCaptureStart: (() -> Void)? = nil) {
         self.error = error
@@ -184,11 +185,12 @@ final class MockScreenshotCaptureService: ScreenshotCapturing {
     }
 
     @MainActor
-    func captureScreenshot(to url: URL) async throws {
+    func captureScreenshot(in rect: CGRect, to url: URL) async throws {
         if let error {
             throw error
         }
 
+        capturedRects.append(rect)
         onCaptureStart?()
 
         if delayNanoseconds > 0 {
@@ -196,6 +198,23 @@ final class MockScreenshotCaptureService: ScreenshotCapturing {
         }
 
         try Data("screenshot".utf8).write(to: url)
+    }
+}
+
+@MainActor
+final class MockScreenshotSelectionService: ScreenshotSelecting {
+    var nextResult: ScreenshotSelectionResult = .selected(CGRect(x: 20, y: 20, width: 120, height: 80))
+    var error: Error?
+    private(set) var selectRegionCallCount = 0
+
+    func selectRegion() async throws -> ScreenshotSelectionResult {
+        selectRegionCallCount += 1
+
+        if let error {
+            throw error
+        }
+
+        return nextResult
     }
 }
 
@@ -400,6 +419,7 @@ struct AppStateHarness {
     let issueExtractionService: MockIssueExtractionService
     let exportService: MockExportService
     let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
+    let screenshotSelectionService: MockScreenshotSelectionService
     let appState: AppState
 
     init(
@@ -409,6 +429,7 @@ struct AppStateHarness {
         autoSaveTranscript: Bool = true,
         autoExtractIssues: Bool = false,
         screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
+        screenshotSelectionService: MockScreenshotSelectionService = MockScreenshotSelectionService(),
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
     ) {
         let fileManager = FileManager.default
@@ -457,6 +478,7 @@ struct AppStateHarness {
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
         self.screenCapturePermissionAccess = screenCapturePermissionAccess
+        self.screenshotSelectionService = screenshotSelectionService
         self.appState = AppState(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
@@ -466,6 +488,7 @@ struct AppStateHarness {
             transcriptionClient: transcriptionClient,
             hotkeyManager: hotkeyManager,
             screenshotCaptureService: screenshotCaptureService,
+            screenshotSelectionService: screenshotSelectionService,
             issueExtractionService: issueExtractionService,
             exportService: exportService,
             artifactsService: artifactsService,

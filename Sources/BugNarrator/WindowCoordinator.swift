@@ -14,10 +14,10 @@ final class WindowCoordinator {
     private var supportWindowController: NSWindowController?
     private var recordingControlWindowController: NSWindowController?
     private var singleInstanceActivationObserver: NSObjectProtocol?
+    private var shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
 
-    private let recordingControlSize = NSSize(width: 336, height: 256)
+    private let recordingControlSize = NSSize(width: 336, height: 220)
     private let recordingControlAutosaveName = "BugNarratorRecordingControlsWindow"
-    private let screenshotHideDelayNanoseconds: UInt64 = 250_000_000
 
     init(appState: AppState, transcriptStore: TranscriptStore, settingsStore: SettingsStore) {
         self.appState = appState
@@ -180,9 +180,6 @@ final class WindowCoordinator {
             onStopSession: { [weak self] in
                 self?.handleRecordingControlStop()
             },
-            onInsertMarker: { [weak self] in
-                self?.handleRecordingControlMarker()
-            },
             onCaptureScreenshot: { [weak self] in
                 self?.handleRecordingControlScreenshot()
             },
@@ -221,29 +218,34 @@ final class WindowCoordinator {
         }
     }
 
-    private func handleRecordingControlMarker() {
+    private func handleRecordingControlScreenshot() {
         Task { @MainActor [weak self] in
-            await self?.appState.insertMarker()
+            await self?.appState.captureScreenshot()
         }
     }
 
-    private func handleRecordingControlScreenshot() {
-        recordingControlWindowController?.window?.orderOut(nil)
-
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
-
-            try? await Task.sleep(nanoseconds: self.screenshotHideDelayNanoseconds)
-            await self.appState.captureScreenshot()
-
-            guard let window = self.recordingControlWindowController?.window, window.isVisible == false else {
-                return
-            }
-
-            window.orderFrontRegardless()
+    func prepareForScreenshotSelection() {
+        guard let window = recordingControlWindowController?.window else {
+            shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
+            return
         }
+
+        shouldRestoreRecordingControlWindowAfterScreenshotSelection = window.isVisible
+        if shouldRestoreRecordingControlWindowAfterScreenshotSelection {
+            window.orderOut(nil)
+        }
+    }
+
+    func restoreAfterScreenshotSelection() {
+        guard shouldRestoreRecordingControlWindowAfterScreenshotSelection,
+              let window = recordingControlWindowController?.window else {
+            shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
+            return
+        }
+
+        shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
+        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func makeWindow<Content: View>(title: String, size: NSSize, rootView: Content) -> NSWindow {

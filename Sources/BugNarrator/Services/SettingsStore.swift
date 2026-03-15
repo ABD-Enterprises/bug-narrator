@@ -60,31 +60,24 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    @Published var startRecordingHotkeyShortcut: HotkeyShortcut = HotkeyAction.startRecording.defaultShortcut {
+    @Published var startRecordingHotkeyShortcut: HotkeyShortcut = .disabled {
         didSet {
             guard hasLoaded else { return }
-            hotkeyDidChange(.startRecording)
+            hotkeyDidChange(.startRecording, previousShortcut: oldValue)
         }
     }
 
-    @Published var stopRecordingHotkeyShortcut: HotkeyShortcut = HotkeyAction.stopRecording.defaultShortcut {
+    @Published var stopRecordingHotkeyShortcut: HotkeyShortcut = .disabled {
         didSet {
             guard hasLoaded else { return }
-            hotkeyDidChange(.stopRecording)
+            hotkeyDidChange(.stopRecording, previousShortcut: oldValue)
         }
     }
 
-    @Published var markerHotkeyShortcut: HotkeyShortcut = HotkeyAction.insertMarker.defaultShortcut {
+    @Published var screenshotHotkeyShortcut: HotkeyShortcut = .disabled {
         didSet {
             guard hasLoaded else { return }
-            hotkeyDidChange(.insertMarker)
-        }
-    }
-
-    @Published var screenshotHotkeyShortcut: HotkeyShortcut = HotkeyAction.captureScreenshot.defaultShortcut {
-        didSet {
-            guard hasLoaded else { return }
-            hotkeyDidChange(.captureScreenshot)
+            hotkeyDidChange(.captureScreenshot, previousShortcut: oldValue)
         }
     }
 
@@ -169,6 +162,7 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var apiKeyPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var githubTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var jiraTokenPersistenceState: APIKeyPersistenceState = .empty
+    @Published private(set) var hotkeyConflictMessage: String?
 
     var trimmedAPIKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -178,7 +172,6 @@ final class SettingsStore: ObservableObject {
         [
             (.startRecording, startRecordingHotkeyShortcut),
             (.stopRecording, stopRecordingHotkeyShortcut),
-            (.insertMarker, markerHotkeyShortcut),
             (.captureScreenshot, screenshotHotkeyShortcut)
         ]
     }
@@ -402,24 +395,17 @@ final class SettingsStore: ObservableObject {
 
         startRecordingHotkeyShortcut = loadHotkey(
             key: Keys.startRecordingHotkeyShortcut,
-            legacyKeys: [Keys.legacyStartRecordingHotkeyShortcut, Keys.legacyRecordingHotkeyShortcut],
-            fallback: HotkeyAction.startRecording.defaultShortcut
+            legacyKeys: [Keys.legacyStartRecordingHotkeyShortcut, Keys.legacyRecordingHotkeyShortcut]
         )
         stopRecordingHotkeyShortcut = loadHotkey(
             key: Keys.stopRecordingHotkeyShortcut,
-            legacyKeys: [],
-            fallback: HotkeyAction.stopRecording.defaultShortcut
-        )
-        markerHotkeyShortcut = loadHotkey(
-            key: Keys.markerHotkeyShortcut,
-            legacyKeys: [],
-            fallback: HotkeyAction.insertMarker.defaultShortcut
+            legacyKeys: []
         )
         screenshotHotkeyShortcut = loadHotkey(
             key: Keys.screenshotHotkeyShortcut,
-            legacyKeys: [],
-            fallback: HotkeyAction.captureScreenshot.defaultShortcut
+            legacyKeys: []
         )
+        removeObsoleteMarkerHotkeyIfNeeded()
 
         githubRepositoryOwner = stringValue(forKey: Keys.githubRepositoryOwner) ?? ""
         githubRepositoryName = stringValue(forKey: Keys.githubRepositoryName) ?? ""
@@ -431,6 +417,7 @@ final class SettingsStore: ObservableObject {
         jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? "Task"
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
+        migrateLegacyBuiltInHotkeysIfNeeded()
         normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
         logger.info(
@@ -485,7 +472,7 @@ final class SettingsStore: ObservableObject {
         )
     }
 
-    private func loadHotkey(key: String, legacyKeys: [String], fallback: HotkeyShortcut) -> HotkeyShortcut {
+    private func loadHotkey(key: String, legacyKeys: [String]) -> HotkeyShortcut {
         if let data = dataValue(forKey: key),
            let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
             return decodedShortcut
@@ -499,10 +486,10 @@ final class SettingsStore: ObservableObject {
             }
         }
 
-        return fallback
+        return .disabled
     }
 
-    private func hotkeyDidChange(_ changedAction: HotkeyAction) {
+    private func hotkeyDidChange(_ changedAction: HotkeyAction, previousShortcut: HotkeyShortcut) {
         let changedShortcut = shortcut(for: changedAction)
 
         if isSynchronizingHotkeys {
@@ -513,13 +500,55 @@ final class SettingsStore: ObservableObject {
         isSynchronizingHotkeys = true
         defer { isSynchronizingHotkeys = false }
 
-        if changedShortcut.isEnabled {
-            for action in HotkeyAction.allCases where action != changedAction && shortcut(for: action) == changedShortcut {
-                setShortcut(.disabled, for: action)
-            }
+        if changedShortcut.isEnabled,
+           let conflictingAction = HotkeyAction.allCases.first(where: {
+               $0 != changedAction && shortcut(for: $0) == changedShortcut
+           }) {
+            logger.warning(
+                "hotkey_conflict_rejected",
+                "A conflicting hotkey assignment was rejected.",
+                metadata: [
+                    "action": changedAction.title,
+                    "conflict_action": conflictingAction.title,
+                    "shortcut": changedShortcut.displayString
+                ]
+            )
+            hotkeyConflictMessage = "\(changedShortcut.displayString) is already assigned to \(conflictingAction.title). Clear it first or choose a different shortcut."
+            setShortcut(previousShortcut, for: changedAction)
+            return
         }
 
+        hotkeyConflictMessage = nil
         persistHotkey(changedShortcut, key: storageKey(for: changedAction))
+    }
+
+    private func migrateLegacyBuiltInHotkeysIfNeeded() {
+        guard defaults.object(forKey: Keys.didMigrateLegacyBuiltInHotkeys) == nil else {
+            return
+        }
+
+        var clearedActions: [String] = []
+
+        for action in HotkeyAction.allCases {
+            guard let legacyBuiltInShortcut = action.legacyBuiltInShortcut,
+                  shortcut(for: action) == legacyBuiltInShortcut else {
+                continue
+            }
+
+            setShortcut(.disabled, for: action)
+            persistHotkey(.disabled, key: storageKey(for: action))
+            clearedActions.append(action.title)
+        }
+
+        defaults.set(true, forKey: Keys.didMigrateLegacyBuiltInHotkeys)
+
+        if !clearedActions.isEmpty {
+            logger.info(
+                "legacy_hotkey_defaults_cleared",
+                "Cleared previously built-in hotkey defaults so shortcuts start unassigned.",
+                metadata: ["cleared_actions": clearedActions.joined(separator: ",")]
+            )
+        }
     }
 
     private func normalizeLoadedHotkeyConflicts() {
@@ -551,8 +580,6 @@ final class SettingsStore: ObservableObject {
             return startRecordingHotkeyShortcut
         case .stopRecording:
             return stopRecordingHotkeyShortcut
-        case .insertMarker:
-            return markerHotkeyShortcut
         case .captureScreenshot:
             return screenshotHotkeyShortcut
         }
@@ -564,8 +591,6 @@ final class SettingsStore: ObservableObject {
             startRecordingHotkeyShortcut = shortcut
         case .stopRecording:
             stopRecordingHotkeyShortcut = shortcut
-        case .insertMarker:
-            markerHotkeyShortcut = shortcut
         case .captureScreenshot:
             screenshotHotkeyShortcut = shortcut
         }
@@ -577,11 +602,21 @@ final class SettingsStore: ObservableObject {
             return Keys.startRecordingHotkeyShortcut
         case .stopRecording:
             return Keys.stopRecordingHotkeyShortcut
-        case .insertMarker:
-            return Keys.markerHotkeyShortcut
         case .captureScreenshot:
             return Keys.screenshotHotkeyShortcut
         }
+    }
+
+    private func removeObsoleteMarkerHotkeyIfNeeded() {
+        guard defaults.object(forKey: Keys.markerHotkeyShortcut) != nil else {
+            return
+        }
+
+        defaults.removeObject(forKey: Keys.markerHotkeyShortcut)
+        logger.info(
+            "removed_obsolete_marker_hotkey",
+            "Removed the obsolete standalone marker hotkey assignment during settings load."
+        )
     }
 
     @discardableResult
@@ -856,6 +891,7 @@ private enum Keys {
     static let stopRecordingHotkeyShortcut = "settings.stopRecordingHotkeyShortcut"
     static let markerHotkeyShortcut = "settings.markerHotkeyShortcut"
     static let screenshotHotkeyShortcut = "settings.screenshotHotkeyShortcut"
+    static let didMigrateLegacyBuiltInHotkeys = "settings.didMigrateLegacyBuiltInHotkeys"
     static let githubRepositoryOwner = "settings.githubRepositoryOwner"
     static let githubRepositoryName = "settings.githubRepositoryName"
     static let githubDefaultLabels = "settings.githubDefaultLabels"
