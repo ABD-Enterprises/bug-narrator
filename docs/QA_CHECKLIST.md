@@ -2,6 +2,7 @@
 
 ## Setup
 
+- For manual recording-based QA, ask testers to follow the [Tester Narration Guide](UserGuide.md#tester-narration-guide) so transcripts and extracted issues include clear repro context.
 - Build the DMG with `./scripts/build_dmg.sh`.
 - Open the generated DMG and confirm it shows `BugNarrator.app` plus the `Applications` shortcut in a clean drag-to-Applications Finder layout.
 - Confirm the mounted DMG shows the branded BugNarrator volume icon on the desktop and in Finder.
@@ -61,6 +62,7 @@
 
 ## Core Workflow
 
+- During any narrated manual test, verify the tester is stating environment, goal, expected behavior, actual behavior, and session-ending outcome clearly enough for the transcript to stand alone.
 - Start a feedback session from the menu bar.
 - Verify the recording controls window opens immediately and no duplicate control windows appear if you click `Start Recording` again.
 - Verify the status changes to `Recording`.

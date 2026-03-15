@@ -78,6 +78,76 @@ The intended mental model is:
 
 `record → review → refine → export`
 
+## Tester Narration Guide
+
+Good sessions come from short, factual narration. BugNarrator can produce better transcripts, better bug summaries, cleaner repro steps, and better Codex or Claude follow-up prompts when the recording clearly states what you were testing, what you expected, and what actually happened. Unrelated chatter makes bug extraction harder.
+
+Use this pattern during live testing:
+
+1. Start with environment context.
+   - `This is BugNarrator version [version] on macOS [version] on Apple Silicon. Installed from the DMG.`
+   - `This is a fresh install.`
+   - `This is an upgraded install over an older version.`
+2. State the goal of the test.
+   - `I'm testing first-launch microphone and screen recording permissions.`
+   - `I'm testing that starting and stopping a recording creates a transcript and screenshot markers.`
+3. Narrate each action as you do it.
+   - `I'm clicking Start Recording now.`
+   - `I'm opening Settings.`
+   - `I'm stopping the session now.`
+4. State the expected behavior before or during the action.
+   - `I expected a macOS permission prompt here.`
+   - `I expected the transcript to appear in the session library.`
+5. State the actual behavior immediately when something is wrong.
+   - `The prompt did not appear.`
+   - `The session stopped, but no transcript was created.`
+6. Call out system state when it matters.
+   - `BugNarrator is not listed under Microphone in Privacy & Security.`
+   - `The microphone toggle is already enabled.`
+   - `I reopened BugNarrator after changing permissions.`
+   - `I'm launching the app from Applications, not from Xcode.`
+7. Mention timing or responsiveness when it is relevant.
+   - `I waited ten seconds and no prompt appeared.`
+   - `The window lost focus after I clicked Start Recording.`
+   - `The spinner stayed visible for about twenty seconds.`
+8. Use screenshot capture when something looks wrong, and say why.
+   - `I'm taking a screenshot marker for the missing prompt.`
+   - `I'm taking a screenshot marker for the disabled button state.`
+9. End with a one- or two-sentence outcome summary.
+   - `Ending test: recording started, but permissions were not granted correctly.`
+   - `Ending test: transcript, screenshot, and summary all appeared as expected.`
+
+### Word-For-Word Example
+
+You can follow this script almost exactly:
+
+- `This is BugNarrator version [version] on macOS [version] on Apple Silicon.`
+- `I'm testing first-launch microphone and screen recording permissions.`
+- `I'm clicking Start Recording now.`
+- `I expected a macOS permission prompt here.`
+- `The prompt did not appear.`
+- `BugNarrator is not listed under Microphone in Privacy & Security.`
+- `I'm taking a screenshot marker for the missing prompt.`
+- `Ending test: recording started, but permissions were not granted correctly.`
+
+### Do This / Avoid This
+
+Do this:
+
+- use short, factual sentences
+- say one action at a time
+- say what you expected and what actually happened
+- mention version, install method, permissions state, or app location when they matter
+- capture a screenshot when a visual problem or missing prompt is important
+
+Avoid this:
+
+- unrelated chatter or side conversations
+- long theories while the problem is still happening
+- vague comments like `it broke` without describing what broke
+- mixing multiple issues into one sentence
+- waiting until the end of the session to describe the main failure
+
 ## Core Features
 
 ### Recording Narrated Testing Sessions
