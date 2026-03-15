@@ -104,6 +104,12 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.refreshPermissionRecoveryState()
+            }
+            .store(in: &cancellables)
+
         hotkeyManager.register(shortcut: settingsStore.recordingHotkeyShortcut, for: .toggleRecording)
         hotkeyManager.register(shortcut: settingsStore.markerHotkeyShortcut, for: .insertMarker)
         hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
@@ -157,6 +163,22 @@ final class AppState: ObservableObject {
 
     func isExporting(to destination: ExportDestination) -> Bool {
         exportDestinationInProgress == destination
+    }
+
+    func refreshPermissionRecoveryState() {
+        guard status.phase != .recording, status.phase != .transcribing else {
+            return
+        }
+
+        guard currentError == .microphonePermissionDenied else {
+            return
+        }
+
+        guard audioRecorder.microphonePermissionState() == .authorized else {
+            return
+        }
+
+        setStatus(.idle("Microphone access enabled. You can start a session again."))
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {

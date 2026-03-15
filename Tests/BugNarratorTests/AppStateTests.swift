@@ -45,6 +45,28 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
     }
 
+    func testPermissionRefreshClearsStaleMicrophoneDeniedErrorAfterAccessIsGranted() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.permissionState = .denied
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.currentError, .microphonePermissionDenied)
+        XCTAssertEqual(harness.appState.status.phase, .error)
+
+        harness.audioRecorder.permissionState = .authorized
+        harness.appState.refreshPermissionRecoveryState()
+
+        XCTAssertNil(harness.appState.currentError)
+        XCTAssertEqual(harness.appState.status.phase, .idle)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Microphone access enabled. You can start a session again."
+        )
+    }
+
     func testOpenMicrophoneSettingsUsesPrivacyDeepLinkFirst() {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

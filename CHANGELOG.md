@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.3 - 2026-03-14
+
+- Fixed a microphone-permission recovery bug where BugNarrator could keep showing a stale “microphone denied” error even after access had been granted in System Settings.
+
 ## 1.0.2 - 2026-03-14
 
 - Migrated screenshot capture from the deprecated CoreGraphics screenshot path to ScreenCaptureKit on macOS 14+, while preserving session associations, marker proximity, and screenshot-specific permission recovery.

@@ -24,6 +24,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-005` | The Support Development flow used three donation amounts even though the product only needed a simple path to the PayPal support page. | Added unnecessary decision friction and UI clutter. | Fixed | `1.0.1` |
 | `BN-P1-006` | When microphone permission was denied, BugNarrator only showed an error message and did not help the user recover. | Users could get stuck without a direct path to fix the problem. | Fixed | `1.0.2` |
 | `BN-P1-007` | Long error messages could be truncated in the top status card of the menu bar window. | Important recovery guidance was cut off exactly when the user needed it most. | Fixed | `1.0.2` |
+| `BN-P1-008` | After enabling microphone access in System Settings, BugNarrator could keep showing the stale denied state until the user manually retried or restarted. | Made the app appear blocked even after the permission issue was already fixed. | Fixed | `1.0.3` |
 
 ## Notes Per Issue
 
@@ -71,6 +72,12 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - Symptom: long error text could be clipped in the top status card.
 - Root cause: the menu bar window used a fixed width with status text that did not explicitly wrap and expand.
 - Fix: the status text now wraps, the card grows vertically, and the menu widens for longer error states when needed.
+
+### BN-P1-008: Stale microphone-denied state after access was granted
+
+- Symptom: a user could grant microphone access in System Settings, return to BugNarrator, and still see the app presenting itself as blocked by microphone denial.
+- Root cause: the error state reflected the previous permission check and was not reconciled when the app became active again.
+- Fix: BugNarrator now re-checks microphone permission when the app becomes active and clears the stale denied state once access is authorized again.
 
 ## Current State
 
