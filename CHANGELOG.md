@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.9 - 2026-03-15
+
 - Added a dedicated microphone permission service with structured recording preflight, clearer denied vs restricted vs unavailable states, and better local-testing guidance for unsigned Xcode builds.
 - Fixed review-workspace tab selection so switching between sessions with different content does not leave the right-hand pane on an invalid or stale tab.
 - Switched screenshot previews in the review workspace to cached thumbnails instead of repeatedly decoding full-size images, which reduces lag and memory waste in screenshot-heavy sessions.
