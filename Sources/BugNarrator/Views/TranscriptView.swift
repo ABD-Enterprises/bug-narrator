@@ -319,10 +319,12 @@ struct TranscriptView: View {
     private var allSessions: [TranscriptSession] {
         var sessions = transcriptStore.sessions
 
-        if let currentTranscript = appState.currentTranscript,
-           !appState.currentTranscriptIsPersisted,
-           !sessions.contains(where: { $0.id == currentTranscript.id }) {
-            sessions.insert(currentTranscript, at: 0)
+        if let currentTranscript = appState.currentTranscript {
+            if let existingIndex = sessions.firstIndex(where: { $0.id == currentTranscript.id }) {
+                sessions[existingIndex] = currentTranscript
+            } else if !appState.currentTranscriptIsPersisted {
+                sessions.insert(currentTranscript, at: 0)
+            }
         }
 
         return sessions

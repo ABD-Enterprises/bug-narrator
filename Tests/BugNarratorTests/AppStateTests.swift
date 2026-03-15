@@ -41,7 +41,60 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertEqual(harness.appState.status.detail, AppError.microphonePermissionDenied.userMessage)
+        XCTAssertEqual(harness.appState.currentError, .microphonePermissionDenied)
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+    }
+
+    func testOpenMicrophoneSettingsUsesPrivacyDeepLinkFirst() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.appState.openMicrophonePrivacySettings()
+
+        XCTAssertEqual(harness.urlHandler.openedURLs, [BugNarratorLinks.microphonePrivacySettings])
+    }
+
+    func testOpenMicrophoneSettingsFallsBackToSecuritySettings() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.urlHandler.openResults = [false, true]
+
+        harness.appState.openMicrophonePrivacySettings()
+
+        XCTAssertEqual(
+            harness.urlHandler.openedURLs,
+            [
+                BugNarratorLinks.microphonePrivacySettings,
+                BugNarratorLinks.securityPrivacySettings
+            ]
+        )
+    }
+
+    func testOpenScreenRecordingSettingsUsesPrivacyDeepLinkFirst() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.appState.openScreenRecordingPrivacySettings()
+
+        XCTAssertEqual(harness.urlHandler.openedURLs, [BugNarratorLinks.screenRecordingPrivacySettings])
+    }
+
+    func testOpenScreenRecordingSettingsFallsBackToSecuritySettings() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.urlHandler.openResults = [false, true]
+
+        harness.appState.openScreenRecordingPrivacySettings()
+
+        XCTAssertEqual(
+            harness.urlHandler.openedURLs,
+            [
+                BugNarratorLinks.screenRecordingPrivacySettings,
+                BugNarratorLinks.securityPrivacySettings
+            ]
+        )
     }
 
     func testSuccessfulSessionSavesCopiesAndDeletesTemporaryAudioFile() async throws {
@@ -81,6 +134,47 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.transcriptStore.sessions.count, 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertNil(harness.appState.activeRecordingSession)
+    }
+
+    func testSuccessfulTranscriptionWithStorageFailureKeepsTranscriptAvailableForManualSave() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "storage-failure")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Transcript survived local save failure.", segments: []))
+        )
+
+        var didOpenTranscriptWindow = false
+        harness.appState.showTranscriptWindow = {
+            didOpenTranscriptWindow = true
+        }
+
+        await harness.appState.startSession()
+        await harness.appState.captureScreenshot()
+
+        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.json")
+        try? FileManager.default.removeItem(at: storageURL)
+        try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+
+        await harness.appState.stopSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertTrue(
+            harness.appState.status.detail?.hasPrefix("Transcript ready, but Could not save local session history:") == true
+        )
+        XCTAssertEqual(harness.appState.currentTranscript?.transcript, "Transcript survived local save failure.")
+        XCTAssertFalse(harness.appState.currentTranscriptIsPersisted)
+        XCTAssertEqual(harness.transcriptStore.sessions.count, 0)
+        XCTAssertEqual(harness.clipboardService.copiedStrings.last, "Transcript survived local save failure.")
+        XCTAssertTrue(didOpenTranscriptWindow)
+        XCTAssertNil(harness.appState.activeRecordingSession)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
+
+        let screenshotPath = try XCTUnwrap(harness.appState.currentTranscript?.screenshots.first?.filePath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: screenshotPath))
+        XCTAssertTrue(harness.artifactsService.removedDirectories.isEmpty)
     }
 
     func testStopSessionIgnoresDuplicateStopsWhileStopping() async throws {
@@ -392,7 +486,7 @@ final class AppStateTests: XCTestCase {
     func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async {
         let harness = AppStateHarness(
             screenshotCaptureService: MockScreenshotCaptureService(
-                error: AppError.screenshotCaptureFailure("Permission denied.")
+                error: AppError.screenshotCaptureFailure("The screenshot file could not be written to disk.")
             )
         )
         defer { harness.cleanup() }
@@ -403,9 +497,73 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .recording)
         XCTAssertEqual(
             harness.appState.status.detail,
-            AppError.screenshotCaptureFailure("Permission denied.").userMessage
+            AppError.screenshotCaptureFailure("The screenshot file could not be written to disk.").userMessage
+        )
+        XCTAssertEqual(
+            harness.appState.currentError,
+            AppError.screenshotCaptureFailure("The screenshot file could not be written to disk.")
         )
         XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+    }
+
+    func testCaptureScreenshotWithDeniedScreenRecordingKeepsRecordingAndShowsRecoveryContext() async {
+        let harness = AppStateHarness(
+            screenshotCaptureService: MockScreenshotCaptureService(
+                error: AppError.screenRecordingPermissionDenied
+            )
+        )
+        defer { harness.cleanup() }
+
+        await harness.appState.startSession()
+        await harness.appState.captureScreenshot()
+
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.status.detail, AppError.screenRecordingPermissionDenied.userMessage)
+        XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+    }
+
+    func testRapidRepeatedScreenshotRequestsOnlyPersistOneCaptureAtATime() async throws {
+        let firstCaptureStarted = expectation(description: "first screenshot capture started")
+        let screenshotService = MockScreenshotCaptureService(delayNanoseconds: 200_000_000)
+        screenshotService.onCaptureStart = {
+            firstCaptureStarted.fulfill()
+        }
+
+        let harness = AppStateHarness(screenshotCaptureService: screenshotService)
+        defer { harness.cleanup() }
+
+        await harness.appState.startSession()
+
+        async let firstCapture: Void = harness.appState.captureScreenshot()
+        await fulfillment(of: [firstCaptureStarted], timeout: 1.0)
+        async let secondCapture: Void = harness.appState.captureScreenshot()
+        _ = await (firstCapture, secondCapture)
+
+        let recordingSession = try XCTUnwrap(harness.appState.activeRecordingSession)
+        XCTAssertEqual(recordingSession.screenshots.count, 1)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1.")
+        XCTAssertNil(harness.appState.currentError)
+    }
+
+    func testInsertMarkerWithScreenshotPermissionDeniedStillCreatesMarker() async {
+        let harness = AppStateHarness(
+            screenshotCaptureService: MockScreenshotCaptureService(
+                error: AppError.screenRecordingPermissionDenied
+            )
+        )
+        defer { harness.cleanup() }
+
+        await harness.appState.startSession()
+        harness.audioRecorder.currentDuration = 7
+
+        await harness.appState.insertMarker(title: "Checkout", captureScreenshot: true)
+
+        XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 1)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+        XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
     }
 
     func testAutomaticIssueExtractionPersistsDraftIssuesAfterTranscription() async throws {
@@ -442,6 +600,34 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .success)
     }
 
+    func testExtractIssuesWithoutAPIKeyFailsAndOpensSettings() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil
+        )
+        try harness.transcriptStore.add(session)
+        harness.appState.selectedTranscriptID = session.id
+        harness.settingsStore.removeAPIKey()
+
+        var didOpenSettings = false
+        harness.appState.showSettingsWindow = {
+            didOpenSettings = true
+        }
+
+        await harness.appState.extractIssuesForDisplayedTranscript()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(harness.appState.status.detail, AppError.missingAPIKey.userMessage)
+        XCTAssertTrue(didOpenSettings)
+    }
+
     func testCanExportIssuesRequiresConfiguredDestinationAndSelectedIssue() {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -470,6 +656,8 @@ final class AppStateTests: XCTestCase {
         )
 
         XCTAssertFalse(harness.appState.canExportIssues(from: session, to: .github))
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
 
         harness.settingsStore.githubToken = "github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
@@ -504,6 +692,8 @@ final class AppStateTests: XCTestCase {
                 ]
             )
         )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
 
         var didOpenSettings = false
         harness.appState.showSettingsWindow = {
@@ -514,6 +704,50 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertTrue(didOpenSettings)
+    }
+
+    func testExportSelectedIssuesFailsWhenSessionIsNoLongerAvailable() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(
+                summary: "Summary",
+                issues: [
+                    ExtractedIssue(
+                        title: "Issue",
+                        category: .bug,
+                        summary: "Summary",
+                        evidenceExcerpt: "Evidence",
+                        timestamp: 2,
+                        requiresReview: true,
+                        isSelectedForExport: true
+                    )
+                ]
+            )
+        )
+
+        XCTAssertFalse(harness.appState.canExportIssues(from: session, to: .github))
+
+        await harness.appState.exportSelectedIssues(from: session, to: .github)
+
+        let callCount = await harness.exportService.gitHubCallCount
+        XCTAssertEqual(callCount, 0)
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            AppError.exportFailure("This session is no longer available in the library.").userMessage
+        )
     }
 
     func testExportSelectedIssuesCallsGitHubProviderWhenConfigured() async {
@@ -550,12 +784,67 @@ final class AppStateTests: XCTestCase {
             prompt: nil,
             issueExtraction: IssueExtractionResult(summary: "Summary", issues: [sourceIssue])
         )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
 
         await harness.appState.exportSelectedIssues(from: session, to: .github)
 
         let callCount = await harness.exportService.gitHubCallCount
         XCTAssertEqual(callCount, 1)
         XCTAssertEqual(harness.appState.status.phase, .success)
+    }
+
+    func testPersistUpdatedSessionFailureKeepsEditedIssueVisibleAsUnsavedOverlay() throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let originalIssue = ExtractedIssue(
+            title: "Original title",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: 5,
+            requiresReview: true,
+            isSelectedForExport: true
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [originalIssue])
+        )
+        try harness.transcriptStore.add(session)
+        harness.appState.selectedTranscriptID = session.id
+
+        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.json")
+        try FileManager.default.removeItem(at: storageURL)
+        try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+
+        var updatedIssue = originalIssue
+        updatedIssue.title = "Updated visible title"
+
+        harness.appState.updateExtractedIssue(updatedIssue, in: session.id)
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertTrue(
+            harness.appState.status.detail?.hasPrefix("Could not save local session history:") == true
+        )
+        XCTAssertEqual(
+            harness.appState.currentTranscript?.issueExtraction?.issues.first?.title,
+            "Updated visible title"
+        )
+        XCTAssertEqual(
+            harness.appState.displayedTranscript?.issueExtraction?.issues.first?.title,
+            "Updated visible title"
+        )
+        XCTAssertFalse(harness.appState.currentTranscriptIsPersisted)
+        XCTAssertEqual(
+            harness.transcriptStore.session(with: session.id)?.issueExtraction?.issues.first?.title,
+            "Original title"
+        )
     }
 
     func testConsecutiveSessionsWorkBackToBackWithoutRestart() async throws {

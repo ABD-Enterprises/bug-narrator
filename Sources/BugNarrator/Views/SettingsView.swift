@@ -126,6 +126,20 @@ struct SettingsView: View {
                     }
                 }
 
+                GroupBox("Permissions") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("BugNarrator asks for microphone access only when you start recording.")
+                            .foregroundStyle(.secondary)
+
+                        Text("BugNarrator asks for Screen Recording access only when you capture a screenshot. Recording can continue without screenshots if you skip this permission.")
+                            .foregroundStyle(.secondary)
+
+                        Text("If you deny a permission, BugNarrator shows recovery buttons in the menu bar window so you can reopen the right System Settings pane.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 GroupBox("Global Hotkeys") {
                     VStack(alignment: .leading, spacing: 12) {
                         hotkeyRow(title: HotkeyAction.toggleRecording.title, shortcut: $settingsStore.recordingHotkeyShortcut)

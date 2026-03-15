@@ -204,6 +204,58 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testStartupSkipsInteractiveLegacyExportKeychainPromptsUntilUserInitiatesAccess() {
+        let suiteName = "BugNarrator-SettingsDeferredExportKeychainTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let legacyGitHubKey = "SessionMic.GitHub::github-token"
+        let legacyJiraKey = "SessionMic.Jira::jira-api-token"
+        keychain.values[legacyGitHubKey] = "legacy-github-token"
+        keychain.values[legacyJiraKey] = "legacy-jira-token"
+        keychain.interactionRequiredKeys = [legacyGitHubKey, legacyJiraKey]
+
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(store.githubToken, "")
+        XCTAssertEqual(store.jiraAPIToken, "")
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.GitHub" && !$0.allowInteraction
+            }
+        )
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.Jira" && !$0.allowInteraction
+            }
+        )
+
+        store.refreshExportSecretsForUserInitiatedAccess()
+
+        XCTAssertEqual(store.githubToken, "legacy-github-token")
+        XCTAssertEqual(store.jiraAPIToken, "legacy-jira-token")
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.GitHub" && $0.allowInteraction
+            }
+        )
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.Jira" && $0.allowInteraction
+            }
+        )
+        XCTAssertEqual(
+            keychain.values["BugNarrator.GitHub::github-token"],
+            "legacy-github-token"
+        )
+        XCTAssertEqual(
+            keychain.values["BugNarrator.Jira::jira-api-token"],
+            "legacy-jira-token"
+        )
+    }
+
     func testMaskedExportTokensOnlyExposeSuffix() {
         let suiteName = "BugNarrator-SettingsExportMaskTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

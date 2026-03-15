@@ -160,6 +160,49 @@ final class SessionLibraryTests: XCTestCase {
         XCTAssertEqual(SessionLibrary.count(for: .customRange, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 1)
     }
 
+    func testDateBucketFilteringHandlesMidnightBoundariesInLocalTimezone() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+
+        let formatter = ISO8601DateFormatter()
+        let referenceDate = formatter.date(from: "2026-03-14T00:30:00-04:00")!
+        let sessions = [
+            makeSession(
+                transcript: "Just after midnight transcript",
+                createdAt: formatter.date(from: "2026-03-14T00:05:00-04:00")!,
+                summary: ""
+            ),
+            makeSession(
+                transcript: "Just before midnight transcript",
+                createdAt: formatter.date(from: "2026-03-13T23:55:00-04:00")!,
+                summary: ""
+            )
+        ]
+        let query = SessionLibraryQuery(
+            filter: .today,
+            customDateRange: SessionLibraryDateRange(startDate: referenceDate, endDate: referenceDate)
+        )
+
+        let todaySessions = SessionLibrary.filteredSessions(
+            from: sessions,
+            query: query,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+        let yesterdaySessions = SessionLibrary.filteredSessions(
+            from: sessions,
+            query: SessionLibraryQuery(
+                filter: .yesterday,
+                customDateRange: query.customDateRange
+            ),
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(todaySessions.map(\.transcript), ["Just after midnight transcript"])
+        XCTAssertEqual(yesterdaySessions.map(\.transcript), ["Just before midnight transcript"])
+    }
+
     func testEmptyStateCoversNoSessionsNoResultsAndNoFilterMatches() {
         let emptyQuery = SessionLibraryQuery(
             filter: .allSessions,
