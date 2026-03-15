@@ -10,23 +10,43 @@ final class ReviewWorkspaceTests: XCTestCase {
             summary: "",
             extraction: IssueExtractionResult(summary: "", issues: [])
         )
+        let extractionWithIssuesSession = makeSession(
+            summary: "",
+            extraction: IssueExtractionResult(
+                summary: "",
+                issues: [
+                    ExtractedIssue(
+                        title: "Export button missing",
+                        category: .bug,
+                        summary: "Missing export button on reports page.",
+                        evidenceExcerpt: "Export button is missing.",
+                        timestamp: 65
+                    )
+                ]
+            )
+        )
 
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: baseSession),
-            [.rawTranscript, .screenshots, .extractedIssues]
+            [.rawTranscript, .screenshots]
         )
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: summarySession),
-            [.rawTranscript, .screenshots, .extractedIssues, .reviewSummary]
+            [.rawTranscript, .screenshots, .reviewSummary]
         )
         XCTAssertEqual(
             ReviewWorkspace.availableTabs(for: extractionSession),
+            [.rawTranscript, .screenshots, .reviewSummary]
+        )
+        XCTAssertEqual(
+            ReviewWorkspace.availableTabs(for: extractionWithIssuesSession),
             [.rawTranscript, .screenshots, .extractedIssues, .reviewSummary]
         )
     }
 
-    func testClampedTabFallsBackToTranscriptWhenSelectedTabIsUnavailable() {
+    func testClampedTabFallsBackToSummaryWhenReviewSummaryIsAvailable() {
         let baseSession = makeSession(summary: "", extraction: nil)
+        let summarySession = makeSession(summary: "One summary line.", extraction: nil)
 
         XCTAssertEqual(
             ReviewWorkspace.clampedTab(.reviewSummary, for: baseSession),
@@ -35,6 +55,10 @@ final class ReviewWorkspaceTests: XCTestCase {
         XCTAssertEqual(
             ReviewWorkspace.clampedTab(.screenshots, for: baseSession),
             .screenshots
+        )
+        XCTAssertEqual(
+            ReviewWorkspace.clampedTab(.extractedIssues, for: summarySession),
+            .reviewSummary
         )
         XCTAssertEqual(
             ReviewWorkspace.clampedTab(.reviewSummary, for: nil),

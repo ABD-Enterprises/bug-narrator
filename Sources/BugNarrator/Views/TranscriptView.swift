@@ -456,7 +456,8 @@ struct TranscriptView: View {
         return [
             selectedSession.id.uuidString,
             selectedSession.summaryText.isEmpty ? "summary:0" : "summary:1",
-            selectedSession.issueExtraction == nil ? "extraction:0" : "extraction:1"
+            selectedSession.issueExtraction == nil ? "extraction:0" : "extraction:1",
+            "issue-count:\(selectedSession.issueCount)"
         ]
         .joined(separator: "|")
     }
@@ -998,14 +999,14 @@ struct TranscriptView: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 12) {
-                            Button(appState.isExporting(to: .github) ? "Exporting to GitHub..." : "Export to GitHub") {
+                            Button(appState.isExporting(to: .github) ? "Exporting to GitHub..." : "Export to GitHub (Experimental)") {
                                 Task {
                                     await appState.exportSelectedIssues(from: session, to: .github)
                                 }
                             }
                             .disabled(!appState.canExportIssues(from: session, to: .github) || appState.isExporting(to: .github))
 
-                            Button(appState.isExporting(to: .jira) ? "Exporting to Jira..." : "Export to Jira") {
+                            Button(appState.isExporting(to: .jira) ? "Exporting to Jira..." : "Export to Jira (Experimental)") {
                                 Task {
                                     await appState.exportSelectedIssues(from: session, to: .jira)
                                 }

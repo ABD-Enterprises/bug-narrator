@@ -224,7 +224,7 @@ final class SettingsStore: ObservableObject {
     var githubTokenStorageDescription: String {
         storageDescription(
             for: githubTokenPersistenceState,
-            empty: "Add a GitHub personal access token if you want to export extracted issues to GitHub Issues."
+            empty: "Add a GitHub personal access token if you want to try the experimental GitHub Issues export."
         )
     }
 
@@ -270,7 +270,7 @@ final class SettingsStore: ObservableObject {
     var jiraTokenStorageDescription: String {
         storageDescription(
             for: jiraTokenPersistenceState,
-            empty: "Add Jira Cloud credentials if you want to export extracted issues to Jira."
+            empty: "Add Jira Cloud credentials if you want to try the experimental Jira export."
         )
     }
 

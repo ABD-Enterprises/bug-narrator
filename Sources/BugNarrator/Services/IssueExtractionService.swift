@@ -79,13 +79,44 @@ actor IssueExtractionService: IssueExtracting {
             }
 
             let completion = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-            guard let content = completion.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines),
+            guard let message = completion.choices.first?.message else {
+                logger.warning("issue_extraction_empty", "OpenAI returned an empty issue extraction response.")
+                throw AppError.issueExtractionFailure("The extraction response was empty.")
+            }
+
+            if let refusal = message.refusal?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !refusal.isEmpty {
+                logger.warning(
+                    "issue_extraction_refused",
+                    "OpenAI refused the issue extraction request.",
+                    metadata: ["session_id": reviewSession.id.uuidString]
+                )
+                throw AppError.issueExtractionFailure(refusal)
+            }
+
+            guard let content = message.content?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !content.isEmpty else {
                 logger.warning("issue_extraction_empty", "OpenAI returned an empty issue extraction response.")
                 throw AppError.issueExtractionFailure("The extraction response was empty.")
             }
 
-            let payload = try JSONDecoder().decode(IssueExtractionPayload.self, from: Data(content.utf8))
+            let payload: IssueExtractionPayload
+            do {
+                payload = try IssueExtractionPayload.parse(from: content)
+            } catch {
+                logger.error(
+                    "issue_extraction_response_parse_failed",
+                    "OpenAI returned issue data that BugNarrator could not parse.",
+                    metadata: [
+                        "session_id": reviewSession.id.uuidString,
+                        "content_length": "\(content.count)",
+                        "parse_error": String(describing: error)
+                    ]
+                )
+                throw AppError.issueExtractionFailure(
+                    "OpenAI returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings."
+                )
+            }
             logger.info(
                 "issue_extraction_request_succeeded",
                 "OpenAI returned extracted review issues.",
@@ -205,12 +236,57 @@ private struct ChatChoice: Decodable {
 
 private struct ChatMessageResponse: Decodable {
     let content: String?
+    let refusal: String?
+
+    enum CodingKeys: String, CodingKey {
+        case content
+        case refusal
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        refusal = try? container.decodeIfPresent(String.self, forKey: .refusal)
+
+        if let content = try? container.decodeIfPresent(String.self, forKey: .content) {
+            self.content = content
+            return
+        }
+
+        if let parts = try? container.decodeIfPresent([ChatMessageContentPart].self, forKey: .content) {
+            let joinedContent = parts
+                .compactMap(\.text)
+                .joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            self.content = joinedContent.isEmpty ? nil : joinedContent
+            return
+        }
+
+        content = nil
+    }
 }
 
-private struct IssueExtractionPayload: Decodable {
+private struct ChatMessageContentPart: Decodable {
+    let text: String?
+}
+
+private struct IssueExtractionPayload {
     let summary: String
     let guidanceNote: String?
     let issues: [IssuePayload]
+
+    static func parse(from content: String) throws -> IssueExtractionPayload {
+        var parseErrors: [String] = []
+
+        for candidate in jsonCandidates(from: content) {
+            do {
+                return try parse(from: candidate)
+            } catch {
+                parseErrors.append(String(describing: error))
+            }
+        }
+
+        throw IssueExtractionParseError.invalidPayload(parseErrors.joined(separator: " | "))
+    }
 
     func makeIssueExtractionResult(using session: TranscriptSession) -> IssueExtractionResult {
         let screenshotIndex = Dictionary(uniqueKeysWithValues: session.screenshots.map { ($0.fileName.lowercased(), $0.id) })
@@ -223,9 +299,116 @@ private struct IssueExtractionPayload: Decodable {
             issues: issues
         )
     }
+
+    private static func parse(from data: Data) throws -> IssueExtractionPayload {
+        let jsonObject = try JSONSerialization.jsonObject(with: data)
+        guard let dictionary = jsonObject as? [String: Any] else {
+            throw IssueExtractionParseError.invalidPayload("Top-level issue extraction payload was not a JSON object.")
+        }
+
+        let summary = firstString(in: dictionary, keys: ["summary", "reviewSummary", "review_summary"])?.trimmedForExtraction
+        let guidanceNote = firstString(in: dictionary, keys: ["guidanceNote", "guidance_note", "reviewGuidance", "review_guidance"])?.trimmedForExtraction
+        let issueObjects = firstArray(in: dictionary, keys: ["issues", "draftIssues", "draft_issues", "items"]) ?? []
+
+        let issues = issueObjects.compactMap { issueObject -> IssuePayload? in
+            guard let issueDictionary = issueObject as? [String: Any] else {
+                return nil
+            }
+
+            return IssuePayload(dictionary: issueDictionary)
+        }
+
+        if summary == nil, guidanceNote == nil, issues.isEmpty {
+            throw IssueExtractionParseError.invalidPayload("Issue extraction payload did not contain a summary, guidance note, or issues.")
+        }
+
+        if !issueObjects.isEmpty, issues.isEmpty {
+            throw IssueExtractionParseError.invalidPayload("Issue extraction payload contained issues, but none matched the expected structure.")
+        }
+
+        return IssueExtractionPayload(
+            summary: summary ?? "",
+            guidanceNote: guidanceNote,
+            issues: issues
+        )
+    }
+
+    private static func jsonCandidates(from content: String) -> [Data] {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        var candidates: [String] = []
+        var seen = Set<String>()
+
+        func appendCandidate(_ value: String) {
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else {
+                return
+            }
+            candidates.append(normalized)
+        }
+
+        appendCandidate(trimmed)
+
+        if let unfenced = stripMarkdownFence(from: trimmed) {
+            appendCandidate(unfenced)
+        }
+
+        if let extractedJSONObject = extractJSONObjectString(from: trimmed) {
+            appendCandidate(extractedJSONObject)
+        }
+
+        return candidates.map { Data($0.utf8) }
+    }
+
+    private static func stripMarkdownFence(from content: String) -> String? {
+        guard content.hasPrefix("```") else {
+            return nil
+        }
+
+        let lines = content.components(separatedBy: .newlines)
+        guard lines.count >= 3 else {
+            return nil
+        }
+
+        let closingFenceIndex = lines.lastIndex { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "```" }
+        guard let closingFenceIndex, closingFenceIndex > lines.startIndex else {
+            return nil
+        }
+
+        let bodyLines = lines[(lines.startIndex + 1)..<closingFenceIndex]
+        return bodyLines.joined(separator: "\n")
+    }
+
+    private static func extractJSONObjectString(from content: String) -> String? {
+        guard let startIndex = content.firstIndex(of: "{"),
+              let endIndex = content.lastIndex(of: "}") else {
+            return nil
+        }
+
+        return String(content[startIndex...endIndex])
+    }
+
+    private static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = dictionary[key] as? String {
+                return value
+            }
+        }
+
+        return nil
+    }
+
+    private static func firstArray(in dictionary: [String: Any], keys: [String]) -> [Any]? {
+        for key in keys {
+            if let value = dictionary[key] as? [Any] {
+                return value
+            }
+        }
+
+        return nil
+    }
 }
 
-private struct IssuePayload: Decodable {
+private struct IssuePayload {
     let title: String
     let category: String
     let summary: String
@@ -235,6 +418,33 @@ private struct IssuePayload: Decodable {
     let relatedScreenshotFileNames: [String]?
     let confidence: Double?
     let requiresReview: Bool?
+
+    init?(dictionary: [String: Any]) {
+        let title = Self.firstString(in: dictionary, keys: ["title", "issueTitle", "name"])?.trimmedForExtraction
+        let category = Self.firstString(in: dictionary, keys: ["category", "type", "classification"])?.trimmedForExtraction
+        let summary = Self.firstString(in: dictionary, keys: ["summary", "description", "details"])?.trimmedForExtraction
+        let evidenceExcerpt = Self.firstString(in: dictionary, keys: ["evidenceExcerpt", "evidence", "evidenceQuote", "evidence_excerpt"])?.trimmedForExtraction
+
+        guard let title, !title.isEmpty,
+              let category, !category.isEmpty,
+              let summary, !summary.isEmpty,
+              let evidenceExcerpt, !evidenceExcerpt.isEmpty else {
+            return nil
+        }
+
+        self.title = title
+        self.category = category
+        self.summary = summary
+        self.evidenceExcerpt = evidenceExcerpt
+        self.timestamp = Self.firstString(in: dictionary, keys: ["timestamp", "time", "timecode"])?.trimmedForExtraction
+        self.sectionTitle = Self.firstString(in: dictionary, keys: ["sectionTitle", "section", "sectionName"])?.trimmedForExtraction
+        self.relatedScreenshotFileNames = Self.firstStringArray(
+            in: dictionary,
+            keys: ["relatedScreenshotFileNames", "screenshotFileNames", "screenshots", "related_screenshot_file_names"]
+        )
+        self.confidence = Self.firstDouble(in: dictionary, keys: ["confidence", "score"])
+        self.requiresReview = Self.firstBool(in: dictionary, keys: ["requiresReview", "requires_review", "needsReview"])
+    }
 
     func makeExtractedIssue(screenshotIndex: [String: UUID]) -> ExtractedIssue {
         let screenshotIDs = (relatedScreenshotFileNames ?? []).compactMap { fileName in
@@ -253,6 +463,61 @@ private struct IssuePayload: Decodable {
             isSelectedForExport: true,
             sectionTitle: sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    private static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = dictionary[key] as? String {
+                return value
+            }
+        }
+
+        return nil
+    }
+
+    private static func firstStringArray(in dictionary: [String: Any], keys: [String]) -> [String]? {
+        for key in keys {
+            if let values = dictionary[key] as? [String] {
+                return values
+            }
+
+            if let values = dictionary[key] as? [Any] {
+                let strings = values.compactMap { $0 as? String }
+                if !strings.isEmpty {
+                    return strings
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private static func firstDouble(in dictionary: [String: Any], keys: [String]) -> Double? {
+        for key in keys {
+            if let value = dictionary[key] as? Double {
+                return value
+            }
+
+            if let value = dictionary[key] as? NSNumber {
+                return value.doubleValue
+            }
+
+            if let value = dictionary[key] as? String, let doubleValue = Double(value) {
+                return doubleValue
+            }
+        }
+
+        return nil
+    }
+
+    private static func firstBool(in dictionary: [String: Any], keys: [String]) -> Bool? {
+        for key in keys {
+            if let value = dictionary[key] as? Bool {
+                return value
+            }
+        }
+
+        return nil
     }
 
     private func parseCategory(_ value: String) -> ExtractedIssueCategory {
@@ -286,5 +551,15 @@ private struct IssuePayload: Decodable {
         default:
             return nil
         }
+    }
+}
+
+private enum IssueExtractionParseError: Error {
+    case invalidPayload(String)
+}
+
+private extension String {
+    var trimmedForExtraction: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
