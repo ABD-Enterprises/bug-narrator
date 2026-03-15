@@ -22,6 +22,7 @@
 
 - BugNarrator does not include a built-in OpenAI API key.
 - OpenAI transcription and issue extraction use your own OpenAI account and may cost money.
-- The app asks for microphone permission on first record.
-- Screenshot capture may ask for Screen Recording permission on first use.
+- The app asks for microphone permission only when you start recording. If you deny it, BugNarrator gives you an `Open Microphone Settings` recovery button.
+- Screenshot capture may ask for Screen Recording permission on first use. If you deny it, recording can still continue without screenshots.
+- If OpenAI rejects your key, BugNarrator sends you back to `Settings` so you can replace it.
 - To build or package the app from source, see [docs/Distribution.md](docs/Distribution.md).

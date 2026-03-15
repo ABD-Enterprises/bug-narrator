@@ -5,7 +5,7 @@
 
 BugNarrator is a macOS menu bar tool for narrated software testing sessions that automatically captures transcripts, markers, screenshots, and extracted issues.
 
-## Download
+## Download BugNarrator
 
 - [Download the latest macOS DMG](https://github.com/deffenda/bugnarrator/releases/latest/download/BugNarrator-macOS.dmg)
 - [View the latest release page](https://github.com/deffenda/bugnarrator/releases/latest)
@@ -17,6 +17,13 @@ If the direct DMG link is not live yet, use the release page and download the ne
 BugNarrator is free to use. If it helps your workflow, consider supporting development.
 
 - [Support BugNarrator on PayPal](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
+
+## Help And Project Links
+
+- [Read the user guide](docs/UserGuide.md)
+- [Hosted documentation](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
+- [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
+- [View the changelog](CHANGELOG.md)
 
 ## What BugNarrator Does
 
@@ -54,9 +61,10 @@ Important:
 2. Open the DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
-5. If Gatekeeper warns about the app, use Finder and choose `Open` for the app you trust.
+5. If Gatekeeper warns about the app, open `Applications`, Control-click `BugNarrator.app`, choose `Open`, then confirm once.
 6. On first run, expect microphone permission and OpenAI API key setup.
 7. If you use screenshot capture, expect Screen Recording permission on first use.
+8. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
 
 ## Quick Start
 
@@ -83,7 +91,7 @@ Markers let you flag important moments during a session. Each marker stores a ti
 
 ### Screenshot Capture
 
-Screenshots are captured only when you request them. Each screenshot is attached to the current session and can appear alongside markers and extracted issues.
+Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit to capture the current desktop layout and attach the saved image to the active session. Each screenshot is attached to the current session and can appear alongside markers and extracted issues.
 
 ### Review Summary
 
@@ -133,11 +141,11 @@ Configure your Jira Cloud URL, email, API token, project key, and issue type in 
 
 ### Microphone
 
-BugNarrator requests microphone permission the first time you start a recording.
+BugNarrator requests microphone permission the first time you start a recording. If access is denied, recording is blocked until you re-enable BugNarrator in `System Settings > Privacy & Security > Microphone`. The menu bar window includes an `Open Microphone Settings` recovery button.
 
 ### Screen Recording
 
-Screenshot capture may prompt for Screen Recording permission on first use.
+Screenshot capture may prompt for Screen Recording permission on first use. That permission is only needed for screenshots. If access is denied, the current recording can still continue without screenshots, and the menu bar window includes an `Open Screen Recording Settings` recovery button.
 
 ### Accessibility
 
@@ -169,6 +177,7 @@ BugNarrator does not continuously upload audio while you are still recording.
 - [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
 - [Support development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 - [Changelog](CHANGELOG.md)
+- [Post-1.0.0 bug log](docs/PostV1BugLog.md)
 
 ## Build From Source
 
@@ -196,8 +205,12 @@ The script builds a Release app, creates a DMG with `BugNarrator.app` plus an `A
 
 Full packaging details live in [docs/Distribution.md](docs/Distribution.md).
 
-For public distribution, prefer a signed and notarized build. The packaging script supports signed local builds when you provide your Apple team in the environment.
-For a true public macOS release, use a `Developer ID Application` certificate plus notarization so Gatekeeper accepts the download on other Macs.
+For public distribution, use a `Developer ID Application` certificate plus notarization so Gatekeeper accepts the download on other Macs. The packaging script supports:
+
+- unsigned local packaging for development
+- signed Release builds
+- notarization and stapling
+- validation that the DMG contains `BugNarrator.app`, an `Applications` shortcut, and the expected branded icon resources
 
 ## Documentation
 
@@ -207,6 +220,7 @@ For a true public macOS release, use a `Developer ID Application` certificate pl
 - [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md)
 - [docs/TESTING_NOTES.md](docs/TESTING_NOTES.md)
 - [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+- [docs/PostV1BugLog.md](docs/PostV1BugLog.md)
 - [SECURITY.md](SECURITY.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 
@@ -214,7 +228,7 @@ For a true public macOS release, use a `Developer ID Application` certificate pl
 
 - transcription and issue extraction require network access
 - BugNarrator does not yet support offline Whisper
-- screenshot capture still uses a deprecated CoreGraphics API and should move to ScreenCaptureKit
+- if you remove or invalidate the OpenAI API key while a recording is already in progress, BugNarrator cannot yet hold that finished audio for a later retry
 - GitHub and Jira export include screenshot references in issue bodies instead of uploading attachments automatically
 - session deletion is permanent today
 

@@ -4,6 +4,10 @@ struct MenuBarView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
 
+    private var statusPresentation: MenuBarStatusPresentation {
+        MenuBarStatusPresentation(status: appState.status, currentError: appState.currentError)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             statusCard
@@ -20,7 +24,7 @@ struct MenuBarView: View {
             footerSection
         }
         .padding(16)
-        .frame(width: 340)
+        .frame(width: preferredMenuWidth)
         .alert("Discard this recording?", isPresented: $appState.showDiscardConfirmation) {
             Button("Discard", role: .destructive) {
                 Task {
@@ -69,29 +73,151 @@ struct MenuBarView: View {
                     if let detail = appState.status.detail {
                         Text(detail)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(appState.currentError == nil ? .secondary : .primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    statusRecoverySection
                 }
             } else if appState.status.phase == .transcribing {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(appState.status.detail ?? "Uploading audio and waiting for transcription...")
-                        .font(.subheadline)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(appState.status.detail ?? "Uploading audio and waiting for transcription...")
+                            .font(.subheadline)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    statusRecoverySection
                 }
             } else if let detail = appState.status.detail {
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(statusTint)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                statusRecoverySection
             } else {
                 Text("Ready for a spoken software review session.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var microphoneRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Open System Settings and enable BugNarrator in Privacy & Security > Microphone.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Open Microphone Settings") {
+                appState.openMicrophonePrivacySettings()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .accessibilityLabel("Open Microphone privacy settings")
+            .accessibilityHint("Opens the macOS privacy settings for microphone access")
+        }
+    }
+
+    @ViewBuilder
+    private var statusRecoverySection: some View {
+        switch statusPresentation.recoveryAction {
+        case .microphone:
+            microphoneRecoverySection
+        case .screenRecording:
+            screenRecordingRecoverySection
+        case .openAI:
+            openAIKeyRecoverySection
+        case .exportConfiguration:
+            exportConfigurationRecoverySection
+        case .storage:
+            storageRecoverySection
+        case .none:
+            EmptyView()
+        }
+    }
+
+    private var screenRecordingRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Recording can continue without screenshots. To capture them again, enable BugNarrator in Privacy & Security > Screen & System Audio Recording.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Open Screen Recording Settings") {
+                appState.openScreenRecordingPrivacySettings()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .accessibilityLabel("Open Screen Recording privacy settings")
+            .accessibilityHint("Opens the macOS privacy settings for screen recording access")
+        }
+    }
+
+    private var openAIKeyRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Open Settings to add or replace your own OpenAI API key. BugNarrator stores it in your macOS Keychain when available.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Open Settings") {
+                appState.openSettings()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+    }
+
+    private var exportConfigurationRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Open Settings and finish the GitHub or Jira export configuration before exporting issues.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Open Settings") {
+                appState.openSettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var storageRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("The transcript is still available in BugNarrator. After fixing local storage, open the transcript window and save it to history.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Open Transcript Window") {
+                appState.openTranscriptHistory()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var preferredMenuWidth: CGFloat {
+        statusPresentation.preferredWidth
     }
 
     private var apiKeyRequirementCard: some View {
@@ -116,7 +242,40 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 10) {
             switch appState.status.phase {
             case .idle, .success, .error:
-                if appState.needsAPIKeySetup {
+                if appState.currentError == .microphonePermissionDenied {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button("Open Microphone Settings") {
+                                appState.openMicrophonePrivacySettings()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+
+                            Button("Try Again") {
+                                Task {
+                                    await appState.startSession()
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        Text("After allowing access, return to BugNarrator and try starting the session again.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let currentError = appState.currentError, currentError.suggestsOpenAISettings {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("Open Settings") {
+                            appState.openSettings()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Text("BugNarrator requires your own OpenAI API key and keeps it in Keychain when available.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if appState.needsAPIKeySetup {
                     Button("Add OpenAI API Key") {
                         appState.openSettings()
                     }

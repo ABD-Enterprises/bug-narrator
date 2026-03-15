@@ -17,7 +17,20 @@ ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
+APP_NAME="${APP_NAME:-BugNarrator}"
 MANUAL_DISTRIBUTION_SIGNING="NO"
+VERIFY_MOUNTPOINT=""
+
+cleanup_mountpoint() {
+    if [[ -n "$VERIFY_MOUNTPOINT" && -d "$VERIFY_MOUNTPOINT" ]]; then
+        if mount | grep -Fq "on $VERIFY_MOUNTPOINT "; then
+            hdiutil detach "$VERIFY_MOUNTPOINT" -quiet || true
+        fi
+        rmdir "$VERIFY_MOUNTPOINT" 2>/dev/null || true
+    fi
+}
+
+trap cleanup_mountpoint EXIT
 
 if [[ "$CODE_SIGN_IDENTITY" == Developer\ ID\ Application* && "$CODE_SIGN_STYLE" == "Automatic" ]]; then
     # Developer ID builds are direct-distribution builds and should not use
@@ -92,7 +105,7 @@ fi
 
 xcodebuild "${xcodebuild_args[@]}" build
 
-APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/BugNarrator.app"
+APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app"
 
 if [[ ! -d "$APP_PATH" ]]; then
     echo "error: built app not found at $APP_PATH" >&2
@@ -126,16 +139,28 @@ fi
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
+APP_ICON_ICNS_PATH="$APP_PATH/Contents/Resources/AppIcon.icns"
+APP_ASSETS_CAR_PATH="$APP_PATH/Contents/Resources/Assets.car"
 
-VERSIONED_DMG_NAME="BugNarrator-v${VERSION}-macOS.dmg"
-STABLE_DMG_NAME="BugNarrator-macOS.dmg"
-TEMP_DMG_PATH="$OUTPUT_DIR/BugNarrator-temp.dmg"
+if [[ ! -f "$APP_ICON_ICNS_PATH" ]]; then
+    echo "error: expected app icon resource at $APP_ICON_ICNS_PATH" >&2
+    exit 1
+fi
+
+if [[ ! -f "$APP_ASSETS_CAR_PATH" ]]; then
+    echo "error: expected asset catalog resource at $APP_ASSETS_CAR_PATH" >&2
+    exit 1
+fi
+
+VERSIONED_DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
+STABLE_DMG_NAME="${APP_NAME}-macOS.dmg"
+TEMP_DMG_PATH="$OUTPUT_DIR/${APP_NAME}-temp.dmg"
 VERSIONED_DMG_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME"
 STABLE_DMG_PATH="$OUTPUT_DIR/$STABLE_DMG_NAME"
 
 rm -f "$TEMP_DMG_PATH" "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
-ditto "$APP_PATH" "$STAGING_DIR/BugNarrator.app"
+ditto "$APP_PATH" "$STAGING_DIR/$APP_NAME.app"
 ln -s /Applications "$STAGING_DIR/Applications"
 
 hdiutil create \
@@ -154,19 +179,60 @@ hdiutil convert \
 rm -f "$TEMP_DMG_PATH"
 rm -rf "$STAGING_DIR"
 
+VERIFY_MOUNTPOINT="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-dmg-check.XXXXXX")"
+hdiutil attach "$VERSIONED_DMG_PATH" -readonly -nobrowse -mountpoint "$VERIFY_MOUNTPOINT" -quiet
+
+MOUNTED_APP_PATH="$VERIFY_MOUNTPOINT/$APP_NAME.app"
+MOUNTED_APPLICATIONS_LINK="$VERIFY_MOUNTPOINT/Applications"
+
+if [[ ! -d "$MOUNTED_APP_PATH" ]]; then
+    echo "error: mounted DMG does not contain $APP_NAME.app" >&2
+    exit 1
+fi
+
+if [[ ! -L "$MOUNTED_APPLICATIONS_LINK" ]]; then
+    echo "error: mounted DMG does not contain an Applications shortcut" >&2
+    exit 1
+fi
+
+if [[ ! -f "$MOUNTED_APP_PATH/Contents/Resources/AppIcon.icns" ]]; then
+    echo "error: mounted DMG app is missing AppIcon.icns" >&2
+    exit 1
+fi
+
+if [[ ! -f "$MOUNTED_APP_PATH/Contents/Resources/Assets.car" ]]; then
+    echo "error: mounted DMG app is missing Assets.car" >&2
+    exit 1
+fi
+
+cleanup_mountpoint
+VERIFY_MOUNTPOINT=""
+
 if [[ "$NOTARIZE" == "YES" ]]; then
     echo "Submitting DMG for notarization with profile '$NOTARY_PROFILE'..."
     xcrun notarytool submit "$VERSIONED_DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
     xcrun stapler staple -v "$VERSIONED_DMG_PATH"
     xcrun stapler validate "$VERSIONED_DMG_PATH"
+    if ! dmg_spctl_output="$(spctl -a -vv -t open "$VERSIONED_DMG_PATH" 2>&1)"; then
+        if [[ "$dmg_spctl_output" == *"Insufficient Context"* ]]; then
+            echo "warning: spctl could not fully assess the local DMG (Insufficient Context). This is expected for some locally built, non-quarantined disk images. Rely on stapler validation here and do a second-Mac download smoke test before publishing." >&2
+        else
+            printf '%s\n' "$dmg_spctl_output" >&2
+            exit 1
+        fi
+    else
+        printf '%s\n' "$dmg_spctl_output"
+    fi
+
     spctl -a -vv "$APP_PATH"
 fi
 
 cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
-echo "Built BugNarrator $VERSION ($BUILD_NUMBER)"
+echo "Built $APP_NAME $VERSION ($BUILD_NUMBER)"
 if [[ -n "$SIGNING_AUTHORITY" ]]; then
     echo "Signing authority: $SIGNING_AUTHORITY"
 fi
+echo "Release app: $APP_PATH"
 echo "Versioned DMG: $VERSIONED_DMG_PATH"
 echo "Stable DMG: $STABLE_DMG_PATH"

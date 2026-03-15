@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+## 1.0.2 - 2026-03-14
+
+- Migrated screenshot capture from the deprecated CoreGraphics screenshot path to ScreenCaptureKit on macOS 14+, while preserving session associations, marker proximity, and screenshot-specific permission recovery.
+- Added direct recovery guidance and an `Open Microphone Settings` action when microphone permission is denied.
+- Updated the menu bar status card to wrap longer error text and expand for recovery messaging instead of truncating it.
+- Hardened post-transcription persistence so a completed transcript stays open as an unsaved session if local history storage fails after transcription.
+- Updated the session library to prefer the latest in-memory session snapshot when persistence falls behind, preventing stale issue edits and summaries from disappearing out of the detail view.
+- Prevented GitHub and Jira exports from running against deleted or stale sessions and added date-bucket regression coverage around midnight in local timezones.
+- Hardened the DMG packaging script to verify branded icon resources, DMG contents, and public-release validation steps before publishing.
+- Added regression coverage for deferred interactive secret loading and the menu bar status presentation rules behind the permission and error fixes.
+
 ## 1.0.1 - 2026-03-14
 
 - Fixed the app icon pipeline so BugNarrator ships with branded app icon assets instead of a generic fallback.
