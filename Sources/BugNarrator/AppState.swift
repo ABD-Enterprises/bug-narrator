@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     var showRecordingControlWindow: (() -> Void)?
 
     private let audioRecorder: any AudioRecording
+    private let microphonePermissionService: any MicrophonePermissionServicing
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let screenshotCaptureService: any ScreenshotCapturing
@@ -59,6 +60,7 @@ final class AppState: ObservableObject {
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
         audioRecorder: AudioRecording = AudioRecorder(),
+        microphonePermissionService: any MicrophonePermissionServicing = MicrophonePermissionService(),
         transcriptionClient: any TranscriptionServing = TranscriptionClient(),
         hotkeyManager: any HotkeyManaging = HotkeyManager(),
         screenshotCaptureService: any ScreenshotCapturing = ScreenshotCaptureService(),
@@ -73,6 +75,7 @@ final class AppState: ObservableObject {
         self.transcriptStore = transcriptStore
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
+        self.microphonePermissionService = microphonePermissionService
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.screenshotCaptureService = screenshotCaptureService
@@ -192,19 +195,11 @@ final class AppState: ObservableObject {
     }
 
     var microphoneRecoveryGuidance: String {
-        if runtimeEnvironment.isLocalTestingBuild {
-            return "Open System Settings and enable BugNarrator in Privacy & Security > Microphone. For local testing, keep launching this same app copy or use the signed DMG build because macOS tracks microphone access per app bundle path."
-        }
-
-        return "Open System Settings and enable BugNarrator in Privacy & Security > Microphone."
+        microphoneRecoveryGuidanceDetails.message
     }
 
     var microphoneRecoveryLocalTestingNote: String? {
-        guard runtimeEnvironment.isLocalTestingBuild else {
-            return nil
-        }
-
-        return "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path."
+        microphoneRecoveryGuidanceDetails.localTestingNote
     }
 
     var debugInfoSnapshot: DebugInfoSnapshot {
@@ -228,11 +223,11 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard currentError == .microphonePermissionDenied else {
+        guard currentError?.suggestsMicrophoneSettings == true else {
             return
         }
 
-        guard audioRecorder.microphonePermissionState() == .authorized else {
+        guard microphonePermissionService.currentStatus() == .granted else {
             return
         }
 
@@ -269,7 +264,8 @@ final class AppState: ObservableObject {
             return
         }
 
-        if let preflightError = await preflightForSessionStart() {
+        let preflightResult = await preflightForSessionStart()
+        if let preflightError = preflightResult.error {
             permissionsLogger.warning("session_start_preflight_failed", preflightError.userMessage)
             presentError(preflightError)
             return
@@ -1313,14 +1309,8 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func preflightForSessionStart() async -> AppError? {
-        switch audioRecorder.microphonePermissionState() {
-        case .denied, .restricted:
-            permissionsLogger.warning("session_start_requires_microphone", "Microphone access is required before a recording can start.")
-            return .microphonePermissionDenied
-        case .authorized, .notDetermined:
-            return nil
-        }
+    private func preflightForSessionStart() async -> RecordingStartPreflightResult {
+        await microphonePermissionService.preflightForRecordingStart(audioRecorder: audioRecorder)
     }
 
     private func preflightForIssueExtraction(_ session: TranscriptSession) -> AppError? {
@@ -1439,7 +1429,7 @@ final class AppState: ObservableObject {
         let metadata = ["context": context]
 
         switch error {
-        case .microphonePermissionDenied, .screenRecordingPermissionDenied:
+        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable, .screenRecordingPermissionDenied:
             permissionsLogger.warning("app_error", error.userMessage, metadata: metadata)
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
             settingsLogger.warning("app_error", error.userMessage, metadata: metadata)
@@ -1472,6 +1462,26 @@ final class AppState: ObservableObject {
             status: status,
             currentError: currentError
         )
+    }
+
+    private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
+        microphonePermissionService.recoveryGuidance(
+            for: microphoneRecoveryStatus,
+            runtimeEnvironment: runtimeEnvironment
+        )
+    }
+
+    private var microphoneRecoveryStatus: MicrophonePermissionStatus {
+        switch currentError {
+        case .microphonePermissionDenied:
+            return .denied
+        case .microphonePermissionRestricted:
+            return .restricted
+        case .microphoneUnavailable:
+            return .unavailable
+        default:
+            return microphonePermissionService.currentStatus()
+        }
     }
 
     private func makeDebugBundleSnapshot() async -> DebugBundleSnapshot {

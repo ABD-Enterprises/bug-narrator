@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added a dedicated microphone permission service with structured recording preflight, clearer denied vs restricted vs unavailable states, and better local-testing guidance for unsigned Xcode builds.
+- Fixed review-workspace tab selection so switching between sessions with different content does not leave the right-hand pane on an invalid or stale tab.
+- Switched screenshot previews in the review workspace to cached thumbnails instead of repeatedly decoding full-size images, which reduces lag and memory waste in screenshot-heavy sessions.
+- Fixed a single-instance regression that could terminate the XCTest app host when another BugNarrator copy was already running during local validation.
+- Added targeted automated coverage for review-workspace state rules, session-bundle export contents, and the XCTest single-instance bypass path.
+
 ## 1.0.8 - 2026-03-15
 
 - Simplified the menu bar so recording actions now live only in the BugNarrator controls window, with the menu focusing that window instead of duplicating start or stop actions.

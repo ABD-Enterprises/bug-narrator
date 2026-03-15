@@ -2,6 +2,16 @@ import XCTest
 @testable import BugNarrator
 
 final class SingleInstanceControllerTests: XCTestCase {
+    func testRuntimeEnvironmentBypassesSingleInstanceEnforcementUnderXCTest() {
+        let runtimeEnvironment = AppRuntimeEnvironment(
+            bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app",
+            environment: ["XCTestConfigurationFilePath": "/tmp/test.xctestconfiguration"]
+        )
+
+        XCTAssertTrue(runtimeEnvironment.isRunningUnderTests)
+        XCTAssertTrue(runtimeEnvironment.shouldBypassSingleInstanceEnforcement)
+    }
+
     func testLaunchDispositionIsPrimaryWhenNoOtherInstanceMatchesBundleIdentifier() {
         let disposition = SingleInstanceController.launchDisposition(
             bundleIdentifier: "com.abdenterprises.bugnarrator",

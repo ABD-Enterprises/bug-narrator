@@ -12,9 +12,9 @@ enum HotkeyAction: UInt32, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .startRecording:
-            return "Start Feedback Session"
+            return "Start Recording"
         case .stopRecording:
-            return "Stop Feedback Session"
+            return "Stop Recording"
         case .insertMarker:
             return "Insert Marker"
         case .captureScreenshot:

@@ -10,13 +10,21 @@ struct BugNarratorApp: App {
     private let windowCoordinator: WindowCoordinator
 
     init() {
-        guard SingleInstanceController.enforcePrimaryInstance() else {
-            exit(EXIT_SUCCESS)
+        let runtimeEnvironment = AppRuntimeEnvironment()
+
+        if !runtimeEnvironment.shouldBypassSingleInstanceEnforcement {
+            guard SingleInstanceController.enforcePrimaryInstance() else {
+                exit(EXIT_SUCCESS)
+            }
         }
 
         let settingsStore = SettingsStore()
         let transcriptStore = TranscriptStore()
-        let appState = AppState(settingsStore: settingsStore, transcriptStore: transcriptStore)
+        let appState = AppState(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            runtimeEnvironment: runtimeEnvironment
+        )
         let windowCoordinator = WindowCoordinator(
             appState: appState,
             transcriptStore: transcriptStore,

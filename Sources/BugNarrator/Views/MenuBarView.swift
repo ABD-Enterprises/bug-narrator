@@ -65,7 +65,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text(appState.status.title)
+                Text(statusBadgeTitle)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(statusTint)
             }
@@ -150,13 +150,15 @@ struct MenuBarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button("Open Microphone Settings") {
-                appState.openMicrophonePrivacySettings()
+            if appState.currentError?.suggestsMicrophoneSettings == true {
+                Button("Open Microphone Settings") {
+                    appState.openMicrophonePrivacySettings()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityLabel("Open Microphone privacy settings")
+                .accessibilityHint("Opens the macOS privacy settings for microphone access")
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .accessibilityLabel("Open Microphone privacy settings")
-            .accessibilityHint("Opens the macOS privacy settings for microphone access")
         }
     }
 
@@ -537,5 +539,13 @@ struct MenuBarView: View {
         case .error:
             return .red
         }
+    }
+
+    private var statusBadgeTitle: String {
+        if appState.status.phase == .error, let currentError = appState.currentError {
+            return currentError.statusTitle
+        }
+
+        return appState.status.title
     }
 }

@@ -3,7 +3,7 @@ import XCTest
 @testable import BugNarrator
 
 @MainActor
-final class MockAudioRecorder: AudioRecording {
+final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     var currentDuration: TimeInterval = 0
     var startCallCount = 0
     var stopCallCount = 0
@@ -12,11 +12,32 @@ final class MockAudioRecorder: AudioRecording {
     var stopResults: [Result<RecordedAudio, Error>] = []
     var suspendStop = false
     var permissionState: MicrophonePermissionState = .authorized
+    var requestedPermissionStates: [MicrophonePermissionState] = []
+    var prerequisiteError: AppError?
+    private(set) var permissionRequestCallCount = 0
 
     private var stopContinuation: CheckedContinuation<RecordedAudio, Error>?
 
     func microphonePermissionState() -> MicrophonePermissionState {
         permissionState
+    }
+
+    func currentPermissionState() -> MicrophonePermissionState {
+        permissionState
+    }
+
+    func requestPermissionIfNeeded() async -> MicrophonePermissionState {
+        permissionRequestCallCount += 1
+
+        if permissionState == .notDetermined, !requestedPermissionStates.isEmpty {
+            permissionState = requestedPermissionStates.removeFirst()
+        }
+
+        return permissionState
+    }
+
+    func validateRecordingPrerequisites() async -> AppError? {
+        prerequisiteError
     }
 
     func startRecording() async throws {
@@ -378,6 +399,7 @@ struct AppStateHarness {
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
             audioRecorder: audioRecorder,
+            microphonePermissionService: MicrophonePermissionService(permissionAccess: audioRecorder),
             transcriptionClient: transcriptionClient,
             hotkeyManager: hotkeyManager,
             screenshotCaptureService: screenshotCaptureService,
