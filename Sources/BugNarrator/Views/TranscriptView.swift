@@ -13,7 +13,7 @@ struct TranscriptView: View {
     @State private var selectedFilter: SessionLibraryDateFilter = .today
     @State private var customStartDate = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
     @State private var customEndDate = Date()
-    @State private var selectedDetailTab: DetailTab = .rawTranscript
+    @State private var selectedDetailTab: ReviewWorkspaceTab = .rawTranscript
     @State private var hasResolvedInitialFilter = false
 
     private let exporter = TranscriptExporter()
@@ -62,30 +62,40 @@ struct TranscriptView: View {
         .onAppear {
             resolveInitialFilterIfNeeded()
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: selectedFilter) { _, _ in
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: searchText) { _, _ in
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: sortOrder) { _, _ in
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: customStartDate) { _, _ in
             selectedFilter = .customRange
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: customEndDate) { _, _ in
             selectedFilter = .customRange
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: sessionIDSignature) { _, _ in
             resolveInitialFilterIfNeeded()
             syncSelection()
+            syncDetailTabSelection()
         }
         .onChange(of: appState.selectedTranscriptID) { _, _ in
             selectedDetailTab = .rawTranscript
+        }
+        .onChange(of: selectedSessionWorkspaceSignature) { _, _ in
+            syncDetailTabSelection()
         }
     }
 
@@ -213,13 +223,7 @@ struct TranscriptView: View {
 
                 Spacer()
 
-                Picker("Sort", selection: $sortOrder) {
-                    ForEach(SessionLibrarySortOrder.allCases) { order in
-                        Text(order.rawValue).tag(order)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 140)
+                sortMenu
             }
 
             HStack(spacing: 10) {
@@ -249,6 +253,44 @@ struct TranscriptView: View {
                 }
                 .disabled(selectedSession == nil)
             }
+        }
+    }
+
+    private var sortMenu: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            Text("Sort")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Menu {
+                ForEach(SessionLibrarySortOrder.allCases) { order in
+                    Button {
+                        sortOrder = order
+                    } label: {
+                        if order == sortOrder {
+                            Label(order.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(order.rawValue)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(sortOrder.rawValue)
+                        .lineLimit(1)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityLabel("Sort sessions")
         }
     }
 
@@ -406,6 +448,19 @@ struct TranscriptView: View {
         allSessionEntries.map(\.id.uuidString).joined(separator: "|")
     }
 
+    private var selectedSessionWorkspaceSignature: String {
+        guard let selectedSession else {
+            return "none"
+        }
+
+        return [
+            selectedSession.id.uuidString,
+            selectedSession.summaryText.isEmpty ? "summary:0" : "summary:1",
+            selectedSession.issueExtraction == nil ? "extraction:0" : "extraction:1"
+        ]
+        .joined(separator: "|")
+    }
+
     private var deletionAlertTitle: String {
         pendingDeletionIDs.count == 1 ? "Delete Session?" : "Delete \(pendingDeletionIDs.count) Sessions?"
     }
@@ -450,6 +505,10 @@ struct TranscriptView: View {
         }
 
         appState.selectedTranscriptID = filteredEntries.first?.id
+    }
+
+    private func syncDetailTabSelection() {
+        selectedDetailTab = ReviewWorkspace.clampedTab(selectedDetailTab, for: selectedSession)
     }
 
     private func requestDeletion(for ids: Set<UUID>) {
@@ -539,63 +598,48 @@ struct TranscriptView: View {
 
     private func transcriptDetail(for session: TranscriptSession) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                headerSection(session)
-                actionSection(session)
-                tabPicker(for: session)
-                detailContent(for: session)
+            VStack(alignment: .leading, spacing: 16) {
+                reviewWorkspace(for: session)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func headerSection(_ session: TranscriptSession) -> some View {
+    private func reviewWorkspace(for session: TranscriptSession) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            workspaceHeader(session)
+            dividerSection
+            workspaceActions(session)
+            dividerSection
+            workspaceTabs(session)
+            dividerSection
+            detailContent(for: session)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func workspaceHeader(_ session: TranscriptSession) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(session.title)
-                        .font(.title2.weight(.semibold))
-
-                    Text("Review the transcript, refine extracted issues, then export only what you want to keep or share.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 8) {
-                        metricChip(systemImage: "calendar", title: session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        metricChip(systemImage: "clock", title: ElapsedTimeFormatter.string(from: session.duration))
-                        metricChip(systemImage: "waveform", title: session.model)
-                    }
-                }
-
-                Spacer()
-
-                if appState.status.phase == .recording {
-                    Button("Open Recording Controls") {
-                        appState.openRecordingControls()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
+            Text(session.title)
+                .font(.title2.weight(.semibold))
 
             HStack(spacing: 8) {
-                if session.markerCount > 0 {
-                    metricChip(systemImage: "mappin.and.ellipse", title: "\(session.markerCount) markers")
-                }
-
-                if session.screenshotCount > 0 {
-                    metricChip(systemImage: "photo", title: "\(session.screenshotCount) screenshots")
-                }
-
-                if session.issueCount > 0 {
-                    metricChip(systemImage: "checklist", title: "\(session.issueCount) issues")
-                }
+                Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
+                Text("•")
+                Text(ElapsedTimeFormatter.string(from: session.duration))
+                Text("•")
+                Text(session.model)
             }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
 
             if isUnsaved(session.id) {
-                HStack {
-                    Text("Auto-save is off. This transcript is only in memory until you quit the app.")
-                        .font(.subheadline)
+                HStack(spacing: 10) {
+                    Label("Only stored in memory until you save it.", systemImage: "tray")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
 
                     Spacer()
@@ -603,38 +647,56 @@ struct TranscriptView: View {
                     Button("Save to History") {
                         appState.saveCurrentTranscriptToHistory()
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
-            }
+            } else if appState.status.phase == .recording {
+                HStack(spacing: 10) {
+                    Label("Recording is active", systemImage: "record.circle.fill")
+                        .foregroundStyle(.red)
 
-            if appState.status.phase == .recording {
-                liveReviewControls
+                    Text(appState.elapsedTimeString)
+                        .font(.system(.footnote, design: .monospaced))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button("Open Recording Controls") {
+                        appState.openRecordingControls()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .font(.footnote)
             }
         }
+        .padding(18)
     }
 
-    private func actionSection(_ session: TranscriptSession) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Session Actions")
-                .font(.headline)
+    private var dividerSection: some View {
+        Divider()
+            .overlay(Color(nsColor: .separatorColor).opacity(0.45))
+    }
 
-            HStack(spacing: 10) {
-                Button("Copy Transcript") {
-                    appState.selectedTranscriptID = session.id
-                    appState.copyDisplayedTranscript()
+    private func workspaceActions(_ session: TranscriptSession) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Button(appState.isExtractingIssues(for: session) ? "Extracting Issues..." : "Extract Issues") {
+                appState.selectedTranscriptID = session.id
+                Task {
+                    await appState.extractIssuesForDisplayedTranscript()
                 }
+            }
+            .disabled(appState.isExtractingIssues(for: session))
 
-                Button(appState.isExtractingIssues(for: session) ? "Extracting Issues..." : "Extract Issues") {
-                    appState.selectedTranscriptID = session.id
-                    Task {
-                        await appState.extractIssuesForDisplayedTranscript()
-                    }
-                }
-                .disabled(appState.isExtractingIssues(for: session))
-
-                Spacer()
+            Button("Copy Transcript") {
+                appState.selectedTranscriptID = session.id
+                appState.copyDisplayedTranscript()
             }
 
-            HStack(spacing: 10) {
+            Spacer(minLength: 12)
+
+            Menu("Export") {
                 Button("Export TXT") {
                     export(session: session, format: .text)
                 }
@@ -655,41 +717,19 @@ struct TranscriptView: View {
                 }
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .padding(18)
     }
 
-    private func tabPicker(for session: TranscriptSession) -> some View {
+    private func workspaceTabs(_ session: TranscriptSession) -> some View {
         Picker("Session Detail", selection: $selectedDetailTab) {
-            ForEach(detailTabs(for: session)) { tab in
+            ForEach(ReviewWorkspace.availableTabs(for: session)) { tab in
                 Text(tab.title).tag(tab)
             }
         }
         .pickerStyle(.segmented)
-        .padding(10)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private var liveReviewControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Label("Recording is active", systemImage: "record.circle.fill")
-                    .foregroundStyle(.red)
-
-                Text(appState.elapsedTimeString)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(.semibold)
-
-                Spacer()
-            }
-
-            Text("Markers and screenshots are available from the recording controls window and global hotkeys.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(14)
-        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(18)
     }
 
     @ViewBuilder
@@ -708,61 +748,81 @@ struct TranscriptView: View {
         }
     }
 
+    @ViewBuilder
     private func reviewSummarySection(_ session: TranscriptSession) -> some View {
-        detailCard(title: "Review Summary", subtitle: "A concise readout of the issues and themes BugNarrator extracted from this feedback session.") {
-            if let extraction = session.issueExtraction, !extraction.summary.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(extraction.summary)
-                        .textSelection(.enabled)
+        if let extraction = session.issueExtraction {
+            let groupedIssues = ReviewWorkspace.summaryGroups(for: extraction.issues)
 
-                    Text(extraction.guidanceNote)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Review Summary")
+                    .font(.headline)
+
+                if !groupedIssues.isEmpty {
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(groupedIssues, id: \.category) { group in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(group.title)
+                                    .font(.body.weight(.semibold))
+
+                                ForEach(group.issues) { issue in
+                                    Text("– \(issue.title)")
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                    }
                 }
-            } else if !session.summaryText.isEmpty {
+
+                if groupedIssues.isEmpty || extraction.issues.isEmpty {
+                    if !extraction.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(extraction.summary)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+        } else if !session.summaryText.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Review Summary")
+                    .font(.headline)
+
                 Text(session.summaryText)
                     .textSelection(.enabled)
-            } else {
-                Text("No review summary is available for this session yet.")
-                    .foregroundStyle(.secondary)
             }
+        } else {
+            emptyDetailState(
+                title: "No review summary yet",
+                message: "Generate or extract issues for this session to build a concise summary."
+            )
         }
     }
 
     private func rawTranscriptSection(_ session: TranscriptSession) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            detailCard(title: "Raw Transcript", subtitle: "The full transcript stays separate from summaries and extracted issues.") {
-                Text(session.transcript)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        let entries = ReviewWorkspace.timelineEntries(for: session)
 
-            if !session.sections.isEmpty {
-                transcriptSections(session)
+        return LazyVStack(alignment: .leading, spacing: 12) {
+            ForEach(entries) { entry in
+                transcriptTimelineRow(entry, session: session)
             }
         }
     }
 
+    @ViewBuilder
     private func markersSection(_ session: TranscriptSession) -> some View {
-        detailCard(title: "Markers", subtitle: "Markers keep important moments aligned with the session timeline.") {
-            if session.markers.isEmpty {
-                Text("No markers were inserted for this session.")
-                    .foregroundStyle(.secondary)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(session.markers) { marker in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(marker.title)
-                                .font(.body.weight(.semibold))
+        if session.markers.isEmpty {
+            emptyDetailState(
+                title: "No markers yet",
+                message: "Insert markers during recording to flag moments worth revisiting."
+            )
+        } else {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                ForEach(session.markers) { marker in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Marker \(marker.index) — \(marker.timeLabel)")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundStyle(.secondary)
 
-                            Spacer()
-
-                            Text(marker.timeLabel)
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
+                        Text(marker.title)
+                            .font(.body.weight(.semibold))
 
                         if let note = marker.note, !note.isEmpty {
                             Text(note)
@@ -781,91 +841,184 @@ struct TranscriptView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
+            }
+        }
+    }
+
+    private func transcriptTimelineRow(_ entry: ReviewWorkspaceTimelineEntry, session: TranscriptSession) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(entry.timeLabel)
+                .font(.system(.body, design: .monospaced))
+                .fontWeight(.semibold)
+                .foregroundStyle(.pink)
+                .frame(width: 56, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 6) {
+                switch entry.kind {
+                case .transcript:
+                    if let title = entry.title, !title.isEmpty, title != "Full Session" {
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(entry.text)
+                        .font(.body)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                case .marker:
+                    Text("Marker \(entry.index ?? 0)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(entry.text)
+                        .font(.body.weight(.semibold))
+
+                case .screenshot:
+                    Text("Screenshot")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(entry.text)
+                        .font(.body.weight(.semibold))
+
+                    if let screenshotID = entry.screenshotID,
+                       let screenshot = session.screenshot(with: screenshotID) {
+                        Button("Open Screenshot") {
+                            appState.openScreenshot(screenshot)
+                        }
+                        .buttonStyle(.link)
+                    }
+                }
+
+                if let secondaryText = entry.secondaryText, !secondaryText.isEmpty {
+                    Text(secondaryText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func screenshotsSection(_ session: TranscriptSession) -> some View {
+        if session.screenshots.isEmpty {
+            emptyDetailState(
+                title: "No screenshots yet",
+                message: "Captured screenshots appear here with their timeline position and related marker."
+            )
+        } else {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(session.screenshots.enumerated()), id: \.element.id) { index, screenshot in
+                    screenshotTimelineRow(screenshot, index: index, session: session)
                 }
             }
         }
     }
 
-    private func screenshotsSection(_ session: TranscriptSession) -> some View {
-        detailCard(title: "Screenshots", subtitle: "Visual evidence stays tied to the session timeline and related markers.") {
-            if session.screenshots.isEmpty {
-                Text("No screenshots were captured for this session.")
-                    .foregroundStyle(.secondary)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
-                    ForEach(session.screenshots) { screenshot in
-                        VStack(alignment: .leading, spacing: 10) {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(.quaternary.opacity(0.5))
-                                .frame(height: 120)
-                                .overlay {
-                                    VStack(spacing: 6) {
-                                        Image(systemName: "photo")
-                                            .font(.title2)
-                                            .foregroundStyle(.secondary)
-                                        Text(screenshot.fileName)
-                                            .font(.caption)
-                                            .multilineTextAlignment(.center)
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 8)
-                                    }
-                                }
+    private func screenshotTimelineRow(_ screenshot: SessionScreenshot, index: Int, session: TranscriptSession) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Screenshot")
+                    .font(.body.weight(.semibold))
 
-                            Text(screenshot.fileName)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(2)
-
-                            HStack {
-                                Text(screenshot.timeLabel)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-
-                                Spacer()
-
-                                if let associatedMarkerID = screenshot.associatedMarkerID,
-                                   let marker = session.marker(with: associatedMarkerID) {
-                                    Text(marker.title)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            Button("Open Screenshot") {
-                                appState.openScreenshot(screenshot)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                }
+                Text("\(index + 1)")
+                    .font(.system(.body, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.pink)
             }
+
+            screenshotPreview(screenshot)
+
+            HStack(spacing: 10) {
+                Text(screenshot.timeLabel)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                if let associatedMarkerID = screenshot.associatedMarkerID,
+                   let marker = session.marker(with: associatedMarkerID) {
+                    Text("•")
+                        .foregroundStyle(.secondary)
+
+                    Text(marker.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Open Screenshot") {
+                    appState.openScreenshot(screenshot)
+                }
+                .buttonStyle(.link)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func screenshotPreview(_ screenshot: SessionScreenshot) -> some View {
+        if let image = ScreenshotPreviewCache.shared.previewImage(for: screenshot.fileURL) {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, minHeight: 140, maxHeight: 220, alignment: .leading)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(.quaternary.opacity(0.5), lineWidth: 1)
+                )
+        } else {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.quaternary.opacity(0.45))
+                .frame(maxWidth: .infinity, minHeight: 140, maxHeight: 180)
+                .overlay(alignment: .center) {
+                    Text("[preview unavailable]")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
         }
     }
 
     private func extractedIssuesSection(_ session: TranscriptSession) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if let extraction = session.issueExtraction {
-                detailCard(title: "Extracted Issues", subtitle: "Reviewable draft issues with transcript evidence and optional screenshot links.") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if !extraction.guidanceNote.isEmpty {
-                            Text(extraction.guidanceNote)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Extracted Issues")
+                        .font(.headline)
+
+                    Text(extraction.guidanceNote.isEmpty ? "Review before exporting." : extraction.guidanceNote)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    if extraction.issues.isEmpty {
+                        emptyDetailState(
+                            title: "No extracted issues",
+                            message: "Issue extraction ran, but it did not return any draft issues for this session."
+                        )
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(extraction.issues) { issue in
+                                issueReviewRow(issue: issue, session: session)
+                            }
                         }
 
-                        HStack(spacing: 10) {
-                            Button("Select All") {
-                                appState.setAllIssuesSelected(true, in: session.id)
-                            }
+                        Divider()
+                            .padding(.top, 4)
 
-                            Button("Select None") {
-                                appState.setAllIssuesSelected(false, in: session.id)
-                            }
+                        Text(ReviewWorkspace.selectedIssueSummary(for: session))
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
 
-                            Spacer()
-
+                        HStack(spacing: 12) {
                             Button(appState.isExporting(to: .github) ? "Exporting to GitHub..." : "Export to GitHub") {
                                 Task {
                                     await appState.exportSelectedIssues(from: session, to: .github)
@@ -880,39 +1033,28 @@ struct TranscriptView: View {
                             }
                             .disabled(!appState.canExportIssues(from: session, to: .jira) || appState.isExporting(to: .jira))
                         }
-
-                        if extraction.issues.isEmpty {
-                            Text("No reviewable issues were extracted from this transcript.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            LazyVStack(alignment: .leading, spacing: 14) {
-                                ForEach(extraction.issues) { issue in
-                                    issueCard(issue: issue, session: session)
-                                }
-                            }
-                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
             } else {
-                detailCard(title: "Extracted Issues", subtitle: "Turn this transcript into reviewable draft bugs, UX issues, enhancements, and follow-ups.") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Run issue extraction to turn this transcript into reviewable draft bugs, UX issues, enhancements, and follow-ups.")
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Run issue extraction to turn this transcript into reviewable draft bugs, UX issues, enhancements, and follow-ups.")
+                        .foregroundStyle(.secondary)
 
-                        Button(appState.isExtractingIssues(for: session) ? "Extracting Issues..." : "Extract Issues") {
-                            appState.selectedTranscriptID = session.id
-                            Task {
-                                await appState.extractIssuesForDisplayedTranscript()
-                            }
+                    Button(appState.isExtractingIssues(for: session) ? "Extracting Issues..." : "Extract Issues") {
+                        appState.selectedTranscriptID = session.id
+                        Task {
+                            await appState.extractIssuesForDisplayedTranscript()
                         }
-                        .disabled(appState.isExtractingIssues(for: session))
                     }
+                    .disabled(appState.isExtractingIssues(for: session))
                 }
             }
         }
     }
 
-    private func issueCard(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+    private func issueReviewRow(issue: ExtractedIssue, session: TranscriptSession) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 Toggle(
@@ -927,81 +1069,69 @@ struct TranscriptView: View {
                 .toggleStyle(.checkbox)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    TextField(
-                        "Issue title",
-                        text: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.title, fallback: issue.title)
-                    )
-                    .textFieldStyle(.roundedBorder)
-
-                    HStack(spacing: 12) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Picker(
-                            "Category",
+                            "",
                             selection: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.category, fallback: issue.category)
                         ) {
                             ForEach(ExtractedIssueCategory.allCases) { category in
                                 Text(category.rawValue).tag(category)
                             }
                         }
+                        .labelsHidden()
                         .pickerStyle(.menu)
 
-                        Toggle(
-                            "Needs Review",
-                            isOn: issueBinding(
-                                sessionID: session.id,
-                                issueID: issue.id,
-                                keyPath: \.requiresReview,
-                                fallback: issue.requiresReview
-                            )
+                        Text("—")
+                            .foregroundStyle(.secondary)
+
+                        TextField(
+                            "Issue title",
+                            text: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.title, fallback: issue.title)
                         )
-                        .toggleStyle(.switch)
+                        .textFieldStyle(.plain)
 
                         Spacer()
-                    }
 
-                    HStack(spacing: 12) {
-                        if let timestampLabel = extractedIssue(sessionID: session.id, issueID: issue.id)?.timestampLabel ?? issue.timestampLabel {
-                            Label(timestampLabel, systemImage: "clock")
-                                .font(.caption)
+                        if extractedIssue(sessionID: session.id, issueID: issue.id)?.requiresReview ?? issue.requiresReview {
+                            Text("Review")
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                        }
-
-                        if let sectionTitle = extractedIssue(sessionID: session.id, issueID: issue.id)?.sectionTitle ?? issue.sectionTitle,
-                           !sectionTitle.isEmpty {
-                            Label(sectionTitle, systemImage: "text.quote")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if let confidenceLabel = extractedIssue(sessionID: session.id, issueID: issue.id)?.confidenceLabel ?? issue.confidenceLabel {
-                            Label(confidenceLabel, systemImage: "checkmark.seal")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.quaternary.opacity(0.45), in: Capsule())
                         }
                     }
 
-                    fieldEditor(
-                        title: "Summary",
-                        text: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.summary, fallback: issue.summary),
-                        minHeight: 84
-                    )
+                    if let timestampLabel = extractedIssue(sessionID: session.id, issueID: issue.id)?.timestampLabel ?? issue.timestampLabel {
+                        Text("Timestamp: \(timestampLabel)")
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.pink)
+                    }
 
-                    fieldEditor(
-                        title: "Evidence",
-                        text: issueBinding(
-                            sessionID: session.id,
-                            issueID: issue.id,
-                            keyPath: \.evidenceExcerpt,
-                            fallback: issue.evidenceExcerpt
-                        ),
-                        minHeight: 92
-                    )
+                    Text("Evidence: \"\((extractedIssue(sessionID: session.id, issueID: issue.id)?.evidenceExcerpt ?? issue.evidenceExcerpt).trimmingCharacters(in: .whitespacesAndNewlines))\"")
+                        .textSelection(.enabled)
+
+                    if let sectionTitle = extractedIssue(sessionID: session.id, issueID: issue.id)?.sectionTitle ?? issue.sectionTitle,
+                       !sectionTitle.isEmpty {
+                        Text("Section: \(sectionTitle)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    let summaryText = (extractedIssue(sessionID: session.id, issueID: issue.id)?.summary ?? issue.summary).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !summaryText.isEmpty && summaryText != (extractedIssue(sessionID: session.id, issueID: issue.id)?.evidenceExcerpt ?? issue.evidenceExcerpt).trimmingCharacters(in: .whitespacesAndNewlines) {
+                        Text("Summary: \(summaryText)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
 
                     let relatedScreenshots = (extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue).relatedScreenshotIDs
                         .compactMap(session.screenshot(with:))
-
                     if !relatedScreenshots.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Related Screenshots")
+                        HStack(spacing: 8) {
+                            Text("Screenshots:")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
 
@@ -1013,6 +1143,7 @@ struct TranscriptView: View {
                             }
                         }
                     }
+
                 }
             }
         }
@@ -1021,69 +1152,17 @@ struct TranscriptView: View {
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func transcriptSections(_ session: TranscriptSession) -> some View {
-        detailCard(title: "Transcript Sections", subtitle: "Markers and screenshots split the transcript into review moments.") {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                ForEach(session.sections) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(section.title)
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text(section.timeRangeLabel)
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if !section.screenshotIDs.isEmpty {
-                            HStack(spacing: 8) {
-                                Text("Screenshots:")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-
-                                ForEach(section.screenshotIDs, id: \.self) { screenshotID in
-                                    if let screenshot = session.screenshot(with: screenshotID) {
-                                        Button(screenshot.fileName) {
-                                            appState.openScreenshot(screenshot)
-                                        }
-                                        .buttonStyle(.link)
-                                    }
-                                }
-                            }
-                        }
-
-                        Text(section.text)
-                            .textSelection(.enabled)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func detailCard<Content: View>(
-        title: String,
-        subtitle: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
+    private func emptyDetailState(title: String, message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
+            Text(title)
+                .font(.headline)
 
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            content()
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.vertical, 8)
     }
 
     private func resolveSession(for entry: SessionLibraryEntry) -> TranscriptSession? {
@@ -1161,39 +1240,4 @@ struct TranscriptView: View {
         )
     }
 
-    private func detailTabs(for session: TranscriptSession) -> [DetailTab] {
-        var tabs: [DetailTab] = [.rawTranscript]
-
-        if !session.summaryText.isEmpty || session.issueExtraction != nil {
-            tabs.append(.reviewSummary)
-        }
-
-        tabs.append(contentsOf: [.markers, .screenshots, .extractedIssues])
-        return tabs
-    }
-}
-
-private enum DetailTab: Identifiable {
-    case rawTranscript
-    case reviewSummary
-    case markers
-    case screenshots
-    case extractedIssues
-
-    var id: String { title }
-
-    var title: String {
-        switch self {
-        case .rawTranscript:
-            return "Raw Transcript"
-        case .reviewSummary:
-            return "Review Summary"
-        case .markers:
-            return "Markers"
-        case .screenshots:
-            return "Screenshots"
-        case .extractedIssues:
-            return "Extracted Issues"
-        }
-    }
 }

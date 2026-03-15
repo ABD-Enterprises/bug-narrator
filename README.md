@@ -80,10 +80,10 @@ Important:
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Click `Start Feedback Session`.
+5. Click `Start Recording`.
 6. Speak while you continue reviewing the target app.
 7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or the global hotkeys to insert markers and capture screenshots without reopening the menu.
-8. Click `Stop Feedback Session`.
+8. Click `Stop Recording`.
 9. Review the transcript, review summary, screenshots, and extracted issues in the session library.
 10. Export a session bundle or selected issues when needed.
 
@@ -93,7 +93,7 @@ Important:
 
 BugNarrator records in the background while you switch apps and continue normal mouse or keyboard interaction. It does not type live dictation into the frontmost app.
 
-Clicking `Start Feedback Session` opens a persistent recording controls window. That window is the primary place to:
+Clicking `Start Recording` opens a persistent recording controls window. That window is the primary place to:
 
 - start the session
 - stop the session
@@ -161,7 +161,16 @@ Configure your Jira Cloud URL, email, API token, project key, and issue type in 
 
 ### Microphone
 
-BugNarrator requests microphone permission the first time you start a recording. If access is denied, recording is blocked until you re-enable BugNarrator in `System Settings > Privacy & Security > Microphone`. The menu bar window includes an `Open Microphone Settings` recovery button.
+BugNarrator now runs a microphone preflight before recording starts. It requests permission only when needed, blocks recording before any fake recording state appears, and distinguishes between:
+
+- access not granted yet
+- access denied
+- access restricted
+- audio capture unavailable even though permission looks enabled
+
+If access is denied, recording is blocked until you re-enable BugNarrator in `System Settings > Privacy & Security > Microphone`. If access is restricted, the app tells you to check device-management or parental-control restrictions. If permission looks granted but audio capture still cannot be prepared, BugNarrator reports that as a microphone availability problem instead of a generic recording failure.
+
+For local testing from Xcode or `DerivedData`, macOS may treat different app bundle paths as different apps. If microphone behavior looks inconsistent while testing unsigned builds, keep launching the same local app copy or use the signed DMG build for steadier permission behavior.
 
 ### Screen Recording
 

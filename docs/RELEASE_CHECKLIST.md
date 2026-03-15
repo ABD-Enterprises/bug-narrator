@@ -37,6 +37,8 @@ Use this checklist before cutting a public test build or release candidate.
 - Use a custom date range and confirm the session list updates immediately.
 - Search by transcript text or summary text and confirm results narrow correctly.
 - Delete a session and confirm the list, counts, and detail pane update immediately.
+- Switch from a session with extracted issues or summary content to one without those sections and confirm the review workspace falls back to a valid tab instead of showing stale content.
+- Open a screenshot-heavy session and confirm the `Screenshots` tab stays responsive while loading previews.
 
 ## Artifact And Persistence Safety
 
@@ -68,4 +70,5 @@ Use this checklist before cutting a public test build or release candidate.
 - Run `spctl -a -vv build/DerivedData/Build/Products/Release/BugNarrator.app` and confirm the notarized app is accepted.
 - If `spctl -a -vv -t open` on the local DMG reports `Insufficient Context`, treat that as a local-check limitation and verify the published download on a second Mac instead.
 - Run the automated test suite and confirm it passes.
+- Run the automated test suite with no manually launched BugNarrator copies required, and confirm single-instance enforcement does not interfere with the XCTest app host.
 - Note any known limitations in the release notes or changelog before publishing.

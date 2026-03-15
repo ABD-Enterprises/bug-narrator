@@ -1,0 +1,225 @@
+import AVFAudio
+import AVFoundation
+import Foundation
+
+@MainActor
+final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
+    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
+
+    func currentPermissionState() -> MicrophonePermissionState {
+        let capturePermission = captureDevicePermissionState()
+        let audioPermission = audioApplicationPermissionState()
+        let resolvedPermission = MicrophonePermissionResolver.resolve(
+            capturePermission: capturePermission,
+            audioPermission: audioPermission
+        )
+
+        if capturePermission != audioPermission {
+            permissionsLogger.warning(
+                "microphone_permission_mismatch",
+                "Microphone permission sources disagreed. BugNarrator will use the most permissive state to avoid false denials.",
+                metadata: [
+                    "capture_permission": capturePermission.diagnosticsValue,
+                    "audio_permission": audioPermission.diagnosticsValue,
+                    "resolved_permission": resolvedPermission.diagnosticsValue
+                ]
+            )
+        }
+
+        return resolvedPermission
+    }
+
+    func requestPermissionIfNeeded() async -> MicrophonePermissionState {
+        switch currentPermissionState() {
+        case .authorized:
+            permissionsLogger.debug("microphone_permission_authorized", "Microphone access is already authorized.")
+            return .authorized
+        case .notDetermined:
+            permissionsLogger.info("microphone_permission_requested", "Requesting microphone access from macOS.")
+
+            if captureDevicePermissionState() == .notDetermined {
+                let granted = await withCheckedContinuation { continuation in
+                    AVCaptureDevice.requestAccess(for: .audio) { granted in
+                        continuation.resume(returning: granted)
+                    }
+                }
+
+                if granted || currentPermissionState() == .authorized {
+                    return .authorized
+                }
+            }
+
+            if audioApplicationPermissionState() == .notDetermined {
+                let granted = await withCheckedContinuation { continuation in
+                    AVAudioApplication.requestRecordPermission { granted in
+                        continuation.resume(returning: granted)
+                    }
+                }
+
+                if granted || currentPermissionState() == .authorized {
+                    return .authorized
+                }
+            }
+
+            return currentPermissionState()
+        case .denied, .restricted:
+            permissionsLogger.warning("microphone_permission_blocked", "Microphone access is denied or restricted.")
+            return currentPermissionState()
+        }
+    }
+
+    private func audioApplicationPermissionState() -> MicrophonePermissionState {
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return .authorized
+        case .undetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        @unknown default:
+            return .restricted
+        }
+    }
+
+    private func captureDevicePermissionState() -> MicrophonePermissionState {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .restricted:
+            return .restricted
+        @unknown default:
+            return .restricted
+        }
+    }
+}
+
+@MainActor
+final class MicrophonePermissionService: MicrophonePermissionServicing {
+    private let permissionAccess: any MicrophonePermissionAccessing
+    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
+
+    init(permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess()) {
+        self.permissionAccess = permissionAccess
+    }
+
+    func currentStatus() -> MicrophonePermissionStatus {
+        status(from: permissionAccess.currentPermissionState())
+    }
+
+    func recoveryGuidance(
+        for status: MicrophonePermissionStatus,
+        runtimeEnvironment: AppRuntimeEnvironment
+    ) -> MicrophoneRecoveryGuidance {
+        let localTestingNote = runtimeEnvironment.isLocalTestingBuild
+            ? "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. For steadier testing, keep launching the same app copy or use the signed DMG build."
+            : nil
+
+        switch status {
+        case .notDetermined:
+            return MicrophoneRecoveryGuidance(
+                headline: "Microphone access will be requested when you start recording.",
+                message: "BugNarrator needs microphone access to record a feedback session. Start recording to trigger the macOS permission prompt.",
+                localTestingNote: localTestingNote
+            )
+        case .granted:
+            return MicrophoneRecoveryGuidance(
+                headline: "Microphone access is available.",
+                message: "BugNarrator can use the microphone on this app copy.",
+                localTestingNote: runtimeEnvironment.isLocalTestingBuild ? localTestingNote : nil
+            )
+        case .denied:
+            return MicrophoneRecoveryGuidance(
+                headline: "Microphone access is blocked.",
+                message: "Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again.",
+                localTestingNote: localTestingNote
+            )
+        case .restricted:
+            return MicrophoneRecoveryGuidance(
+                headline: "Microphone access is restricted.",
+                message: "Microphone access is restricted on this Mac. Check System Settings > Privacy & Security > Microphone and any device-management or parental-control restrictions, then try again.",
+                localTestingNote: localTestingNote
+            )
+        case .unavailable:
+            return MicrophoneRecoveryGuidance(
+                headline: "Audio capture is unavailable.",
+                message: "BugNarrator could not prepare audio capture. Check that an input device is connected and available, then try again.",
+                localTestingNote: localTestingNote
+            )
+        case .unknownError:
+            return MicrophoneRecoveryGuidance(
+                headline: "BugNarrator could not confirm microphone access.",
+                message: "Relaunch the app and try again. If the problem continues, export a debug bundle and include it with your bug report.",
+                localTestingNote: localTestingNote
+            )
+        }
+    }
+
+    func preflightForRecordingStart(audioRecorder: any AudioRecording) async -> RecordingStartPreflightResult {
+        let permissionStatus = status(from: await permissionAccess.requestPermissionIfNeeded())
+
+        switch permissionStatus {
+        case .granted:
+            break
+        case .notDetermined:
+            permissionsLogger.warning(
+                "microphone_permission_not_determined_after_request",
+                "Microphone access remained undecided after BugNarrator requested it."
+            )
+            return .needsUserAction(.microphonePermissionDenied)
+        case .denied:
+            permissionsLogger.warning("microphone_permission_denied", "Microphone access was denied.")
+            return .needsUserAction(.microphonePermissionDenied)
+        case .restricted:
+            permissionsLogger.warning("microphone_permission_restricted", "Microphone access is restricted.")
+            return .blocked(.microphonePermissionRestricted)
+        case .unavailable:
+            permissionsLogger.error("microphone_unavailable", "Microphone access is unavailable.")
+            return .blocked(.microphoneUnavailable("Check that an input device is connected and available, then try again."))
+        case .unknownError:
+            permissionsLogger.error("microphone_permission_unknown_error", "BugNarrator could not confirm microphone availability.")
+            return .failure(.microphoneUnavailable("BugNarrator could not confirm microphone availability. Relaunch the app and try again."))
+        }
+
+        if let prerequisiteError = await audioRecorder.validateRecordingPrerequisites() {
+            permissionsLogger.error(
+                "microphone_recording_prerequisites_failed",
+                prerequisiteError.userMessage
+            )
+            return .failure(prerequisiteError)
+        }
+
+        return .success
+    }
+
+    private func status(from permissionState: MicrophonePermissionState) -> MicrophonePermissionStatus {
+        switch permissionState {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .restricted:
+            return .restricted
+        }
+    }
+}
+
+private extension MicrophonePermissionState {
+    var diagnosticsValue: String {
+        switch self {
+        case .authorized:
+            return "authorized"
+        case .notDetermined:
+            return "not_determined"
+        case .denied:
+            return "denied"
+        case .restricted:
+            return "restricted"
+        }
+    }
+}

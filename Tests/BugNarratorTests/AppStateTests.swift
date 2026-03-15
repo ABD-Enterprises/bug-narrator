@@ -93,6 +93,49 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
     }
 
+    func testStartSessionWithRestrictedMicrophonePermissionFailsBeforeRecorderStarts() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.permissionState = .restricted
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(harness.appState.currentError, .microphonePermissionRestricted)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+    }
+
+    func testStartSessionRequestsMicrophonePermissionBeforeRecording() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.permissionState = .notDetermined
+        harness.audioRecorder.requestedPermissionStates = [.authorized]
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.audioRecorder.permissionRequestCallCount, 1)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
+    }
+
+    func testStartSessionShowsCaptureUnavailableErrorWhenPrerequisitesFail() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.prerequisiteError = .microphoneUnavailable("The selected microphone could not be opened.")
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.currentError,
+            .microphoneUnavailable("The selected microphone could not be opened.")
+        )
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+    }
+
     func testPermissionRefreshClearsStaleMicrophoneDeniedErrorAfterAccessIsGranted() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -115,6 +158,23 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testPermissionRefreshClearsStaleMicrophoneRestrictedErrorAfterAccessIsGranted() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.permissionState = .restricted
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.currentError, .microphonePermissionRestricted)
+
+        harness.audioRecorder.permissionState = .authorized
+        harness.appState.refreshPermissionRecoveryState()
+
+        XCTAssertNil(harness.appState.currentError)
+        XCTAssertEqual(harness.appState.status.phase, .idle)
+    }
+
     func testLocalTestingBuildAddsMicrophoneRecoveryGuidance() {
         let harness = AppStateHarness(
             runtimeEnvironment: AppRuntimeEnvironment(
@@ -123,10 +183,12 @@ final class AppStateTests: XCTestCase {
         )
         defer { harness.cleanup() }
 
-        XCTAssertTrue(harness.appState.microphoneRecoveryGuidance.contains("same app copy"))
+        harness.audioRecorder.permissionState = .denied
+
+        XCTAssertTrue(harness.appState.microphoneRecoveryGuidance.contains("System Settings > Privacy & Security > Microphone"))
         XCTAssertEqual(
             harness.appState.microphoneRecoveryLocalTestingNote,
-            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path."
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. For steadier testing, keep launching the same app copy or use the signed DMG build."
         )
     }
 

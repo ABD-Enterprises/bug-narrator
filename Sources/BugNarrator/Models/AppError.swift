@@ -5,6 +5,8 @@ enum AppError: LocalizedError, Equatable {
     case invalidAPIKey
     case revokedAPIKey
     case microphonePermissionDenied
+    case microphonePermissionRestricted
+    case microphoneUnavailable(String)
     case screenRecordingPermissionDenied
     case noActiveSession(String)
     case recordingFailure(String)
@@ -30,6 +32,10 @@ enum AppError: LocalizedError, Equatable {
             return "The OpenAI API key is no longer valid. Open Settings, remove it, and add a new key."
         case .microphonePermissionDenied:
             return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again."
+        case .microphonePermissionRestricted:
+            return "Microphone access is restricted on this Mac. Check System Settings > Privacy & Security > Microphone and any device-management or parental-control restrictions, then try again."
+        case .microphoneUnavailable(let message):
+            return "BugNarrator could not start audio capture. \(message)"
         case .screenRecordingPermissionDenied:
             return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again."
         case .noActiveSession(let message):
@@ -61,6 +67,68 @@ enum AppError: LocalizedError, Equatable {
         }
     }
 
+    var statusTitle: String {
+        switch self {
+        case .missingAPIKey:
+            return "OpenAI Key Needed"
+        case .invalidAPIKey, .revokedAPIKey:
+            return "OpenAI Key Rejected"
+        case .microphonePermissionDenied:
+            return "Microphone Access Needed"
+        case .microphonePermissionRestricted:
+            return "Microphone Access Restricted"
+        case .microphoneUnavailable:
+            return "Microphone Unavailable"
+        case .screenRecordingPermissionDenied:
+            return "Screen Recording Access Needed"
+        case .recordingFailure:
+            return "Recording Failed"
+        case .transcriptionFailure, .openAIRequestRejected, .emptyTranscript:
+            return "Transcription Failed"
+        case .screenshotCaptureFailure:
+            return "Screenshot Failed"
+        case .issueExtractionFailure:
+            return "Issue Extraction Failed"
+        case .networkTimeout, .networkFailure:
+            return "Network Issue"
+        case .exportConfigurationMissing:
+            return "Export Setup Needed"
+        case .exportFailure:
+            return "Export Failed"
+        case .storageFailure:
+            return "Local Save Failed"
+        case .diagnosticsFailure:
+            return "Diagnostics Failed"
+        case .noActiveSession:
+            return "Action Needed"
+        }
+    }
+
+    var recoveryHeadline: String? {
+        switch self {
+        case .microphonePermissionDenied:
+            return "Microphone access is blocked."
+        case .microphonePermissionRestricted:
+            return "Microphone access is restricted."
+        case .microphoneUnavailable:
+            return "Audio capture is unavailable."
+        case .screenRecordingPermissionDenied:
+            return "Screen recording access is blocked."
+        case .missingAPIKey:
+            return "Add your OpenAI API key before continuing."
+        case .invalidAPIKey, .revokedAPIKey:
+            return "Replace your OpenAI API key before continuing."
+        case .networkTimeout, .networkFailure:
+            return "BugNarrator could not reach OpenAI."
+        case .exportConfigurationMissing:
+            return "Finish export setup before continuing."
+        case .storageFailure:
+            return "BugNarrator could not update local session history."
+        default:
+            return nil
+        }
+    }
+
     var errorDescription: String? {
         userMessage
     }
@@ -68,6 +136,15 @@ enum AppError: LocalizedError, Equatable {
     var suggestsOpenAISettings: Bool {
         switch self {
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var suggestsMicrophoneSettings: Bool {
+        switch self {
+        case .microphonePermissionDenied, .microphonePermissionRestricted:
             return true
         default:
             return false

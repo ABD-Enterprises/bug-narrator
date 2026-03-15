@@ -7,13 +7,61 @@ enum MicrophonePermissionState: Equatable {
     case restricted
 }
 
+enum MicrophonePermissionStatus: String, Equatable {
+    case notDetermined
+    case granted
+    case denied
+    case restricted
+    case unavailable
+    case unknownError
+}
+
+struct MicrophoneRecoveryGuidance: Equatable {
+    let headline: String
+    let message: String
+    let localTestingNote: String?
+}
+
+enum RecordingStartPreflightResult: Equatable {
+    case success
+    case blocked(AppError)
+    case needsUserAction(AppError)
+    case failure(AppError)
+
+    var error: AppError? {
+        switch self {
+        case .success:
+            return nil
+        case .blocked(let error), .needsUserAction(let error), .failure(let error):
+            return error
+        }
+    }
+}
+
 @MainActor
 protocol AudioRecording: AnyObject {
     var currentDuration: TimeInterval { get }
     func microphonePermissionState() -> MicrophonePermissionState
+    func validateRecordingPrerequisites() async -> AppError?
     func startRecording() async throws
     func stopRecording() async throws -> RecordedAudio
     func cancelRecording(preserveFile: Bool) async
+}
+
+@MainActor
+protocol MicrophonePermissionAccessing {
+    func currentPermissionState() -> MicrophonePermissionState
+    func requestPermissionIfNeeded() async -> MicrophonePermissionState
+}
+
+@MainActor
+protocol MicrophonePermissionServicing {
+    func currentStatus() -> MicrophonePermissionStatus
+    func recoveryGuidance(
+        for status: MicrophonePermissionStatus,
+        runtimeEnvironment: AppRuntimeEnvironment
+    ) -> MicrophoneRecoveryGuidance
+    func preflightForRecordingStart(audioRecorder: any AudioRecording) async -> RecordingStartPreflightResult
 }
 
 protocol TranscriptionServing: Sendable {

@@ -20,7 +20,7 @@ struct MenuBarStatusPresentation: Equatable {
 
     private static func recoveryAction(for currentError: AppError?) -> MenuBarStatusRecoveryAction {
         switch currentError {
-        case .microphonePermissionDenied:
+        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
             return .microphone
         case .screenRecordingPermissionDenied:
             return .screenRecording

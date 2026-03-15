@@ -49,7 +49,7 @@ It helps you:
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Start a session with `Start Feedback Session`.
+5. Start a session with `Start Recording`.
 
 BugNarrator does not ship with a built-in OpenAI API key. Transcription and issue extraction use your own OpenAI account and may incur charges under OpenAI pricing.
 
@@ -61,8 +61,8 @@ Start a session from the menu bar or by using your configured start hotkey. BugN
 
 The recording controls window includes:
 
-- `Start Feedback Session`
-- `Stop Feedback Session`
+- `Start Recording`
+- `Stop Recording`
 - `Insert Marker`
 - `Capture Screenshot`
 
@@ -212,6 +212,9 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - use BugNarrator's `Open Microphone Settings` button if it appears in the menu bar window
 - or open `System Settings > Privacy & Security > Microphone`
 - verify microphone permission is granted to BugNarrator
+- if BugNarrator says microphone access is restricted, also check device-management, parental-control, or workplace policy restrictions
+- if BugNarrator says audio capture is unavailable even though permission is enabled, check that an input device is connected and not already failing at the macOS level
+- if you are testing from Xcode or `DerivedData`, keep launching the same local app copy or switch to the signed DMG build; macOS may treat different local build paths as different apps for microphone approval
 - restart the app after changing permission settings if needed
 
 ### BugNarrator Opened Twice

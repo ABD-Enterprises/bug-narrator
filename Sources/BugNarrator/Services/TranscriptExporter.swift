@@ -82,6 +82,10 @@ struct TranscriptExporter {
             return
         }
 
+        _ = try writeBundle(session: session, to: destinationRoot)
+    }
+
+    func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {
         let bundleDirectoryURL = uniqueBundleDirectoryURL(
             baseDirectory: destinationRoot,
             suggestedName: session.suggestedBundleDirectoryName
@@ -123,6 +127,8 @@ struct TranscriptExporter {
                 "screenshot_count": "\(session.screenshotCount)"
             ]
         )
+
+        return bundleDirectoryURL
     }
 
     private func uniqueBundleDirectoryURL(baseDirectory: URL, suggestedName: String) -> URL {

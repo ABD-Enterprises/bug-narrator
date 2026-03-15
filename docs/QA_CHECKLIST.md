@@ -21,6 +21,8 @@
 - Verify `Export Debug Bundle` writes a local bundle containing `system-info.json`, `app-version.txt`, `macos-version.txt`, `recent-log.txt`, and `session-metadata.json`.
 - Verify the exported debug bundle does not contain API keys, GitHub tokens, Jira tokens, or raw credentials.
 - Confirm microphone permission is requested on the first recording attempt if it has not already been granted.
+- Confirm recording does not enter a fake `Recording` state if microphone preflight fails before capture starts.
+- Confirm a denied microphone state, a restricted microphone state, and an audio-capture-unavailable state each show distinct guidance instead of the same generic error.
 - Confirm screenshot capture prompts for Screen Recording permission if macOS requires it.
 
 ## About And Product Info
@@ -60,7 +62,7 @@
 ## Core Workflow
 
 - Start a feedback session from the menu bar.
-- Verify the recording controls window opens immediately and no duplicate control windows appear if you click `Start Feedback Session` again.
+- Verify the recording controls window opens immediately and no duplicate control windows appear if you click `Start Recording` again.
 - Verify the status changes to `Recording`.
 - Verify the red recording indicator and elapsed timer appear and continue updating.
 - Switch between apps, click around, and keep speaking for at least 15 seconds.
@@ -86,6 +88,7 @@
 - Change sorting to `Oldest First` and confirm the list order reverses correctly.
 - Select a session from the list and verify the detail pane updates in place without opening a separate popup.
 - Rapidly switch between several different sessions and verify the detail pane updates cleanly without visual thrash, stale transcript content, or mismatched counts.
+- Select a session with `Extracted Issues` or `Summary`, switch to that tab, then select a session without those sections and verify the review workspace falls back cleanly instead of staying on a blank or stale tab.
 - Verify the detail pane keeps access to raw transcript, markers, screenshots, extracted issues, and export actions.
 - Verify an empty state appears for no sessions yet, no sessions in a filter, no sessions in a custom date range, and no search results.
 
@@ -93,9 +96,11 @@
 
 - Insert a marker during recording and verify it appears in the `Markers` tab with the correct time.
 - Capture a screenshot during recording and verify it appears in the `Screenshots` tab.
+- With several screenshots in one session, open the `Screenshots` tab and verify previews load promptly without obvious UI hitching or full-size-image jank.
 - If the screenshot is near a marker, verify the screenshot shows a linked marker when practical.
 - Open a captured screenshot from the review window and verify Finder reveals the file.
 - Export a session bundle and verify `transcript.txt`, `transcript.md`, `summary.md`, and the `screenshots` folder are present.
+- Verify the exported `transcript.txt` contains the raw session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
 - Export a debug bundle during or after a session and verify `session-metadata.json` reflects the right session ID and counts without raw transcript content.
 
 ## Session Deletion
@@ -156,6 +161,12 @@
   Expected: the app fails gracefully, explains that the key is missing, and remains usable for the next session.
 - Deny microphone permission and attempt to start a session.
   Expected: recording does not start, the error explains how to re-enable access in System Settings, and `Open Microphone Settings` opens the expected privacy pane or a safe fallback.
+- Force or simulate a restricted microphone state if practical.
+  Expected: recording does not start and BugNarrator explains that microphone access is restricted rather than simply denied.
+- Use a local unsigned Xcode / DerivedData build after switching app copies or paths.
+  Expected: BugNarrator explains that local builds can need microphone approval again because macOS tracks permission by app bundle path.
+- Simulate microphone capture setup failing after permission is already granted if practical.
+  Expected: BugNarrator reports a microphone availability problem instead of claiming recording started and then immediately failing.
 - Capture a screenshot without Screen Recording permission.
   Expected: recording continues, BugNarrator shows a screenshot-specific error, and `Open Screen Recording Settings` opens the expected privacy pane or a safe fallback.
 - Delete or move a saved screenshot file outside the app, then open it from the session detail view.
@@ -168,6 +179,8 @@
   Expected: the transcript window still opens, the completed session remains available as an unsaved session, screenshots remain accessible, and `Save to History` can be retried later after storage is fixed.
 - Cancel an active recording.
   Expected: discard confirmation appears first, then the session returns to `Idle` with no stale timer.
+- Run `xcodebuild test` while another normal BugNarrator copy is already running.
+  Expected: the test run still boots cleanly instead of failing because single-instance enforcement terminated the XCTest host.
 
 ## Persistence And Cleanup
 

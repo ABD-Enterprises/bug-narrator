@@ -11,6 +11,7 @@ struct RecordedAudio {
 final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
+    private let permissionAccess: any MicrophonePermissionAccessing
 
     private var recorder: AVAudioRecorder?
     private var currentFileURL: URL?
@@ -19,20 +20,40 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     private var pendingStopResult: RecordedAudio?
     private var isCancelling = false
 
+    init(permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess()) {
+        self.permissionAccess = permissionAccess
+    }
+
     var currentDuration: TimeInterval {
         recorder?.currentTime ?? 0
     }
 
     func microphonePermissionState() -> MicrophonePermissionState {
-        switch AVAudioApplication.shared.recordPermission {
-        case .granted:
-            return .authorized
-        case .undetermined:
-            return .notDetermined
-        case .denied:
-            return .denied
-        @unknown default:
-            return .restricted
+        permissionAccess.currentPermissionState()
+    }
+
+    func validateRecordingPrerequisites() async -> AppError? {
+        guard recorder == nil, stopContinuation == nil, cancelContinuation == nil else {
+            return .recordingFailure("A recording session is already active.")
+        }
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-Preflight-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+
+        do {
+            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let prepared = recorder.prepareToRecord()
+            try? FileManager.default.removeItem(at: fileURL)
+
+            guard prepared else {
+                return .microphoneUnavailable("Check that an input device is connected and available, then try again.")
+            }
+
+            return nil
+        } catch {
+            try? FileManager.default.removeItem(at: fileURL)
+            return .microphoneUnavailable("Check that an input device is connected and available, then try again. \(error.localizedDescription)")
         }
     }
 
@@ -44,24 +65,28 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             throw AppError.recordingFailure("A recording session is already active.")
         }
 
-        guard await requestMicrophonePermissionIfNeeded() else {
+        let permissionState = await permissionAccess.requestPermissionIfNeeded()
+        switch permissionState {
+        case .authorized:
+            break
+        case .restricted:
+            permissionsLogger.warning("microphone_permission_restricted", "Microphone access is restricted.")
+            throw AppError.microphonePermissionRestricted
+        case .denied, .notDetermined:
             permissionsLogger.warning("microphone_permission_denied", "Microphone access was denied or restricted.")
             throw AppError.microphonePermissionDenied
+        }
+
+        if let prerequisiteError = await validateRecordingPrerequisites() {
+            throw prerequisiteError
         }
 
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-\(UUID().uuidString)")
             .appendingPathExtension("m4a")
 
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 44_100,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-
         do {
-            let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
+            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
             recorder.delegate = self
             recorder.prepareToRecord()
 
@@ -208,24 +233,6 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         isCancelling = false
     }
 
-    private func requestMicrophonePermissionIfNeeded() async -> Bool {
-        switch microphonePermissionState() {
-        case .authorized:
-            permissionsLogger.debug("microphone_permission_authorized", "Microphone access is already authorized.")
-            return true
-        case .notDetermined:
-            permissionsLogger.info("microphone_permission_requested", "Requesting microphone access from macOS.")
-            return await withCheckedContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
-        case .denied, .restricted:
-            permissionsLogger.warning("microphone_permission_blocked", "Microphone access is denied or restricted.")
-            return false
-        }
-    }
-
     private func validateRecordedAudioFile(at url: URL) throws {
         let attributes: [FileAttributeKey: Any]
 
@@ -239,5 +246,14 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         guard fileSize > 0 else {
             throw AppError.recordingFailure("The recorded audio file was empty.")
         }
+    }
+
+    private var recordingSettings: [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
     }
 }

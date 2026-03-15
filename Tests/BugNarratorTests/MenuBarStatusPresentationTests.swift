@@ -12,6 +12,16 @@ final class MenuBarStatusPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.preferredWidth, 420)
     }
 
+    func testMicrophoneUnavailableUsesRecoveryWidthAndAction() {
+        let presentation = MenuBarStatusPresentation(
+            status: .error(AppError.microphoneUnavailable("The selected microphone could not be opened.").userMessage),
+            currentError: .microphoneUnavailable("The selected microphone could not be opened.")
+        )
+
+        XCTAssertEqual(presentation.recoveryAction, .microphone)
+        XCTAssertEqual(presentation.preferredWidth, 420)
+    }
+
     func testScreenRecordingErrorUsesRecoveryWidthAndAction() {
         let presentation = MenuBarStatusPresentation(
             status: .recording(AppError.screenRecordingPermissionDenied.userMessage),

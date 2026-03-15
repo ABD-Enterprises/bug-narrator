@@ -35,7 +35,7 @@ struct RecordingControlPanelView: View {
 
             Spacer()
 
-            Text(appState.status.title)
+            Text(statusBadgeTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(statusTint)
         }
@@ -92,7 +92,7 @@ struct RecordingControlPanelView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 actionButton(
-                    title: "Start Feedback Session",
+                    title: "Start Recording",
                     shortcut: appState.settingsStore.startRecordingHotkeyShortcut.displayString,
                     prominence: .primary,
                     enabled: canStartSession,
@@ -100,7 +100,7 @@ struct RecordingControlPanelView: View {
                 )
 
                 actionButton(
-                    title: "Stop Feedback Session",
+                    title: "Stop Recording",
                     shortcut: appState.settingsStore.stopRecordingHotkeyShortcut.displayString,
                     prominence: .secondary,
                     enabled: canStopSession,
@@ -178,7 +178,7 @@ struct RecordingControlPanelView: View {
         case .success:
             return "Latest session ready."
         case .error:
-            return "Action needed before you continue."
+            return appState.currentError?.recoveryHeadline ?? "Action needed before you continue."
         }
     }
 
@@ -202,16 +202,17 @@ struct RecordingControlPanelView: View {
     }
 
     private var localTestingNote: String? {
-        guard appState.currentError == .microphonePermissionDenied else {
+        switch appState.currentError {
+        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
+            return appState.microphoneRecoveryLocalTestingNote
+        default:
             return nil
         }
-
-        return appState.microphoneRecoveryLocalTestingNote
     }
 
     private var showsRecoveryButton: Bool {
         switch appState.currentError {
-        case .microphonePermissionDenied, .screenRecordingPermissionDenied:
+        case .microphonePermissionDenied, .microphonePermissionRestricted, .screenRecordingPermissionDenied:
             return true
         case let error?:
             return error.suggestsOpenAISettings
@@ -223,7 +224,7 @@ struct RecordingControlPanelView: View {
     @ViewBuilder
     private var recoveryButton: some View {
         switch appState.currentError {
-        case .microphonePermissionDenied:
+        case .microphonePermissionDenied, .microphonePermissionRestricted:
             Button("Open Microphone Settings") {
                 appState.openMicrophonePrivacySettings()
             }
@@ -259,6 +260,14 @@ struct RecordingControlPanelView: View {
         case .error:
             return .red
         }
+    }
+
+    private var statusBadgeTitle: String {
+        if appState.status.phase == .error, let currentError = appState.currentError {
+            return currentError.statusTitle
+        }
+
+        return appState.status.title
     }
 
     @ViewBuilder

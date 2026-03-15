@@ -12,6 +12,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - branding and icon packaging problems
 - support / donation UX inconsistencies
 - permission-recovery and error-message usability gaps
+- review-workspace and validation regressions discovered during late-stage hardening
 
 ## Issues Surfaced Since 1.0.0
 
@@ -25,6 +26,9 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-006` | When microphone permission was denied, BugNarrator only showed an error message and did not help the user recover. | Users could get stuck without a direct path to fix the problem. | Fixed | `1.0.2` |
 | `BN-P1-007` | Long error messages could be truncated in the top status card of the menu bar window. | Important recovery guidance was cut off exactly when the user needed it most. | Fixed | `1.0.2` |
 | `BN-P1-008` | After enabling microphone access in System Settings, BugNarrator could keep showing the stale denied state until the user manually retried or restarted. | Made the app appear blocked even after the permission issue was already fixed. | Fixed | `1.0.3` |
+| `BN-P1-009` | The review workspace could stay on a tab that no longer existed for the newly selected session, leaving the right-hand pane confusing or stale. | Users switching between sessions could see mismatched content or an invalid tab state in the review area. | Fixed | Unreleased |
+| `BN-P1-010` | Screenshot-heavy sessions could decode full-size images repeatedly in the review workspace instead of using thumbnails. | Larger sessions could feel sluggish and waste memory while reviewing screenshots. | Fixed | Unreleased |
+| `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | Unreleased |
 
 ## Notes Per Issue
 
@@ -79,6 +83,24 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - Root cause: the error state reflected the previous permission check and was not reconciled when the app became active again.
 - Fix: BugNarrator now re-checks microphone permission when the app becomes active and clears the stale denied state once access is authorized again.
 
+### BN-P1-009: Review workspace tab drift after session changes
+
+- Symptom: selecting a session with extracted issues or a summary, then moving to a session without that content, could leave the review pane on an invalid tab or stale content surface.
+- Root cause: tab availability and tab selection correction lived directly in the view layer and were not being clamped consistently when the selected session changed.
+- Fix: review-workspace tab availability, clamping, timeline construction, and summary grouping were extracted into a dedicated helper model and the selected tab is now synchronized whenever the active session changes.
+
+### BN-P1-010: Screenshot review used full-size image decoding
+
+- Symptom: screenshot-heavy sessions could feel heavier than they needed to in the review workspace.
+- Root cause: the screenshots tab was loading on-disk images directly instead of using sized previews.
+- Fix: screenshot previews now use a thumbnail cache so the review pane reuses smaller preview images instead of decoding each screenshot at full size.
+
+### BN-P1-011: Single-instance enforcement interfered with XCTest
+
+- Symptom: if a normal BugNarrator copy was already running, `xcodebuild test` could fail because the test host exited early as a supposed second instance.
+- Root cause: the app's single-instance guard applied equally to normal launches and the XCTest-hosted app process.
+- Fix: the runtime environment now bypasses process-level single-instance enforcement when BugNarrator is running under XCTest, while normal production launches remain single-instance.
+
 ## Current State
 
 As of the current local workspace state:
@@ -86,11 +108,13 @@ As of the current local workspace state:
 - `1.0.1` already covers the icon pipeline, support-flow simplification, and first-run credential-prompt fix.
 - `1.0.2` covers the microphone-recovery UX, multiline status-card sizing, and the ScreenCaptureKit screenshot modernization.
 - the current diagnostics and supportability pass adds structured local diagnostics logging, `Copy Debug Info`, and `Export Debug Bundle` so user-reported issues can carry better support context without exposing credentials.
+- the microphone-permissions maturity pass replaces the old ad hoc recording-start check with a dedicated microphone permission service, structured preflight results, denied vs restricted vs unavailable states, and clearer local-testing guidance for unsigned builds.
 - the release-hardening pass now keeps successfully transcribed sessions visible as unsaved drafts if local history persistence fails, and it prevents exports from running against stale or deleted session snapshots.
 - the DMG packaging script now validates icon resources in both the built app and the mounted DMG, which reduces regression risk for the original icon-shipping bugs.
 - screenshot capture now uses ScreenCaptureKit on macOS 14+, which removes the deprecated CoreGraphics capture path from the primary screenshot workflow.
 - the performance and single-instance pass now prevents duplicate BugNarrator launches from staying active at the same time, which reduces the risk of duplicate menu bar items, competing local writes, and overlapping recording state.
 - the session library now keeps indexed metadata and direct ID lookups in memory, which reduces filter/search/detail lag as local history grows.
+- the current testing and defect-finding pass added explicit review-workspace state tests, session-bundle export validation, screenshot-preview caching, and a safe single-instance bypass for XCTest-hosted runs so release validation is more trustworthy.
 
 ## Remaining Spec-Alignment / Release Notes
 
