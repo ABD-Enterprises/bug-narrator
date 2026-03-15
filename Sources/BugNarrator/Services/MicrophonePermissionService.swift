@@ -12,28 +12,84 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
     }
 
     func requestPermissionIfNeeded() async -> MicrophonePermissionState {
-        switch currentPermissionState() {
+        let initialState = currentPermissionState()
+        permissionsLogger.debug(
+            "microphone_permission_state_read",
+            "Read the current app-level microphone permission state.",
+            metadata: ["state": initialState.diagnosticsValue]
+        )
+
+        switch initialState {
         case .authorized:
             permissionsLogger.debug("microphone_permission_authorized", "Microphone access is already authorized.")
             return .authorized
         case .notDetermined:
-            permissionsLogger.info("microphone_permission_requested", "Requesting microphone access from macOS.")
-            NSApp.activate(ignoringOtherApps: true)
-            let granted = await withCheckedContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
-
-            if granted || currentPermissionState() == .authorized {
-                return .authorized
-            }
-
-            return currentPermissionState()
+            return await requestPermissionFromSystem()
         case .denied, .restricted:
-            permissionsLogger.warning("microphone_permission_blocked", "Microphone access is denied or restricted.")
-            return currentPermissionState()
+            permissionsLogger.warning(
+                "microphone_permission_refreshing_blocked_state",
+                "Microphone access looked blocked, so BugNarrator will reactivate and refresh the app-level permission state before finalizing the result.",
+                metadata: ["state": initialState.diagnosticsValue]
+            )
+
+            NSApp.activate(ignoringOtherApps: true)
+            try? await Task.sleep(nanoseconds: 150_000_000)
+
+            let refreshedState = currentPermissionState()
+            permissionsLogger.debug(
+                "microphone_permission_state_refreshed",
+                "Re-read the app-level microphone permission state after activating BugNarrator.",
+                metadata: ["state": refreshedState.diagnosticsValue]
+            )
+
+            switch refreshedState {
+            case .authorized:
+                return .authorized
+            case .notDetermined:
+                return await requestPermissionFromSystem()
+            case .denied, .restricted:
+                let postRequestState = await requestPermissionFromSystem()
+                if postRequestState == .authorized {
+                    return .authorized
+                }
+
+                permissionsLogger.warning(
+                    "microphone_permission_blocked",
+                    "Microphone access is still blocked after BugNarrator refreshed and retried the app-level permission request.",
+                    metadata: ["state": postRequestState.diagnosticsValue]
+                )
+                return postRequestState
+            }
         }
+    }
+
+    private func requestPermissionFromSystem() async -> MicrophonePermissionState {
+        permissionsLogger.info("microphone_permission_requested", "Requesting microphone access from macOS.")
+        NSApp.activate(ignoringOtherApps: true)
+
+        let granted = await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+
+        let finalState = currentPermissionState()
+        permissionsLogger.debug(
+            "microphone_permission_request_completed",
+            granted
+                ? "macOS reported that microphone access was granted."
+                : "macOS reported that microphone access was not granted.",
+            metadata: [
+                "granted": granted ? "true" : "false",
+                "final_state": finalState.diagnosticsValue
+            ]
+        )
+
+        if granted || finalState == .authorized {
+            return .authorized
+        }
+
+        return finalState
     }
 
     private func audioApplicationPermissionState() -> MicrophonePermissionState {

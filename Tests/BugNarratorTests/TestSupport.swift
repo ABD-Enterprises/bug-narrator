@@ -37,7 +37,7 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     func requestPermissionIfNeeded() async -> MicrophonePermissionState {
         permissionRequestCallCount += 1
 
-        if permissionState == .notDetermined, !requestedPermissionStates.isEmpty {
+        if !requestedPermissionStates.isEmpty {
             permissionState = requestedPermissionStates.removeFirst()
         }
 
