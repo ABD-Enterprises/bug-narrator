@@ -85,9 +85,12 @@ As of the current local workspace state:
 
 - `1.0.1` already covers the icon pipeline, support-flow simplification, and first-run credential-prompt fix.
 - `1.0.2` covers the microphone-recovery UX, multiline status-card sizing, and the ScreenCaptureKit screenshot modernization.
+- the current diagnostics and supportability pass adds structured local diagnostics logging, `Copy Debug Info`, and `Export Debug Bundle` so user-reported issues can carry better support context without exposing credentials.
 - the release-hardening pass now keeps successfully transcribed sessions visible as unsaved drafts if local history persistence fails, and it prevents exports from running against stale or deleted session snapshots.
 - the DMG packaging script now validates icon resources in both the built app and the mounted DMG, which reduces regression risk for the original icon-shipping bugs.
 - screenshot capture now uses ScreenCaptureKit on macOS 14+, which removes the deprecated CoreGraphics capture path from the primary screenshot workflow.
+- the performance and single-instance pass now prevents duplicate BugNarrator launches from staying active at the same time, which reduces the risk of duplicate menu bar items, competing local writes, and overlapping recording state.
+- the session library now keeps indexed metadata and direct ID lookups in memory, which reduces filter/search/detail lag as local history grows.
 
 ## Remaining Spec-Alignment / Release Notes
 

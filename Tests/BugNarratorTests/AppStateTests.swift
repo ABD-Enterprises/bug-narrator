@@ -3,6 +3,21 @@ import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testRecordingControlsStartFlowShowsPanelAndStartsSession() async {
+        let harness = AppStateHarness(apiKey: "")
+        defer { harness.cleanup() }
+
+        var didOpenRecordingControls = false
+        harness.appState.showRecordingControlWindow = {
+            didOpenRecordingControls = true
+        }
+
+        await harness.appState.openRecordingControlsAndStartSession()
+
+        XCTAssertTrue(didOpenRecordingControls)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+    }
+
     func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
@@ -21,6 +36,20 @@ final class AppStateTests: XCTestCase {
         )
         XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
         XCTAssertFalse(didOpenSettings)
+    }
+
+    func testAppStateRegistersDistinctRecordingHotkeys() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        XCTAssertEqual(
+            harness.hotkeyManager.registeredShortcuts[.startRecording],
+            harness.settingsStore.startRecordingHotkeyShortcut
+        )
+        XCTAssertEqual(
+            harness.hotkeyManager.registeredShortcuts[.stopRecording],
+            harness.settingsStore.stopRecordingHotkeyShortcut
+        )
     }
 
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {
@@ -120,6 +149,32 @@ final class AppStateTests: XCTestCase {
                 BugNarratorLinks.securityPrivacySettings
             ]
         )
+    }
+
+    func testCopyDebugInfoCopiesSafeSupportMetadataToClipboard() throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let session = TranscriptSession(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            createdAt: Date(),
+            transcript: "A saved transcript.",
+            duration: 12,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil
+        )
+        try harness.transcriptStore.add(session)
+        harness.appState.selectedTranscriptID = session.id
+
+        harness.appState.copyDebugInfo()
+
+        let copied = try XCTUnwrap(harness.clipboardService.copiedStrings.last)
+        XCTAssertTrue(copied.contains("BugNarrator Version"))
+        XCTAssertTrue(copied.contains("Transcription Model: whisper-1"))
+        XCTAssertTrue(copied.contains("Issue Extraction Model: gpt-4.1-mini"))
+        XCTAssertTrue(copied.contains("Session ID: \(session.id.uuidString)"))
+        XCTAssertFalse(copied.contains(harness.settingsStore.trimmedAPIKey))
     }
 
     func testSuccessfulSessionSavesCopiesAndDeletesTemporaryAudioFile() async throws {

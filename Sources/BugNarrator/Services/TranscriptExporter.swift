@@ -37,6 +37,7 @@ enum TranscriptExportFormat {
 @MainActor
 struct TranscriptExporter {
     private let fileManager = FileManager.default
+    private let logger = DiagnosticsLogger(category: .export)
 
     func export(session: TranscriptSession, as format: TranscriptExportFormat) throws {
         let savePanel = NSSavePanel()
@@ -58,6 +59,14 @@ struct TranscriptExporter {
         }
 
         try content.write(to: url, atomically: true, encoding: .utf8)
+        logger.info(
+            "transcript_exported",
+            "Exported a transcript file.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "format": format.fileExtension
+            ]
+        )
     }
 
     func exportBundle(session: TranscriptSession) throws {
@@ -105,6 +114,15 @@ struct TranscriptExporter {
             }
             try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
         }
+
+        logger.info(
+            "session_bundle_exported",
+            "Exported a local session bundle.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "screenshot_count": "\(session.screenshotCount)"
+            ]
+        )
     }
 
     private func uniqueBundleDirectoryURL(baseDirectory: URL, suggestedName: String) -> URL {

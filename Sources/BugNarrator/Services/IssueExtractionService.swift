@@ -3,6 +3,7 @@ import Foundation
 actor IssueExtractionService: IssueExtracting {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let session: URLSession
+    private let logger = DiagnosticsLogger(category: .transcription)
 
     init(session: URLSession? = nil) {
         if let session {
@@ -20,6 +21,16 @@ actor IssueExtractionService: IssueExtracting {
         apiKey: String,
         model: String
     ) async throws -> IssueExtractionResult {
+        logger.info(
+            "issue_extraction_request_started",
+            "Sending the transcript to OpenAI for issue extraction.",
+            metadata: [
+                "session_id": reviewSession.id.uuidString,
+                "model": model,
+                "marker_count": "\(reviewSession.markerCount)",
+                "screenshot_count": "\(reviewSession.screenshotCount)"
+            ]
+        )
         let body = try JSONEncoder().encode(
             ChatCompletionRequest(
                 model: model,
@@ -55,6 +66,11 @@ actor IssueExtractionService: IssueExtracting {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                logger.warning(
+                    "issue_extraction_request_rejected",
+                    "OpenAI rejected the issue extraction request.",
+                    metadata: ["status_code": "\(httpResponse.statusCode)"]
+                )
                 throw OpenAIErrorMapper.mapResponse(
                     statusCode: httpResponse.statusCode,
                     data: data,
@@ -65,12 +81,26 @@ actor IssueExtractionService: IssueExtracting {
             let completion = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
             guard let content = completion.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !content.isEmpty else {
+                logger.warning("issue_extraction_empty", "OpenAI returned an empty issue extraction response.")
                 throw AppError.issueExtractionFailure("The extraction response was empty.")
             }
 
             let payload = try JSONDecoder().decode(IssueExtractionPayload.self, from: Data(content.utf8))
+            logger.info(
+                "issue_extraction_request_succeeded",
+                "OpenAI returned extracted review issues.",
+                metadata: [
+                    "session_id": reviewSession.id.uuidString,
+                    "issue_count": "\(payload.issues.count)"
+                ]
+            )
             return payload.makeIssueExtractionResult(using: reviewSession)
         } catch {
+            logger.error(
+                "issue_extraction_request_failed",
+                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                metadata: ["session_id": reviewSession.id.uuidString]
+            )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.issueExtractionFailure)
         }
     }

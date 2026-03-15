@@ -1,5 +1,45 @@
 import Foundation
 
+protocol SessionLibraryItem: Identifiable {
+    var id: UUID { get }
+    var createdAt: Date { get }
+    var searchIndexText: String { get }
+}
+
+struct SessionLibraryEntry: SessionLibraryItem, Equatable {
+    let id: UUID
+    let createdAt: Date
+    let updatedAt: Date
+    let title: String
+    let preview: String
+    let summaryText: String
+    let duration: TimeInterval
+    let markerCount: Int
+    let screenshotCount: Int
+    let issueCount: Int
+    let searchIndexText: String
+
+    init(session: TranscriptSession) {
+        id = session.id
+        createdAt = session.createdAt
+        updatedAt = session.updatedAt
+        title = session.title
+        preview = session.preview
+        summaryText = session.summaryText
+        duration = session.duration
+        markerCount = session.markerCount
+        screenshotCount = session.screenshotCount
+        issueCount = session.issueCount
+        searchIndexText = session.searchIndexText
+    }
+}
+
+struct SessionLibrarySnapshot<Item: SessionLibraryItem> {
+    let filteredItems: [Item]
+    let counts: [SessionLibraryDateFilter: Int]
+    let emptyState: SessionLibraryEmptyState?
+}
+
 enum SessionLibraryDateFilter: String, CaseIterable, Identifiable {
     case today = "Today"
     case yesterday = "Yesterday"
@@ -79,13 +119,13 @@ enum SessionLibraryEmptyState: Equatable {
     var description: String {
         switch self {
         case .noSessionsYet:
-            return "Start and stop a review session to build your BugNarrator library."
+            return "Start and stop a feedback session to begin building your BugNarrator session library."
         case .noSessionsInFilter(let filter):
-            return "There are no saved sessions in \(filter.rawValue.lowercased()) yet."
+            return "No saved sessions match \(filter.rawValue.lowercased()) yet."
         case .noSessionsInCustomRange:
-            return "Try widening the selected date range to include more sessions."
+            return "Widen the selected date range to include more sessions."
         case .noSearchResults:
-            return "Try a different search term or clear the search field."
+            return "Try a different search term or clear search to see more sessions."
         }
     }
 
@@ -102,27 +142,53 @@ enum SessionLibraryEmptyState: Equatable {
 }
 
 enum SessionLibrary {
-    static func filteredSessions(
-        from sessions: [TranscriptSession],
+    static func snapshot<Item: SessionLibraryItem>(
+        from items: [Item],
         query: SessionLibraryQuery,
         calendar: Calendar = .current,
         referenceDate: Date = Date()
-    ) -> [TranscriptSession] {
-        let dateFilteredSessions = sessions.filter {
-            matchesDateFilter($0, filter: query.filter, customDateRange: query.customDateRange, calendar: calendar, referenceDate: referenceDate)
-        }
-
+    ) -> SessionLibrarySnapshot<Item> {
         let searchText = normalizedSearchText(query.searchText)
-        let searchFilteredSessions: [TranscriptSession]
-        if searchText.isEmpty {
-            searchFilteredSessions = dateFilteredSessions
-        } else {
-            searchFilteredSessions = dateFilteredSessions.filter { session in
-                session.searchIndexText.contains(searchText)
+        var counts = Dictionary(uniqueKeysWithValues: SessionLibraryDateFilter.allCases.map { ($0, 0) })
+        counts[.allSessions] = items.count
+        var filteredItems: [Item] = []
+
+        for item in items {
+            let membership = dateMembership(
+                for: item.createdAt,
+                customDateRange: query.customDateRange,
+                calendar: calendar,
+                referenceDate: referenceDate
+            )
+
+            if membership.today {
+                counts[.today, default: 0] += 1
             }
+            if membership.yesterday {
+                counts[.yesterday, default: 0] += 1
+            }
+            if membership.last7Days {
+                counts[.last7Days, default: 0] += 1
+            }
+            if membership.last30Days {
+                counts[.last30Days, default: 0] += 1
+            }
+            if membership.customRange {
+                counts[.customRange, default: 0] += 1
+            }
+
+            guard membership.matches(query.filter) else {
+                continue
+            }
+
+            if !searchText.isEmpty && !item.searchIndexText.contains(searchText) {
+                continue
+            }
+
+            filteredItems.append(item)
         }
 
-        return searchFilteredSessions.sorted { lhs, rhs in
+        filteredItems.sort { lhs, rhs in
             switch query.sortOrder {
             case .newestFirst:
                 if lhs.createdAt == rhs.createdAt {
@@ -136,18 +202,52 @@ enum SessionLibrary {
                 return lhs.createdAt < rhs.createdAt
             }
         }
+
+        return SessionLibrarySnapshot(
+            filteredItems: filteredItems,
+            counts: counts,
+            emptyState: emptyState(
+                allSessionCount: items.count,
+                filteredSessionCount: filteredItems.count,
+                query: query
+            )
+        )
     }
 
-    static func count(
+    static func filteredSessions(
+        from sessions: [TranscriptSession],
+        query: SessionLibraryQuery,
+        calendar: Calendar = .current,
+        referenceDate: Date = Date()
+    ) -> [TranscriptSession] {
+        snapshot(from: sessions, query: query, calendar: calendar, referenceDate: referenceDate).filteredItems
+    }
+
+    static func filteredEntries(
+        from entries: [SessionLibraryEntry],
+        query: SessionLibraryQuery,
+        calendar: Calendar = .current,
+        referenceDate: Date = Date()
+    ) -> [SessionLibraryEntry] {
+        snapshot(from: entries, query: query, calendar: calendar, referenceDate: referenceDate).filteredItems
+    }
+
+    static func count<Item: SessionLibraryItem>(
         for filter: SessionLibraryDateFilter,
-        in sessions: [TranscriptSession],
+        in items: [Item],
         customDateRange: SessionLibraryDateRange,
         calendar: Calendar = .current,
         referenceDate: Date = Date()
     ) -> Int {
-        sessions.filter {
-            matchesDateFilter($0, filter: filter, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate)
-        }.count
+        snapshot(
+            from: items,
+            query: SessionLibraryQuery(
+                filter: .allSessions,
+                customDateRange: customDateRange
+            ),
+            calendar: calendar,
+            referenceDate: referenceDate
+        ).counts[filter] ?? 0
     }
 
     static func emptyState(
@@ -155,11 +255,23 @@ enum SessionLibrary {
         filteredSessions: [TranscriptSession],
         query: SessionLibraryQuery
     ) -> SessionLibraryEmptyState? {
-        guard filteredSessions.isEmpty else {
+        emptyState(
+            allSessionCount: allSessions.count,
+            filteredSessionCount: filteredSessions.count,
+            query: query
+        )
+    }
+
+    private static func emptyState(
+        allSessionCount: Int,
+        filteredSessionCount: Int,
+        query: SessionLibraryQuery
+    ) -> SessionLibraryEmptyState? {
+        guard filteredSessionCount == 0 else {
             return nil
         }
 
-        guard !allSessions.isEmpty else {
+        guard allSessionCount > 0 else {
             return .noSessionsYet
         }
 
@@ -177,27 +289,22 @@ enum SessionLibrary {
         }
     }
 
-    private static func matchesDateFilter(
-        _ session: TranscriptSession,
-        filter: SessionLibraryDateFilter,
+    private static func dateMembership(
+        for createdAt: Date,
         customDateRange: SessionLibraryDateRange,
         calendar: Calendar,
         referenceDate: Date
-    ) -> Bool {
-        switch filter {
-        case .today:
-            return calendar.isDate(session.createdAt, inSameDayAs: referenceDate)
-        case .yesterday:
-            return calendar.isDate(session.createdAt, inSameDayAs: calendar.date(byAdding: .day, value: -1, to: referenceDate) ?? referenceDate)
-        case .last7Days:
-            return recentWindow(dayCount: 7, calendar: calendar, referenceDate: referenceDate).contains(session.createdAt)
-        case .last30Days:
-            return recentWindow(dayCount: 30, calendar: calendar, referenceDate: referenceDate).contains(session.createdAt)
-        case .allSessions:
-            return true
-        case .customRange:
-            return customDateRange.normalized(in: calendar).contains(session.createdAt)
-        }
+    ) -> SessionLibraryDateMembership {
+        SessionLibraryDateMembership(
+            today: calendar.isDate(createdAt, inSameDayAs: referenceDate),
+            yesterday: calendar.isDate(
+                createdAt,
+                inSameDayAs: calendar.date(byAdding: .day, value: -1, to: referenceDate) ?? referenceDate
+            ),
+            last7Days: recentWindow(dayCount: 7, calendar: calendar, referenceDate: referenceDate).contains(createdAt),
+            last30Days: recentWindow(dayCount: 30, calendar: calendar, referenceDate: referenceDate).contains(createdAt),
+            customRange: customDateRange.normalized(in: calendar).contains(createdAt)
+        )
     }
 
     private static func recentWindow(
@@ -215,5 +322,30 @@ enum SessionLibrary {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
+private struct SessionLibraryDateMembership {
+    let today: Bool
+    let yesterday: Bool
+    let last7Days: Bool
+    let last30Days: Bool
+    let customRange: Bool
+
+    func matches(_ filter: SessionLibraryDateFilter) -> Bool {
+        switch filter {
+        case .today:
+            return today
+        case .yesterday:
+            return yesterday
+        case .last7Days:
+            return last7Days
+        case .last30Days:
+            return last30Days
+        case .allSessions:
+            return true
+        case .customRange:
+            return customRange
+        }
     }
 }

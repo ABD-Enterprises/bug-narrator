@@ -1,3 +1,4 @@
+import Darwin
 import SwiftUI
 
 @main
@@ -9,6 +10,10 @@ struct BugNarratorApp: App {
     private let windowCoordinator: WindowCoordinator
 
     init() {
+        guard SingleInstanceController.enforcePrimaryInstance() else {
+            exit(EXIT_SUCCESS)
+        }
+
         let settingsStore = SettingsStore()
         let transcriptStore = TranscriptStore()
         let appState = AppState(settingsStore: settingsStore, transcriptStore: transcriptStore)
@@ -32,6 +37,9 @@ struct BugNarratorApp: App {
         }
         appState.showSupportWindow = { [weak windowCoordinator] in
             windowCoordinator?.showSupportWindow()
+        }
+        appState.showRecordingControlWindow = { [weak windowCoordinator] in
+            windowCoordinator?.showRecordingControlWindow()
         }
 
         _settingsStore = StateObject(wrappedValue: settingsStore)

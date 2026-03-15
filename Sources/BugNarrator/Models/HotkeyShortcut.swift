@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 
-struct HotkeyShortcut: Codable, Equatable {
+struct HotkeyShortcut: Codable, Equatable, Hashable {
     var keyCode: UInt32
     var modifiers: UInt
 

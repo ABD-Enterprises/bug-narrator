@@ -9,6 +9,8 @@ The packaging workflow creates:
 - a Release build of `BugNarrator.app`
 - a DMG containing `BugNarrator.app`
 - an `Applications` shortcut inside the DMG
+- a custom Finder layout with a drag-to-Applications presentation
+- a mounted DMG volume icon that uses the BugNarrator app icon
 - validation that branded icon resources are present in the app bundle
 - validation that the mounted DMG contains the app plus the `Applications` shortcut
 - two output filenames in `dist/`
@@ -25,6 +27,14 @@ The non-versioned filename is useful for a stable GitHub Releases download link.
 - Xcode installed
 - the generated project file `BugNarrator.xcodeproj`
 - `hdiutil`, which is included with macOS
+- a local packaging virtualenv with `dmgbuild`
+
+Create the packaging virtualenv once on a release machine:
+
+```bash
+python3 -m venv build/dmg-venv
+build/dmg-venv/bin/python -m pip install dmgbuild
+```
 
 If you changed `project.yml`, regenerate the Xcode project first:
 
@@ -45,12 +55,15 @@ From the repository root:
 The script:
 
 1. builds the app in `Release`
-2. stages `BugNarrator.app`
-3. adds an `Applications` symlink
-4. creates a compressed DMG
-5. verifies `AppIcon.icns` and `Assets.car` exist in the built app
-6. mounts the DMG and verifies the expected layout
-7. writes the finished artifacts to `dist/`
+2. generates the DMG background art
+3. uses `dmgbuild` to package a styled HFS+ DMG with:
+   - `BugNarrator.app`
+   - an `Applications` shortcut
+   - the BugNarrator mounted-volume icon
+   - a clean drag-to-Applications Finder layout
+4. verifies `AppIcon.icns` and `Assets.car` exist in the built app
+5. mounts the DMG and verifies the expected layout resources
+6. writes the finished artifacts to `dist/`
 
 ## Output Location
 
@@ -128,11 +141,12 @@ The packaging script will:
 2. re-sign the app explicitly when a Developer ID build requires manual distribution signing
 3. verify the app is signed
 4. verify icon resources are present in the built app
-5. create the DMG
-6. mount the DMG and verify `BugNarrator.app` plus the `Applications` shortcut are present
-7. submit the DMG to Apple's notarization service
-8. staple the notarization ticket to the DMG
-9. run `stapler validate` and `spctl` checks
+5. create a styled DMG with `dmgbuild`
+6. apply the custom volume icon and Finder window layout metadata directly
+7. mount the DMG and verify `BugNarrator.app` plus the `Applications` shortcut are present
+8. submit the DMG to Apple's notarization service
+9. staple the notarization ticket to the DMG
+10. run `stapler validate` and `spctl` checks
 
 Because BugNarrator targets macOS 14 or later, the shipped app now uses ScreenCaptureKit for screenshot capture. No extra packaging step is required for that API, but your release smoke test should still verify that Screen Recording permission prompts only when the user requests a screenshot.
 
@@ -171,11 +185,13 @@ Recommended flow:
 After building:
 
 1. open the DMG in Finder
-2. confirm `BugNarrator.app` is present
-3. confirm the `Applications` shortcut is present
-4. drag the app into `Applications`
-5. confirm the installed app shows the branded BugNarrator icon in Finder
-6. launch the installed app and verify first-run behavior
+2. confirm the DMG window opens to a clean drag-to-Applications layout with `BugNarrator.app` on the left and `Applications` on the right
+3. confirm the mounted DMG shows the branded BugNarrator volume icon on the desktop and in Finder
+4. confirm `BugNarrator.app` is present
+5. confirm the `Applications` shortcut is present
+6. drag the app into `Applications`
+7. confirm the installed app shows the branded BugNarrator icon in Finder
+8. launch the installed app and verify first-run behavior
 
 For a public release, also verify:
 

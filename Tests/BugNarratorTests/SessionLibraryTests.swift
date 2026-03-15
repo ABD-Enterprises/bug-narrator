@@ -263,6 +263,49 @@ final class SessionLibraryTests: XCTestCase {
         )
     }
 
+    func testSnapshotSupportsIndexedEntriesForLargeHistory() {
+        let calendar = makeCalendar()
+        let sessions = (0..<1_000).map { index in
+            makeSession(
+                transcript: index.isMultiple(of: 125) ? "Critical checkout tooltip regression \(index)" : "Transcript \(index)",
+                createdAt: referenceDate.addingTimeInterval(TimeInterval(-index * 60)),
+                summary: index.isMultiple(of: 200) ? "Tooltip summary \(index)" : ""
+            )
+        }
+        let entries = sessions.map(SessionLibraryEntry.init(session:))
+        let snapshot = SessionLibrary.snapshot(
+            from: entries,
+            query: SessionLibraryQuery(
+                filter: .allSessions,
+                customDateRange: SessionLibraryDateRange(
+                    startDate: referenceDate.addingTimeInterval(-40 * 24 * 60 * 60),
+                    endDate: referenceDate
+                ),
+                searchText: "tooltip",
+                sortOrder: .newestFirst
+            ),
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(snapshot.counts[.allSessions], 1_000)
+        XCTAssertEqual(snapshot.filteredItems.count, 12)
+        XCTAssertEqual(snapshot.filteredItems.first?.title, SessionLibraryEntry(session: sessions[0]).title)
+    }
+
+    func testDisplayTitleFallsBackToUntitledSessionWhenTranscriptIsBlank() {
+        XCTAssertEqual(TranscriptSession.displayTitle(from: "   \n  "), "Untitled Session")
+    }
+
+    func testPreviewTextTruncatesAtWordBoundaryWithEllipsis() {
+        let transcript = Array(repeating: "checkout tooltip evidence", count: 20).joined(separator: " ")
+        let preview = TranscriptSession.previewText(from: transcript)
+
+        XCTAssertLessThanOrEqual(preview.count, 161)
+        XCTAssertTrue(preview.hasSuffix("…"))
+        XCTAssertFalse(preview.hasSuffix(" "))
+    }
+
     private func makeCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

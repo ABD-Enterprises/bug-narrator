@@ -2,6 +2,8 @@ import Foundation
 
 final class TranscriptStore: ObservableObject {
     @Published private(set) var sessions: [TranscriptSession] = []
+    @Published private(set) var libraryEntries: [SessionLibraryEntry] = []
+    private let logger = DiagnosticsLogger(category: .sessionLibrary)
 
     private enum StoragePolicy {
         static let maximumStoredSessions = 500
@@ -12,6 +14,7 @@ final class TranscriptStore: ObservableObject {
     private let decoder = JSONDecoder()
     private let storageURL: URL
     private let backupStorageURL: URL
+    private var sessionLookup: [UUID: TranscriptSession] = [:]
 
     init(fileManager: FileManager = .default, storageURL: URL? = nil) {
         self.fileManager = fileManager
@@ -35,8 +38,21 @@ final class TranscriptStore: ObservableObject {
 
         do {
             try persist(updatedSessions)
-            sessions = updatedSessions
+            replaceState(with: updatedSessions)
+            logger.debug(
+                "session_saved",
+                "Saved session history entry.",
+                metadata: [
+                    "session_id": session.id.uuidString,
+                    "stored_sessions": "\(sessions.count)"
+                ]
+            )
         } catch {
+            logger.error(
+                "session_save_failed",
+                "Saving session history failed.",
+                metadata: ["session_id": session.id.uuidString]
+            )
             throw AppError.storageFailure(error.localizedDescription)
         }
     }
@@ -52,31 +68,55 @@ final class TranscriptStore: ObservableObject {
 
         do {
             try persist(remainingSessions)
-            sessions = remainingSessions
+            replaceState(with: remainingSessions)
+            logger.info(
+                "sessions_deleted",
+                "Removed sessions from local history.",
+                metadata: [
+                    "removed_count": "\(removedSessions.count)",
+                    "remaining_sessions": "\(remainingSessions.count)"
+                ]
+            )
             return removedSessions
         } catch {
+            logger.error(
+                "session_delete_failed",
+                "Removing sessions from local history failed.",
+                metadata: ["requested_count": "\(ids.count)"]
+            )
             throw AppError.storageFailure(error.localizedDescription)
         }
     }
 
     func session(with id: UUID) -> TranscriptSession? {
-        sessions.first { $0.id == id }
+        sessionLookup[id]
     }
 
     private func load() {
         if let storedSessions = loadSessions(from: storageURL) {
-            sessions = normalizedSessions(storedSessions)
+            replaceState(with: normalizedSessions(storedSessions))
+            logger.info(
+                "session_store_loaded",
+                "Loaded session history from primary storage.",
+                metadata: ["session_count": "\(sessions.count)"]
+            )
             return
         }
 
         if let backupSessions = loadSessions(from: backupStorageURL) {
             let normalizedBackupSessions = normalizedSessions(backupSessions)
-            sessions = normalizedBackupSessions
+            replaceState(with: normalizedBackupSessions)
             try? persist(normalizedBackupSessions)
+            logger.warning(
+                "session_store_recovered_from_backup",
+                "Recovered session history from the backup store after the primary store failed to load.",
+                metadata: ["session_count": "\(sessions.count)"]
+            )
             return
         }
 
-        sessions = []
+        replaceState(with: [])
+        logger.info("session_store_empty", "No existing session history was found on disk.")
     }
 
     private func persist(_ sessions: [TranscriptSession]) throws {
@@ -99,6 +139,11 @@ final class TranscriptStore: ObservableObject {
             let data = try Data(contentsOf: url)
             return try decoder.decode([TranscriptSession].self, from: data)
         } catch {
+            logger.warning(
+                "session_store_decode_failed",
+                "Session history could not be decoded from disk.",
+                metadata: ["file": url.lastPathComponent]
+            )
             return nil
         }
     }
@@ -115,6 +160,12 @@ final class TranscriptStore: ObservableObject {
             }
             .prefix(StoragePolicy.maximumStoredSessions)
             .map { $0 }
+    }
+
+    private func replaceState(with sessions: [TranscriptSession]) {
+        self.sessions = sessions
+        sessionLookup = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        libraryEntries = sessions.map(SessionLibraryEntry.init(session:))
     }
 
     private static func makeAppSupportDirectory(fileManager: FileManager) -> URL {

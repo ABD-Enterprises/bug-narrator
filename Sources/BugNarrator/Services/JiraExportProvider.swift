@@ -2,6 +2,7 @@ import Foundation
 
 actor JiraExportProvider {
     private let session: URLSession
+    private let logger = DiagnosticsLogger(category: .export)
 
     init(session: URLSession? = nil) {
         if let session {
@@ -24,6 +25,16 @@ actor JiraExportProvider {
                 "Jira export requires a base URL, email, API token, project key, and issue type."
             )
         }
+
+        logger.info(
+            "jira_export_requested",
+            "Exporting selected issues to Jira.",
+            metadata: [
+                "issue_count": "\(issues.count)",
+                "project_key": configuration.projectKey,
+                "session_id": reviewSession.id.uuidString
+            ]
+        )
 
         var results: [ExportResult] = []
 
@@ -49,12 +60,36 @@ actor JiraExportProvider {
                         remoteURL: configuration.baseURL.appending(path: "browse/\(payload.key)")
                     )
                 )
+                logger.info(
+                    "jira_issue_exported",
+                    "Exported one issue to Jira.",
+                    metadata: [
+                        "source_issue_id": issue.id.uuidString,
+                        "remote_identifier": payload.key
+                    ]
+                )
             } catch {
+                logger.error(
+                    "jira_export_failed",
+                    (error as? AppError)?.userMessage ?? error.localizedDescription,
+                    metadata: [
+                        "successful_count": "\(results.count)",
+                        "source_issue_id": issue.id.uuidString
+                    ]
+                )
                 let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
                 throw partialExportError(mappedError, successfulCount: results.count)
             }
         }
 
+        logger.info(
+            "jira_export_completed",
+            "Finished exporting issues to Jira.",
+            metadata: [
+                "issue_count": "\(results.count)",
+                "project_key": configuration.projectKey
+            ]
+        )
         return results
     }
 

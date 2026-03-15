@@ -20,9 +20,13 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.autoSaveTranscript = false
         firstStore.autoExtractIssues = true
         firstStore.debugMode = true
-        firstStore.recordingHotkeyShortcut = HotkeyShortcut(
+        firstStore.startRecordingHotkeyShortcut = HotkeyShortcut(
             keyCode: 1,
             modifiers: NSEvent.ModifierFlags.command.union(.shift).rawValue
+        )
+        firstStore.stopRecordingHotkeyShortcut = HotkeyShortcut(
+            keyCode: 3,
+            modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue
         )
         firstStore.markerHotkeyShortcut = HotkeyAction.insertMarker.defaultShortcut
         firstStore.screenshotHotkeyShortcut = HotkeyAction.captureScreenshot.defaultShortcut
@@ -47,10 +51,15 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(secondStore.autoSaveTranscript)
         XCTAssertTrue(secondStore.autoExtractIssues)
         XCTAssertTrue(secondStore.debugMode)
-        XCTAssertEqual(secondStore.recordingHotkeyShortcut.keyCode, 1)
+        XCTAssertEqual(secondStore.startRecordingHotkeyShortcut.keyCode, 1)
         XCTAssertEqual(
-            secondStore.recordingHotkeyShortcut.modifiers,
+            secondStore.startRecordingHotkeyShortcut.modifiers,
             NSEvent.ModifierFlags.command.union(.shift).rawValue
+        )
+        XCTAssertEqual(secondStore.stopRecordingHotkeyShortcut.keyCode, 3)
+        XCTAssertEqual(
+            secondStore.stopRecordingHotkeyShortcut.modifiers,
+            NSEvent.ModifierFlags.command.union(.option).rawValue
         )
         XCTAssertEqual(secondStore.githubToken, "github-token")
         XCTAssertEqual(secondStore.githubRepositoryOwner, "acme")
@@ -143,11 +152,30 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.preferredModel, "whisper-1")
         XCTAssertFalse(store.autoSaveTranscript)
         XCTAssertEqual(store.githubRepositoryName, "bugnarrator")
-        XCTAssertEqual(store.recordingHotkeyShortcut.keyCode, 2)
+        XCTAssertEqual(store.startRecordingHotkeyShortcut.keyCode, 2)
         XCTAssertEqual(
             defaults.string(forKey: "settings.githubRepositoryName"),
             "bugnarrator"
         )
+    }
+
+    func testDuplicateHotkeyAssignmentsDisableOlderConflictingAction() {
+        let suiteName = "BugNarrator-SettingsHotkeyConflictTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let duplicateShortcut = HotkeyShortcut(
+            keyCode: 7,
+            modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue
+        )
+
+        store.startRecordingHotkeyShortcut = duplicateShortcut
+        store.stopRecordingHotkeyShortcut = duplicateShortcut
+
+        XCTAssertEqual(store.stopRecordingHotkeyShortcut, duplicateShortcut)
+        XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
     }
 
     func testSettingsLoadLegacyKeychainServiceAndMigrateToBugNarratorNamespace() {

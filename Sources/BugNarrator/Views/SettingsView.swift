@@ -7,15 +7,21 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("BugNarrator Settings")
-                    .font(.title2.weight(.semibold))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("BugNarrator Settings")
+                        .font(.title2.weight(.semibold))
+
+                    Text("Set up your OpenAI key, review workflow defaults, export destinations, and local diagnostics in one place.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
                 GroupBox("Before You Start") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("BugNarrator requires your own OpenAI API key.")
                             .font(.headline)
 
-                        Text("This app does not ship with OpenAI access or bundled credits. Paste your own key below before you try to transcribe a session.")
+                        Text("BugNarrator does not ship with OpenAI access or bundled credits. Paste your own key below before you transcribe a session or run issue extraction.")
                             .foregroundStyle(.secondary)
 
                         Text("Transcription and issue extraction use the OpenAI API and may incur charges on your OpenAI account.")
@@ -24,8 +30,10 @@ struct SettingsView: View {
                     }
                 }
 
-                GroupBox("OpenAI") {
+                GroupBox("OpenAI Setup") {
                     VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Recording can start without a key, but transcription and issue extraction require your own OpenAI API key.")
+
                         labeledField(title: "OpenAI API Key") {
                             SecureField("sk-...", text: $settingsStore.apiKey)
                                 .textFieldStyle(.roundedBorder)
@@ -68,8 +76,10 @@ struct SettingsView: View {
                     }
                 }
 
-                GroupBox("Transcription") {
+                GroupBox("Transcription Defaults") {
                     VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Choose the default transcription model and optional hints BugNarrator sends to OpenAI.")
+
                         labeledField(title: "Model") {
                             TextField("whisper-1", text: $settingsStore.preferredModel)
                                 .textFieldStyle(.roundedBorder)
@@ -101,6 +111,8 @@ struct SettingsView: View {
 
                 GroupBox("Issue Extraction") {
                     VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Configure how BugNarrator turns finished transcripts into reviewable draft issues.")
+
                         labeledField(title: "Extraction Model") {
                             TextField("gpt-4.1-mini", text: $settingsStore.issueExtractionModel)
                                 .textFieldStyle(.roundedBorder)
@@ -114,13 +126,19 @@ struct SettingsView: View {
                     }
                 }
 
-                GroupBox("Behavior") {
+                GroupBox("Workflow Defaults") {
                     VStack(alignment: .leading, spacing: 10) {
+                        sectionIntro("Control what BugNarrator does automatically after recording, transcription, and support workflows.")
+
                         Toggle("Auto-copy transcript to clipboard", isOn: $settingsStore.autoCopyTranscript)
                         Toggle("Auto-save transcript to local history", isOn: $settingsStore.autoSaveTranscript)
-                        Toggle("Debug mode keeps successful temp audio files", isOn: $settingsStore.debugMode)
+                        Toggle("Debug mode enables verbose local diagnostics", isOn: $settingsStore.debugMode)
 
                         Text("Screenshot capture prompts for Screen Recording permission the first time you use it if macOS requires access.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Text("When debug mode is on, BugNarrator records extra local diagnostics, keeps successful temp audio files, and adds more validation notes to exported debug bundles.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -128,6 +146,8 @@ struct SettingsView: View {
 
                 GroupBox("Permissions") {
                     VStack(alignment: .leading, spacing: 10) {
+                        sectionIntro("BugNarrator only asks for the permissions it needs for recording and screenshots.")
+
                         Text("BugNarrator asks for microphone access only when you start recording.")
                             .foregroundStyle(.secondary)
 
@@ -142,11 +162,14 @@ struct SettingsView: View {
 
                 GroupBox("Global Hotkeys") {
                     VStack(alignment: .leading, spacing: 12) {
-                        hotkeyRow(title: HotkeyAction.toggleRecording.title, shortcut: $settingsStore.recordingHotkeyShortcut)
-                        hotkeyRow(title: HotkeyAction.insertMarker.title, shortcut: $settingsStore.markerHotkeyShortcut)
-                        hotkeyRow(title: HotkeyAction.captureScreenshot.title, shortcut: $settingsStore.screenshotHotkeyShortcut)
+                        sectionIntro("Hotkeys are the primary way to control recording, markers, and screenshots while you keep testing.")
 
-                        Text("Hotkeys use Carbon and do not require Accessibility access. Marker and screenshot hotkeys only work while a session is recording.")
+                        hotkeyRow(action: .startRecording, shortcut: $settingsStore.startRecordingHotkeyShortcut)
+                        hotkeyRow(action: .stopRecording, shortcut: $settingsStore.stopRecordingHotkeyShortcut)
+                        hotkeyRow(action: .insertMarker, shortcut: $settingsStore.markerHotkeyShortcut)
+                        hotkeyRow(action: .captureScreenshot, shortcut: $settingsStore.screenshotHotkeyShortcut)
+
+                        Text("Hotkeys use Carbon and do not require Accessibility access. Marker and screenshot hotkeys only work while a session is recording. If you reuse a shortcut, BugNarrator disables the older conflicting action so only one action stays assigned.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -154,6 +177,8 @@ struct SettingsView: View {
 
                 GroupBox("GitHub Export") {
                     VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues.")
+
                         labeledField(title: "Personal Access Token") {
                             SecureField("github_pat_...", text: $settingsStore.githubToken)
                                 .textFieldStyle(.roundedBorder)
@@ -167,7 +192,7 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            Button("Remove Token", role: .destructive) {
+                            Button("Remove GitHub Token", role: .destructive) {
                                 settingsStore.removeGitHubToken()
                             }
                             .disabled(secureControlsDisabled || !settingsStore.hasGitHubToken)
@@ -200,6 +225,8 @@ struct SettingsView: View {
 
                 GroupBox("Jira Export") {
                     VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Configure the Jira Cloud project BugNarrator should use when exporting selected extracted issues.")
+
                         labeledField(title: "Jira Cloud URL") {
                             TextField("your-domain.atlassian.net", text: $settingsStore.jiraBaseURL)
                                 .textFieldStyle(.roundedBorder)
@@ -223,7 +250,7 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            Button("Remove Token", role: .destructive) {
+                            Button("Remove Jira Token", role: .destructive) {
                                 settingsStore.removeJiraAPIToken()
                             }
                             .disabled(secureControlsDisabled || !settingsStore.hasJiraAPIToken)
@@ -249,8 +276,77 @@ struct SettingsView: View {
                     }
                 }
 
+                GroupBox("Diagnostics & Support") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Use these details when filing GitHub issues or sharing a debug bundle with support.")
+
+                        labeledField(title: "App Version") {
+                            Text(debugInfoSnapshot.versionDescription)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "macOS") {
+                            Text(debugInfoSnapshot.macOSVersion)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "Architecture") {
+                            Text(debugInfoSnapshot.architecture)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "Transcription") {
+                            Text(debugInfoSnapshot.activeTranscriptionModel)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "Issue Extraction") {
+                            Text(debugInfoSnapshot.issueExtractionModel)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "Log Level") {
+                            Text(debugInfoSnapshot.logLevel)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        labeledField(title: "Session ID") {
+                            Text(debugInfoSnapshot.sessionID?.uuidString ?? "No active or selected session")
+                                .font(.footnote.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        HStack(spacing: 12) {
+                            Button("Copy Debug Info") {
+                                appState.copyDebugInfo()
+                            }
+
+                            Button("Export Debug Bundle") {
+                                Task {
+                                    await appState.exportDebugBundle()
+                                }
+                            }
+
+                            Button("Report an Issue") {
+                                appState.openIssueReporter()
+                            }
+                        }
+
+                        Text("Attach the debug bundle and, if relevant, an exported session bundle when reporting an issue. BugNarrator never includes OpenAI, GitHub, or Jira credentials in the debug bundle.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 if secureControlsDisabled {
-                    Text("Secret changes are disabled while a recording, transcription, extraction, or export is in progress.")
+                    Text("Credential changes are disabled while recording, transcription, extraction, or export is in progress.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -263,19 +359,30 @@ struct SettingsView: View {
         appState.status.phase == .recording || appState.status.phase == .transcribing
     }
 
-    private func hotkeyRow(title: String, shortcut: Binding<HotkeyShortcut>) -> some View {
+    private var debugInfoSnapshot: DebugInfoSnapshot {
+        appState.debugInfoSnapshot
+    }
+
+    private func hotkeyRow(action: HotkeyAction, shortcut: Binding<HotkeyShortcut>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-            HotkeyRecorderView(shortcut: shortcut)
+            Text(action.title)
+                .font(.subheadline.weight(.medium))
+            HotkeyRecorderView(shortcut: shortcut, defaultShortcut: action.defaultShortcut)
         }
     }
 
     @ViewBuilder
     private func labeledField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .top) {
             Text(title)
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 170, alignment: .leading)
             content()
         }
+    }
+
+    private func sectionIntro(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
     }
 }
