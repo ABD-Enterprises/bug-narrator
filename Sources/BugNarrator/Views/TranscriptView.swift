@@ -173,7 +173,7 @@ struct TranscriptView: View {
                 ContentUnavailableView {
                     Label("OpenAI API Key Required", systemImage: "key.horizontal")
                 } description: {
-                    Text("Add your own OpenAI API key in Settings before you start recording sessions for the library.")
+                    Text("You can record without an OpenAI API key, but you need one in Settings before a session can be transcribed into the library.")
                 } actions: {
                     Button("Open Settings") {
                         appState.openSettings()
@@ -641,6 +641,10 @@ struct TranscriptView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            Text(appState.preferredRecordingWorkflowSummary + " Screenshot capture automatically inserts a marker.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             Text("\(appState.activeMarkerCount) markers  •  \(appState.activeScreenshotCount) screenshots")
                 .font(.footnote)

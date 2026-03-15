@@ -87,11 +87,11 @@ BugNarrator records in the background while you switch apps and continue normal 
 
 ### Markers
 
-Markers let you flag important moments during a session. Each marker stores a timestamp and appears in the transcript review UI and transcript exports.
+Markers let you flag important moments during a session. Each marker stores a timestamp and appears in the transcript review UI and transcript exports. Screenshot captures also add an automatic marker so visual evidence stays aligned with the transcript timeline.
 
 ### Screenshot Capture
 
-Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit to capture the current desktop layout and attach the saved image to the active session. Each screenshot is attached to the current session and can appear alongside markers and extracted issues.
+Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit to capture the current desktop layout and attach the saved image to the active session. Each screenshot is attached to the current session, creates an automatic marker, and can appear alongside extracted issues.
 
 ### Review Summary
 

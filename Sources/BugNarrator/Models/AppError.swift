@@ -22,7 +22,7 @@ enum AppError: LocalizedError, Equatable {
     var userMessage: String {
         switch self {
         case .missingAPIKey:
-            return "BugNarrator requires your own OpenAI API key. Add it in Settings before starting a session."
+            return "BugNarrator requires your own OpenAI API key for transcription and issue extraction. Add it in Settings before stopping the session."
         case .invalidAPIKey:
             return "The OpenAI API key was rejected. Open Settings, replace it, and try again."
         case .revokedAPIKey:

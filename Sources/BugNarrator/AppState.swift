@@ -157,6 +157,10 @@ final class AppState: ObservableObject {
         !settingsStore.hasAPIKey
     }
 
+    var preferredRecordingWorkflowSummary: String {
+        "Use global hotkeys or the floating HUD while you keep testing. The menu controls are a fallback."
+    }
+
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
         issueExtractionSessionID == session.id
     }
@@ -232,7 +236,14 @@ final class AppState: ObservableObject {
                     sessionID: sessionID,
                     artifactsDirectoryURL: artifactsDirectoryURL
                 )
-                setStatus(.recording("Recording in progress."))
+                let recordingDetail: String
+                if settingsStore.hasAPIKey {
+                    recordingDetail = "Recording in progress."
+                } else {
+                    recordingDetail = "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
+                }
+
+                setStatus(.recording(recordingDetail))
                 beginActivity(reason: "Recording a spoken feedback session")
                 startTimer()
             } catch {
@@ -650,8 +661,10 @@ final class AppState: ObservableObject {
         }
 
         let screenshotIndex = recordingSession.screenshots.count + 1
+        let markerIndex = recordingSession.markers.count + 1
         let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
-        let associatedMarkerID = nearestMarkerID(in: recordingSession, to: elapsedTime)
+        let markerID = UUID()
+        let markerTitle = "Screenshot \(screenshotIndex)"
 
         do {
             let screenshot = try await performScreenshotCapture(
@@ -659,16 +672,26 @@ final class AppState: ObservableObject {
                 prefix: "capture",
                 index: screenshotIndex,
                 elapsedTime: elapsedTime,
-                associatedMarkerID: associatedMarkerID
+                associatedMarkerID: markerID
             )
             guard status.phase == .recording,
                   var latestRecordingSession = activeRecordingSession,
                   latestRecordingSession.sessionID == recordingSession.sessionID else {
                 return
             }
+            latestRecordingSession.markers.append(
+                SessionMarker(
+                    id: markerID,
+                    index: markerIndex,
+                    elapsedTime: elapsedTime,
+                    title: markerTitle,
+                    note: "Created automatically from a screenshot capture.",
+                    screenshotID: screenshot.id
+                )
+            )
             latestRecordingSession.screenshots.append(screenshot)
             activeRecordingSession = latestRecordingSession
-            setStatus(.recording("Captured Screenshot \(screenshotIndex)."))
+            setStatus(.recording("Captured Screenshot \(screenshotIndex) and added \(markerTitle) marker."))
         } catch {
             let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
             guard status.phase == .recording else {
@@ -1013,12 +1036,6 @@ final class AppState: ObservableObject {
     }
 
     private func preflightForSessionStart() async -> AppError? {
-        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
-
-        guard settingsStore.hasAPIKey else {
-            return .missingAPIKey
-        }
-
         switch audioRecorder.microphonePermissionState() {
         case .denied, .restricted:
             return .microphonePermissionDenied
@@ -1153,17 +1170,4 @@ final class AppState: ObservableObject {
         return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
-    private func nearestMarkerID(
-        in recordingSession: RecordingSessionDraft,
-        to elapsedTime: TimeInterval,
-        threshold: TimeInterval = 5
-    ) -> UUID? {
-        recordingSession.markers
-            .map { marker in
-                (markerID: marker.id, distance: abs(marker.elapsedTime - elapsedTime))
-            }
-            .filter { $0.distance <= threshold }
-            .min { $0.distance < $1.distance }?
-            .markerID
-    }
 }

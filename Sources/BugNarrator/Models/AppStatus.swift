@@ -7,7 +7,7 @@ enum AppStatus: Equatable {
     case success(String)
     case error(String)
 
-    enum Phase {
+    enum Phase: Equatable {
         case idle
         case recording
         case transcribing
