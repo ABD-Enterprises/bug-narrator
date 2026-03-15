@@ -327,7 +327,8 @@ struct AppStateHarness {
         autoCopyTranscript: Bool = true,
         autoSaveTranscript: Bool = true,
         autoExtractIssues: Bool = false,
-        screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService()
+        screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
     ) {
         let fileManager = FileManager.default
         let rootDirectoryURL = fileManager.temporaryDirectory
@@ -384,7 +385,8 @@ struct AppStateHarness {
             exportService: exportService,
             artifactsService: artifactsService,
             clipboardService: clipboardService,
-            urlHandler: urlHandler
+            urlHandler: urlHandler,
+            runtimeEnvironment: runtimeEnvironment
         )
     }
 

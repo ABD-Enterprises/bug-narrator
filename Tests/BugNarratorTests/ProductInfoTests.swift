@@ -62,4 +62,18 @@ final class ProductInfoTests: XCTestCase {
 
         XCTAssertEqual(changelog.latestHighlights, ["Added About BugNarrator.", "Added changelog viewing."])
     }
+
+    func testRuntimeEnvironmentDetectsLocalTestingBuildsFromDerivedData() {
+        let environment = AppRuntimeEnvironment(
+            bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
+        )
+
+        XCTAssertTrue(environment.isLocalTestingBuild)
+    }
+
+    func testRuntimeEnvironmentDoesNotTreatInstalledBuildAsLocalTestingBuild() {
+        let environment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
+
+        XCTAssertFalse(environment.isLocalTestingBuild)
+    }
 }

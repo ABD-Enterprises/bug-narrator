@@ -138,10 +138,17 @@ struct MenuBarView: View {
 
     private var microphoneRecoverySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Open System Settings and enable BugNarrator in Privacy & Security > Microphone.")
+            Text(appState.microphoneRecoveryGuidance)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let localTestingNote = appState.microphoneRecoveryLocalTestingNote {
+                Text(localTestingNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Button("Open Microphone Settings") {
                 appState.openMicrophonePrivacySettings()
@@ -258,7 +265,7 @@ struct MenuBarView: View {
     private var controlsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Feedback Session")
+                Text("Recording Controls")
                     .font(.headline)
 
                 Text(sessionControlsSubtitle)
@@ -266,113 +273,39 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
 
-            switch appState.status.phase {
-            case .idle, .success, .error:
-                if appState.currentError == .microphonePermissionDenied {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button("Start Feedback Session") {
-                            runMenuAction {
-                                await appState.openRecordingControlsAndStartSession()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-
-                        Text("After enabling microphone access above, start the session again.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } else if let currentError = appState.currentError, currentError.suggestsOpenAISettings {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Button("Start Feedback Session") {
-                                runMenuAction {
-                                    await appState.openRecordingControlsAndStartSession()
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-
-                            Button("Open Settings") {
-                                appState.openSettings()
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        Text("You can still record without a key. Add your own OpenAI API key in Settings before stopping if you want transcription.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } else if appState.needsAPIKeySetup {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Button("Start Feedback Session") {
-                                runMenuAction {
-                                    await appState.openRecordingControlsAndStartSession()
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-
-                            Button("Open Settings") {
-                                appState.openSettings()
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        Text("You can start recording now. Add your own OpenAI API key in Settings before stopping if you want transcription or issue extraction.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Button("Start Feedback Session") {
-                        runMenuAction {
-                            await appState.openRecordingControlsAndStartSession()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+            Button("Show Recording Controls") {
+                runMenuAction {
+                    appState.openRecordingControls()
                 }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
 
+            switch appState.status.phase {
+            case .idle:
+                Text("Open the control window to start, stop, mark moments, and capture screenshots. Global shortcuts stay active too.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             case .recording:
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Recording controls stay in one place.", systemImage: "rectangle.on.rectangle")
-                            .font(.footnote.weight(.semibold))
-
-                        Text("Use the recording controls window or the global hotkeys while you keep testing. Screenshot capture automatically adds a marker.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Button("Open Recording Controls") {
-                            runMenuAction {
-                                appState.openRecordingControls()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Button("Stop Feedback Session") {
-                            Task {
-                                await appState.stopSession()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("Cancel Session") {
-                            appState.requestSessionCancel()
-                        }
-                        .buttonStyle(.bordered)
-                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recording is active. Keep the control window parked where you want it while you keep testing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
                     Text("\(appState.activeMarkerCount) markers  •  \(appState.activeScreenshotCount) screenshots")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-
             case .transcribing:
-                Text("Audio is being uploaded to OpenAI for transcription.")
+                Text("The control window can stay open while BugNarrator uploads audio and prepares the transcript.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            case .success:
+                Text("The latest session is ready in the session library. Reopen the control window when you want to start the next pass.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            case .error:
+                Text("Use the recovery guidance above, then continue from the control window.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -567,15 +500,15 @@ struct MenuBarView: View {
     private var sessionControlsSubtitle: String {
         switch appState.status.phase {
         case .idle:
-            return "Start a feedback session, then narrate while you keep testing."
+            return "The control window is the single place for recording actions."
         case .recording:
-            return "Use the recording controls or hotkeys to capture moments without interrupting your flow."
+            return "Keep the controls open and use them or the hotkeys without reopening the menu."
         case .transcribing:
-            return "The recording is finished. BugNarrator is preparing the transcript."
+            return "Recording has stopped. The control window stays available while transcription finishes."
         case .success:
-            return "The latest session is ready for review in the session library."
+            return "Use the control window to start the next session when you are ready."
         case .error:
-            return "Use the recovery guidance below, then continue the workflow."
+            return "Fix the current issue, then continue from the control window."
         }
     }
 

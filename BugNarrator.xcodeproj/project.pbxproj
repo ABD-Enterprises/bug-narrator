@@ -29,6 +29,7 @@
 		45F46F4649A31F438D58E465 /* BugNarratorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD698A35E065D940A06FB72 /* BugNarratorApp.swift */; };
 		4D9A19996F3BCEC530DEA5F8 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865C5FE84904ECA5F4379637 /* MenuBarView.swift */; };
 		4F04273FAEFE2C33F78701B4 /* ElapsedTimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */; };
+		5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1805C56FBAED6588A225F0 /* AppRuntimeEnvironment.swift */; };
 		5090A54144CACF59295F137C /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22447E5581818B8003AA49F8 /* TestSupport.swift */; };
 		5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */; };
 		562BF7C0BF2A8D013BA2F63F /* BugNarratorMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */; };
@@ -94,6 +95,7 @@
 		0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControlPanelView.swift; sourceTree = "<group>"; };
 		0DF81E6E8D3A702691797E56 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		1ACC8A426CF0E64809970F2A /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
+		1D1805C56FBAED6588A225F0 /* AppRuntimeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeEnvironment.swift; sourceTree = "<group>"; };
 		22447E5581818B8003AA49F8 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraft.swift; sourceTree = "<group>"; };
 		277DC17D4084F918920CB8C5 /* URLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLHandler.swift; sourceTree = "<group>"; };
@@ -282,6 +284,7 @@
 		901867F0DBC0A9BD975CCE02 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				1D1805C56FBAED6588A225F0 /* AppRuntimeEnvironment.swift */,
 				60B609057DB2068E0F4FD292 /* AppSupportLocation.swift */,
 				0599934D564C87030D294589 /* BugNarratorDiagnostics.swift */,
 				D6C80DD2FADBED13E068990D /* BugNarratorLinks.swift */,
@@ -439,6 +442,7 @@
 				C4DEF637FA4D2980FA55A9C9 /* APIKeyValidationState.swift in Sources */,
 				7FC6E70710547A486C4ED5BA /* AboutBugNarratorView.swift in Sources */,
 				CB9E1F15D2FB0B7CF38DD5F6 /* AppError.swift in Sources */,
+				5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */,
 				9F837FB17474EEB037FC01B4 /* AppState.swift in Sources */,
 				C4388FB859242F0C2B148293 /* AppStatus.swift in Sources */,
 				EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */,
