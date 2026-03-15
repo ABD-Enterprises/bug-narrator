@@ -7,6 +7,7 @@
 - Drag `BugNarrator.app` to `Applications` and launch that installed copy once.
 - Build and run `BugNarrator` from Xcode.
 - Confirm the menu bar item appears after launch.
+- Confirm the first launch does not trigger an unexpected Keychain or admin-style credential prompt before you open Settings or start a key-dependent action.
 - Confirm the menu bar explains that the app requires the user's own OpenAI API key.
 - Open Settings and verify the onboarding copy explains that OpenAI usage may incur charges.
 - Verify the OpenAI API key can be entered, remains masked, and shows a secure-storage note.
@@ -84,6 +85,7 @@
 - Delete a session from the row context menu and verify the same behavior.
 - Delete a session that contains screenshots and verify the app warns that local screenshots will also be removed.
 - Verify exported files outside BugNarrator remain untouched after deleting the session.
+- After deleting the selected session, verify GitHub and Jira export actions are no longer available for that removed session state.
 
 ## Issue Extraction Workflow
 
@@ -129,15 +131,17 @@
 - Start recording, remove the OpenAI API key from Settings, then stop the session.
   Expected: the app fails gracefully, explains that the key is missing, and remains usable for the next session.
 - Deny microphone permission and attempt to start a session.
-  Expected: recording does not start and the error explains how to re-enable access in System Settings.
+  Expected: recording does not start, the error explains how to re-enable access in System Settings, and `Open Microphone Settings` opens the expected privacy pane or a safe fallback.
 - Capture a screenshot without Screen Recording permission.
-  Expected: recording continues and BugNarrator shows a screenshot-specific error.
+  Expected: recording continues, BugNarrator shows a screenshot-specific error, and `Open Screen Recording Settings` opens the expected privacy pane or a safe fallback.
 - Delete or move a saved screenshot file outside the app, then open it from the session detail view.
   Expected: BugNarrator explains that the local screenshot file is no longer available instead of failing silently.
 - Disconnect networking or force a timeout during transcription.
   Expected: transcription ends in a clear timeout or API error state and the app returns to a usable state.
 - Use an invalid OpenAI API key.
-  Expected: transcription or issue extraction ends in a clear invalid-key error and Settings opens.
+  Expected: transcription or issue extraction ends in a clear invalid-key error, Settings opens, and the menu bar offers a direct `Open Settings` recovery action.
+- Simulate a local history write failure after a successful transcription if practical.
+  Expected: the transcript window still opens, the completed session remains available as an unsaved session, screenshots remain accessible, and `Save to History` can be retried later after storage is fixed.
 - Cancel an active recording.
   Expected: discard confirmation appears first, then the session returns to `Idle` with no stale timer.
 

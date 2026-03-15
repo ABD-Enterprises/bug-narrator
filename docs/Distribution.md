@@ -1,6 +1,6 @@
 # BugNarrator Distribution
 
-This document explains how to build the BugNarrator release app and package it as a distributable macOS DMG.
+This document explains how to build the BugNarrator release app, package it as a distributable macOS DMG, and validate it before publishing on GitHub Releases.
 
 ## What This Produces
 
@@ -9,11 +9,13 @@ The packaging workflow creates:
 - a Release build of `BugNarrator.app`
 - a DMG containing `BugNarrator.app`
 - an `Applications` shortcut inside the DMG
+- validation that branded icon resources are present in the app bundle
+- validation that the mounted DMG contains the app plus the `Applications` shortcut
 - two output filenames in `dist/`
 
 By default you will get:
 
-- `BugNarrator-vX.Y-macOS.dmg`
+- `BugNarrator-vX.Y.Z-macOS.dmg`
 - `BugNarrator-macOS.dmg`
 
 The non-versioned filename is useful for a stable GitHub Releases download link.
@@ -46,7 +48,9 @@ The script:
 2. stages `BugNarrator.app`
 3. adds an `Applications` symlink
 4. creates a compressed DMG
-5. writes the finished artifacts to `dist/`
+5. verifies `AppIcon.icns` and `Assets.car` exist in the built app
+6. mounts the DMG and verifies the expected layout
+7. writes the finished artifacts to `dist/`
 
 ## Output Location
 
@@ -54,6 +58,14 @@ By default the script writes:
 
 - the DMG files to `dist/`
 - intermediate build data to `build/DerivedData`
+
+## Release App Output
+
+The built Release app is left at:
+
+- `build/DerivedData/Build/Products/Release/BugNarrator.app`
+
+Use that path for extra manual checks if you want to inspect codesigning or bundle resources directly.
 
 ## Release Signing Notes
 
@@ -113,21 +125,46 @@ NOTARY_PROFILE=***REMOVED*** \
 The packaging script will:
 
 1. build the Release app
-2. verify the app is signed
-3. create the DMG
-4. submit the DMG to Apple's notarization service
-5. staple the notarization ticket to the DMG
-6. run `stapler validate` and `spctl` checks
+2. re-sign the app explicitly when a Developer ID build requires manual distribution signing
+3. verify the app is signed
+4. verify icon resources are present in the built app
+5. create the DMG
+6. mount the DMG and verify `BugNarrator.app` plus the `Applications` shortcut are present
+7. submit the DMG to Apple's notarization service
+8. staple the notarization ticket to the DMG
+9. run `stapler validate` and `spctl` checks
+
+Because BugNarrator targets macOS 14 or later, the shipped app now uses ScreenCaptureKit for screenshot capture. No extra packaging step is required for that API, but your release smoke test should still verify that Screen Recording permission prompts only when the user requests a screenshot.
+
+## Example Public Release Command
+
+If your local Mac already has a `Developer ID Application` certificate and a `***REMOVED***` profile configured, this is the practical public-release command:
+
+```bash
+CODE_SIGNING_ALLOWED=YES \
+CODE_SIGN_IDENTITY="Developer ID Application" \
+DEVELOPMENT_TEAM=***REMOVED*** \
+ALLOW_PROVISIONING_UPDATES=YES \
+NOTARIZE=YES \
+NOTARY_PROFILE=***REMOVED*** \
+./scripts/build_dmg.sh
+```
+
+That produces:
+
+- `dist/BugNarrator-vX.Y.Z-macOS.dmg`
+- `dist/BugNarrator-macOS.dmg`
 
 ## Releasing On GitHub
 
 Recommended flow:
 
-1. run `./scripts/build_dmg.sh`
+1. run the signed/notarized packaging command
 2. create a GitHub Release
 3. upload `dist/BugNarrator-macOS.dmg`
-4. optionally upload the versioned `dist/BugNarrator-vX.Y-macOS.dmg`
-5. update release notes and changelog if needed
+4. optionally upload the versioned `dist/BugNarrator-vX.Y.Z-macOS.dmg`
+5. add release notes and link back to the changelog if needed
+6. verify the README top download link matches the uploaded stable DMG filename
 
 ## Verify The DMG
 
@@ -137,13 +174,25 @@ After building:
 2. confirm `BugNarrator.app` is present
 3. confirm the `Applications` shortcut is present
 4. drag the app into `Applications`
-5. launch the installed app and verify first-run behavior
+5. confirm the installed app shows the branded BugNarrator icon in Finder
+6. launch the installed app and verify first-run behavior
 
 For a public release, also verify:
 
-1. `xcrun stapler validate dist/BugNarrator-vX.Y-macOS.dmg`
-2. `spctl -a -vv -t open dist/BugNarrator-vX.Y-macOS.dmg`
+1. `xcrun stapler validate dist/BugNarrator-vX.Y.Z-macOS.dmg`
+2. `spctl -a -vv build/DerivedData/Build/Products/Release/BugNarrator.app`
 3. Gatekeeper accepts the downloaded DMG on a second Mac that has never built the app locally
+
+Note: `spctl -a -vv -t open` against a locally produced DMG can report `Insufficient Context` on the build machine because the file is not a quarantined download. Treat `stapler validate` plus an app-level `spctl` check as the reliable local validation, then do a real download/open smoke test before publishing.
+
+## Updating Release Links
+
+The README intentionally points to:
+
+- the stable direct asset path: `BugNarrator-macOS.dmg`
+- the latest GitHub release page
+
+If you change the stable DMG filename in the script, update the README download section in the same change so public visitors do not hit a broken link.
 
 ## Related Docs
 

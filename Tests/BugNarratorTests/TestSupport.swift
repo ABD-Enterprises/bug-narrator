@@ -113,12 +113,27 @@ final class MockHotkeyManager: HotkeyManaging {
     }
 }
 
-struct MockScreenshotCaptureService: ScreenshotCapturing {
+final class MockScreenshotCaptureService: ScreenshotCapturing {
     var error: Error?
+    var delayNanoseconds: UInt64 = 0
+    var onCaptureStart: (() -> Void)?
 
-    func captureScreenshot(to url: URL) throws {
+    init(error: Error? = nil, delayNanoseconds: UInt64 = 0, onCaptureStart: (() -> Void)? = nil) {
+        self.error = error
+        self.delayNanoseconds = delayNanoseconds
+        self.onCaptureStart = onCaptureStart
+    }
+
+    @MainActor
+    func captureScreenshot(to url: URL) async throws {
         if let error {
             throw error
+        }
+
+        onCaptureStart?()
+
+        if delayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: delayNanoseconds)
         }
 
         try Data("screenshot".utf8).write(to: url)
@@ -241,10 +256,15 @@ final class MockClipboardService: ClipboardWriting {
 final class MockURLHandler: URLOpening {
     private(set) var openedURLs: [URL] = []
     var shouldSucceed = true
+    var openResults: [Bool] = []
 
     @discardableResult
     func open(_ url: URL) -> Bool {
         openedURLs.append(url)
+        if !openResults.isEmpty {
+            return openResults.removeFirst()
+        }
+
         return shouldSucceed
     }
 }

@@ -28,7 +28,8 @@ protocol HotkeyManaging: AnyObject {
 }
 
 protocol ScreenshotCapturing {
-    func captureScreenshot(to url: URL) throws
+    @MainActor
+    func captureScreenshot(to url: URL) async throws
 }
 
 protocol IssueExtracting: Sendable {
