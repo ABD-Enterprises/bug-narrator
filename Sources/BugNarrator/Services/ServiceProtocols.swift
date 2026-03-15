@@ -13,6 +13,7 @@ enum MicrophonePermissionStatus: String, Equatable {
     case denied
     case restricted
     case unavailable
+    case captureSetupFailed
     case unknownError
 }
 
@@ -38,11 +39,49 @@ enum RecordingStartPreflightResult: Equatable {
     }
 }
 
+enum ScreenCapturePermissionState: Equatable {
+    case granted
+    case notDetermined
+    case denied
+    case unavailable
+}
+
+enum ScreenCapturePermissionStatus: String, Equatable {
+    case notDetermined
+    case granted
+    case denied
+    case unavailable
+    case captureSetupFailed
+    case unknownError
+}
+
+struct ScreenCaptureRecoveryGuidance: Equatable {
+    let headline: String
+    let message: String
+}
+
+enum ScreenshotCapturePreflightResult: Equatable {
+    case success
+    case blocked(AppError)
+    case needsUserAction(AppError)
+    case failure(AppError)
+
+    var error: AppError? {
+        switch self {
+        case .success:
+            return nil
+        case .blocked(let error), .needsUserAction(let error), .failure(let error):
+            return error
+        }
+    }
+}
+
 @MainActor
 protocol AudioRecording: AnyObject {
     var currentDuration: TimeInterval { get }
     func microphonePermissionState() -> MicrophonePermissionState
     func validateRecordingPrerequisites() async -> AppError?
+    func validateRecordingActivation() async -> AppError?
     func startRecording() async throws
     func stopRecording() async throws -> RecordedAudio
     func cancelRecording(preserveFile: Bool) async
@@ -55,6 +94,12 @@ protocol MicrophonePermissionAccessing {
 }
 
 @MainActor
+protocol ScreenCapturePermissionAccessing {
+    func currentPermissionState() -> ScreenCapturePermissionState
+    func requestPermissionIfNeeded() async -> ScreenCapturePermissionState
+}
+
+@MainActor
 protocol MicrophonePermissionServicing {
     func currentStatus() -> MicrophonePermissionStatus
     func recoveryGuidance(
@@ -62,6 +107,19 @@ protocol MicrophonePermissionServicing {
         runtimeEnvironment: AppRuntimeEnvironment
     ) -> MicrophoneRecoveryGuidance
     func preflightForRecordingStart(audioRecorder: any AudioRecording) async -> RecordingStartPreflightResult
+}
+
+@MainActor
+protocol ScreenCapturePermissionServicing {
+    func currentStatus() -> ScreenCapturePermissionStatus
+    func recoveryGuidance(
+        for status: ScreenCapturePermissionStatus,
+        runtimeEnvironment: AppRuntimeEnvironment
+    ) -> ScreenCaptureRecoveryGuidance
+    func preflightForScreenshotCapture(
+        screenshotCaptureService: any ScreenshotCapturing,
+        hasActiveRecordingSession: Bool
+    ) async -> ScreenshotCapturePreflightResult
 }
 
 protocol TranscriptionServing: Sendable {
@@ -76,6 +134,8 @@ protocol HotkeyManaging: AnyObject {
 }
 
 protocol ScreenshotCapturing {
+    @MainActor
+    func validateCaptureAvailability() async -> AppError?
     @MainActor
     func captureScreenshot(to url: URL) async throws
 }

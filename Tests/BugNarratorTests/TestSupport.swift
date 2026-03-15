@@ -4,6 +4,12 @@ import XCTest
 
 @MainActor
 final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
+    enum ActivationProbeBehavior {
+        case automatic
+        case success
+        case error(AppError)
+    }
+
     var currentDuration: TimeInterval = 0
     var startCallCount = 0
     var stopCallCount = 0
@@ -14,7 +20,9 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     var permissionState: MicrophonePermissionState = .authorized
     var requestedPermissionStates: [MicrophonePermissionState] = []
     var prerequisiteError: AppError?
+    var activationProbeBehavior: ActivationProbeBehavior = .automatic
     private(set) var permissionRequestCallCount = 0
+    private(set) var activationProbeCallCount = 0
 
     private var stopContinuation: CheckedContinuation<RecordedAudio, Error>?
 
@@ -38,6 +46,30 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 
     func validateRecordingPrerequisites() async -> AppError? {
         prerequisiteError
+    }
+
+    func validateRecordingActivation() async -> AppError? {
+        activationProbeCallCount += 1
+
+        switch activationProbeBehavior {
+        case .automatic:
+            if let prerequisiteError {
+                return prerequisiteError
+            }
+
+            switch permissionState {
+            case .authorized, .notDetermined:
+                return nil
+            case .denied:
+                return .microphonePermissionDenied
+            case .restricted:
+                return .microphonePermissionRestricted
+            }
+        case .success:
+            return nil
+        case .error(let error):
+            return error
+        }
     }
 
     func startRecording() async throws {
@@ -136,6 +168,7 @@ final class MockHotkeyManager: HotkeyManaging {
 
 final class MockScreenshotCaptureService: ScreenshotCapturing {
     var error: Error?
+    var availabilityError: AppError?
     var delayNanoseconds: UInt64 = 0
     var onCaptureStart: (() -> Void)?
 
@@ -143,6 +176,11 @@ final class MockScreenshotCaptureService: ScreenshotCapturing {
         self.error = error
         self.delayNanoseconds = delayNanoseconds
         self.onCaptureStart = onCaptureStart
+    }
+
+    @MainActor
+    func validateCaptureAvailability() async -> AppError? {
+        availabilityError
     }
 
     @MainActor
@@ -290,6 +328,27 @@ final class MockURLHandler: URLOpening {
     }
 }
 
+@MainActor
+final class MockScreenCapturePermissionAccess: ScreenCapturePermissionAccessing {
+    var permissionState: ScreenCapturePermissionState = .granted
+    var requestedPermissionStates: [ScreenCapturePermissionState] = []
+    private(set) var permissionRequestCallCount = 0
+
+    func currentPermissionState() -> ScreenCapturePermissionState {
+        permissionState
+    }
+
+    func requestPermissionIfNeeded() async -> ScreenCapturePermissionState {
+        permissionRequestCallCount += 1
+
+        if permissionState == .notDetermined, !requestedPermissionStates.isEmpty {
+            permissionState = requestedPermissionStates.removeFirst()
+        }
+
+        return permissionState
+    }
+}
+
 final class MockKeychainService: KeychainServicing {
     var values: [String: String] = [:]
     var setError: Error?
@@ -340,6 +399,7 @@ struct AppStateHarness {
     let urlHandler: MockURLHandler
     let issueExtractionService: MockIssueExtractionService
     let exportService: MockExportService
+    let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
     let appState: AppState
 
     init(
@@ -380,6 +440,7 @@ struct AppStateHarness {
         let urlHandler = MockURLHandler()
         let issueExtractionService = MockIssueExtractionService()
         let exportService = MockExportService()
+        let screenCapturePermissionAccess = MockScreenCapturePermissionAccess()
 
         self.rootDirectoryURL = rootDirectoryURL
         self.defaultsSuiteName = defaultsSuiteName
@@ -395,11 +456,13 @@ struct AppStateHarness {
         self.urlHandler = urlHandler
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
+        self.screenCapturePermissionAccess = screenCapturePermissionAccess
         self.appState = AppState(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
             audioRecorder: audioRecorder,
             microphonePermissionService: MicrophonePermissionService(permissionAccess: audioRecorder),
+            screenCapturePermissionService: ScreenCapturePermissionService(permissionAccess: screenCapturePermissionAccess),
             transcriptionClient: transcriptionClient,
             hotkeyManager: hotkeyManager,
             screenshotCaptureService: screenshotCaptureService,

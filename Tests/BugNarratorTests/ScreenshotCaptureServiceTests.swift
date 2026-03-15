@@ -5,19 +5,15 @@ import XCTest
 @testable import BugNarrator
 
 final class ScreenshotCaptureServiceTests: XCTestCase {
-    func testCaptureScreenshotFailsFastWhenScreenRecordingPermissionIsDenied() async {
+    func testValidateCaptureAvailabilityReturnsPermissionDeniedError() async {
         let service = ScreenshotCaptureService(
-            permissionChecker: MockScreenCapturePermissionChecker(preflightAccessValue: false, requestAccessValue: false),
-            imageProvider: MockScreenCaptureImageProvider(),
+            imageProvider: MockScreenCaptureImageProvider(error: AppError.screenRecordingPermissionDenied),
             imageWriter: PNGScreenshotImageWriter()
         )
 
-        do {
-            try await service.captureScreenshot(to: temporaryDirectoryURL().appendingPathComponent("capture.png"))
-            XCTFail("Expected permission denial.")
-        } catch {
-            XCTAssertEqual(error as? AppError, .screenRecordingPermissionDenied)
-        }
+        let error = await service.validateCaptureAvailability()
+
+        XCTAssertEqual(error, .screenRecordingPermissionDenied)
     }
 
     func testCaptureScreenshotCreatesParentDirectoryAndWritesCompositePNG() async throws {
@@ -46,7 +42,6 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
         )
 
         let service = ScreenshotCaptureService(
-            permissionChecker: MockScreenCapturePermissionChecker(preflightAccessValue: true, requestAccessValue: false),
             imageProvider: provider,
             imageWriter: PNGScreenshotImageWriter()
         )
@@ -67,7 +62,6 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
 
     func testCaptureScreenshotFailsWhenNoDisplaysAreAvailable() async {
         let service = ScreenshotCaptureService(
-            permissionChecker: MockScreenCapturePermissionChecker(preflightAccessValue: true, requestAccessValue: false),
             imageProvider: MockScreenCaptureImageProvider(displays: []),
             imageWriter: PNGScreenshotImageWriter()
         )
@@ -111,21 +105,6 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
         }
 
         return image
-    }
-}
-
-private struct MockScreenCapturePermissionChecker: ScreenCapturePermissionChecking {
-    let preflightAccessValue: Bool
-    let requestAccessValue: Bool
-
-    @MainActor
-    func preflightAccess() -> Bool {
-        preflightAccessValue
-    }
-
-    @MainActor
-    func requestAccess() -> Bool {
-        requestAccessValue
     }
 }
 

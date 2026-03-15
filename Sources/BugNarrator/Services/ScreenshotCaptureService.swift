@@ -16,23 +16,6 @@ struct CapturedDisplayImage {
     let image: CGImage
 }
 
-protocol ScreenCapturePermissionChecking {
-    @MainActor
-    func preflightAccess() -> Bool
-    @MainActor
-    func requestAccess() -> Bool
-}
-
-struct SystemScreenCapturePermissionChecker: ScreenCapturePermissionChecking {
-    func preflightAccess() -> Bool {
-        CGPreflightScreenCaptureAccess()
-    }
-
-    func requestAccess() -> Bool {
-        CGRequestScreenCaptureAccess()
-    }
-}
-
 protocol ScreenCaptureImageProviding {
     @MainActor
     func availableDisplays() async throws -> [ScreenCaptureDisplaySnapshot]
@@ -170,20 +153,31 @@ struct PNGScreenshotImageWriter: ScreenshotImageWriting {
 }
 
 struct ScreenshotCaptureService: ScreenshotCapturing {
-    private let permissionChecker: any ScreenCapturePermissionChecking
     private let imageProvider: any ScreenCaptureImageProviding
     private let imageWriter: any ScreenshotImageWriting
     private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
-    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
 
     init(
-        permissionChecker: any ScreenCapturePermissionChecking = SystemScreenCapturePermissionChecker(),
         imageProvider: any ScreenCaptureImageProviding = ScreenCaptureKitImageProvider(),
         imageWriter: any ScreenshotImageWriting = PNGScreenshotImageWriter()
     ) {
-        self.permissionChecker = permissionChecker
         self.imageProvider = imageProvider
         self.imageWriter = imageWriter
+    }
+
+    @MainActor
+    func validateCaptureAvailability() async -> AppError? {
+        do {
+            let displays = try await resolvedDisplaysForCapture()
+            guard !displays.isEmpty else {
+                return .screenshotCaptureFailure("No displays were available to capture.")
+            }
+            return nil
+        } catch let error as AppError {
+            return error
+        } catch {
+            return .screenshotCaptureFailure(error.localizedDescription)
+        }
     }
 
     @MainActor
@@ -194,15 +188,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
             metadata: ["file_name": url.lastPathComponent]
         )
 
-        if !permissionChecker.preflightAccess() && !permissionChecker.requestAccess() {
-            permissionsLogger.warning(
-                "screen_recording_permission_denied",
-                "Screen Recording permission was denied for screenshot capture."
-            )
-            throw AppError.screenRecordingPermissionDenied
-        }
-
-        let displays = try await imageProvider.availableDisplays()
+        let displays = try await resolvedDisplaysForCapture()
         guard !displays.isEmpty else {
             screenshotLogger.error("screenshot_capture_no_displays", "No displays were available for ScreenCaptureKit.")
             throw AppError.screenshotCaptureFailure("No displays were available to capture.")
@@ -230,6 +216,17 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
                 "display_count": "\(capturedDisplays.count)"
             ]
         )
+    }
+
+    @MainActor
+    private func resolvedDisplaysForCapture() async throws -> [ScreenCaptureDisplaySnapshot] {
+        do {
+            return try await imageProvider.availableDisplays()
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.screenshotCaptureFailure(error.localizedDescription)
+        }
     }
 
     private func makeCompositeImage(from capturedDisplays: [CapturedDisplayImage]) throws -> CGImage {

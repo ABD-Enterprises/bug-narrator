@@ -93,6 +93,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
     }
 
+    func testStartSessionCanRecoverFromStaleDeniedPermissionWhenActivationProbeSucceeds() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.audioRecorder.permissionState = .denied
+        harness.audioRecorder.activationProbeBehavior = .success
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertNil(harness.appState.currentError)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
+        XCTAssertEqual(harness.audioRecorder.activationProbeCallCount, 1)
+    }
+
     func testStartSessionWithRestrictedMicrophonePermissionFailsBeforeRecorderStarts() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -154,7 +169,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .idle)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "Microphone access enabled. You can start a session again."
+            "Microphone access enabled. You can start recording again."
         )
     }
 
@@ -175,6 +190,29 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .idle)
     }
 
+    func testPermissionRefreshClearsStaleScreenRecordingDeniedErrorAfterAccessIsGranted() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.screenCapturePermissionAccess.permissionState = .denied
+
+        await harness.appState.startSession()
+        await harness.appState.captureScreenshot()
+
+        XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+
+        harness.screenCapturePermissionAccess.permissionState = .granted
+        harness.appState.refreshPermissionRecoveryState()
+
+        XCTAssertNil(harness.appState.currentError)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Screen Recording access enabled. You can capture screenshots again."
+        )
+    }
+
     func testLocalTestingBuildAddsMicrophoneRecoveryGuidance() {
         let harness = AppStateHarness(
             runtimeEnvironment: AppRuntimeEnvironment(
@@ -188,7 +226,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(harness.appState.microphoneRecoveryGuidance.contains("System Settings > Privacy & Security > Microphone"))
         XCTAssertEqual(
             harness.appState.microphoneRecoveryLocalTestingNote,
-            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. For steadier testing, keep launching the same app copy or use the signed DMG build."
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
         )
     }
 
@@ -687,13 +725,14 @@ final class AppStateTests: XCTestCase {
     }
 
     func testCaptureScreenshotWithDeniedScreenRecordingKeepsRecordingAndShowsRecoveryContext() async {
-        let harness = AppStateHarness(
-            screenshotCaptureService: MockScreenshotCaptureService(
-                error: AppError.screenRecordingPermissionDenied
-            )
-        )
+        var didAttemptCapture = false
+        let screenshotService = MockScreenshotCaptureService(onCaptureStart: {
+            didAttemptCapture = true
+        })
+        let harness = AppStateHarness(screenshotCaptureService: screenshotService)
         defer { harness.cleanup() }
 
+        harness.screenCapturePermissionAccess.permissionState = .denied
         await harness.appState.startSession()
         await harness.appState.captureScreenshot()
 
@@ -702,6 +741,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
         XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
         XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 0)
+        XCTAssertFalse(didAttemptCapture)
     }
 
     func testRapidRepeatedScreenshotRequestsOnlyPersistOneCaptureAtATime() async throws {
@@ -730,13 +770,10 @@ final class AppStateTests: XCTestCase {
     }
 
     func testInsertMarkerWithScreenshotPermissionDeniedStillCreatesMarker() async {
-        let harness = AppStateHarness(
-            screenshotCaptureService: MockScreenshotCaptureService(
-                error: AppError.screenRecordingPermissionDenied
-            )
-        )
+        let harness = AppStateHarness(screenshotCaptureService: MockScreenshotCaptureService())
         defer { harness.cleanup() }
 
+        harness.screenCapturePermissionAccess.permissionState = .denied
         await harness.appState.startSession()
         harness.audioRecorder.currentDuration = 7
 
