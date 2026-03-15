@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
-    func testStartSessionWithoutAPIKeyShowsErrorAndOpensSettings() async {
+    func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
 
@@ -14,10 +14,13 @@ final class AppStateTests: XCTestCase {
 
         await harness.appState.startSession()
 
-        XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertEqual(harness.appState.status.detail, AppError.missingAPIKey.userMessage)
-        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
-        XCTAssertTrue(didOpenSettings)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
+        )
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
+        XCTAssertFalse(didOpenSettings)
     }
 
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {
@@ -484,7 +487,7 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testCaptureScreenshotStoresMetadataAndAssociatesNearestMarker() async throws {
+    func testCaptureScreenshotStoresMetadataAndCreatesAutoMarker() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
@@ -497,12 +500,18 @@ final class AppStateTests: XCTestCase {
 
         let recordingSession = try XCTUnwrap(harness.appState.activeRecordingSession)
         let screenshot = try XCTUnwrap(recordingSession.screenshots.first)
+        let autoMarker = try XCTUnwrap(recordingSession.markers.last)
 
         XCTAssertEqual(recordingSession.screenshots.count, 1)
+        XCTAssertEqual(recordingSession.markers.count, 2)
         XCTAssertEqual(screenshot.elapsedTime, 12)
-        XCTAssertEqual(screenshot.associatedMarkerID, recordingSession.markers.first?.id)
+        XCTAssertEqual(screenshot.associatedMarkerID, autoMarker.id)
+        XCTAssertEqual(autoMarker.title, "Screenshot 1")
+        XCTAssertEqual(autoMarker.note, "Created automatically from a screenshot capture.")
+        XCTAssertEqual(autoMarker.screenshotID, screenshot.id)
         XCTAssertTrue(FileManager.default.fileExists(atPath: screenshot.filePath))
         XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1 and added Screenshot 1 marker.")
     }
 
     func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async {
@@ -526,6 +535,7 @@ final class AppStateTests: XCTestCase {
             AppError.screenshotCaptureFailure("The screenshot file could not be written to disk.")
         )
         XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 0)
     }
 
     func testCaptureScreenshotWithDeniedScreenRecordingKeepsRecordingAndShowsRecoveryContext() async {
@@ -543,6 +553,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.detail, AppError.screenRecordingPermissionDenied.userMessage)
         XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
         XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 0)
     }
 
     func testRapidRepeatedScreenshotRequestsOnlyPersistOneCaptureAtATime() async throws {
@@ -564,8 +575,9 @@ final class AppStateTests: XCTestCase {
 
         let recordingSession = try XCTUnwrap(harness.appState.activeRecordingSession)
         XCTAssertEqual(recordingSession.screenshots.count, 1)
+        XCTAssertEqual(recordingSession.markers.count, 1)
         XCTAssertEqual(harness.appState.status.phase, .recording)
-        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1.")
+        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1 and added Screenshot 1 marker.")
         XCTAssertNil(harness.appState.currentError)
     }
 

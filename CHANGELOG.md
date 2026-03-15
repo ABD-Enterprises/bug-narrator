@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.6 - 2026-03-14
+
+- Added a compact floating recording HUD so marker and screenshot controls stay available without reopening the menu bar window.
+- Changed screenshot capture to auto-insert a marker so screenshots stay anchored to the session timeline.
+- Updated the start-session flow so recording can begin without an OpenAI API key, while still requiring the key before transcription.
+
 ## 1.0.5 - 2026-03-14
 
 - Rebuilt and republished BugNarrator from the current stabilized main branch as a fresh signed, notarized, and stapled macOS release.

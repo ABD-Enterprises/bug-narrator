@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MenuBarView: View {
+    @Environment(\.dismiss) private var dismiss
+
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
 
@@ -225,7 +227,7 @@ struct MenuBarView: View {
             Label("Bring Your Own OpenAI API Key", systemImage: "key.horizontal.fill")
                 .font(.subheadline.weight(.semibold))
 
-            Text("BugNarrator sends transcription requests to the OpenAI API. Add your own API key in Settings before your first session. OpenAI usage may incur charges on your account.")
+            Text("BugNarrator sends transcription requests to the OpenAI API. You can start recording without a key, but you need your own API key in Settings before transcription or issue extraction will work. OpenAI usage may incur charges on your account.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -265,26 +267,46 @@ struct MenuBarView: View {
                     }
                 } else if let currentError = appState.currentError, currentError.suggestsOpenAISettings {
                     VStack(alignment: .leading, spacing: 8) {
-                        Button("Open Settings") {
-                            appState.openSettings()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        HStack {
+                            Button("Start Feedback Session") {
+                                Task {
+                                    await appState.startSession()
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
 
-                        Text("BugNarrator requires your own OpenAI API key and keeps it in Keychain when available.")
+                            Button("Open Settings") {
+                                appState.openSettings()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        Text("You can still record without an API key. Add your own OpenAI API key in Settings before stopping if you want transcription.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 } else if appState.needsAPIKeySetup {
-                    Button("Add OpenAI API Key") {
-                        appState.openSettings()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button("Start Feedback Session") {
+                                Task {
+                                    await appState.startSession()
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
 
-                    Text("Recording is disabled until you add your own OpenAI API key in Settings.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                            Button("Open Settings") {
+                                appState.openSettings()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        Text("You can start recording now. Add your own OpenAI API key in Settings before stopping if you want transcription or issue extraction.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Button("Start Feedback Session") {
                         Task {
@@ -297,6 +319,15 @@ struct MenuBarView: View {
 
             case .recording:
                 VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(appState.preferredRecordingWorkflowSummary, systemImage: "keyboard")
+                            .font(.footnote.weight(.semibold))
+
+                        Text("Menu controls stay available as a fallback. Screenshot capture automatically adds a marker.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     HStack {
                         Button("Stop Feedback Session") {
                             Task {
@@ -313,14 +344,14 @@ struct MenuBarView: View {
 
                     HStack {
                         Button("Insert Marker") {
-                            Task {
+                            runFallbackMenuAction {
                                 await appState.insertMarker()
                             }
                         }
                         .buttonStyle(.bordered)
 
                         Button("Capture Screenshot") {
-                            Task {
+                            runFallbackMenuAction {
                                 await appState.captureScreenshot()
                             }
                         }
@@ -339,6 +370,9 @@ struct MenuBarView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
+                Text("Global Hotkeys")
+                    .font(.footnote.weight(.semibold))
+
                 Text("Session hotkey: \(appState.settingsStore.recordingHotkeyShortcut.displayString)")
                 Text("Marker hotkey: \(appState.settingsStore.markerHotkeyShortcut.displayString)")
                 Text("Screenshot hotkey: \(appState.settingsStore.screenshotHotkeyShortcut.displayString)")
@@ -391,6 +425,18 @@ struct MenuBarView: View {
             Button("Quit") {
                 NSApp.terminate(nil)
             }
+        }
+    }
+
+    private func runFallbackMenuAction(
+        delayNanoseconds: UInt64 = 250_000_000,
+        action: @escaping @MainActor () async -> Void
+    ) {
+        dismiss()
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            await action()
         }
     }
 

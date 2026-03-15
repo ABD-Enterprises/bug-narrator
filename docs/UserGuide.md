@@ -55,7 +55,7 @@ BugNarrator does not ship with a built-in OpenAI API key. Transcription and issu
 
 ### Start A Narrated Testing Session
 
-Start a session from the menu bar or by using your configured recording hotkey. BugNarrator records in the background while you keep working in other apps.
+Start a session from the menu bar or by using your configured recording hotkey. BugNarrator records in the background while you keep working in other apps. During recording, the preferred workflow is to keep using the global hotkeys or the floating recording HUD instead of reopening the menu.
 
 ### Stop A Session
 
@@ -81,7 +81,7 @@ Markers let you flag moments that matter while the session is still running. The
 
 ### Screenshot Capture
 
-Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit for this capture path. Each screenshot is attached to the current session and can be associated with nearby markers.
+Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit for this capture path. Each screenshot is attached to the current session and automatically inserts a marker at the same timestamp so the transcript and visual evidence stay aligned.
 
 ### Review Summary
 
