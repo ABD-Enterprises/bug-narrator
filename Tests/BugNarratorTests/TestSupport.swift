@@ -26,10 +26,6 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 
     private var stopContinuation: CheckedContinuation<RecordedAudio, Error>?
 
-    func microphonePermissionState() -> MicrophonePermissionState {
-        permissionState
-    }
-
     func currentPermissionState() -> MicrophonePermissionState {
         permissionState
     }

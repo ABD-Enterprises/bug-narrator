@@ -96,6 +96,8 @@ final class AppState: ObservableObject {
         self.urlHandler = urlHandler
         self.selectedTranscriptID = transcriptStore.sessions.first?.id
 
+        BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
+
         self.hotkeyManager.onHotKeyPressed = { [weak self] action in
             Task { @MainActor [weak self] in
                 self?.handleHotKeyPressed(action)
@@ -136,6 +138,12 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+            .sink { [weak self] _ in
+                self?.prepareForApplicationTermination()
+            }
+            .store(in: &cancellables)
+
         hotkeyManager.register(shortcut: settingsStore.startRecordingHotkeyShortcut, for: .startRecording)
         hotkeyManager.register(shortcut: settingsStore.stopRecordingHotkeyShortcut, for: .stopRecording)
         hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
@@ -148,6 +156,8 @@ final class AppState: ObservableObject {
                 "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
             ]
         )
+        validateRuntimeConfiguration()
+        logLaunchDiagnostics()
     }
 
     var elapsedTimeString: String {
@@ -221,6 +231,15 @@ final class AppState: ObservableObject {
     }
 
     func refreshPermissionRecoveryState() {
+        permissionsLogger.debug(
+            "permission_recovery_refresh_started",
+            "Refreshing permission recovery state after BugNarrator became active.",
+            metadata: [
+                "microphone_status": microphonePermissionService.currentStatus().rawValue,
+                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
+            ]
+        )
+
         switch currentError {
         case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
             guard status.phase != .recording, status.phase != .transcribing else {
@@ -1144,6 +1163,33 @@ final class AppState: ObservableObject {
         processActivity = nil
     }
 
+    private func prepareForApplicationTermination() {
+        settingsLogger.info(
+            "application_will_terminate",
+            "BugNarrator is preparing for application shutdown.",
+            metadata: [
+                "status_phase": status.phase.debugName,
+                "has_active_recording_session": activeRecordingSession == nil ? "no" : "yes",
+                "is_extracting_issues": issueExtractionSessionID == nil ? "no" : "yes",
+                "is_exporting": exportDestinationInProgress == nil ? "no" : "yes"
+            ]
+        )
+
+        if let activeRecordingSession {
+            recordingLogger.warning(
+                "application_terminating_during_recording",
+                "BugNarrator is terminating while a recording session is still active.",
+                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+            )
+        }
+
+        toastDismissTask?.cancel()
+        transientToast = nil
+        hotkeyManager.unregisterAll()
+        stopTimer(resetElapsed: false)
+        endActivity()
+    }
+
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
         status = newStatus
         currentError = error
@@ -1459,4 +1505,62 @@ final class AppState: ObservableObject {
         )
     }
 
+    private func validateRuntimeConfiguration() {
+        guard let microphoneUsageDescription = Bundle.main.object(
+            forInfoDictionaryKey: "NSMicrophoneUsageDescription"
+        ) as? String else {
+            permissionsLogger.error(
+                "runtime_configuration_missing_microphone_usage_description",
+                "BugNarrator is missing NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
+            )
+            return
+        }
+
+        if microphoneUsageDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            permissionsLogger.error(
+                "runtime_configuration_empty_microphone_usage_description",
+                "BugNarrator has an empty NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
+            )
+        }
+    }
+
+    private func logLaunchDiagnostics() {
+        permissionsLogger.info(
+            "launch_permission_snapshot",
+            "Captured the initial permission state snapshot for this BugNarrator app copy.",
+            metadata: [
+                "bundle_path": runtimeEnvironment.bundlePath,
+                "is_local_testing_build": runtimeEnvironment.isLocalTestingBuild ? "yes" : "no",
+                "microphone_status": microphonePermissionService.currentStatus().rawValue,
+                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
+            ]
+        )
+
+        sessionLibraryLogger.info(
+            "launch_session_store_snapshot",
+            "Captured the initial session library state at launch.",
+            metadata: [
+                "stored_session_count": "\(transcriptStore.sessions.count)",
+                "selected_transcript_id": selectedTranscriptID?.uuidString ?? "none"
+            ]
+        )
+    }
+
+}
+
+private extension AppStatus.Phase {
+    var debugName: String {
+        switch self {
+        case .idle:
+            return "idle"
+        case .recording:
+            return "recording"
+        case .transcribing:
+            return "transcribing"
+        case .success:
+            return "success"
+        case .error:
+            return "error"
+        }
+    }
 }

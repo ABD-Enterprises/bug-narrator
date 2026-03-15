@@ -156,10 +156,30 @@ actor DiagnosticsLogStore {
         return entries
     }
 
-    private static func defaultStorageURL(fileManager: FileManager) -> URL {
+    static func defaultStorageURL(fileManager: FileManager) -> URL {
         AppSupportLocation.appDirectory(fileManager: fileManager)
             .appendingPathComponent("Diagnostics", isDirectory: true)
             .appendingPathComponent("recent-log.json")
+    }
+
+    static func persistedRecentLogText(
+        fileManager: FileManager = .default,
+        storageURL: URL? = nil,
+        limit: Int = 200
+    ) -> String {
+        let decoder = JSONDecoder()
+        let resolvedStorageURL = storageURL ?? defaultStorageURL(fileManager: fileManager)
+        let entries = loadEntries(
+            from: resolvedStorageURL,
+            fileManager: fileManager,
+            decoder: decoder
+        )
+        let lines = Array(entries.suffix(limit)).map { $0.formattedLine() }
+        if lines.isEmpty {
+            return "No recent BugNarrator diagnostics logs were captured."
+        }
+
+        return lines.joined(separator: "\n") + "\n"
     }
 }
 
@@ -256,6 +276,13 @@ enum BugNarratorDiagnostics {
 
     static func recentLogText(limit: Int = 200) async -> String {
         await store.recentLogText(limit: limit)
+    }
+
+    static func exportableRecentLogText(fileManager: FileManager = .default, limit: Int = 200) -> String {
+        DiagnosticsLogStore.persistedRecentLogText(
+            fileManager: fileManager,
+            limit: limit
+        )
     }
 }
 

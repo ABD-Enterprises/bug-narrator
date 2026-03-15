@@ -143,6 +143,7 @@ Use `Export Session Bundle` when you want a local package of the review session.
 - `transcript.txt`
 - `transcript.md`
 - `summary.md`
+- `recent-log.txt`
 - `screenshots/`
 
 ### Export To GitHub (Experimental)

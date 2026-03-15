@@ -4,6 +4,7 @@
 
 - For manual recording-based QA, ask testers to follow the [Tester Narration Guide](UserGuide.md#tester-narration-guide) so transcripts and extracted issues include clear repro context.
 - Build the DMG with `./scripts/build_dmg.sh`.
+- Run `./scripts/release_smoke_test.sh` before a release candidate so the current app still passes the core automated validation path.
 - Open the generated DMG and confirm it shows `BugNarrator.app` plus the `Applications` shortcut in a clean drag-to-Applications Finder layout.
 - Confirm the mounted DMG shows the branded BugNarrator volume icon on the desktop and in Finder.
 - Drag `BugNarrator.app` to `Applications` and launch that installed copy once.
@@ -111,6 +112,7 @@
 - Click `Show in Transcript` from a screenshot entry and verify the review workspace switches back to the transcript timeline.
 - Open a captured screenshot from the review window and verify Finder reveals the file.
 - Export a session bundle and verify `transcript.txt`, `transcript.md`, `summary.md`, and the `screenshots` folder are present.
+- Export a session bundle and verify `recent-log.txt` is present and readable.
 - Verify the exported `transcript.txt` contains the raw session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
 - Export a debug bundle during or after a session and verify `session-metadata.json` reflects the right session ID and counts without raw transcript content.
 

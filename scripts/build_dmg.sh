@@ -72,6 +72,39 @@ cleanup_mountpoints() {
     detach_attachment "$VERIFY_DEVICE" "$VERIFY_MOUNTPOINT"
 }
 
+has_boolean_entitlement() {
+    local app_path="$1"
+    local entitlement_key="$2"
+    local entitlements_file
+
+    entitlements_file="$(mktemp "${TMPDIR:-/tmp}/bugnarrator-entitlements.XXXXXX.plist")"
+
+    if ! codesign -d --entitlements :- "$app_path" >"$entitlements_file" 2>/dev/null; then
+        rm -f "$entitlements_file"
+        return 1
+    fi
+
+    if /usr/bin/python3 - "$entitlements_file" "$entitlement_key" <<'PY'
+import plistlib
+import sys
+
+entitlements_path = sys.argv[1]
+entitlement_key = sys.argv[2]
+
+with open(entitlements_path, "rb") as handle:
+    entitlements = plistlib.load(handle)
+
+sys.exit(0 if entitlements.get(entitlement_key) is True else 1)
+PY
+    then
+        rm -f "$entitlements_file"
+        return 0
+    fi
+
+    rm -f "$entitlements_file"
+    return 1
+}
+
 trap cleanup_mountpoints EXIT
 
 if [[ "$CODE_SIGN_IDENTITY" == Developer\ ID\ Application* && "$CODE_SIGN_STYLE" == "Automatic" ]]; then
@@ -190,6 +223,11 @@ if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
     if [[ "$NOTARIZE" != "YES" && "$SIGNING_AUTHORITY" != Developer\ ID\ Application:* ]]; then
         echo "warning: app is signed as '$SIGNING_AUTHORITY'. Gatekeeper will still reject broad public distribution without Developer ID Application signing and notarization." >&2
     fi
+
+    if ! has_boolean_entitlement "$APP_PATH" "com.apple.security.device.audio-input"; then
+        echo "error: expected microphone entitlement com.apple.security.device.audio-input=true on the signed app at $APP_PATH" >&2
+        exit 1
+    fi
 fi
 
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
@@ -283,6 +321,11 @@ fi
 
 if [[ ! -f "$MOUNTED_APP_PATH/Contents/Resources/Assets.car" ]]; then
     echo "error: mounted DMG app is missing Assets.car" >&2
+    exit 1
+fi
+
+if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]] && ! has_boolean_entitlement "$MOUNTED_APP_PATH" "com.apple.security.device.audio-input"; then
+    echo "error: expected microphone entitlement com.apple.security.device.audio-input=true on the mounted DMG app at $MOUNTED_APP_PATH" >&2
     exit 1
 fi
 

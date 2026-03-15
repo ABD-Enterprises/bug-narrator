@@ -184,7 +184,10 @@ Use this when you want a portable local copy of the session. The bundle can incl
 - `transcript.txt`
 - `transcript.md`
 - `summary.md`
+- `recent-log.txt`
 - `screenshots/`
+
+`recent-log.txt` contains recent local BugNarrator diagnostics so a tester can attach the bundle to a bug report without exporting a separate debug bundle first.
 
 ### Export To GitHub (Experimental)
 
@@ -280,6 +283,7 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - if BugNarrator says microphone access is restricted, also check device-management, parental-control, or workplace policy restrictions
 - if BugNarrator says audio capture is unavailable even though permission is enabled, check that an input device is connected and not already failing at the macOS level
 - if you are testing from Xcode or `DerivedData`, keep launching the same local app copy or switch to the signed DMG build; macOS may treat different local build paths as different apps for microphone approval
+- if repeated local builds are cluttering Launch Services or permission state, run `./scripts/cleanup_local_build_apps.sh` from the repo root so only the installed `Applications` copy remains active
 - restart the app after changing permission settings if needed
 
 ### BugNarrator Opened Twice

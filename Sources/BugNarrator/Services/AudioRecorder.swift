@@ -27,10 +27,6 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         recorder?.currentTime ?? 0
     }
 
-    func microphonePermissionState() -> MicrophonePermissionState {
-        permissionAccess.currentPermissionState()
-    }
-
     func validateRecordingPrerequisites() async -> AppError? {
         guard recorder == nil, stopContinuation == nil, cancelContinuation == nil else {
             return .recordingFailure("A recording session is already active.")

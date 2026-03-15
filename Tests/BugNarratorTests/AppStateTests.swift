@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import BugNarrator
 
@@ -70,6 +71,17 @@ final class AppStateTests: XCTestCase {
             harness.hotkeyManager.registeredShortcuts[.captureScreenshot],
             harness.settingsStore.screenshotHotkeyShortcut
         )
+    }
+
+    func testApplicationTerminationUnregistersHotkeys() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        XCTAssertFalse(harness.hotkeyManager.registeredShortcuts.isEmpty)
+
+        NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: nil)
+
+        XCTAssertTrue(harness.hotkeyManager.registeredShortcuts.isEmpty)
     }
 
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {

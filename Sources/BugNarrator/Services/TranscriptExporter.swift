@@ -36,8 +36,19 @@ enum TranscriptExportFormat {
 
 @MainActor
 struct TranscriptExporter {
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
+    private let bundleWriter: AtomicBundleDirectoryWriter
+    private let recentLogTextProvider: () -> String
     private let logger = DiagnosticsLogger(category: .export)
+
+    init(
+        fileManager: FileManager = .default,
+        recentLogTextProvider: @escaping () -> String = { BugNarratorDiagnostics.exportableRecentLogText() }
+    ) {
+        self.fileManager = fileManager
+        self.bundleWriter = AtomicBundleDirectoryWriter(fileManager: fileManager)
+        self.recentLogTextProvider = recentLogTextProvider
+    }
 
     func export(session: TranscriptSession, as format: TranscriptExportFormat) throws {
         let savePanel = NSSavePanel()
@@ -86,37 +97,51 @@ struct TranscriptExporter {
     }
 
     func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {
-        let bundleDirectoryURL = uniqueBundleDirectoryURL(
-            baseDirectory: destinationRoot,
+        let recentLogText = recentLogTextProvider()
+        var copiedScreenshotCount = 0
+        var missingScreenshotCount = 0
+
+        let bundleDirectoryURL = try bundleWriter.writeBundle(
+            in: destinationRoot,
             suggestedName: session.suggestedBundleDirectoryName
-        )
+        ) { bundleDirectoryURL in
+            try session.plainTextContent.write(
+                to: bundleDirectoryURL.appendingPathComponent("transcript.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try session.markdownContent.write(
+                to: bundleDirectoryURL.appendingPathComponent("transcript.md"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try session.summaryMarkdownContent.write(
+                to: bundleDirectoryURL.appendingPathComponent("summary.md"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try recentLogText.write(
+                to: bundleDirectoryURL.appendingPathComponent("recent-log.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
 
-        try fileManager.createDirectory(at: bundleDirectoryURL, withIntermediateDirectories: true)
-        try session.plainTextContent.write(
-            to: bundleDirectoryURL.appendingPathComponent("transcript.txt"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try session.markdownContent.write(
-            to: bundleDirectoryURL.appendingPathComponent("transcript.md"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try session.summaryMarkdownContent.write(
-            to: bundleDirectoryURL.appendingPathComponent("summary.md"),
-            atomically: true,
-            encoding: .utf8
-        )
+            let screenshotsDirectoryURL = bundleDirectoryURL.appendingPathComponent("screenshots", isDirectory: true)
+            try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
 
-        let screenshotsDirectoryURL = bundleDirectoryURL.appendingPathComponent("screenshots", isDirectory: true)
-        try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
+            for screenshot in session.screenshots {
+                guard fileManager.fileExists(atPath: screenshot.fileURL.path) else {
+                    missingScreenshotCount += 1
+                    continue
+                }
 
-        for screenshot in session.screenshots where fileManager.fileExists(atPath: screenshot.fileURL.path) {
-            let destinationURL = screenshotsDirectoryURL.appendingPathComponent(screenshot.fileName)
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try? fileManager.removeItem(at: destinationURL)
+                let destinationURL = uniqueScreenshotDestinationURL(
+                    for: screenshot.fileName,
+                    in: screenshotsDirectoryURL
+                )
+                try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
+                copiedScreenshotCount += 1
             }
-            try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
         }
 
         logger.info(
@@ -124,19 +149,26 @@ struct TranscriptExporter {
             "Exported a local session bundle.",
             metadata: [
                 "session_id": session.id.uuidString,
-                "screenshot_count": "\(session.screenshotCount)"
+                "screenshot_count": "\(session.screenshotCount)",
+                "copied_screenshot_count": "\(copiedScreenshotCount)",
+                "missing_screenshot_count": "\(missingScreenshotCount)"
             ]
         )
 
         return bundleDirectoryURL
     }
 
-    private func uniqueBundleDirectoryURL(baseDirectory: URL, suggestedName: String) -> URL {
-        var candidateURL = baseDirectory.appendingPathComponent(suggestedName, isDirectory: true)
+    private func uniqueScreenshotDestinationURL(for fileName: String, in directoryURL: URL) -> URL {
+        let fileExtension = URL(fileURLWithPath: fileName).pathExtension
+        let baseName = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        var candidateURL = directoryURL.appendingPathComponent(fileName)
         var suffix = 2
 
         while fileManager.fileExists(atPath: candidateURL.path) {
-            candidateURL = baseDirectory.appendingPathComponent("\(suggestedName)-\(suffix)", isDirectory: true)
+            let suffixedName = fileExtension.isEmpty
+                ? "\(baseName)-\(suffix)"
+                : "\(baseName)-\(suffix).\(fileExtension)"
+            candidateURL = directoryURL.appendingPathComponent(suffixedName)
             suffix += 1
         }
 

@@ -50,6 +50,12 @@ From the repository root:
 ./scripts/build_dmg.sh
 ```
 
+For a quick unsigned release-readiness pass before packaging:
+
+```bash
+./scripts/release_smoke_test.sh
+```
+
 ## What The Script Does
 
 The script:
@@ -64,6 +70,7 @@ The script:
 4. verifies `AppIcon.icns` and `Assets.car` exist in the built app
 5. mounts the DMG and verifies the expected layout resources
 6. writes the finished artifacts to `dist/`
+7. when signing is enabled, verifies the built app and mounted DMG app still carry the microphone entitlement required for recording
 
 ## Output Location
 
@@ -79,6 +86,12 @@ The built Release app is left at:
 - `build/DerivedData/Build/Products/Release/BugNarrator.app`
 
 Use that path for extra manual checks if you want to inspect codesigning or bundle resources directly.
+
+If you want to remove local build copies after testing so only `/Applications/BugNarrator.app` remains in Spotlight, Launch Services, and macOS privacy prompts, run:
+
+```bash
+./scripts/cleanup_local_build_apps.sh
+```
 
 ## Release Signing Notes
 
@@ -173,12 +186,14 @@ That produces:
 
 Recommended flow:
 
-1. run the signed/notarized packaging command
-2. create a GitHub Release
-3. upload `dist/BugNarrator-macOS.dmg`
-4. optionally upload the versioned `dist/BugNarrator-vX.Y.Z-macOS.dmg`
-5. add release notes and link back to the changelog if needed
-6. verify the README top download link matches the uploaded stable DMG filename
+1. run `./scripts/release_smoke_test.sh`
+2. run the signed/notarized packaging command
+3. optionally run `./scripts/cleanup_local_build_apps.sh` after publishing so local test builds do not linger in `DerivedData`
+4. create a GitHub Release
+5. upload `dist/BugNarrator-macOS.dmg`
+6. optionally upload the versioned `dist/BugNarrator-vX.Y.Z-macOS.dmg`
+7. add release notes and link back to the changelog if needed
+8. verify the README top download link matches the uploaded stable DMG filename
 
 ## Verify The DMG
 

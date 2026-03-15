@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.0.19 - 2026-03-15
+
+- Hardened session and debug bundle export so BugNarrator now writes bundles through an atomic staging directory, adds `recent-log.txt` to exported session bundles, and avoids overwriting duplicate screenshot filenames inside an export.
+- Added launch-time permission and session-store diagnostics plus shutdown cleanup for timers, process activity, and hotkey registrations so menu bar lifecycle issues are easier to diagnose and recover.
+- Added `./scripts/release_smoke_test.sh` and `./scripts/cleanup_local_build_apps.sh` to tighten pre-release validation and keep local build copies from polluting macOS permissions or Spotlight results after release testing.
+- Tightened screenshot artifact validation and DMG packaging checks so BugNarrator now verifies non-empty screenshot files and confirms the microphone entitlement survives the signed app and mounted DMG flow.
+- Added a tester narration guide and refreshed QA, release, and distribution docs so external testers have clearer recording and release validation instructions.
+
 ## 1.0.18 - 2026-03-15
 
 - Hardened OpenAI issue extraction decoding so BugNarrator now accepts array-based message content, fenced JSON, and a few schema variations instead of failing on valid structured responses with a generic format error.
