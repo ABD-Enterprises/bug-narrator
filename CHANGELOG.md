@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.8 - 2026-03-15
+
+- Simplified the menu bar so recording actions now live only in the BugNarrator controls window, with the menu focusing that window instead of duplicating start or stop actions.
+- Reduced the controls window size, preserved its position between launches, and stopped it from jumping across the screen when starting a session or capturing screenshots.
+- Added clearer microphone recovery guidance for local unsigned builds so testing from DerivedData explains why macOS may ask for permission again for different app bundle paths.
+
 ## 1.0.7 - 2026-03-15
 
 - Replaced the floating recording HUD with a persistent recording controls window and configurable start, stop, marker, and screenshot shortcuts.
