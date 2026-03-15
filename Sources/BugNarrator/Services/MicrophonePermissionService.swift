@@ -182,17 +182,11 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
             )
             return .needsUserAction(.microphonePermissionDenied)
         case .denied:
-            return await blockedPermissionResult(
-                permissionLogKey: "microphone_permission_denied",
-                permissionLogMessage: "Microphone access was denied.",
-                audioRecorder: audioRecorder
-            )
+            permissionsLogger.warning("microphone_permission_denied", "Microphone access was denied.")
+            return .needsUserAction(.microphonePermissionDenied)
         case .restricted:
-            return await blockedPermissionResult(
-                permissionLogKey: "microphone_permission_restricted",
-                permissionLogMessage: "Microphone access is restricted.",
-                audioRecorder: audioRecorder
-            )
+            permissionsLogger.warning("microphone_permission_restricted", "Microphone access is restricted.")
+            return .blocked(.microphonePermissionRestricted)
         case .unavailable:
             permissionsLogger.error("microphone_unavailable", "Microphone access is unavailable.")
             return .blocked(.microphoneUnavailable("Check that an input device is connected and available, then try again."))
@@ -253,35 +247,6 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
             }
         }
 
-        return .success
-    }
-
-    private func blockedPermissionResult(
-        permissionLogKey: String,
-        permissionLogMessage: String,
-        audioRecorder: any AudioRecording
-    ) async -> RecordingStartPreflightResult {
-        if let activationError = await audioRecorder.validateRecordingActivation() {
-            switch activationError {
-            case .microphonePermissionDenied:
-                permissionsLogger.warning(permissionLogKey, permissionLogMessage)
-                return .needsUserAction(.microphonePermissionDenied)
-            case .microphonePermissionRestricted:
-                permissionsLogger.warning(permissionLogKey, permissionLogMessage)
-                return .blocked(.microphonePermissionRestricted)
-            default:
-                permissionsLogger.error(
-                    "microphone_activation_probe_failed",
-                    activationError.userMessage
-                )
-                return .failure(activationError)
-            }
-        }
-
-        permissionsLogger.warning(
-            "microphone_permission_probe_overrode_blocked_state",
-            "Microphone status looked blocked, but a live recorder probe succeeded. BugNarrator will continue with recording for this app copy."
-        )
         return .success
     }
 }
