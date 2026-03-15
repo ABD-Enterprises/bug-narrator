@@ -40,12 +40,18 @@ final class TranscriptExporterTests: XCTestCase {
             )
         )
 
-        let exporter = TranscriptExporter()
+        let exporter = TranscriptExporter(
+            fileManager: fileManager,
+            recentLogTextProvider: {
+                "2026-03-15T12:00:00Z [INFO] [recording] session_started - Started a session.\n"
+            }
+        )
         let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
 
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.txt").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.md").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("summary.md").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("recent-log.txt").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("screenshots").path))
         XCTAssertTrue(
             fileManager.fileExists(
@@ -61,6 +67,9 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertTrue(summaryMarkdown.contains("# BugNarrator Review Output"))
         XCTAssertTrue(summaryMarkdown.contains("## Bug"))
         XCTAssertTrue(summaryMarkdown.contains("Export button missing"))
+
+        let recentLog = try String(contentsOf: bundleURL.appendingPathComponent("recent-log.txt"))
+        XCTAssertTrue(recentLog.contains("session_started"))
     }
 
     func testWriteBundleSkipsMissingScreenshotFilesButStillCreatesScreenshotsDirectory() throws {
@@ -83,12 +92,56 @@ final class TranscriptExporterTests: XCTestCase {
             ]
         )
 
-        let exporter = TranscriptExporter()
+        let exporter = TranscriptExporter(
+            fileManager: fileManager,
+            recentLogTextProvider: { "No recent BugNarrator diagnostics logs were captured.\n" }
+        )
         let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
         let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots", isDirectory: true)
 
         XCTAssertTrue(fileManager.fileExists(atPath: screenshotsDirectoryURL.path))
         let screenshotContents = try fileManager.contentsOfDirectory(atPath: screenshotsDirectoryURL.path)
         XCTAssertTrue(screenshotContents.isEmpty)
+    }
+
+    func testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames() throws {
+        let fileManager = FileManager.default
+        let rootDirectoryURL = fileManager.temporaryDirectory
+            .appendingPathComponent("TranscriptExporterDuplicateScreenshotTests-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: rootDirectoryURL) }
+
+        let firstSourceDirectoryURL = rootDirectoryURL.appendingPathComponent("one", isDirectory: true)
+        let secondSourceDirectoryURL = rootDirectoryURL.appendingPathComponent("two", isDirectory: true)
+        try fileManager.createDirectory(at: firstSourceDirectoryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: secondSourceDirectoryURL, withIntermediateDirectories: true)
+
+        let firstScreenshotURL = firstSourceDirectoryURL.appendingPathComponent("capture.png")
+        let secondScreenshotURL = secondSourceDirectoryURL.appendingPathComponent("capture.png")
+        try Data("first-image".utf8).write(to: firstScreenshotURL, options: [.atomic])
+        try Data("second-image".utf8).write(to: secondScreenshotURL, options: [.atomic])
+
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_200),
+            transcript: "Transcript with screenshots that collide on export file name.",
+            duration: 9,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            screenshots: [
+                SessionScreenshot(elapsedTime: 2, filePath: firstScreenshotURL.path),
+                SessionScreenshot(elapsedTime: 4, filePath: secondScreenshotURL.path)
+            ]
+        )
+
+        let exporter = TranscriptExporter(
+            fileManager: fileManager,
+            recentLogTextProvider: { "No recent BugNarrator diagnostics logs were captured.\n" }
+        )
+        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
+        let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots", isDirectory: true)
+        let screenshotContents = try fileManager.contentsOfDirectory(atPath: screenshotsDirectoryURL.path).sorted()
+
+        XCTAssertEqual(screenshotContents, ["capture-2.png", "capture.png"])
     }
 }

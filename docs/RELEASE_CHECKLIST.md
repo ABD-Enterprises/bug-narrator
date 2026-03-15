@@ -5,12 +5,14 @@ Use this checklist before cutting a public test build or release candidate.
 ## Build And Signing
 
 - Regenerate the project with `xcodegen generate` if `project.yml` changed.
+- Run `./scripts/release_smoke_test.sh` and confirm it passes before packaging a candidate build.
 - Build the app in the intended configuration and confirm the build succeeds.
 - Run `./scripts/build_dmg.sh` and confirm the DMG packaging step succeeds.
 - If shipping a signed build, verify the Apple signing team, bundle identifier, and entitlements are correct.
 - For a public download, use `Developer ID Application` signing rather than `Apple Development`.
 - If publishing broadly, notarize the DMG and staple the ticket before release.
 - Confirm the Release app bundle contains `Contents/Resources/AppIcon.icns` and `Contents/Resources/Assets.car`.
+- Confirm the signed Release app and the mounted DMG app both retain `com.apple.security.device.audio-input=true`.
 - Launch the built app and confirm the menu bar item appears.
 - Confirm first launch does not trigger an unexpected Keychain prompt before the user opens Settings or starts a credential-dependent workflow.
 
@@ -64,6 +66,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Confirm no secrets, tokens, personal paths, or local-only files are tracked in git.
 - Review `.gitignore` for generated Xcode data and result bundles.
 - Upload `dist/BugNarrator-macOS.dmg` to the release and confirm the release asset name matches the README link strategy.
+- If you built or tested BugNarrator from local `DerivedData`, run `./scripts/cleanup_local_build_apps.sh` after publishing so only the installed `/Applications` copy remains in normal tester paths.
 - Open the final DMG and confirm Finder shows the branded BugNarrator icon instead of the generic macOS app placeholder.
 - Confirm the DMG contains `BugNarrator.app` plus the `Applications` shortcut and supports the normal drag-to-Applications install flow.
 - Run `xcrun stapler validate` on the final DMG.

@@ -177,10 +177,12 @@ private struct DebugSystemInfoDocument: Codable {
 @MainActor
 struct DebugBundleExporter {
     private let fileManager: FileManager
+    private let bundleWriter: AtomicBundleDirectoryWriter
     private let encoder = JSONEncoder()
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
+        self.bundleWriter = AtomicBundleDirectoryWriter(fileManager: fileManager)
     }
 
     func export(snapshot: DebugBundleSnapshot) throws -> URL? {
@@ -200,13 +202,6 @@ struct DebugBundleExporter {
     }
 
     func writeBundle(snapshot: DebugBundleSnapshot, to destinationRoot: URL) throws -> URL {
-        let bundleDirectoryURL = uniqueBundleDirectoryURL(
-            baseDirectory: destinationRoot,
-            suggestedName: suggestedBundleName()
-        )
-
-        try fileManager.createDirectory(at: bundleDirectoryURL, withIntermediateDirectories: true)
-
         let systemInfoDocument = DebugSystemInfoDocument(
             generatedAt: Date(),
             appName: snapshot.debugInfo.appName,
@@ -222,49 +217,40 @@ struct DebugBundleExporter {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
 
-        try encoder.encode(systemInfoDocument).write(
-            to: bundleDirectoryURL.appendingPathComponent("system-info.json"),
-            options: [.atomic]
-        )
-        try snapshot.debugInfo.appVersionText.write(
-            to: bundleDirectoryURL.appendingPathComponent("app-version.txt"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try snapshot.debugInfo.macOSVersionText.write(
-            to: bundleDirectoryURL.appendingPathComponent("macos-version.txt"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try snapshot.recentLogText.write(
-            to: bundleDirectoryURL.appendingPathComponent("recent-log.txt"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try encoder.encode(snapshot.sessionMetadata).write(
-            to: bundleDirectoryURL.appendingPathComponent("session-metadata.json"),
-            options: [.atomic]
-        )
-
-        return bundleDirectoryURL
+        return try bundleWriter.writeBundle(
+            in: destinationRoot,
+            suggestedName: suggestedBundleName()
+        ) { bundleDirectoryURL in
+            try encoder.encode(systemInfoDocument).write(
+                to: bundleDirectoryURL.appendingPathComponent("system-info.json"),
+                options: [.atomic]
+            )
+            try snapshot.debugInfo.appVersionText.write(
+                to: bundleDirectoryURL.appendingPathComponent("app-version.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try snapshot.debugInfo.macOSVersionText.write(
+                to: bundleDirectoryURL.appendingPathComponent("macos-version.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try snapshot.recentLogText.write(
+                to: bundleDirectoryURL.appendingPathComponent("recent-log.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try encoder.encode(snapshot.sessionMetadata).write(
+                to: bundleDirectoryURL.appendingPathComponent("session-metadata.json"),
+                options: [.atomic]
+            )
+        }
     }
 
     private func suggestedBundleName() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         return "bugnarrator-debug-bundle-\(formatter.string(from: Date()))"
-    }
-
-    private func uniqueBundleDirectoryURL(baseDirectory: URL, suggestedName: String) -> URL {
-        var candidateURL = baseDirectory.appendingPathComponent(suggestedName, isDirectory: true)
-        var suffix = 2
-
-        while fileManager.fileExists(atPath: candidateURL.path) {
-            candidateURL = baseDirectory.appendingPathComponent("\(suggestedName)-\(suffix)", isDirectory: true)
-            suffix += 1
-        }
-
-        return candidateURL
     }
 }
 

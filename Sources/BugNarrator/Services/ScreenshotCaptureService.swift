@@ -272,6 +272,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
 
         let image = try makeCompositeImage(from: capturedDisplays, bounds: selectionRect)
         try imageWriter.writePNG(image, to: url)
+        try validateCapturedScreenshotFile(at: url)
         screenshotLogger.info(
             "screenshot_capture_succeeded",
             "Saved a screenshot for the active review session.",
@@ -336,5 +337,20 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         return image
+    }
+
+    private func validateCapturedScreenshotFile(at url: URL) throws {
+        let attributes: [FileAttributeKey: Any]
+
+        do {
+            attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        } catch {
+            throw AppError.screenshotCaptureFailure("The screenshot file could not be found after capture.")
+        }
+
+        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
+        guard fileSize > 0 else {
+            throw AppError.screenshotCaptureFailure("The screenshot file was empty after capture.")
+        }
     }
 }

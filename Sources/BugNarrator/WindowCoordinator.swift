@@ -13,7 +13,7 @@ final class WindowCoordinator {
     private var changelogWindowController: NSWindowController?
     private var supportWindowController: NSWindowController?
     private var recordingControlWindowController: NSWindowController?
-    private var singleInstanceActivationObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var singleInstanceActivationObserver: NSObjectProtocol?
     private var shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
 
     private let recordingControlSize = NSSize(width: 336, height: 220)
@@ -32,6 +32,12 @@ final class WindowCoordinator {
             Task { @MainActor [weak self] in
                 self?.presentPrimaryInterfaceForReactivation()
             }
+        }
+    }
+
+    deinit {
+        if let singleInstanceActivationObserver {
+            DistributedNotificationCenter.default().removeObserver(singleInstanceActivationObserver)
         }
     }
 
