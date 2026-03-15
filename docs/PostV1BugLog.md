@@ -30,6 +30,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-010` | Screenshot-heavy sessions could decode full-size images repeatedly in the review workspace instead of using thumbnails. | Larger sessions could feel sluggish and waste memory while reviewing screenshots. | Fixed | Unreleased |
 | `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | Unreleased |
 | `BN-P1-012` | BugNarrator could still reject recording with a microphone-denied error after preflight passed because the recorder repeated its own permission gate using stale local-build state. | Users could stay blocked from testing for multiple local builds even when System Settings already showed microphone access enabled. | Fixed | Unreleased |
+| `BN-P1-013` | The old standalone marker shortcut and related settings copy remained after screenshots became the primary way to mark timeline moments. | Settings and QA flows described controls that no longer belonged in the simplified review model, which increased maintenance risk and UX confusion. | Fixed | Unreleased |
 
 ## Notes Per Issue
 
@@ -108,6 +109,12 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - Root cause: recording start used split permission logic. The app-level preflight could succeed or recover from a stale blocked state, but `AudioRecorder.startRecording()` immediately ran its own permission/prerequisite gate again and could re-surface a stale denial for the same launch.
 - Fix: microphone and screenshot permission flows now run through centralized preflight services, the recorder no longer re-requests or re-gates microphone permission after preflight succeeds, and the microphone service uses a live recorder activation probe to distinguish stale permission state from real capture failure.
 
+### BN-P1-013: Stale standalone marker shortcut and settings path lingered after workflow simplification
+
+- Symptom: after the product shifted to screenshot-driven timeline moments, older settings/tests/docs still acted like a separate marker shortcut and marker-first workflow were active.
+- Root cause: the user-facing marker button had been removed, but the legacy marker hotkey storage key, runtime registration path, and some supporting copy were still present.
+- Fix: the standalone marker hotkey path was removed from runtime registration and settings, legacy stored marker shortcuts are now cleared during settings load, and the QA/release docs now describe the screenshot-driven workflow consistently.
+
 ## Current State
 
 As of the current local workspace state:
@@ -123,6 +130,8 @@ As of the current local workspace state:
 - the session library now keeps indexed metadata and direct ID lookups in memory, which reduces filter/search/detail lag as local history grows.
 - the current testing and defect-finding pass added explicit review-workspace state tests, session-bundle export validation, screenshot-preview caching, and a safe single-instance bypass for XCTest-hosted runs so release validation is more trustworthy.
 - the current permissions-preflight hardening pass centralizes microphone and screenshot permission validation, adds live recorder activation probing before recording begins, and removes the duplicate recorder-side microphone gate that could keep local testing falsely blocked.
+- the current screenshot-workflow simplification pass removes the separate marker button from the recording controls window, treats screenshots as the primary way to mark important timeline moments, and compacts the right-hand review workspace around transcript, screenshots, extracted issues, and summary.
+- the current cleanup and deployment-readiness pass removes the obsolete standalone marker shortcut path, aligns the settings and QA surfaces with the screenshot-driven workflow, and revalidates the workspace with passing debug tests, a clean Release build, and a successful local DMG package build.
 
 ## Remaining Spec-Alignment / Release Notes
 

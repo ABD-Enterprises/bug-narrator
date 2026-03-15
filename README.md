@@ -3,7 +3,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black)](https://www.apple.com/macos/)
 
-BugNarrator is a macOS menu bar tool for narrated software testing sessions that automatically captures transcripts, markers, screenshots, and extracted issues.
+BugNarrator is a macOS menu bar tool for narrated software testing sessions that automatically captures transcripts, screenshot-based timeline markers, screenshots, and extracted issues.
 
 BugNarrator intentionally runs as a single-instance menu bar app. If you launch it again while it is already running, the existing instance is reactivated and the second copy exits so you do not end up with duplicate menu bar items or competing session state.
 
@@ -39,8 +39,7 @@ It can:
 
 - record a narrated session from the menu bar
 - transcribe the finished recording with the OpenAI API
-- insert markers during a live review
-- capture screenshots during a live review
+- capture screenshots during a live review and turn them into timeline markers automatically
 - generate a review summary
 - extract draft bugs, UX issues, enhancements, and follow-up questions
 - export selected issues to GitHub Issues or Jira Cloud
@@ -61,6 +60,7 @@ Important:
 - OpenAI usage may cost money on your account
 - the app stores your key in macOS Keychain when available
 - the key is not bundled into the source code or compiled app
+- global hotkeys are optional and start as `Not Set` until you assign them
 
 ## Install On macOS
 
@@ -82,7 +82,7 @@ Important:
 4. Optionally click `Validate Key`.
 5. Click `Start Recording`.
 6. Speak while you continue reviewing the target app.
-7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or the global hotkeys to insert markers and capture screenshots without reopening the menu.
+7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or any global hotkeys you explicitly assign in Settings to stop recording and capture screenshots without reopening the menu.
 8. Click `Stop Recording`.
 9. Review the transcript, review summary, screenshots, and extracted issues in the session library.
 10. Export a session bundle or selected issues when needed.
@@ -97,18 +97,13 @@ Clicking `Start Recording` opens a persistent recording controls window. That wi
 
 - start the session
 - stop the session
-- insert markers
 - capture screenshots
 
 It stays open until you close it, even after recording stops, so you can reuse the same control surface across repeated sessions.
 
-### Markers
-
-Markers let you flag important moments during a session. Each marker stores a timestamp and appears in the transcript review UI and transcript exports. Screenshot captures also add an automatic marker so visual evidence stays aligned with the transcript timeline.
-
 ### Screenshot Capture
 
-Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit to capture the current desktop layout and attach the saved image to the active session. Each screenshot is attached to the current session, creates an automatic marker, and can appear alongside extracted issues.
+Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit and a drag-to-select overlay so you can choose the exact region you want to capture instead of saving every display. Each screenshot is attached to the current session, creates an automatic timeline marker at the same timestamp, and appears later in the `Screenshots` tab with a thumbnail, timestamp, and linked marker label when available.
 
 ### Review Summary
 
@@ -132,7 +127,7 @@ The session library is designed for repeated daily use and supports:
 - `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `All Sessions`, and `Custom Date Range`
 - search across transcript text, titles, and summaries
 - newest-first or oldest-first sorting
-- inline detail review with a clearer workspace for raw transcript, review summary, markers, screenshots, and extracted issues
+- inline detail review with a clearer workspace for the transcript timeline, screenshots, review summary, and extracted issues
 - permanent deletion of sessions you no longer want to keep
 - cached metadata and lookup indexes so larger local histories stay more responsive than a full eager transcript scan
 
@@ -174,7 +169,7 @@ For local testing from Xcode or `DerivedData`, macOS may treat different app bun
 
 ### Screen Recording
 
-Screenshot capture may prompt for Screen Recording permission on first use. That permission is only needed for screenshots. If access is denied, the current recording can still continue without screenshots, and the menu bar window includes an `Open Screen Recording Settings` recovery button.
+Screenshot capture may prompt for Screen Recording permission on first use. That permission is only needed for screenshots. If access is denied, the current recording can still continue without screenshots, and the menu bar window includes an `Open Screen Recording Settings` recovery button. Press `Capture Screenshot`, drag to select the region you want, release to save it, or press `Esc` to cancel cleanly without interrupting recording.
 
 ### Accessibility
 
@@ -186,7 +181,7 @@ Data that stays local on your Mac:
 
 - session history
 - transcripts after they return from OpenAI
-- markers
+- screenshot-driven timeline markers and older marker data from existing sessions
 - screenshots and screenshot metadata
 - extracted issue drafts
 - exported bundles you explicitly create

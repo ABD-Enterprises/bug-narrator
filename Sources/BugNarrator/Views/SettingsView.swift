@@ -162,14 +162,19 @@ struct SettingsView: View {
 
                 GroupBox("Global Hotkeys") {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionIntro("Hotkeys are the primary way to control recording, markers, and screenshots while you keep testing.")
+                        sectionIntro("Hotkeys are optional. BugNarrator starts with every shortcut unassigned, so choose only the ones you want to use.")
 
                         hotkeyRow(action: .startRecording, shortcut: $settingsStore.startRecordingHotkeyShortcut)
                         hotkeyRow(action: .stopRecording, shortcut: $settingsStore.stopRecordingHotkeyShortcut)
-                        hotkeyRow(action: .insertMarker, shortcut: $settingsStore.markerHotkeyShortcut)
                         hotkeyRow(action: .captureScreenshot, shortcut: $settingsStore.screenshotHotkeyShortcut)
 
-                        Text("Hotkeys use Carbon and do not require Accessibility access. Marker and screenshot hotkeys only work while a session is recording. If you reuse a shortcut, BugNarrator disables the older conflicting action so only one action stays assigned.")
+                        if let hotkeyConflictMessage = settingsStore.hotkeyConflictMessage {
+                            Text(hotkeyConflictMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+
+                        Text("Hotkeys use Carbon and do not require Accessibility access. Screenshot hotkeys only work while a session is recording. If you choose a shortcut that is already assigned to another BugNarrator action, the new assignment is rejected until you clear or change the conflicting shortcut.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -367,7 +372,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(action.title)
                 .font(.subheadline.weight(.medium))
-            HotkeyRecorderView(shortcut: shortcut, defaultShortcut: action.defaultShortcut)
+            HotkeyRecorderView(shortcut: shortcut)
         }
     }
 

@@ -4,7 +4,6 @@ import SwiftUI
 
 struct HotkeyRecorderView: View {
     @Binding var shortcut: HotkeyShortcut
-    let defaultShortcut: HotkeyShortcut
 
     @State private var isCapturing = false
     @State private var eventMonitor: Any?
@@ -12,7 +11,12 @@ struct HotkeyRecorderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Button(isCapturing ? "Press Shortcut" : shortcut.displayString) {
+                Text(shortcut.displayString)
+                    .font(.subheadline.monospaced())
+                    .foregroundStyle(shortcut.isEnabled ? .primary : .secondary)
+                    .frame(minWidth: 120, alignment: .leading)
+
+                Button(isCapturing ? "Press Shortcut" : shortcut.isEnabled ? "Change" : "Assign") {
                     if isCapturing {
                         stopCapture()
                     } else {
@@ -21,17 +25,19 @@ struct HotkeyRecorderView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button("Default") {
-                    shortcut = defaultShortcut
-                }
-
-                Button("Disable") {
+                Button("Clear") {
                     shortcut = .disabled
                 }
                 .disabled(shortcut == .disabled)
             }
 
-            Text(isCapturing ? "Press Escape to cancel shortcut capture." : "Capture a key combination with at least one modifier.")
+            Text(
+                isCapturing
+                    ? "Press the shortcut you want to use, or press Escape to cancel."
+                    : shortcut.isEnabled
+                        ? "This action uses the shortcut shown above."
+                        : "No shortcut assigned."
+            )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

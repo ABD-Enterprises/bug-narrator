@@ -6,6 +6,7 @@ import Foundation
 final class AppState: ObservableObject {
     @Published private(set) var status: AppStatus = .idle()
     @Published private(set) var currentError: AppError?
+    @Published private(set) var transientToast: TransientToast?
     @Published private(set) var elapsedDuration: TimeInterval = 0
     @Published var showDiscardConfirmation = false
     @Published var currentTranscript: TranscriptSession?
@@ -25,6 +26,8 @@ final class AppState: ObservableObject {
     var showChangelogWindow: (() -> Void)?
     var showSupportWindow: (() -> Void)?
     var showRecordingControlWindow: (() -> Void)?
+    var prepareForScreenshotSelection: (() -> Void)?
+    var restoreAfterScreenshotSelection: (() -> Void)?
 
     private let audioRecorder: any AudioRecording
     private let microphonePermissionService: any MicrophonePermissionServicing
@@ -32,6 +35,7 @@ final class AppState: ObservableObject {
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let screenshotCaptureService: any ScreenshotCapturing
+    private let screenshotSelectionService: any ScreenshotSelecting
     private let issueExtractionService: any IssueExtracting
     private let exportService: any IssueExporting
     private let artifactsService: any SessionArtifactsManaging
@@ -56,6 +60,7 @@ final class AppState: ObservableObject {
     private var isCancellingSession = false
     private var isValidatingAPIKey = false
     private var isCapturingScreenshot = false
+    private var toastDismissTask: Task<Void, Never>?
 
     init(
         settingsStore: SettingsStore,
@@ -66,6 +71,7 @@ final class AppState: ObservableObject {
         transcriptionClient: any TranscriptionServing = TranscriptionClient(),
         hotkeyManager: any HotkeyManaging = HotkeyManager(),
         screenshotCaptureService: any ScreenshotCapturing = ScreenshotCaptureService(),
+        screenshotSelectionService: any ScreenshotSelecting = ScreenshotSelectionService(),
         issueExtractionService: any IssueExtracting = IssueExtractionService(),
         exportService: any IssueExporting = ExportService(),
         artifactsService: any SessionArtifactsManaging = SessionArtifactsService(),
@@ -82,6 +88,7 @@ final class AppState: ObservableObject {
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.screenshotCaptureService = screenshotCaptureService
+        self.screenshotSelectionService = screenshotSelectionService
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
         self.artifactsService = artifactsService
@@ -109,13 +116,6 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        settingsStore.$markerHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .insertMarker)
-            }
-            .store(in: &cancellables)
-
         settingsStore.$screenshotHotkeyShortcut
             .removeDuplicates()
             .sink { [weak self] shortcut in
@@ -138,7 +138,6 @@ final class AppState: ObservableObject {
 
         hotkeyManager.register(shortcut: settingsStore.startRecordingHotkeyShortcut, for: .startRecording)
         hotkeyManager.register(shortcut: settingsStore.stopRecordingHotkeyShortcut, for: .stopRecording)
-        hotkeyManager.register(shortcut: settingsStore.markerHotkeyShortcut, for: .insertMarker)
         hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
 
         settingsLogger.info(
@@ -155,7 +154,7 @@ final class AppState: ObservableObject {
         ElapsedTimeFormatter.string(from: elapsedDuration)
     }
 
-    var activeMarkerCount: Int {
+    var activeTimelineMomentCount: Int {
         activeRecordingSession?.markers.count ?? 0
     }
 
@@ -768,89 +767,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    func insertMarker(
-        title: String? = nil,
-        note: String? = nil,
-        captureScreenshot: Bool = false
-    ) async {
-        guard status.phase == .recording, var recordingSession = activeRecordingSession else {
-            let error = AppError.noActiveSession("Start a feedback session before inserting a marker.")
-            recordingLogger.warning("marker_insert_rejected", error.userMessage)
-            setStatus(.error(error.userMessage), error: error)
-            return
-        }
-
-        if isCapturingScreenshot {
-            let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
-            screenshotLogger.warning("marker_insert_rejected_during_capture", error.userMessage)
-            setStatus(.recording(error.userMessage), error: error)
-            return
-        }
-
-        let markerIndex = recordingSession.markers.count + 1
-        let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
-        let markerTitle = normalizedMarkerTitle(title, index: markerIndex)
-        let markerID = UUID()
-
-        var screenshot: SessionScreenshot?
-        var statusMessage = "Inserted \(markerTitle)."
-        var warningError: AppError?
-
-        if captureScreenshot {
-            do {
-                screenshot = try await performScreenshotCapture(
-                    in: recordingSession,
-                    prefix: "marker",
-                    index: recordingSession.screenshots.count + 1,
-                    elapsedTime: elapsedTime,
-                    associatedMarkerID: markerID
-                )
-                guard status.phase == .recording,
-                      var latestRecordingSession = activeRecordingSession,
-                      latestRecordingSession.sessionID == recordingSession.sessionID else {
-                    return
-                }
-                latestRecordingSession.screenshots.append(screenshot!)
-                recordingSession = latestRecordingSession
-                statusMessage = "Inserted \(markerTitle) with a screenshot."
-            } catch {
-                let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
-                guard status.phase == .recording else {
-                    return
-                }
-                statusMessage = "\(markerTitle) was inserted, but the screenshot failed."
-                warningError = appError
-                screenshotLogger.warning(
-                    "marker_screenshot_failed",
-                    appError.userMessage,
-                    metadata: ["session_id": recordingSession.sessionID.uuidString]
-                )
-            }
-        }
-
-        recordingSession.markers.append(
-            SessionMarker(
-                id: markerID,
-                index: markerIndex,
-                elapsedTime: elapsedTime,
-                title: markerTitle,
-                note: normalizeOptional(note),
-                screenshotID: screenshot?.id
-            )
-        )
-
-        activeRecordingSession = recordingSession
-        recordingLogger.info(
-            "marker_inserted",
-            statusMessage,
-            metadata: [
-                "session_id": recordingSession.sessionID.uuidString,
-                "marker_count": "\(recordingSession.markers.count)"
-            ]
-        )
-        setStatus(.recording(statusMessage), error: warningError)
-    }
-
     func captureScreenshot() async {
         guard status.phase == .recording, let recordingSession = activeRecordingSession else {
             let error = AppError.noActiveSession("Start a feedback session before capturing a screenshot.")
@@ -870,7 +786,7 @@ final class AppState: ObservableObject {
         let markerIndex = recordingSession.markers.count + 1
         let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
         let markerID = UUID()
-        let markerTitle = "Screenshot \(screenshotIndex)"
+            let markerTitle = "Screenshot \(screenshotIndex)"
 
         do {
             let screenshot = try await performScreenshotCapture(
@@ -880,6 +796,14 @@ final class AppState: ObservableObject {
                 elapsedTime: elapsedTime,
                 associatedMarkerID: markerID
             )
+            guard let screenshot else {
+                guard status.phase == .recording,
+                      activeRecordingSession?.sessionID == recordingSession.sessionID else {
+                    return
+                }
+                showToast("Screenshot canceled", style: .informational)
+                return
+            }
             guard status.phase == .recording,
                   var latestRecordingSession = activeRecordingSession,
                   latestRecordingSession.sessionID == recordingSession.sessionID else {
@@ -891,7 +815,7 @@ final class AppState: ObservableObject {
                     index: markerIndex,
                     elapsedTime: elapsedTime,
                     title: markerTitle,
-                    note: "Created automatically from a screenshot capture.",
+                    note: nil,
                     screenshotID: screenshot.id
                 )
             )
@@ -906,7 +830,8 @@ final class AppState: ObservableObject {
                     "marker_index": "\(markerIndex)"
                 ]
             )
-            setStatus(.recording("Captured Screenshot \(screenshotIndex) and added \(markerTitle) marker."))
+            setStatus(.recording("Captured \(markerTitle)."))
+            showToast("Screenshot captured")
         } catch {
             let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
             guard status.phase == .recording else {
@@ -1145,10 +1070,6 @@ final class AppState: ObservableObject {
             }
             Task {
                 await stopSession()
-            }
-        case .insertMarker:
-            Task {
-                await insertMarker()
             }
         case .captureScreenshot:
             Task {
@@ -1405,7 +1326,7 @@ final class AppState: ObservableObject {
         index: Int,
         elapsedTime: TimeInterval,
         associatedMarkerID: UUID?
-    ) async throws -> SessionScreenshot {
+    ) async throws -> SessionScreenshot? {
         guard !isCapturingScreenshot else {
             throw AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
         }
@@ -1421,6 +1342,16 @@ final class AppState: ObservableObject {
             throw preflightError
         }
 
+        prepareForScreenshotSelection?()
+        defer {
+            restoreAfterScreenshotSelection?()
+        }
+
+        let selectionResult = try await screenshotSelectionService.selectRegion()
+        guard case let .selected(selectionRect) = selectionResult else {
+            return nil
+        }
+
         let screenshotURL = artifactsService.makeScreenshotURL(
             in: recordingSession.artifactsDirectoryURL,
             prefix: prefix,
@@ -1429,7 +1360,7 @@ final class AppState: ObservableObject {
         )
 
         do {
-            try await screenshotCaptureService.captureScreenshot(to: screenshotURL)
+            try await screenshotCaptureService.captureScreenshot(in: selectionRect, to: screenshotURL)
         } catch {
             try? FileManager.default.removeItem(at: screenshotURL)
             throw error
@@ -1446,6 +1377,19 @@ final class AppState: ObservableObject {
             filePath: screenshotURL.path,
             associatedMarkerID: associatedMarkerID
         )
+    }
+
+    private func showToast(_ message: String, style: TransientToastStyle = .success) {
+        toastDismissTask?.cancel()
+        transientToast = TransientToast(message: message, style: style)
+        toastDismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+
+            self?.transientToast = nil
+        }
     }
 
     private func logAppError(_ error: AppError, context: String) {
@@ -1513,20 +1457,6 @@ final class AppState: ObservableObject {
             sessionMetadata: currentDebugSessionMetadata(),
             recentLogText: await BugNarratorDiagnostics.recentLogText()
         )
-    }
-
-    private func normalizedMarkerTitle(_ title: String?, index: Int) -> String {
-        let trimmedTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmedTitle.isEmpty ? "Marker \(index)" : trimmedTitle
-    }
-
-    private func normalizeOptional(_ value: String?) -> String? {
-        guard let value else {
-            return nil
-        }
-
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
 }

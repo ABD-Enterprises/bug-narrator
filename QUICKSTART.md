@@ -16,12 +16,13 @@
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
 5. Start a session with `Start Recording`.
-6. Keep the recording controls window open while you review, or use the global hotkeys, to insert markers and capture screenshots.
+6. Keep the recording controls window open while you review, or assign your own optional global hotkeys in Settings if you want keyboard control for stopping and screenshot capture.
 7. Stop the session and review the session library.
 
 ## Important Notes
 
 - BugNarrator does not include a built-in OpenAI API key.
+- Global hotkeys start disabled until you assign them yourself.
 - OpenAI transcription and issue extraction use your own OpenAI account and may cost money.
 - The app runs a microphone preflight before recording starts. If access is denied, restricted, or audio capture cannot actually be prepared, BugNarrator blocks recording early and explains what to fix.
 - If you deny microphone access, BugNarrator gives you an `Open Microphone Settings` recovery button.

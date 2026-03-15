@@ -66,6 +66,10 @@ final class AppStateTests: XCTestCase {
             harness.hotkeyManager.registeredShortcuts[.stopRecording],
             harness.settingsStore.stopRecordingHotkeyShortcut
         )
+        XCTAssertEqual(
+            harness.hotkeyManager.registeredShortcuts[.captureScreenshot],
+            harness.settingsStore.screenshotHotkeyShortcut
+        )
     }
 
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {
@@ -643,43 +647,11 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .success)
     }
 
-    func testInsertMarkerDuringActiveSessionStoresMarker() async {
-        let harness = AppStateHarness()
-        defer { harness.cleanup() }
-
-        await harness.appState.startSession()
-        harness.audioRecorder.currentDuration = 12
-
-        await harness.appState.insertMarker(title: "Login flow", note: "Cursor jumped unexpectedly")
-
-        let markers = harness.appState.activeRecordingSession?.markers ?? []
-        XCTAssertEqual(markers.count, 1)
-        XCTAssertEqual(markers.first?.title, "Login flow")
-        XCTAssertEqual(markers.first?.note, "Cursor jumped unexpectedly")
-        XCTAssertEqual(markers.first?.elapsedTime, 12)
-        XCTAssertEqual(harness.appState.status.phase, .recording)
-    }
-
-    func testInsertMarkerWithoutRecordingShowsHelpfulError() async {
-        let harness = AppStateHarness()
-        defer { harness.cleanup() }
-
-        await harness.appState.insertMarker()
-
-        XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertEqual(
-            harness.appState.status.detail,
-            AppError.noActiveSession("Start a feedback session before inserting a marker.").userMessage
-        )
-    }
-
     func testCaptureScreenshotStoresMetadataAndCreatesAutoMarker() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
         await harness.appState.startSession()
-        harness.audioRecorder.currentDuration = 10
-        await harness.appState.insertMarker(title: "Checkout", note: nil)
         harness.audioRecorder.currentDuration = 12
 
         await harness.appState.captureScreenshot()
@@ -689,15 +661,34 @@ final class AppStateTests: XCTestCase {
         let autoMarker = try XCTUnwrap(recordingSession.markers.last)
 
         XCTAssertEqual(recordingSession.screenshots.count, 1)
-        XCTAssertEqual(recordingSession.markers.count, 2)
+        XCTAssertEqual(recordingSession.markers.count, 1)
         XCTAssertEqual(screenshot.elapsedTime, 12)
         XCTAssertEqual(screenshot.associatedMarkerID, autoMarker.id)
         XCTAssertEqual(autoMarker.title, "Screenshot 1")
-        XCTAssertEqual(autoMarker.note, "Created automatically from a screenshot capture.")
+        XCTAssertNil(autoMarker.note)
         XCTAssertEqual(autoMarker.screenshotID, screenshot.id)
         XCTAssertTrue(FileManager.default.fileExists(atPath: screenshot.filePath))
+        XCTAssertEqual(harness.screenshotSelectionService.selectRegionCallCount, 1)
         XCTAssertEqual(harness.appState.status.phase, .recording)
-        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1 and added Screenshot 1 marker.")
+        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1.")
+        XCTAssertEqual(harness.appState.transientToast?.message, "Screenshot captured")
+    }
+
+    func testCaptureScreenshotCancellationKeepsRecordingWithoutCreatingMarkerOrScreenshot() async {
+        let selectionService = MockScreenshotSelectionService()
+        selectionService.nextResult = .cancelled
+        let harness = AppStateHarness(screenshotSelectionService: selectionService)
+        defer { harness.cleanup() }
+
+        await harness.appState.startSession()
+        await harness.appState.captureScreenshot()
+
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.status.detail, "Recording in progress.")
+        XCTAssertNil(harness.appState.currentError)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 0)
+        XCTAssertEqual(harness.appState.transientToast?.message, "Screenshot canceled")
     }
 
     func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async {
@@ -765,24 +756,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(recordingSession.screenshots.count, 1)
         XCTAssertEqual(recordingSession.markers.count, 1)
         XCTAssertEqual(harness.appState.status.phase, .recording)
-        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1 and added Screenshot 1 marker.")
+        XCTAssertEqual(harness.appState.status.detail, "Captured Screenshot 1.")
         XCTAssertNil(harness.appState.currentError)
-    }
-
-    func testInsertMarkerWithScreenshotPermissionDeniedStillCreatesMarker() async {
-        let harness = AppStateHarness(screenshotCaptureService: MockScreenshotCaptureService())
-        defer { harness.cleanup() }
-
-        harness.screenCapturePermissionAccess.permissionState = .denied
-        await harness.appState.startSession()
-        harness.audioRecorder.currentDuration = 7
-
-        await harness.appState.insertMarker(title: "Checkout", captureScreenshot: true)
-
-        XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 1)
-        XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
-        XCTAssertEqual(harness.appState.currentError, .screenRecordingPermissionDenied)
-        XCTAssertEqual(harness.appState.status.phase, .recording)
     }
 
     func testAutomaticIssueExtractionPersistsDraftIssuesAfterTranscription() async throws {

@@ -285,7 +285,7 @@ struct MenuBarView: View {
 
             switch appState.status.phase {
             case .idle:
-                Text("Open the control window to start, stop, mark moments, and capture screenshots. Global shortcuts stay active too.")
+                Text("Open the control window to start, stop, and capture screenshots that automatically mark important moments. Global shortcuts stay active too.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             case .recording:
@@ -294,7 +294,7 @@ struct MenuBarView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    Text("\(appState.activeMarkerCount) markers  •  \(appState.activeScreenshotCount) screenshots")
+                    Text("\(appState.activeTimelineMomentCount) timeline moments  •  \(appState.activeScreenshotCount) screenshots")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -320,7 +320,6 @@ struct MenuBarView: View {
 
                 hotkeyLine(label: "Start", value: appState.settingsStore.startRecordingHotkeyShortcut.displayString)
                 hotkeyLine(label: "Stop", value: appState.settingsStore.stopRecordingHotkeyShortcut.displayString)
-                hotkeyLine(label: "Marker", value: appState.settingsStore.markerHotkeyShortcut.displayString)
                 hotkeyLine(label: "Screenshot", value: appState.settingsStore.screenshotHotkeyShortcut.displayString)
             }
         }

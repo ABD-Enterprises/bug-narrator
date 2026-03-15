@@ -49,6 +49,12 @@ struct BugNarratorApp: App {
         appState.showRecordingControlWindow = { [weak windowCoordinator] in
             windowCoordinator?.showRecordingControlWindow()
         }
+        appState.prepareForScreenshotSelection = { [weak windowCoordinator] in
+            windowCoordinator?.prepareForScreenshotSelection()
+        }
+        appState.restoreAfterScreenshotSelection = { [weak windowCoordinator] in
+            windowCoordinator?.restoreAfterScreenshotSelection()
+        }
 
         _settingsStore = StateObject(wrappedValue: settingsStore)
         _transcriptStore = StateObject(wrappedValue: transcriptStore)

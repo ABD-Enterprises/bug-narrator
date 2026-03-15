@@ -13,6 +13,7 @@ struct ScreenCaptureDisplaySnapshot: Equatable {
 
 struct CapturedDisplayImage {
     let display: ScreenCaptureDisplaySnapshot
+    let capturedFrame: CGRect
     let image: CGImage
 }
 
@@ -20,7 +21,10 @@ protocol ScreenCaptureImageProviding {
     @MainActor
     func availableDisplays() async throws -> [ScreenCaptureDisplaySnapshot]
     @MainActor
-    func captureDisplayImage(for display: ScreenCaptureDisplaySnapshot) async throws -> CapturedDisplayImage
+    func captureDisplayImage(
+        for display: ScreenCaptureDisplaySnapshot,
+        sourceRect: CGRect?
+    ) async throws -> CapturedDisplayImage
 }
 
 struct ScreenCaptureKitImageProvider: ScreenCaptureImageProviding {
@@ -50,7 +54,10 @@ struct ScreenCaptureKitImageProvider: ScreenCaptureImageProviding {
             }
     }
 
-    func captureDisplayImage(for display: ScreenCaptureDisplaySnapshot) async throws -> CapturedDisplayImage {
+    func captureDisplayImage(
+        for display: ScreenCaptureDisplaySnapshot,
+        sourceRect: CGRect?
+    ) async throws -> CapturedDisplayImage {
         let shareableContent: SCShareableContent
         do {
             shareableContent = try await SCShareableContent.current
@@ -68,8 +75,27 @@ struct ScreenCaptureKitImageProvider: ScreenCaptureImageProviding {
         }
 
         let configuration = SCStreamConfiguration()
-        configuration.width = size_t(max(1, display.pixelWidth))
-        configuration.height = size_t(max(1, display.pixelHeight))
+        let relativeSourceRect = sourceRect?.standardized.integral
+        let captureFrame = relativeSourceRect.map {
+            CGRect(
+                x: display.frame.minX + $0.minX,
+                y: display.frame.minY + $0.minY,
+                width: $0.width,
+                height: $0.height
+            )
+        } ?? display.frame
+
+        let scaleX = display.frame.width > 0 ? CGFloat(display.pixelWidth) / display.frame.width : 1
+        let scaleY = display.frame.height > 0 ? CGFloat(display.pixelHeight) / display.frame.height : 1
+
+        if let relativeSourceRect {
+            configuration.sourceRect = relativeSourceRect
+            configuration.width = size_t(max(1, Int((relativeSourceRect.width * scaleX).rounded(.up))))
+            configuration.height = size_t(max(1, Int((relativeSourceRect.height * scaleY).rounded(.up))))
+        } else {
+            configuration.width = size_t(max(1, display.pixelWidth))
+            configuration.height = size_t(max(1, display.pixelHeight))
+        }
 
         let image: CGImage
         do {
@@ -86,7 +112,7 @@ struct ScreenCaptureKitImageProvider: ScreenCaptureImageProviding {
             throw Self.mapCaptureError(error)
         }
 
-        return CapturedDisplayImage(display: display, image: image)
+        return CapturedDisplayImage(display: display, capturedFrame: captureFrame, image: image)
     }
 
     private static func mapCaptureError(_ error: Error) -> AppError {
@@ -181,11 +207,20 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
     }
 
     @MainActor
-    func captureScreenshot(to url: URL) async throws {
+    func captureScreenshot(in rect: CGRect, to url: URL) async throws {
+        let selectionRect = rect.standardized.integral
+        guard selectionRect.width > 0, selectionRect.height > 0 else {
+            throw AppError.screenshotCaptureFailure("Select an area to capture before releasing the mouse.")
+        }
+
         screenshotLogger.info(
             "screenshot_capture_requested",
             "Capturing a screenshot for the active review session.",
-            metadata: ["file_name": url.lastPathComponent]
+            metadata: [
+                "file_name": url.lastPathComponent,
+                "selection_width": "\(Int(selectionRect.width))",
+                "selection_height": "\(Int(selectionRect.height))"
+            ]
         )
 
         let displays = try await resolvedDisplaysForCapture()
@@ -194,26 +229,57 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
             throw AppError.screenshotCaptureFailure("No displays were available to capture.")
         }
 
+        let intersectingDisplays = displays.compactMap { display -> (ScreenCaptureDisplaySnapshot, CGRect)? in
+            let intersection = display.frame.intersection(selectionRect)
+            guard !intersection.isNull, intersection.width > 0, intersection.height > 0 else {
+                return nil
+            }
+
+            let relativeSourceRect = CGRect(
+                x: intersection.minX - display.frame.minX,
+                y: intersection.minY - display.frame.minY,
+                width: intersection.width,
+                height: intersection.height
+            ).integral
+
+            return (display, relativeSourceRect)
+        }
+
+        guard !intersectingDisplays.isEmpty else {
+            screenshotLogger.warning(
+                "screenshot_capture_selection_off_display",
+                "The requested screenshot area did not overlap any active display."
+            )
+            throw AppError.screenshotCaptureFailure("The selected area was not on an active display.")
+        }
+
         screenshotLogger.debug(
             "screenshot_displays_resolved",
-            "ScreenCaptureKit resolved the active display layout.",
-            metadata: ["display_count": "\(displays.count)"]
+            "ScreenCaptureKit resolved the active display layout for the selected screenshot region.",
+            metadata: [
+                "display_count": "\(displays.count)",
+                "intersecting_display_count": "\(intersectingDisplays.count)"
+            ]
         )
 
         var capturedDisplays: [CapturedDisplayImage] = []
-        capturedDisplays.reserveCapacity(displays.count)
-        for display in displays {
-            capturedDisplays.append(try await imageProvider.captureDisplayImage(for: display))
+        capturedDisplays.reserveCapacity(intersectingDisplays.count)
+        for (display, sourceRect) in intersectingDisplays {
+            capturedDisplays.append(
+                try await imageProvider.captureDisplayImage(for: display, sourceRect: sourceRect)
+            )
         }
 
-        let image = try makeCompositeImage(from: capturedDisplays)
+        let image = try makeCompositeImage(from: capturedDisplays, bounds: selectionRect)
         try imageWriter.writePNG(image, to: url)
         screenshotLogger.info(
             "screenshot_capture_succeeded",
             "Saved a screenshot for the active review session.",
             metadata: [
                 "file_name": url.lastPathComponent,
-                "display_count": "\(capturedDisplays.count)"
+                "display_count": "\(capturedDisplays.count)",
+                "selection_width": "\(Int(selectionRect.width))",
+                "selection_height": "\(Int(selectionRect.height))"
             ]
         )
     }
@@ -229,11 +295,8 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
     }
 
-    private func makeCompositeImage(from capturedDisplays: [CapturedDisplayImage]) throws -> CGImage {
-        let frames = capturedDisplays.map(\.display.frame)
-        let compositeBounds = frames.reduce(into: CGRect.null) { partialResult, frame in
-            partialResult = partialResult.union(frame)
-        }.integral
+    private func makeCompositeImage(from capturedDisplays: [CapturedDisplayImage], bounds: CGRect) throws -> CGImage {
+        let compositeBounds = bounds.integral
 
         guard !compositeBounds.isNull, compositeBounds.width > 0, compositeBounds.height > 0 else {
             throw AppError.screenshotCaptureFailure("No display content was available to capture.")
@@ -258,7 +321,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         context.interpolationQuality = .high
 
         for capturedDisplay in capturedDisplays {
-            let frame = capturedDisplay.display.frame
+            let frame = capturedDisplay.capturedFrame
             let drawRect = CGRect(
                 x: frame.minX - compositeBounds.minX,
                 y: frame.minY - compositeBounds.minY,

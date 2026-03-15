@@ -66,8 +66,10 @@
 - Verify the status changes to `Recording`.
 - Verify the red recording indicator and elapsed timer appear and continue updating.
 - Switch between apps, click around, and keep speaking for at least 15 seconds.
-- Insert at least two markers during the session.
 - Capture at least one screenshot during the session.
+- Verify screenshot capture opens a dimmed drag-selection overlay with a crosshair cursor instead of immediately saving the full desktop.
+- Drag-select a region and verify only that region is saved to the session.
+- Press `Esc` during screenshot selection and verify the capture cancels without creating a screenshot or ending the recording.
 - Stop the session.
 - Verify the recording controls window stays open after the session stops and only closes when you explicitly close it.
 - Verify the status changes to `Transcribing` and then `Success`.
@@ -89,15 +91,22 @@
 - Select a session from the list and verify the detail pane updates in place without opening a separate popup.
 - Rapidly switch between several different sessions and verify the detail pane updates cleanly without visual thrash, stale transcript content, or mismatched counts.
 - Select a session with `Extracted Issues` or `Summary`, switch to that tab, then select a session without those sections and verify the review workspace falls back cleanly instead of staying on a blank or stale tab.
-- Verify the detail pane keeps access to raw transcript, markers, screenshots, extracted issues, and export actions.
+- Verify the detail pane keeps access to the transcript timeline, screenshots, extracted issues, summary, and export actions.
 - Verify an empty state appears for no sessions yet, no sessions in a filter, no sessions in a custom date range, and no search results.
 
-## Marker And Screenshot Workflow
+## Screenshot Timeline Workflow
 
-- Insert a marker during recording and verify it appears in the `Markers` tab with the correct time.
 - Capture a screenshot during recording and verify it appears in the `Screenshots` tab.
+- Verify the screenshot overlay darkens the screen slightly, shows a live selection rectangle, and completes capture on mouse release.
+- Verify the screenshot overlay shows a lightweight hint and a live size readout while you drag.
+- Verify the screenshot timestamp matches the moment the selection is completed.
+- Verify each screenshot automatically creates a linked timeline marker at the same timestamp.
+- Verify the transcript timeline reflects the screenshot marker event without creating redundant duplicate rows.
+- Verify the recording controls window shows only `Start Recording`, `Stop Recording`, `Capture Screenshot`, and `Close`.
 - With several screenshots in one session, open the `Screenshots` tab and verify previews load promptly without obvious UI hitching or full-size-image jank.
-- If the screenshot is near a marker, verify the screenshot shows a linked marker when practical.
+- Verify the screenshot shows its linked marker label or timeline label when practical.
+- Click a screenshot thumbnail in the `Screenshots` tab and verify BugNarrator opens the saved image cleanly.
+- Click `Show in Transcript` from a screenshot entry and verify the review workspace switches back to the transcript timeline.
 - Open a captured screenshot from the review window and verify Finder reveals the file.
 - Export a session bundle and verify `transcript.txt`, `transcript.md`, `summary.md`, and the `screenshots` folder are present.
 - Verify the exported `transcript.txt` contains the raw session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
@@ -146,7 +155,7 @@
 
 ## Repeated Session Regression
 
-- Complete a full start-record-stop-transcribe cycle with markers and screenshots.
+- Complete a full start-record-stop-transcribe cycle with multiple screenshots.
 - Start a second session without restarting the app.
 - Complete a second full cycle and verify the new session appears first in the session library when sorted newest-first.
 - Repeat once more with automatic issue extraction enabled.
@@ -171,6 +180,10 @@
   Expected: BugNarrator reports a microphone availability problem instead of claiming recording started and then immediately failing.
 - Capture a screenshot without Screen Recording permission.
   Expected: recording continues, BugNarrator shows a screenshot-specific error, and `Open Screen Recording Settings` opens the expected privacy pane or a safe fallback.
+- Start a screenshot selection and release without dragging a real region.
+  Expected: BugNarrator treats the attempt as a cancelled screenshot instead of saving a tiny or empty image.
+- Start a screenshot selection and press `Esc`.
+  Expected: selection mode exits cleanly, recording continues, and BugNarrator shows only a lightweight cancellation message.
 - Delete or move a saved screenshot file outside the app, then open it from the session detail view.
   Expected: BugNarrator explains that the local screenshot file is no longer available instead of failing silently.
 - Disconnect networking or force a timeout during transcription.
@@ -194,8 +207,10 @@
 ## Settings Regression
 
 - Change auto-copy, auto-save, and auto-extract toggles and verify the next session follows the new values.
-- Change the start, stop, marker, and screenshot hotkeys and verify the new shortcuts are registered.
-- Assign the same shortcut to two different actions and verify BugNarrator disables the older conflicting action instead of keeping both active.
+- On a fresh settings domain, verify the start, stop, and screenshot hotkeys all show `Not Set`.
+- Change the start, stop, and screenshot hotkeys and verify the new shortcuts are registered.
+- Clear an assigned shortcut and verify it returns to `Not Set` and no longer triggers globally.
+- Assign the same shortcut to two different actions and verify BugNarrator rejects the conflicting assignment with a clear message instead of silently reassigning another action.
 - While recording, verify secret fields are disabled.
 - Enable Debug Mode and confirm temporary audio files are retained after a completed or cancelled session.
 - Disable Debug Mode and confirm temporary audio files are cleaned up after a completed or cancelled session.
