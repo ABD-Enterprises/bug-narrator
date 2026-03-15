@@ -252,9 +252,18 @@ final class MockURLHandler: URLOpening {
 final class MockKeychainService: KeychainServicing {
     var values: [String: String] = [:]
     var setError: Error?
+    var interactionRequiredKeys: Set<String> = []
+    private(set) var readRequests: [(service: String, account: String, allowInteraction: Bool)] = []
 
-    func string(forService service: String, account: String) throws -> String? {
-        values[key(forService: service, account: account)]
+    func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
+        readRequests.append((service: service, account: account, allowInteraction: allowInteraction))
+
+        let key = key(forService: service, account: account)
+        if interactionRequiredKeys.contains(key), !allowInteraction {
+            return nil
+        }
+
+        return values[key]
     }
 
     func setString(_ value: String, service: String, account: String) throws {

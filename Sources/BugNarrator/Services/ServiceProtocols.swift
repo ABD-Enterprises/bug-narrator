@@ -69,9 +69,15 @@ protocol ClipboardWriting {
 }
 
 protocol KeychainServicing {
-    func string(forService service: String, account: String) throws -> String?
+    func string(forService service: String, account: String, allowInteraction: Bool) throws -> String?
     func setString(_ value: String, service: String, account: String) throws
     func deleteValue(service: String, account: String) throws
+}
+
+extension KeychainServicing {
+    func string(forService service: String, account: String) throws -> String? {
+        try string(forService: service, account: account, allowInteraction: true)
+    }
 }
 
 protocol URLOpening {

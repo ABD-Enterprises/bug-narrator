@@ -30,7 +30,7 @@
 - transcription request construction and OpenAI error mapping
 - About window/changelog action wiring and external project-link dispatch
 - version/build metadata formatting and changelog highlight parsing
-- support window callback wiring and PayPal donation URL construction
+- support window callback wiring and PayPal support-page URL dispatch
 - partial-success export failure reporting for GitHub and Jira issue creation
 - screenshot open failure handling that preserves app-state truthfulness during active sessions
 

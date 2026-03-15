@@ -363,6 +363,7 @@ final class AppState: ObservableObject {
     }
 
     func openSettings() {
+        settingsStore.refreshSecretsForUserInitiatedAccess()
         showSettingsWindow?()
     }
 
@@ -390,8 +391,8 @@ final class AppState: ObservableObject {
         showSupportWindow?()
     }
 
-    func openSupportDonation(amount: Int) {
-        openExternalURL(BugNarratorLinks.supportDonation(amount: amount), label: "PayPal donation page")
+    func openSupportDonationPage() {
+        openExternalURL(BugNarratorLinks.supportDevelopment, label: "PayPal donation page")
     }
 
     func checkForUpdates() {
@@ -402,6 +403,8 @@ final class AppState: ObservableObject {
         guard !isValidatingAPIKey else {
             return
         }
+
+        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
 
         guard settingsStore.hasAPIKey else {
             apiKeyValidationState = .failure(AppError.missingAPIKey.userMessage)
@@ -584,6 +587,8 @@ final class AppState: ObservableObject {
             return
         }
 
+        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
+
         guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
             issueExtractionSessionID = transcriptSession.id
             status = .transcribing("Extracting reviewable issues...")
@@ -680,6 +685,8 @@ final class AppState: ObservableObject {
             presentError(AppError.exportFailure("Select at least one extracted issue to export."))
             return
         }
+
+        settingsStore.refreshExportSecretsForUserInitiatedAccess()
 
         do {
             try validateExportConfiguration(for: destination)
@@ -897,6 +904,8 @@ final class AppState: ObservableObject {
     }
 
     private func preflightForSessionStart() async -> AppError? {
+        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
+
         guard settingsStore.hasAPIKey else {
             return .missingAPIKey
         }

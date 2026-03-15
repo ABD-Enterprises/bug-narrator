@@ -24,8 +24,8 @@
 - Verify the documentation action opens the hosted `docs/UserGuide.md` page in the default browser.
 - Verify the report issue action opens the GitHub new-issue page.
 - Verify the support development action opens the support window.
-- Verify the support window shows `Donate $5`, `Donate $10`, and `Donate $20`.
-- Verify each donation button opens the configured PayPal donation page in the default browser.
+- Verify the support window shows a single PayPal support action.
+- Verify the support button opens the configured PayPal donation page in the default browser.
 - Open `What’s New` from the menu bar or the About window.
 - Verify the changelog window opens and displays the bundled `CHANGELOG.md` content.
 - Verify `Check for Updates` opens the GitHub releases page.

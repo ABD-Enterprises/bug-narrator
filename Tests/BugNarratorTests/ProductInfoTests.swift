@@ -37,17 +37,13 @@ final class ProductInfoTests: XCTestCase {
         XCTAssertEqual(BugNarratorLinks.supportDevelopment.absoluteString, "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8")
     }
 
-    func testSupportDonationLinksIncludeSuggestedAmount() {
-        let fiveDollarURL = BugNarratorLinks.supportDonation(amount: 5)
-        let tenDollarURL = BugNarratorLinks.supportDonation(amount: 10)
+    func testSupportDevelopmentLinkUsesHostedPayPalPage() {
+        let query = URLComponents(
+            url: BugNarratorLinks.supportDevelopment,
+            resolvingAgainstBaseURL: false
+        )?.queryItems ?? []
 
-        let fiveDollarQuery = URLComponents(url: fiveDollarURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        let tenDollarQuery = URLComponents(url: tenDollarURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
-
-        XCTAssertTrue(fiveDollarQuery.contains(URLQueryItem(name: "hosted_button_id", value: "FWFQ6KCZBWWH8")))
-        XCTAssertTrue(fiveDollarQuery.contains(URLQueryItem(name: "amount", value: "5")))
-        XCTAssertTrue(fiveDollarQuery.contains(URLQueryItem(name: "currency_code", value: "USD")))
-        XCTAssertTrue(tenDollarQuery.contains(URLQueryItem(name: "amount", value: "10")))
+        XCTAssertTrue(query.contains(URLQueryItem(name: "hosted_button_id", value: "FWFQ6KCZBWWH8")))
     }
 
     func testChangelogHighlightsUseLatestReleaseSection() {
