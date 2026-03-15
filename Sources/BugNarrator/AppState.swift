@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
 
+    private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
     var showSettingsWindow: (() -> Void)?
     var showAboutWindow: (() -> Void)?
@@ -65,10 +66,12 @@ final class AppState: ObservableObject {
         exportService: any IssueExporting = ExportService(),
         artifactsService: any SessionArtifactsManaging = SessionArtifactsService(),
         clipboardService: any ClipboardWriting = SystemClipboardService(),
-        urlHandler: any URLOpening = WorkspaceURLHandler()
+        urlHandler: any URLOpening = WorkspaceURLHandler(),
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
     ) {
         self.settingsStore = settingsStore
         self.transcriptStore = transcriptStore
+        self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
@@ -185,7 +188,23 @@ final class AppState: ObservableObject {
     }
 
     var preferredRecordingWorkflowSummary: String {
-        "Use the recording controls or global hotkeys while you keep testing. The menu stays available as a fallback."
+        "Open the recording controls window or use the global hotkeys while you keep testing."
+    }
+
+    var microphoneRecoveryGuidance: String {
+        if runtimeEnvironment.isLocalTestingBuild {
+            return "Open System Settings and enable BugNarrator in Privacy & Security > Microphone. For local testing, keep launching this same app copy or use the signed DMG build because macOS tracks microphone access per app bundle path."
+        }
+
+        return "Open System Settings and enable BugNarrator in Privacy & Security > Microphone."
+    }
+
+    var microphoneRecoveryLocalTestingNote: String? {
+        guard runtimeEnvironment.isLocalTestingBuild else {
+            return nil
+        }
+
+        return "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path."
     }
 
     var debugInfoSnapshot: DebugInfoSnapshot {

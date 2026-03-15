@@ -15,7 +15,8 @@ final class WindowCoordinator {
     private var recordingControlWindowController: NSWindowController?
     private var singleInstanceActivationObserver: NSObjectProtocol?
 
-    private let recordingControlSize = NSSize(width: 360, height: 244)
+    private let recordingControlSize = NSSize(width: 336, height: 256)
+    private let recordingControlAutosaveName = "BugNarratorRecordingControlsWindow"
     private let screenshotHideDelayNanoseconds: UInt64 = 250_000_000
 
     init(appState: AppState, transcriptStore: TranscriptStore, settingsStore: SettingsStore) {
@@ -134,11 +135,6 @@ final class WindowCoordinator {
             recordingControlWindowController = makeRecordingControlWindowController()
         }
 
-        guard let window = recordingControlWindowController?.window else {
-            return
-        }
-
-        positionRecordingControlWindow(window)
         present(recordingControlWindowController!)
     }
 
@@ -152,7 +148,6 @@ final class WindowCoordinator {
         if let recordingControlWindowController,
            let window = recordingControlWindowController.window,
            window.isVisible {
-            positionRecordingControlWindow(window)
             window.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -196,7 +191,7 @@ final class WindowCoordinator {
             }
         )
         let panel = makeWindow(
-            title: "Recording Controls",
+            title: "BugNarrator Controls",
             size: recordingControlSize,
             rootView: rootView
         )
@@ -209,13 +204,13 @@ final class WindowCoordinator {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.animationBehavior = .utilityWindow
+        panel.setFrameAutosaveName(recordingControlAutosaveName)
 
         return NSWindowController(window: panel)
     }
 
     private func handleRecordingControlStart() {
         Task { @MainActor [weak self] in
-            self?.showRecordingControlWindow()
             await self?.appState.startSession()
         }
     }
@@ -247,19 +242,8 @@ final class WindowCoordinator {
                 return
             }
 
-            self.positionRecordingControlWindow(window)
             window.orderFrontRegardless()
-            NSApp.activate(ignoringOtherApps: true)
         }
-    }
-
-    private func positionRecordingControlWindow(_ window: NSWindow) {
-        let visibleFrame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
-        let origin = CGPoint(
-            x: visibleFrame.maxX - recordingControlSize.width - 28,
-            y: visibleFrame.maxY - recordingControlSize.height - 54
-        )
-        window.setFrameOrigin(origin)
     }
 
     private func makeWindow<Content: View>(title: String, size: NSSize, rootView: Content) -> NSWindow {

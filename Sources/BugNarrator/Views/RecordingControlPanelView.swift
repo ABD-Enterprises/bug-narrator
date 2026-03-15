@@ -10,36 +10,49 @@ struct RecordingControlPanelView: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             header
             statusSummary
             controlGrid
             footer
         }
-        .padding(18)
-        .frame(width: 360, alignment: .leading)
+        .padding(16)
+        .frame(width: 332, alignment: .leading)
         .background(Color(nsColor: .windowBackgroundColor))
         .accessibilityElement(children: .contain)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Recording Controls")
-                .font(.title3.weight(.semibold))
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("BugNarrator Controls")
+                    .font(.headline)
 
-            Text("Keep this panel open while you narrate. Use it or the global hotkeys to mark moments and capture screenshots without reopening the menu.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Recording actions live here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(appState.status.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(statusTint)
         }
     }
 
     private var statusSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(appState.status.title)
+                if appState.status.phase == .recording {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 8, height: 8)
+                }
+
+                Text(statusHeadline)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(statusTint)
+                    .foregroundStyle(.primary)
 
                 Spacer()
 
@@ -55,13 +68,22 @@ struct RecordingControlPanelView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if appState.status.phase == .recording {
+            if let localTestingNote {
+                Text(localTestingNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if showsRecoveryButton {
+                recoveryButton
+            } else if appState.status.phase == .recording {
                 Text("\(appState.activeMarkerCount) markers • \(appState.activeScreenshotCount) screenshots")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
@@ -108,22 +130,24 @@ struct RecordingControlPanelView: View {
 
     private var footer: some View {
         HStack {
-            if appState.status.phase == .recording && appState.needsAPIKeySetup {
-                Text("You can keep recording without an API key. Add it in Settings before stopping if you want transcription.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("The panel stays open until you close it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(footerMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
 
             Button("Close", action: onClose)
                 .buttonStyle(.bordered)
         }
+    }
+
+    private var footerMessage: String {
+        if appState.status.phase == .recording && appState.needsAPIKeySetup {
+            return "You can keep recording without an API key. Add it in Settings before stopping if you want transcription."
+        }
+
+        return "The controls stay open until you close them."
     }
 
     private var canStartSession: Bool {
@@ -143,6 +167,21 @@ struct RecordingControlPanelView: View {
         appState.status.phase == .recording
     }
 
+    private var statusHeadline: String {
+        switch appState.status.phase {
+        case .idle:
+            return "Ready for the next feedback session."
+        case .recording:
+            return "Recording is active."
+        case .transcribing:
+            return "Preparing the transcript."
+        case .success:
+            return "Latest session ready."
+        case .error:
+            return "Action needed before you continue."
+        }
+    }
+
     private var statusMessage: String {
         if let detail = appState.status.detail, !detail.isEmpty {
             return detail
@@ -152,13 +191,58 @@ struct RecordingControlPanelView: View {
         case .idle:
             return "Start a feedback session when you are ready to narrate the current walkthrough."
         case .recording:
-            return "Recording is active. Add markers or capture screenshots as you move through the workflow."
+            return "Use these controls or the global hotkeys to mark moments and capture screenshots as you test."
         case .transcribing:
-            return "The recording is finished. BugNarrator is preparing the transcript now."
+            return "The recording is finished. BugNarrator is uploading audio and waiting for transcription."
         case .success:
-            return "The latest session is ready in the session library."
+            return "Review the transcript in the session library, then start the next session from here."
         case .error:
-            return "Fix the current issue, then use these controls to continue the workflow."
+            return "Resolve the current issue, then use these controls to continue the workflow."
+        }
+    }
+
+    private var localTestingNote: String? {
+        guard appState.currentError == .microphonePermissionDenied else {
+            return nil
+        }
+
+        return appState.microphoneRecoveryLocalTestingNote
+    }
+
+    private var showsRecoveryButton: Bool {
+        switch appState.currentError {
+        case .microphonePermissionDenied, .screenRecordingPermissionDenied:
+            return true
+        case let error?:
+            return error.suggestsOpenAISettings
+        case nil:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryButton: some View {
+        switch appState.currentError {
+        case .microphonePermissionDenied:
+            Button("Open Microphone Settings") {
+                appState.openMicrophonePrivacySettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case .screenRecordingPermissionDenied:
+            Button("Open Screen Recording Settings") {
+                appState.openScreenRecordingPrivacySettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case let error? where error.suggestsOpenAISettings:
+            Button("Open Settings") {
+                appState.openSettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        default:
+            EmptyView()
         }
     }
 
@@ -196,8 +280,8 @@ struct RecordingControlPanelView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
         }
 
         if prominence == .primary {

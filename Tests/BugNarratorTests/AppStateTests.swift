@@ -18,6 +18,22 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .recording)
     }
 
+    func testOpenRecordingControlsShowsPanelWithoutStartingSession() {
+        let harness = AppStateHarness(apiKey: "")
+        defer { harness.cleanup() }
+
+        var didOpenRecordingControls = false
+        harness.appState.showRecordingControlWindow = {
+            didOpenRecordingControls = true
+        }
+
+        harness.appState.openRecordingControls()
+
+        XCTAssertTrue(didOpenRecordingControls)
+        XCTAssertEqual(harness.appState.status.phase, .idle)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+    }
+
     func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
@@ -96,6 +112,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(
             harness.appState.status.detail,
             "Microphone access enabled. You can start a session again."
+        )
+    }
+
+    func testLocalTestingBuildAddsMicrophoneRecoveryGuidance() {
+        let harness = AppStateHarness(
+            runtimeEnvironment: AppRuntimeEnvironment(
+                bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
+            )
+        )
+        defer { harness.cleanup() }
+
+        XCTAssertTrue(harness.appState.microphoneRecoveryGuidance.contains("same app copy"))
+        XCTAssertEqual(
+            harness.appState.microphoneRecoveryLocalTestingNote,
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path."
         )
     }
 
