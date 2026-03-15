@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.5 - 2026-03-14
+
+- Rebuilt and republished BugNarrator from the current stabilized main branch as a fresh signed, notarized, and stapled macOS release.
+
 ## 1.0.4 - 2026-03-14
 
 - Fixed microphone permission detection on macOS 14+ so BugNarrator reads the app's actual granted microphone state and no longer stays blocked after access has been enabled in System Settings.
