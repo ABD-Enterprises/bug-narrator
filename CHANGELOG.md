@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.12 - 2026-03-15
+
+- Fixed a microphone permission regression where BugNarrator could enter a fake recording state and produce silent sessions even though macOS still had microphone access blocked.
+- Tightened recording preflight so denied or restricted microphone permission now blocks recording immediately instead of letting a recorder activation probe override the system privacy state.
+- Added regression coverage to keep blocked microphone states from starting a session or silently recording nothing.
+
 ## 1.0.11 - 2026-03-15
 
 - Simplified the recording controls window by removing the standalone marker button and making screenshot capture the primary way to mark important moments during a session.

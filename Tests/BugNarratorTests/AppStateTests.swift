@@ -97,7 +97,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
     }
 
-    func testStartSessionCanRecoverFromStaleDeniedPermissionWhenActivationProbeSucceeds() async {
+    func testStartSessionDoesNotStartWhenPermissionLooksDeniedEvenIfProbeWouldSucceed() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
@@ -106,10 +106,10 @@ final class AppStateTests: XCTestCase {
 
         await harness.appState.startSession()
 
-        XCTAssertEqual(harness.appState.status.phase, .recording)
-        XCTAssertNil(harness.appState.currentError)
-        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
-        XCTAssertEqual(harness.audioRecorder.activationProbeCallCount, 1)
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(harness.appState.currentError, .microphonePermissionDenied)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+        XCTAssertEqual(harness.audioRecorder.activationProbeCallCount, 0)
     }
 
     func testStartSessionWithRestrictedMicrophonePermissionFailsBeforeRecorderStarts() async {
