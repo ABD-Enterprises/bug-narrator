@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.17 - 2026-03-15
+
+- Fixed the signed DMG packaging flow so BugNarrator keeps the macOS audio-input entitlement when the release app is re-signed for Developer ID distribution.
+- Added the BugNarrator entitlements file to the project so the shipped app retains microphone capability in notarized public builds instead of losing it during packaging.
+
 ## 1.0.16 - 2026-03-15
 
 - Fixed the signed app's microphone prompt path again by using macOS media-capture authorization to trigger the system microphone prompt, then resolving the final state from both app-level and capture-device permission APIs.

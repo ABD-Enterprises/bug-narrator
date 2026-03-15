@@ -16,6 +16,7 @@ OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:-}"
 ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/Resources/BugNarrator.entitlements}"
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
 APP_NAME="${APP_NAME:-BugNarrator}"
 BACKGROUND_DIR_NAME=".background"
@@ -156,7 +157,21 @@ fi
 SIGNING_AUTHORITY=""
 if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
     if [[ "$MANUAL_DISTRIBUTION_SIGNING" == "YES" ]]; then
-        codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$APP_PATH"
+        codesign_args=(
+            --force
+            --deep
+            --options runtime
+            --timestamp
+            --sign "$CODE_SIGN_IDENTITY"
+        )
+
+        if [[ -f "$ENTITLEMENTS_PATH" ]]; then
+            codesign_args+=(
+                --entitlements "$ENTITLEMENTS_PATH"
+            )
+        fi
+
+        codesign "${codesign_args[@]}" "$APP_PATH"
     fi
 
     CODESIGN_DETAILS="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
