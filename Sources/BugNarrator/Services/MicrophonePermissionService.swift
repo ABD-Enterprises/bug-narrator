@@ -1,3 +1,4 @@
+import AppKit
 import AVFAudio
 import AVFoundation
 import Foundation
@@ -36,6 +37,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
             return .authorized
         case .notDetermined:
             permissionsLogger.info("microphone_permission_requested", "Requesting microphone access from macOS.")
+            NSApp.activate(ignoringOtherApps: true)
 
             if captureDevicePermissionState() == .notDetermined {
                 let granted = await withCheckedContinuation { continuation in
@@ -50,6 +52,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
             }
 
             if audioApplicationPermissionState() == .notDetermined {
+                NSApp.activate(ignoringOtherApps: true)
                 let granted = await withCheckedContinuation { continuation in
                     AVAudioApplication.requestRecordPermission { granted in
                         continuation.resume(returning: granted)

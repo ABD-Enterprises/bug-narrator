@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.13 - 2026-03-15
+
+- Fixed a microphone permission prompt path bug for the menu bar app so BugNarrator now activates itself before requesting microphone access from macOS.
+- Improved first-run and post-reset microphone behavior for the signed app when macOS had a mismatched not-determined vs denied permission state and was failing to surface the system prompt.
+
 ## 1.0.12 - 2026-03-15
 
 - Fixed a microphone permission regression where BugNarrator could enter a fake recording state and produce silent sessions even though macOS still had microphone access blocked.
