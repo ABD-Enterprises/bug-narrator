@@ -28,6 +28,7 @@ final class AppState: ObservableObject {
 
     private let audioRecorder: any AudioRecording
     private let microphonePermissionService: any MicrophonePermissionServicing
+    private let screenCapturePermissionService: any ScreenCapturePermissionServicing
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let screenshotCaptureService: any ScreenshotCapturing
@@ -61,6 +62,7 @@ final class AppState: ObservableObject {
         transcriptStore: TranscriptStore,
         audioRecorder: AudioRecording = AudioRecorder(),
         microphonePermissionService: any MicrophonePermissionServicing = MicrophonePermissionService(),
+        screenCapturePermissionService: any ScreenCapturePermissionServicing = ScreenCapturePermissionService(),
         transcriptionClient: any TranscriptionServing = TranscriptionClient(),
         hotkeyManager: any HotkeyManaging = HotkeyManager(),
         screenshotCaptureService: any ScreenshotCapturing = ScreenshotCaptureService(),
@@ -76,6 +78,7 @@ final class AppState: ObservableObject {
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
+        self.screenCapturePermissionService = screenCapturePermissionService
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.screenshotCaptureService = screenshotCaptureService
@@ -219,19 +222,31 @@ final class AppState: ObservableObject {
     }
 
     func refreshPermissionRecoveryState() {
-        guard status.phase != .recording, status.phase != .transcribing else {
+        switch currentError {
+        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
+            guard status.phase != .recording, status.phase != .transcribing else {
+                return
+            }
+
+            let microphoneStatus = microphonePermissionService.currentStatus()
+            guard microphoneStatus == .granted else {
+                return
+            }
+
+            setStatus(.idle("Microphone access enabled. You can start recording again."))
+        case .screenRecordingPermissionDenied:
+            guard screenCapturePermissionService.currentStatus() == .granted else {
+                return
+            }
+
+            if status.phase == .recording {
+                setStatus(.recording("Screen Recording access enabled. You can capture screenshots again."))
+            } else {
+                setStatus(.idle("Screen Recording access enabled. You can capture screenshots again."))
+            }
+        default:
             return
         }
-
-        guard currentError?.suggestsMicrophoneSettings == true else {
-            return
-        }
-
-        guard microphonePermissionService.currentStatus() == .granted else {
-            return
-        }
-
-        setStatus(.idle("Microphone access enabled. You can start a session again."))
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
@@ -1398,6 +1413,14 @@ final class AppState: ObservableObject {
         isCapturingScreenshot = true
         defer { isCapturingScreenshot = false }
 
+        let preflightResult = await screenCapturePermissionService.preflightForScreenshotCapture(
+            screenshotCaptureService: screenshotCaptureService,
+            hasActiveRecordingSession: true
+        )
+        if let preflightError = preflightResult.error {
+            throw preflightError
+        }
+
         let screenshotURL = artifactsService.makeScreenshotURL(
             in: recordingSession.artifactsDirectoryURL,
             prefix: prefix,
@@ -1478,7 +1501,7 @@ final class AppState: ObservableObject {
         case .microphonePermissionRestricted:
             return .restricted
         case .microphoneUnavailable:
-            return .unavailable
+            return .captureSetupFailed
         default:
             return microphonePermissionService.currentStatus()
         }

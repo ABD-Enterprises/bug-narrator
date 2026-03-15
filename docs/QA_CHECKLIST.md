@@ -165,6 +165,8 @@
   Expected: recording does not start and BugNarrator explains that microphone access is restricted rather than simply denied.
 - Use a local unsigned Xcode / DerivedData build after switching app copies or paths.
   Expected: BugNarrator explains that local builds can need microphone approval again because macOS tracks permission by app bundle path.
+- Keep microphone access enabled in System Settings for the same BugNarrator app copy, then retry recording after a stale blocked state.
+  Expected: BugNarrator rechecks microphone availability with a live recorder probe and starts recording instead of repeating a false denied error.
 - Simulate microphone capture setup failing after permission is already granted if practical.
   Expected: BugNarrator reports a microphone availability problem instead of claiming recording started and then immediately failing.
 - Capture a screenshot without Screen Recording permission.

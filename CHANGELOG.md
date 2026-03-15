@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.10 - 2026-03-15
+
+- Centralized microphone and screenshot permission preflight so recording and screenshot actions validate permissions and real capture capability before starting.
+- Fixed a false-denied microphone path where recording preflight could pass but the recorder immediately re-ran permission checks and blocked the same session start anyway.
+- Added screenshot-specific preflight so denied Screen Recording access no longer leaks into the main recording flow.
+- Added targeted automated coverage for microphone preflight, screenshot preflight, stale permission recovery, and capture-setup failures.
+
 ## 1.0.9 - 2026-03-15
 
 - Added a dedicated microphone permission service with structured recording preflight, clearer denied vs restricted vs unavailable states, and better local-testing guidance for unsigned Xcode builds.

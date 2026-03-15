@@ -29,6 +29,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-009` | The review workspace could stay on a tab that no longer existed for the newly selected session, leaving the right-hand pane confusing or stale. | Users switching between sessions could see mismatched content or an invalid tab state in the review area. | Fixed | Unreleased |
 | `BN-P1-010` | Screenshot-heavy sessions could decode full-size images repeatedly in the review workspace instead of using thumbnails. | Larger sessions could feel sluggish and waste memory while reviewing screenshots. | Fixed | Unreleased |
 | `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | Unreleased |
+| `BN-P1-012` | BugNarrator could still reject recording with a microphone-denied error after preflight passed because the recorder repeated its own permission gate using stale local-build state. | Users could stay blocked from testing for multiple local builds even when System Settings already showed microphone access enabled. | Fixed | Unreleased |
 
 ## Notes Per Issue
 
@@ -101,6 +102,12 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - Root cause: the app's single-instance guard applied equally to normal launches and the XCTest-hosted app process.
 - Fix: the runtime environment now bypasses process-level single-instance enforcement when BugNarrator is running under XCTest, while normal production launches remain single-instance.
 
+### BN-P1-012: Recorder-side permission checks could override a successful preflight
+
+- Symptom: even after multiple microphone fixes, BugNarrator could still show `Microphone Access Needed` and refuse to start recording while System Settings already showed the current app enabled.
+- Root cause: recording start used split permission logic. The app-level preflight could succeed or recover from a stale blocked state, but `AudioRecorder.startRecording()` immediately ran its own permission/prerequisite gate again and could re-surface a stale denial for the same launch.
+- Fix: microphone and screenshot permission flows now run through centralized preflight services, the recorder no longer re-requests or re-gates microphone permission after preflight succeeds, and the microphone service uses a live recorder activation probe to distinguish stale permission state from real capture failure.
+
 ## Current State
 
 As of the current local workspace state:
@@ -115,6 +122,7 @@ As of the current local workspace state:
 - the performance and single-instance pass now prevents duplicate BugNarrator launches from staying active at the same time, which reduces the risk of duplicate menu bar items, competing local writes, and overlapping recording state.
 - the session library now keeps indexed metadata and direct ID lookups in memory, which reduces filter/search/detail lag as local history grows.
 - the current testing and defect-finding pass added explicit review-workspace state tests, session-bundle export validation, screenshot-preview caching, and a safe single-instance bypass for XCTest-hosted runs so release validation is more trustworthy.
+- the current permissions-preflight hardening pass centralizes microphone and screenshot permission validation, adds live recorder activation probing before recording begins, and removes the duplicate recorder-side microphone gate that could keep local testing falsely blocked.
 
 ## Remaining Spec-Alignment / Release Notes
 
