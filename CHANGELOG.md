@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.16 - 2026-03-15
+
+- Fixed the signed app's microphone prompt path again by using macOS media-capture authorization to trigger the system microphone prompt, then resolving the final state from both app-level and capture-device permission APIs.
+- Improved microphone permission recovery when one macOS permission API stayed stale or disagreed with the other after resets or repeated local testing.
+
 ## 1.0.15 - 2026-03-15
 
 - Fixed another microphone permission recovery bug where BugNarrator could stay stuck in a blocked state after a TCC reset or stale app-level permission read instead of refreshing and retrying the macOS prompt path.
