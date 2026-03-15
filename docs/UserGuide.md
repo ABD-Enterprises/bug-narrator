@@ -81,7 +81,7 @@ Markers let you flag moments that matter while the session is still running. The
 
 ### Screenshot Capture
 
-Use screenshot capture to save visual evidence during a review. Each screenshot is attached to the current session and can be associated with nearby markers.
+Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit for this capture path. Each screenshot is attached to the current session and can be associated with nearby markers.
 
 ### Review Summary
 
@@ -147,7 +147,8 @@ BugNarrator is free to use. Donations are optional and separate from any OpenAI 
 
 ### Microphone Permission Problems
 
-- open macOS System Settings
+- use BugNarrator's `Open Microphone Settings` button if it appears in the menu bar window
+- or open `System Settings > Privacy & Security > Microphone`
 - verify microphone permission is granted to BugNarrator
 - restart the app after changing permission settings if needed
 
@@ -156,11 +157,23 @@ BugNarrator is free to use. Donations are optional and separate from any OpenAI 
 - open `Settings`
 - paste your own OpenAI API key
 - click `Validate Key` if you want to check it before recording
+- BugNarrator stores the key in macOS Keychain when available
+
+### API Key Rejected Or Revoked
+
+- open `Settings`
+- replace the key or remove it and paste a new one
+- click `Validate Key`
+- try the session again after OpenAI accepts the new key
 
 ### Screenshots Not Appearing
 
 - confirm the session was actively recording when the screenshot was requested
+- use BugNarrator's `Open Screen Recording Settings` button if it appears in the menu bar window
+- or open `System Settings > Privacy & Security > Screen & System Audio Recording`
 - confirm Screen Recording permission is granted if macOS prompted for it
+- remember that this permission is only needed for screenshots; audio recording and transcription can still continue without it
+- remember that audio recording can continue even if screenshots are unavailable
 - try another screenshot to rule out a temporary storage failure
 
 ### Export Errors

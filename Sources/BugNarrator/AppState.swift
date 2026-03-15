@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var status: AppStatus = .idle()
+    @Published private(set) var currentError: AppError?
     @Published private(set) var elapsedDuration: TimeInterval = 0
     @Published var showDiscardConfirmation = false
     @Published var currentTranscript: TranscriptSession?
@@ -122,12 +123,12 @@ final class AppState: ObservableObject {
 
     var displayedTranscript: TranscriptSession? {
         if let selectedTranscriptID {
-            if let storedSession = transcriptStore.session(with: selectedTranscriptID) {
-                return storedSession
-            }
-
             if currentTranscript?.id == selectedTranscriptID {
                 return currentTranscript
+            }
+
+            if let storedSession = transcriptStore.session(with: selectedTranscriptID) {
+                return storedSession
             }
         }
 
@@ -143,7 +144,7 @@ final class AppState: ObservableObject {
             return false
         }
 
-        return transcriptStore.session(with: currentTranscript.id) != nil
+        return transcriptStore.session(with: currentTranscript.id) == currentTranscript
     }
 
     var needsAPIKeySetup: Bool {
@@ -161,6 +162,7 @@ final class AppState: ObservableObject {
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
         guard status.phase != .recording,
               status.phase != .transcribing,
+              let session = sessionSnapshot(with: session.id),
               let extraction = session.issueExtraction,
               !extraction.selectedIssues.isEmpty else {
             return false
@@ -208,7 +210,7 @@ final class AppState: ObservableObject {
                     sessionID: sessionID,
                     artifactsDirectoryURL: artifactsDirectoryURL
                 )
-                status = .recording("Recording in progress.")
+                setStatus(.recording("Recording in progress."))
                 beginActivity(reason: "Recording a spoken feedback session")
                 startTimer()
             } catch {
@@ -247,7 +249,7 @@ final class AppState: ObservableObject {
                 throw AppError.missingAPIKey
             }
 
-            status = .transcribing("Uploading audio to OpenAI and waiting for transcription...")
+            setStatus(.transcribing("Uploading audio to OpenAI and waiting for transcription..."))
             swapActivity(reason: "Uploading audio for transcription")
 
             let request = TranscriptionRequest(
@@ -283,14 +285,30 @@ final class AppState: ObservableObject {
                 artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
             )
 
+            do {
+                try persistCompletedTranscript(session)
+            } catch {
+                currentTranscript = session
+                selectedTranscriptID = session.id
+                activeRecordingSession = nil
+                if settingsStore.autoCopyTranscript {
+                    clipboardService.copy(session.transcript)
+                }
+                cleanupPendingRecordedAudioIfNeeded()
+                endActivity()
+                let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+                setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
+                showTranscriptWindow?()
+                return
+            }
+
             currentTranscript = session
             activeRecordingSession = nil
-            try persistCompletedTranscript(session)
             showTranscriptWindow?()
 
             if settingsStore.autoExtractIssues {
                 issueExtractionSessionID = session.id
-                status = .transcribing("Extracting reviewable issues...")
+                setStatus(.transcribing("Extracting reviewable issues..."))
                 swapActivity(reason: "Extracting review issues")
 
                 do {
@@ -314,13 +332,13 @@ final class AppState: ObservableObject {
 
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
-            status = .success(
+            setStatus(.success(
                 settingsStore.autoExtractIssues
                     ? "Transcript and extracted issues are ready."
                     : (settingsStore.autoCopyTranscript
                         ? "Transcript copied to the clipboard."
                         : "Transcript ready.")
-            )
+            ))
         } catch {
             if !settingsStore.debugMode {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
@@ -355,7 +373,7 @@ final class AppState: ObservableObject {
             self.activeRecordingSession = nil
         }
         pendingRecordedAudio = nil
-        status = .idle("Session discarded.")
+        setStatus(.idle("Session discarded."))
     }
 
     func openTranscriptHistory() {
@@ -393,6 +411,34 @@ final class AppState: ObservableObject {
 
     func openSupportDonationPage() {
         openExternalURL(BugNarratorLinks.supportDevelopment, label: "PayPal donation page")
+    }
+
+    func openMicrophonePrivacySettings() {
+        let candidateURLs = [
+            BugNarratorLinks.microphonePrivacySettings,
+            BugNarratorLinks.securityPrivacySettings,
+            BugNarratorLinks.systemSettingsApp
+        ]
+
+        for url in candidateURLs where urlHandler.open(url) {
+            return
+        }
+
+        presentUtilityActionFailure("BugNarrator could not open Microphone settings automatically.")
+    }
+
+    func openScreenRecordingPrivacySettings() {
+        let candidateURLs = [
+            BugNarratorLinks.screenRecordingPrivacySettings,
+            BugNarratorLinks.securityPrivacySettings,
+            BugNarratorLinks.systemSettingsApp
+        ]
+
+        for url in candidateURLs where urlHandler.open(url) {
+            return
+        }
+
+        presentUtilityActionFailure("BugNarrator could not open Screen Recording settings automatically.")
     }
 
     func checkForUpdates() {
@@ -436,7 +482,7 @@ final class AppState: ObservableObject {
         }
 
         clipboardService.copy(transcript.transcript)
-        status = .success("Transcript copied to the clipboard.")
+        setStatus(.success("Transcript copied to the clipboard."))
     }
 
     func saveCurrentTranscriptToHistory() {
@@ -448,7 +494,7 @@ final class AppState: ObservableObject {
         do {
             try transcriptStore.add(currentTranscript)
             selectedTranscriptID = currentTranscript.id
-            status = .success("Transcript saved to session history.")
+            setStatus(.success("Transcript saved to session history."))
         } catch {
             presentError(error)
         }
@@ -493,7 +539,7 @@ final class AppState: ObservableObject {
 
             let deletedCount = removedSessions.count + (deletingUnsavedCurrentTranscript ? 1 : 0)
             if deletedCount > 0 {
-                status = .success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions.")
+                setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
             }
         } catch {
             presentError(error)
@@ -506,7 +552,14 @@ final class AppState: ObservableObject {
         captureScreenshot: Bool = false
     ) async {
         guard status.phase == .recording, var recordingSession = activeRecordingSession else {
-            status = .error(AppError.noActiveSession("Start a feedback session before inserting a marker.").userMessage)
+            let error = AppError.noActiveSession("Start a feedback session before inserting a marker.")
+            setStatus(.error(error.userMessage), error: error)
+            return
+        }
+
+        if isCapturingScreenshot {
+            let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
+            setStatus(.recording(error.userMessage), error: error)
             return
         }
 
@@ -517,19 +570,32 @@ final class AppState: ObservableObject {
 
         var screenshot: SessionScreenshot?
         var statusMessage = "Inserted \(markerTitle)."
+        var warningError: AppError?
 
         if captureScreenshot {
             do {
-                screenshot = try performScreenshotCapture(
-                    into: &recordingSession,
+                screenshot = try await performScreenshotCapture(
+                    in: recordingSession,
                     prefix: "marker",
                     index: recordingSession.screenshots.count + 1,
                     elapsedTime: elapsedTime,
                     associatedMarkerID: markerID
                 )
+                guard status.phase == .recording,
+                      var latestRecordingSession = activeRecordingSession,
+                      latestRecordingSession.sessionID == recordingSession.sessionID else {
+                    return
+                }
+                latestRecordingSession.screenshots.append(screenshot!)
+                recordingSession = latestRecordingSession
                 statusMessage = "Inserted \(markerTitle) with a screenshot."
             } catch {
+                let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
+                guard status.phase == .recording else {
+                    return
+                }
                 statusMessage = "\(markerTitle) was inserted, but the screenshot failed."
+                warningError = appError
             }
         }
 
@@ -545,40 +611,48 @@ final class AppState: ObservableObject {
         )
 
         activeRecordingSession = recordingSession
-        status = .recording(statusMessage)
+        setStatus(.recording(statusMessage), error: warningError)
     }
 
     func captureScreenshot() async {
-        guard status.phase == .recording, var recordingSession = activeRecordingSession else {
-            status = .error(AppError.noActiveSession("Start a feedback session before capturing a screenshot.").userMessage)
+        guard status.phase == .recording, let recordingSession = activeRecordingSession else {
+            let error = AppError.noActiveSession("Start a feedback session before capturing a screenshot.")
+            setStatus(.error(error.userMessage), error: error)
             return
         }
 
-        guard !isCapturingScreenshot else {
+        if isCapturingScreenshot {
+            let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
+            setStatus(.recording(error.userMessage), error: error)
             return
         }
-
-        isCapturingScreenshot = true
-        defer { isCapturingScreenshot = false }
 
         let screenshotIndex = recordingSession.screenshots.count + 1
         let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
         let associatedMarkerID = nearestMarkerID(in: recordingSession, to: elapsedTime)
 
         do {
-            _ = try performScreenshotCapture(
-                into: &recordingSession,
+            let screenshot = try await performScreenshotCapture(
+                in: recordingSession,
                 prefix: "capture",
                 index: screenshotIndex,
                 elapsedTime: elapsedTime,
                 associatedMarkerID: associatedMarkerID
             )
-            activeRecordingSession = recordingSession
-            status = .recording("Captured Screenshot \(screenshotIndex).")
+            guard status.phase == .recording,
+                  var latestRecordingSession = activeRecordingSession,
+                  latestRecordingSession.sessionID == recordingSession.sessionID else {
+                return
+            }
+            latestRecordingSession.screenshots.append(screenshot)
+            activeRecordingSession = latestRecordingSession
+            setStatus(.recording("Captured Screenshot \(screenshotIndex)."))
         } catch {
-            activeRecordingSession = recordingSession
             let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
-            status = .recording(appError.userMessage)
+            guard status.phase == .recording else {
+                return
+            }
+            setStatus(.recording(appError.userMessage), error: appError)
         }
     }
 
@@ -591,7 +665,7 @@ final class AppState: ObservableObject {
 
         guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
             issueExtractionSessionID = transcriptSession.id
-            status = .transcribing("Extracting reviewable issues...")
+            setStatus(.transcribing("Extracting reviewable issues..."))
             beginActivity(reason: "Extracting review issues")
 
             do {
@@ -607,7 +681,7 @@ final class AppState: ObservableObject {
 
                 issueExtractionSessionID = nil
                 endActivity()
-                status = .success("Extracted \(extraction.issues.count) review issues.")
+                setStatus(.success("Extracted \(extraction.issues.count) review issues."))
                 showTranscriptWindow?()
             } catch {
                 issueExtractionSessionID = nil
@@ -675,7 +749,17 @@ final class AppState: ObservableObject {
     }
 
     func exportSelectedIssues(from session: TranscriptSession, to destination: ExportDestination) async {
-        guard let extraction = session.issueExtraction else {
+        guard status.phase != .recording, status.phase != .transcribing else {
+            presentError(AppError.exportFailure("Finish the current background work before exporting issues."))
+            return
+        }
+
+        guard let currentSession = sessionSnapshot(with: session.id) else {
+            presentError(AppError.exportFailure("This session is no longer available in the library."))
+            return
+        }
+
+        guard let extraction = currentSession.issueExtraction else {
             presentError(AppError.exportFailure("Run issue extraction before exporting."))
             return
         }
@@ -699,7 +783,7 @@ final class AppState: ObservableObject {
         }
 
         exportDestinationInProgress = destination
-        status = .transcribing("Exporting \(selectedIssues.count) issues to \(destination.rawValue)...")
+        setStatus(.transcribing("Exporting \(selectedIssues.count) issues to \(destination.rawValue)..."))
         beginActivity(reason: "Exporting extracted issues")
 
         do {
@@ -714,7 +798,7 @@ final class AppState: ObservableObject {
                 }
                 results = try await exportService.exportToGitHub(
                     issues: selectedIssues,
-                    session: session,
+                    session: currentSession,
                     configuration: configuration
                 )
             case .jira:
@@ -725,14 +809,14 @@ final class AppState: ObservableObject {
                 }
                 results = try await exportService.exportToJira(
                     issues: selectedIssues,
-                    session: session,
+                    session: currentSession,
                     configuration: configuration
                 )
             }
 
             exportDestinationInProgress = nil
             endActivity()
-            status = .success("Exported \(results.count) issues to \(destination.rawValue).")
+            setStatus(.success("Exported \(results.count) issues to \(destination.rawValue)."))
         } catch {
             exportDestinationInProgress = nil
             presentError(error)
@@ -784,11 +868,11 @@ final class AppState: ObservableObject {
     private func presentUtilityActionFailure(_ message: String) {
         switch status.phase {
         case .recording:
-            status = .recording("\(message) Recording is still active.")
+            setStatus(.recording("\(message) Recording is still active."))
         case .transcribing:
-            status = .transcribing("\(message) Background work is still in progress.")
+            setStatus(.transcribing("\(message) Background work is still in progress."))
         case .idle, .success, .error:
-            status = .error(message)
+            setStatus(.error(message))
         }
     }
 
@@ -833,6 +917,11 @@ final class AppState: ObservableObject {
         processActivity = nil
     }
 
+    private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
+        status = newStatus
+        currentError = error
+    }
+
     private func presentError(_ error: Error) {
         stopTimer(resetElapsed: status.phase == .recording)
         endActivity()
@@ -841,7 +930,7 @@ final class AppState: ObservableObject {
         exportDestinationInProgress = nil
 
         let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
-        status = .error(appError.userMessage)
+        setStatus(.error(appError.userMessage), error: appError)
 
         switch appError {
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey, .exportConfigurationMissing:
@@ -853,7 +942,7 @@ final class AppState: ObservableObject {
 
     private func presentPostTranscriptionError(_ error: Error) {
         let appError = (error as? AppError) ?? .issueExtractionFailure(error.localizedDescription)
-        status = .error("Transcript ready, but \(appError.userMessage)")
+        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
 
         switch appError {
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
@@ -892,9 +981,7 @@ final class AppState: ObservableObject {
         var session = session
         session.updatedAt = Date()
 
-        if currentTranscript?.id == session.id {
-            currentTranscript = session
-        }
+        currentTranscript = session
 
         if transcriptStore.session(with: session.id) != nil {
             try transcriptStore.add(session)
@@ -953,19 +1040,23 @@ final class AppState: ObservableObject {
     }
 
     private func editableSession(with sessionID: UUID) -> TranscriptSession? {
+        sessionSnapshot(with: sessionID)
+    }
+
+    private func preferredTranscriptSelection() -> UUID? {
+        if let currentTranscript, !currentTranscriptIsPersisted {
+            return currentTranscript.id
+        }
+
+        return transcriptStore.sessions.first?.id
+    }
+
+    private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
         if currentTranscript?.id == sessionID {
             return currentTranscript
         }
 
         return transcriptStore.session(with: sessionID)
-    }
-
-    private func preferredTranscriptSelection() -> UUID? {
-        if let currentTranscript, transcriptStore.session(with: currentTranscript.id) == nil {
-            return currentTranscript.id
-        }
-
-        return transcriptStore.sessions.first?.id
     }
 
     private func cleanupArtifactsForDeletedSession(_ session: TranscriptSession) {
@@ -986,12 +1077,19 @@ final class AppState: ObservableObject {
     }
 
     private func performScreenshotCapture(
-        into recordingSession: inout RecordingSessionDraft,
+        in recordingSession: RecordingSessionDraft,
         prefix: String,
         index: Int,
         elapsedTime: TimeInterval,
         associatedMarkerID: UUID?
-    ) throws -> SessionScreenshot {
+    ) async throws -> SessionScreenshot {
+        guard !isCapturingScreenshot else {
+            throw AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
+        }
+
+        isCapturingScreenshot = true
+        defer { isCapturingScreenshot = false }
+
         let screenshotURL = artifactsService.makeScreenshotURL(
             in: recordingSession.artifactsDirectoryURL,
             prefix: prefix,
@@ -999,15 +1097,24 @@ final class AppState: ObservableObject {
             elapsedTime: elapsedTime
         )
 
-        try screenshotCaptureService.captureScreenshot(to: screenshotURL)
+        do {
+            try await screenshotCaptureService.captureScreenshot(to: screenshotURL)
+        } catch {
+            try? FileManager.default.removeItem(at: screenshotURL)
+            throw error
+        }
 
-        let screenshot = SessionScreenshot(
+        guard status.phase == .recording,
+              activeRecordingSession?.sessionID == recordingSession.sessionID else {
+            try? FileManager.default.removeItem(at: screenshotURL)
+            throw AppError.screenshotCaptureFailure("The session ended before the screenshot finished saving.")
+        }
+
+        return SessionScreenshot(
             elapsedTime: elapsedTime,
             filePath: screenshotURL.path,
             associatedMarkerID: associatedMarkerID
         )
-        recordingSession.screenshots.append(screenshot)
-        return screenshot
     }
 
     private func normalizedMarkerTitle(_ title: String?, index: Int) -> String {

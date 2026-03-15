@@ -2,6 +2,15 @@
 
 BugNarrator is distributed as a local macOS app. Release builds and DMGs should be signed and notarized before public distribution whenever practical.
 
+## Permissions
+
+BugNarrator requests permission only when the related feature is used.
+
+- microphone access is requested when you start recording
+- Screen Recording access is requested when you capture a screenshot
+
+BugNarrator does not require Accessibility permission for its core workflow.
+
 ## Credentials
 
 BugNarrator uses a bring-your-own-credentials model.

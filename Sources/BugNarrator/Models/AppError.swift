@@ -1,10 +1,11 @@
 import Foundation
 
-enum AppError: LocalizedError {
+enum AppError: LocalizedError, Equatable {
     case missingAPIKey
     case invalidAPIKey
     case revokedAPIKey
     case microphonePermissionDenied
+    case screenRecordingPermissionDenied
     case noActiveSession(String)
     case recordingFailure(String)
     case transcriptionFailure(String)
@@ -27,7 +28,9 @@ enum AppError: LocalizedError {
         case .revokedAPIKey:
             return "The OpenAI API key is no longer valid. Open Settings, remove it, and add a new key."
         case .microphonePermissionDenied:
-            return "Microphone permission was denied. Enable it in System Settings and try again."
+            return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again."
+        case .screenRecordingPermissionDenied:
+            return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again."
         case .noActiveSession(let message):
             return message
         case .recordingFailure(let message):
@@ -57,5 +60,14 @@ enum AppError: LocalizedError {
 
     var errorDescription: String? {
         userMessage
+    }
+
+    var suggestsOpenAISettings: Bool {
+        switch self {
+        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
+            return true
+        default:
+            return false
+        }
     }
 }

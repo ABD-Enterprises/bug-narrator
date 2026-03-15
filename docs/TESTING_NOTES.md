@@ -6,10 +6,10 @@
 - Build result: passed
 - Packaging command run: `./scripts/build_dmg.sh`
 - Packaging result: passed
-- Packaging validation: generated `dist/BugNarrator-v1.0-macOS.dmg` and `dist/BugNarrator-macOS.dmg`, mounted the DMG successfully, and verified it contains `BugNarrator.app` plus an `Applications` shortcut
+- Packaging validation: generated `dist/BugNarrator-v1.0.1-macOS.dmg` and `dist/BugNarrator-macOS.dmg`, mounted the DMG successfully, and verified it contains `BugNarrator.app` plus an `Applications` shortcut
 - Test command run: `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test`
 - Test result: passed
-- Test count: 69
+- Test count: 91
 
 ## What The Tests Cover
 
@@ -33,6 +33,7 @@
 - support window callback wiring and PayPal support-page URL dispatch
 - partial-success export failure reporting for GitHub and Jira issue creation
 - screenshot open failure handling that preserves app-state truthfulness during active sessions
+- ScreenCaptureKit screenshot metadata generation, output-directory creation, permission-denied handling, and repeated capture protection
 
 ## Manual Validation Still Required
 
@@ -43,9 +44,10 @@
 - real Jira Cloud export against a project you control
 - opening the generated DMG in Finder and validating the drag-to-Applications flow
 - visual review of the session library layout and menu bar UX
+- live multi-display screenshot capture with Screen Recording permission granted on the release build
 
 ## Notes
 
 - The automated suite does not exercise the live SwiftUI UI layer or AVFoundation microphone pipeline.
-- Screenshot capture still builds with one deprecation warning for `CGWindowListCreateImage`; migrating to ScreenCaptureKit remains future work.
+- Screenshot capture now uses ScreenCaptureKit on the app's supported macOS 14+ target. Permission prompting still relies on the macOS Screen Recording TCC helpers so the app can explain recovery steps before a capture attempt fails.
 - The unsigned build and test commands are intentional so the repo does not depend on a personal Apple signing team in project defaults.
