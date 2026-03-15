@@ -23,6 +23,7 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 ## Help And Project Links
 
 - [Read the user guide](docs/UserGuide.md)
+- [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
 - [Hosted documentation](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
 - [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
 - [View the changelog](CHANGELOG.md)
@@ -81,7 +82,7 @@ Important:
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
 5. Click `Start Recording`.
-6. Speak while you continue reviewing the target app.
+6. Speak while you continue reviewing the target app. For better transcripts and bug reports, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide).
 7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or any global hotkeys you explicitly assign in Settings to stop recording and capture screenshots without reopening the menu.
 8. Click `Stop Recording`.
 9. Review the transcript, review summary, screenshots, and extracted issues in the session library.
