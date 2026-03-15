@@ -1,3 +1,4 @@
+import AVFAudio
 import AVFoundation
 import Foundation
 
@@ -20,15 +21,13 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     }
 
     func microphonePermissionState() -> MicrophonePermissionState {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
             return .authorized
-        case .notDetermined:
+        case .undetermined:
             return .notDetermined
         case .denied:
             return .denied
-        case .restricted:
-            return .restricted
         @unknown default:
             return .restricted
         }
@@ -172,7 +171,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             return true
         case .notDetermined:
             return await withCheckedContinuation { continuation in
-                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                AVAudioApplication.requestRecordPermission { granted in
                     continuation.resume(returning: granted)
                 }
             }

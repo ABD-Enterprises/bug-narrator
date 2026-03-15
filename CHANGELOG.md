@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.4 - 2026-03-14
+
+- Fixed microphone permission detection on macOS 14+ so BugNarrator reads the app's actual granted microphone state and no longer stays blocked after access has been enabled in System Settings.
+
 ## 1.0.3 - 2026-03-14
 
 - Fixed a microphone-permission recovery bug where BugNarrator could keep showing a stale “microphone denied” error even after access had been granted in System Settings.
