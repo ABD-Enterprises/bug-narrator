@@ -8,7 +8,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
 
     func currentPermissionState() -> MicrophonePermissionState {
-        audioApplicationPermissionState()
+        resolvedPermissionState(logMismatch: true)
     }
 
     func requestPermissionIfNeeded() async -> MicrophonePermissionState {
@@ -68,12 +68,12 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
         NSApp.activate(ignoringOtherApps: true)
 
         let granted = await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { granted in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
                 continuation.resume(returning: granted)
             }
         }
 
-        let finalState = currentPermissionState()
+        let finalState = resolvedPermissionState(logMismatch: true)
         permissionsLogger.debug(
             "microphone_permission_request_completed",
             granted
@@ -92,6 +92,29 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
         return finalState
     }
 
+    private func resolvedPermissionState(logMismatch: Bool) -> MicrophonePermissionState {
+        let audioPermission = audioApplicationPermissionState()
+        let capturePermission = captureDevicePermissionState()
+        let resolvedPermission = MicrophonePermissionResolver.resolve(
+            capturePermission: capturePermission,
+            audioPermission: audioPermission
+        )
+
+        if logMismatch, audioPermission != capturePermission {
+            permissionsLogger.warning(
+                "microphone_permission_mismatch",
+                "Microphone permission sources disagreed. BugNarrator will use the combined state that still allows a system prompt when one source remains undecided.",
+                metadata: [
+                    "audio_permission": audioPermission.diagnosticsValue,
+                    "capture_permission": capturePermission.diagnosticsValue,
+                    "resolved_permission": resolvedPermission.diagnosticsValue
+                ]
+            )
+        }
+
+        return resolvedPermission
+    }
+
     private func audioApplicationPermissionState() -> MicrophonePermissionState {
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
@@ -100,6 +123,21 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
             return .notDetermined
         case .denied:
             return .denied
+        @unknown default:
+            return .restricted
+        }
+    }
+
+    private func captureDevicePermissionState() -> MicrophonePermissionState {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .restricted:
+            return .restricted
         @unknown default:
             return .restricted
         }
