@@ -134,9 +134,7 @@ Deleting a session removes it from the library immediately and also removes loca
 
 BugNarrator is free to use. Donations are optional and separate from any OpenAI costs.
 
-- [Donate $5](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8&amount=5&currency_code=USD)
-- [Donate $10](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8&amount=10&currency_code=USD)
-- [Donate $20](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8&amount=20&currency_code=USD)
+- [Open the PayPal support page](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
 ## Troubleshooting
 

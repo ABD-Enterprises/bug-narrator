@@ -169,6 +169,41 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(keychain.values["SessionMic.OpenAI::openai-api-key"])
     }
 
+    func testStartupSkipsInteractiveLegacyKeychainPromptUntilUserInitiatesAccess() {
+        let suiteName = "BugNarrator-SettingsDeferredLegacyKeychainTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let legacyKey = "SessionMic.OpenAI::openai-api-key"
+        keychain.values[legacyKey] = "legacy-api-key"
+        keychain.interactionRequiredKeys = [legacyKey]
+
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(store.apiKey, "")
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.OpenAI" && !$0.allowInteraction
+            }
+        )
+        XCTAssertNil(keychain.values["BugNarrator.OpenAI::openai-api-key"])
+
+        store.refreshOpenAISecretForUserInitiatedAccess()
+
+        XCTAssertEqual(store.apiKey, "legacy-api-key")
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "SessionMic.OpenAI" && $0.allowInteraction
+            }
+        )
+        XCTAssertEqual(
+            keychain.values["BugNarrator.OpenAI::openai-api-key"],
+            "legacy-api-key"
+        )
+    }
+
     func testMaskedExportTokensOnlyExposeSuffix() {
         let suiteName = "BugNarrator-SettingsExportMaskTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

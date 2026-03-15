@@ -1,15 +1,22 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 final class KeychainService: KeychainServicing {
-    func string(forService service: String, account: String) throws -> String? {
-        let query: [CFString: Any] = [
+    func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
+        var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ]
+
+        if !allowInteraction {
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            query[kSecUseAuthenticationContext] = context
+        }
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -22,6 +29,11 @@ final class KeychainService: KeychainServicing {
             return String(data: data, encoding: .utf8)
         case errSecItemNotFound:
             return nil
+        case errSecInteractionNotAllowed, errSecAuthFailed:
+            if !allowInteraction {
+                return nil
+            }
+            throw KeychainError.interactionRequired
         default:
             throw KeychainError.unhandledStatus(status)
         }
@@ -72,10 +84,13 @@ final class KeychainService: KeychainServicing {
 }
 
 enum KeychainError: LocalizedError {
+    case interactionRequired
     case unhandledStatus(OSStatus)
 
     var errorDescription: String? {
         switch self {
+        case .interactionRequired:
+            return "Keychain access requires user approval."
         case .unhandledStatus(let status):
             return "Keychain returned OSStatus \(status)."
         }

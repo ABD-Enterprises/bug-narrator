@@ -322,6 +322,18 @@ final class SettingsStore: ObservableObject {
         hasLoaded = true
     }
 
+    func refreshSecretsForUserInitiatedAccess() {
+        reloadSecrets(slots: Array(SecretSlot.allCases), allowInteraction: true, includeLegacyServices: true)
+    }
+
+    func refreshOpenAISecretForUserInitiatedAccess() {
+        reloadSecrets(slots: [.openAI], allowInteraction: true, includeLegacyServices: true)
+    }
+
+    func refreshExportSecretsForUserInitiatedAccess() {
+        reloadSecrets(slots: [.github, .jira], allowInteraction: true, includeLegacyServices: true)
+    }
+
     func removeAPIKey() {
         apiKey = ""
     }
@@ -335,17 +347,11 @@ final class SettingsStore: ObservableObject {
     }
 
     private func load() {
-        let apiKeyLoad = loadSecret(for: .openAI)
-        apiKey = apiKeyLoad.value
-        apiKeyPersistenceState = apiKeyLoad.state
-
-        let githubTokenLoad = loadSecret(for: .github)
-        githubToken = githubTokenLoad.value
-        githubTokenPersistenceState = githubTokenLoad.state
-
-        let jiraTokenLoad = loadSecret(for: .jira)
-        jiraAPIToken = jiraTokenLoad.value
-        jiraTokenPersistenceState = jiraTokenLoad.state
+        reloadSecrets(
+            slots: Array(SecretSlot.allCases),
+            allowInteraction: false,
+            includeLegacyServices: true
+        )
 
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
         languageHint = stringValue(forKey: Keys.languageHint) ?? ""
@@ -386,6 +392,36 @@ final class SettingsStore: ObservableObject {
         jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? "Task"
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
+    }
+
+    private func reloadSecrets(
+        slots: [SecretSlot],
+        allowInteraction: Bool,
+        includeLegacyServices: Bool
+    ) {
+        let previousHasLoaded = hasLoaded
+        hasLoaded = false
+        defer { hasLoaded = previousHasLoaded }
+
+        for slot in slots {
+            let secret = loadSecret(
+                for: slot,
+                allowInteraction: allowInteraction,
+                includeLegacyServices: includeLegacyServices
+            )
+
+            switch slot {
+            case .openAI:
+                apiKey = secret.value
+                apiKeyPersistenceState = secret.state
+            case .github:
+                githubToken = secret.value
+                githubTokenPersistenceState = secret.state
+            case .jira:
+                jiraAPIToken = secret.value
+                jiraTokenPersistenceState = secret.state
+            }
+        }
     }
 
     private func loadHotkey(key: String, legacyKey: String?, fallback: HotkeyShortcut) -> HotkeyShortcut {
@@ -430,18 +466,32 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    private func loadSecret(for slot: SecretSlot) -> (value: String, state: APIKeyPersistenceState) {
+    private func loadSecret(
+        for slot: SecretSlot,
+        allowInteraction: Bool,
+        includeLegacyServices: Bool
+    ) -> (value: String, state: APIKeyPersistenceState) {
         do {
-            if let keychainValue = try keychainService.string(forService: slot.service, account: slot.account),
+            if let keychainValue = try keychainService.string(
+                forService: slot.service,
+                account: slot.account,
+                allowInteraction: allowInteraction
+            ),
                !keychainValue.isEmpty {
                 return (keychainValue, .keychain)
             }
 
-            for legacyService in slot.legacyServices {
-                if let legacyValue = try keychainService.string(forService: legacyService, account: slot.account),
-                   !legacyValue.isEmpty {
-                    _ = persistSecret(legacyValue, for: slot)
-                    return (legacyValue, .keychain)
+            if includeLegacyServices {
+                for legacyService in slot.legacyServices {
+                    if let legacyValue = try keychainService.string(
+                        forService: legacyService,
+                        account: slot.account,
+                        allowInteraction: allowInteraction
+                    ),
+                       !legacyValue.isEmpty {
+                        _ = persistSecret(legacyValue, for: slot)
+                        return (legacyValue, .keychain)
+                    }
                 }
             }
         } catch {
@@ -569,7 +619,7 @@ final class SettingsStore: ObservableObject {
     }
 }
 
-private enum SecretSlot: Hashable {
+private enum SecretSlot: Hashable, CaseIterable {
     case openAI
     case github
     case jira

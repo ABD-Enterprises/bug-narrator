@@ -237,21 +237,15 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testSupportDonationActionsOpenExpectedURLs() {
+    func testSupportDonationActionOpensExpectedURL() {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.appState.openSupportDonation(amount: 5)
-        harness.appState.openSupportDonation(amount: 10)
-        harness.appState.openSupportDonation(amount: 20)
+        harness.appState.openSupportDonationPage()
 
         XCTAssertEqual(
             harness.urlHandler.openedURLs,
-            [
-                BugNarratorLinks.supportDonation(amount: 5),
-                BugNarratorLinks.supportDonation(amount: 10),
-                BugNarratorLinks.supportDonation(amount: 20)
-            ]
+            [BugNarratorLinks.supportDevelopment]
         )
     }
 

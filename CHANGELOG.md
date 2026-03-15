@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 - 2026-03-14
+
+- Fixed the app icon pipeline so BugNarrator ships with branded app icon assets instead of a generic fallback.
+- Simplified Support Development to a single PayPal action and aligned the app UI, documentation, and tests with that flow.
+- Fixed the initial install experience by avoiding an unexpected credential prompt on first launch before the user explicitly uses a key-dependent feature.
+
 ## 1.0.0 - 2026-03-14
 
 - Renamed the app to BugNarrator and aligned the product identity across the project.

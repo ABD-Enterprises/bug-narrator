@@ -6,18 +6,4 @@ enum BugNarratorLinks {
     static let issues = URL(string: "https://github.com/deffenda/bugnarrator/issues/new")!
     static let releases = URL(string: "https://github.com/deffenda/bugnarrator/releases")!
     static let supportDevelopment = URL(string: "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8")!
-
-    static func supportDonation(amount: Int) -> URL {
-        var components = URLComponents(url: supportDevelopment, resolvingAgainstBaseURL: false)
-        var queryItems = components?.queryItems ?? []
-
-        queryItems.removeAll { item in
-            item.name == "amount" || item.name == "currency_code"
-        }
-        queryItems.append(URLQueryItem(name: "amount", value: String(amount)))
-        queryItems.append(URLQueryItem(name: "currency_code", value: "USD"))
-
-        components?.queryItems = queryItems
-        return components?.url ?? supportDevelopment
-    }
 }
