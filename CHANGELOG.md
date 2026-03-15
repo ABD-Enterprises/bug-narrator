@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.15 - 2026-03-15
+
+- Fixed another microphone permission recovery bug where BugNarrator could stay stuck in a blocked state after a TCC reset or stale app-level permission read instead of refreshing and retrying the macOS prompt path.
+- Added regression coverage for blocked microphone states that refresh into a grant during recording preflight.
+- Clarified the public repo policy so BugNarrator is not currently accepting outside code contributions or pull requests.
+
 ## 1.0.14 - 2026-03-15
 
 - Fixed a microphone permission state bug where BugNarrator could mix the older capture-device authorization API with the modern app-level microphone permission API and incorrectly conclude that access was denied before macOS had shown the prompt.

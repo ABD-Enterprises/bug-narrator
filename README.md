@@ -269,9 +269,11 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 - GitHub and Jira export include screenshot references in issue bodies instead of uploading attachments automatically
 - session deletion is permanent today
 
-## Contributing
+## Contribution Policy
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+BugNarrator is not currently accepting outside code contributions or pull requests.
+
+Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/deffenda/bugnarrator/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
 
 ## License
 
