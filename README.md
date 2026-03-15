@@ -42,7 +42,7 @@ It can:
 - capture screenshots during a live review and turn them into timeline markers automatically
 - generate a review summary
 - extract draft bugs, UX issues, enhancements, and follow-up questions
-- export selected issues to GitHub Issues or Jira Cloud
+- export selected issues to GitHub Issues or Jira Cloud with experimental integrations
 - export a local session bundle with transcript and screenshot artifacts
 - keep a searchable session library with date filters and deletion
 - stay responsive with larger local histories by caching session-library metadata for faster filtering, search, and selection changes
@@ -144,13 +144,13 @@ Use `Export Session Bundle` when you want a local package of the review session.
 - `summary.md`
 - `screenshots/`
 
-### Export To GitHub
+### Export To GitHub (Experimental)
 
-Configure your GitHub token, repository owner, and repository name in Settings, then export selected extracted issues as GitHub Issues.
+Configure your GitHub token, repository owner, and repository name in Settings, then export selected extracted issues as GitHub Issues. This integration is currently experimental.
 
-### Export To Jira
+### Export To Jira (Experimental)
 
-Configure your Jira Cloud URL, email, API token, project key, and issue type in Settings, then export selected extracted issues as Jira issues.
+Configure your Jira Cloud URL, email, API token, project key, and issue type in Settings, then export selected extracted issues as Jira issues. This integration is currently experimental.
 
 ## Permissions
 

@@ -180,9 +180,9 @@ struct SettingsView: View {
                     }
                 }
 
-                GroupBox("GitHub Export") {
+                GroupBox("GitHub Export (Experimental)") {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionIntro("Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues.")
+                        sectionIntro("Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues. This integration is still experimental.")
 
                         labeledField(title: "Personal Access Token") {
                             SecureField("github_pat_...", text: $settingsStore.githubToken)
@@ -222,15 +222,15 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(settingsStore.githubTokenPersistenceState == .sessionOnly ? .orange : .secondary)
 
-                        Text("GitHub export creates Issues in the configured repository using the selected extracted issues. Screenshot filenames are referenced in the issue body for manual attachment.")
+                        Text("GitHub export is experimental. It creates Issues in the configured repository using the selected extracted issues. Screenshot filenames are referenced in the issue body for manual attachment.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                GroupBox("Jira Export") {
+                GroupBox("Jira Export (Experimental)") {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionIntro("Configure the Jira Cloud project BugNarrator should use when exporting selected extracted issues.")
+                        sectionIntro("Configure the Jira Cloud project BugNarrator should use when exporting selected extracted issues. This integration is still experimental.")
 
                         labeledField(title: "Jira Cloud URL") {
                             TextField("your-domain.atlassian.net", text: $settingsStore.jiraBaseURL)
@@ -275,7 +275,7 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(settingsStore.jiraTokenPersistenceState == .sessionOnly ? .orange : .secondary)
 
-                        Text("Jira export creates issues in Jira Cloud using the selected extracted issues. Screenshot filenames are referenced in the description for manual attachment.")
+                        Text("Jira export is experimental. It creates issues in Jira Cloud using the selected extracted issues. Screenshot filenames are referenced in the description for manual attachment.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

@@ -2,7 +2,11 @@ import Foundation
 
 enum ReviewWorkspace {
     static func availableTabs(for session: TranscriptSession) -> [ReviewWorkspaceTab] {
-        var tabs: [ReviewWorkspaceTab] = [.rawTranscript, .screenshots, .extractedIssues]
+        var tabs: [ReviewWorkspaceTab] = [.rawTranscript, .screenshots]
+
+        if let extraction = session.issueExtraction, !extraction.issues.isEmpty {
+            tabs.append(.extractedIssues)
+        }
 
         if !session.summaryText.isEmpty || session.issueExtraction != nil {
             tabs.append(.reviewSummary)
@@ -17,7 +21,15 @@ enum ReviewWorkspace {
         }
 
         let availableTabs = availableTabs(for: session)
-        return availableTabs.contains(selectedTab) ? selectedTab : .rawTranscript
+        if availableTabs.contains(selectedTab) {
+            return selectedTab
+        }
+
+        if availableTabs.contains(.reviewSummary) {
+            return .reviewSummary
+        }
+
+        return .rawTranscript
     }
 
     static func timelineEntries(for session: TranscriptSession) -> [ReviewWorkspaceTimelineEntry] {

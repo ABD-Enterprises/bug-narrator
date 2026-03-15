@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.18 - 2026-03-15
+
+- Hardened OpenAI issue extraction decoding so BugNarrator now accepts array-based message content, fenced JSON, and a few schema variations instead of failing on valid structured responses with a generic format error.
+- Fixed the Screen Recording permission request path for the menu bar app by activating BugNarrator before asking macOS for screenshot access, which improves first-run and post-reset screenshot prompting.
+- Tightened the review workspace so the `Extracted Issues` tab only appears when extraction actually returned issues, and empty extractions now fall back to the summary view instead of leaving the user on a dead-end issues screen.
+- Marked GitHub and Jira issue export as experimental across the app and docs so the current maturity of those integrations is explicit before setup or use.
+
 ## 1.0.17 - 2026-03-15
 
 - Fixed the signed DMG packaging flow so BugNarrator keeps the macOS audio-input entitlement when the release app is re-signed for Developer ID distribution.

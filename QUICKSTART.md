@@ -30,5 +30,6 @@
 - Screenshot capture may ask for Screen Recording permission on first use. If you deny it, recording can still continue without screenshots.
 - If OpenAI rejects your key, BugNarrator sends you back to `Settings` so you can replace it.
 - If you hit a bug, use `Copy Debug Info` or `Export Debug Bundle` from the menu bar or Settings before filing an issue.
+- GitHub and Jira issue export are available, but both integrations are currently experimental.
 - BugNarrator intentionally runs as a single-instance app to prevent duplicate menu bar items and competing session state.
 - To build or package the app from source, see [docs/Distribution.md](docs/Distribution.md).

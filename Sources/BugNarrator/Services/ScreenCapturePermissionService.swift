@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -10,7 +11,14 @@ struct SystemScreenCapturePermissionAccess: ScreenCapturePermissionAccessing {
     }
 
     func requestPermissionIfNeeded() async -> ScreenCapturePermissionState {
-        switch currentPermissionState() {
+        let initialState = currentPermissionState()
+        permissionsLogger.debug(
+            "screen_recording_permission_state_read",
+            "Read the current Screen Recording permission state.",
+            metadata: ["state": initialState.diagnosticsValue]
+        )
+
+        switch initialState {
         case .granted:
             permissionsLogger.debug(
                 "screen_recording_permission_authorized",
@@ -18,11 +26,25 @@ struct SystemScreenCapturePermissionAccess: ScreenCapturePermissionAccessing {
             )
             return .granted
         case .notDetermined, .denied:
+            NSApp.activate(ignoringOtherApps: true)
+            try? await Task.sleep(nanoseconds: 150_000_000)
             permissionsLogger.info(
                 "screen_recording_permission_requested",
-                "Requesting Screen Recording access from macOS."
+                "Requesting Screen Recording access from macOS after activating BugNarrator."
             )
-            return CGRequestScreenCaptureAccess() ? .granted : .denied
+            let granted = CGRequestScreenCaptureAccess()
+            let finalState: ScreenCapturePermissionState = granted ? .granted : currentPermissionState()
+            permissionsLogger.debug(
+                "screen_recording_permission_request_completed",
+                granted
+                    ? "macOS reported that Screen Recording access was granted."
+                    : "macOS reported that Screen Recording access was not granted.",
+                metadata: [
+                    "granted": granted ? "true" : "false",
+                    "final_state": finalState.diagnosticsValue
+                ]
+            )
+            return finalState == .granted ? .granted : .denied
         case .unavailable:
             permissionsLogger.error(
                 "screen_recording_permission_unavailable",
@@ -163,6 +185,21 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
             return .denied
         case .unavailable:
             return .unavailable
+        }
+    }
+}
+
+private extension ScreenCapturePermissionState {
+    var diagnosticsValue: String {
+        switch self {
+        case .granted:
+            return "granted"
+        case .notDetermined:
+            return "not_determined"
+        case .denied:
+            return "denied"
+        case .unavailable:
+            return "unavailable"
         }
     }
 }
