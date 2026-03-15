@@ -3,6 +3,7 @@ import Foundation
 struct SessionArtifactsService: SessionArtifactsManaging {
     private let fileManager: FileManager
     private let rootDirectoryURL: URL
+    private let logger = DiagnosticsLogger(category: .sessionLibrary)
 
     init(fileManager: FileManager = .default, rootDirectoryURL: URL? = nil) {
         self.fileManager = fileManager
@@ -22,6 +23,11 @@ struct SessionArtifactsService: SessionArtifactsManaging {
         }
 
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        logger.debug(
+            "artifacts_directory_created",
+            "Prepared a session artifacts directory.",
+            metadata: ["session_id": sessionID.uuidString]
+        )
         return directoryURL
     }
 
@@ -40,10 +46,20 @@ struct SessionArtifactsService: SessionArtifactsManaging {
 
     func removeArtifactsDirectory(at directoryURL: URL) {
         guard isManagedArtifactsDirectory(directoryURL) else {
+            logger.warning(
+                "artifacts_directory_rejected",
+                "Skipped cleanup for a directory outside BugNarrator-managed artifacts storage.",
+                metadata: ["directory_name": directoryURL.lastPathComponent]
+            )
             return
         }
 
         try? fileManager.removeItem(at: directoryURL)
+        logger.debug(
+            "artifacts_directory_removed",
+            "Removed a BugNarrator-managed artifacts directory.",
+            metadata: ["directory_name": directoryURL.lastPathComponent]
+        )
     }
 
     private func sanitizeFileNameComponent(_ value: String) -> String {

@@ -5,6 +5,8 @@
 
 BugNarrator is a macOS menu bar tool for narrated software testing sessions that automatically captures transcripts, markers, screenshots, and extracted issues.
 
+BugNarrator intentionally runs as a single-instance menu bar app. If you launch it again while it is already running, the existing instance is reactivated and the second copy exits so you do not end up with duplicate menu bar items or competing session state.
+
 ## Download BugNarrator
 
 - [Download the latest macOS DMG](https://github.com/deffenda/bugnarrator/releases/latest/download/BugNarrator-macOS.dmg)
@@ -29,6 +31,10 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 
 BugNarrator is built for software-review and software-testing workflows where you want to keep clicking through an app while speaking your notes out loud.
 
+The product is organized around one durable workflow:
+
+`record → review → refine → export`
+
 It can:
 
 - record a narrated session from the menu bar
@@ -40,6 +46,7 @@ It can:
 - export selected issues to GitHub Issues or Jira Cloud
 - export a local session bundle with transcript and screenshot artifacts
 - keep a searchable session library with date filters and deletion
+- stay responsive with larger local histories by caching session-library metadata for faster filtering, search, and selection changes
 
 ## Bring Your Own OpenAI API Key
 
@@ -58,13 +65,14 @@ Important:
 ## Install On macOS
 
 1. Download the latest DMG from [GitHub Releases](https://github.com/deffenda/bugnarrator/releases/latest).
-2. Open the DMG.
+2. Open the DMG. It should present a drag-to-Applications install window.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
 5. If Gatekeeper warns about the app, open `Applications`, Control-click `BugNarrator.app`, choose `Open`, then confirm once.
 6. On first run, expect microphone permission and OpenAI API key setup.
 7. If you use screenshot capture, expect Screen Recording permission on first use.
 8. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
+9. If you try to launch BugNarrator a second time, macOS should bring the existing BugNarrator instance forward instead of opening another menu bar copy.
 
 ## Quick Start
 
@@ -74,9 +82,9 @@ Important:
 4. Optionally click `Validate Key`.
 5. Click `Start Feedback Session`.
 6. Speak while you continue reviewing the target app.
-7. Insert markers or screenshots whenever something important happens.
+7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or the global hotkeys to insert markers and capture screenshots without reopening the menu.
 8. Click `Stop Feedback Session`.
-9. Review the transcript, screenshots, summary, and extracted issues in the session library.
+9. Review the transcript, review summary, screenshots, and extracted issues in the session library.
 10. Export a session bundle or selected issues when needed.
 
 ## Session Workflow
@@ -84,6 +92,15 @@ Important:
 ### Recording
 
 BugNarrator records in the background while you switch apps and continue normal mouse or keyboard interaction. It does not type live dictation into the frontmost app.
+
+Clicking `Start Feedback Session` opens a persistent recording controls window. That window is the primary place to:
+
+- start the session
+- stop the session
+- insert markers
+- capture screenshots
+
+It stays open until you close it, even after recording stops, so you can reuse the same control surface across repeated sessions.
 
 ### Markers
 
@@ -115,8 +132,11 @@ The session library is designed for repeated daily use and supports:
 - `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `All Sessions`, and `Custom Date Range`
 - search across transcript text, titles, and summaries
 - newest-first or oldest-first sorting
-- inline detail review for transcript, markers, screenshots, summary, and extracted issues
+- inline detail review with a clearer workspace for raw transcript, review summary, markers, screenshots, and extracted issues
 - permanent deletion of sessions you no longer want to keep
+- cached metadata and lookup indexes so larger local histories stay more responsive than a full eager transcript scan
+
+Think of the session library as your review archive, not just a transcript list. It is where you revisit sessions, compare evidence, refine extracted issues, and decide what to export.
 
 ## Export Options
 
@@ -168,6 +188,19 @@ Data sent to OpenAI:
 - transcript context used for issue extraction or summary generation
 
 BugNarrator does not continuously upload audio while you are still recording.
+
+BugNarrator does not include automatic telemetry or remote log collection. Diagnostics stay local on your Mac until you explicitly copy debug info or export a debug bundle for support.
+
+## Reporting Problems
+
+If you need help or want to file a GitHub issue:
+
+1. Open BugNarrator and reproduce the problem.
+2. Use `Copy Debug Info` from the menu bar or Settings and paste that into the issue.
+3. Use `Export Debug Bundle` to create a safe local diagnostics bundle.
+4. Attach the debug bundle and, if relevant, a session bundle or screenshots.
+
+The debug bundle includes version info, macOS info, recent local logs, and safe session metadata. It does not include API keys, GitHub tokens, Jira tokens, or other raw credentials.
 
 ## Download, Help, And Support Links
 

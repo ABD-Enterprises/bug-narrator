@@ -173,6 +173,8 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
     private let permissionChecker: any ScreenCapturePermissionChecking
     private let imageProvider: any ScreenCaptureImageProviding
     private let imageWriter: any ScreenshotImageWriting
+    private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
+    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
 
     init(
         permissionChecker: any ScreenCapturePermissionChecking = SystemScreenCapturePermissionChecker(),
@@ -186,14 +188,31 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
 
     @MainActor
     func captureScreenshot(to url: URL) async throws {
+        screenshotLogger.info(
+            "screenshot_capture_requested",
+            "Capturing a screenshot for the active review session.",
+            metadata: ["file_name": url.lastPathComponent]
+        )
+
         if !permissionChecker.preflightAccess() && !permissionChecker.requestAccess() {
+            permissionsLogger.warning(
+                "screen_recording_permission_denied",
+                "Screen Recording permission was denied for screenshot capture."
+            )
             throw AppError.screenRecordingPermissionDenied
         }
 
         let displays = try await imageProvider.availableDisplays()
         guard !displays.isEmpty else {
+            screenshotLogger.error("screenshot_capture_no_displays", "No displays were available for ScreenCaptureKit.")
             throw AppError.screenshotCaptureFailure("No displays were available to capture.")
         }
+
+        screenshotLogger.debug(
+            "screenshot_displays_resolved",
+            "ScreenCaptureKit resolved the active display layout.",
+            metadata: ["display_count": "\(displays.count)"]
+        )
 
         var capturedDisplays: [CapturedDisplayImage] = []
         capturedDisplays.reserveCapacity(displays.count)
@@ -203,6 +222,14 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
 
         let image = try makeCompositeImage(from: capturedDisplays)
         try imageWriter.writePNG(image, to: url)
+        screenshotLogger.info(
+            "screenshot_capture_succeeded",
+            "Saved a screenshot for the active review session.",
+            metadata: [
+                "file_name": url.lastPathComponent,
+                "display_count": "\(capturedDisplays.count)"
+            ]
+        )
     }
 
     private func makeCompositeImage(from capturedDisplays: [CapturedDisplayImage]) throws -> CGImage {

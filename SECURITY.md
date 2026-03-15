@@ -73,6 +73,26 @@ BugNarrator should never log:
 
 When changing networking code, keep request logging disabled or carefully redacted.
 
+BugNarrator does not include automatic telemetry or background log uploads. Diagnostics stay local unless a user explicitly copies debug info or exports a debug bundle for support.
+
+## Debug Bundle Safety
+
+`Copy Debug Info` and `Export Debug Bundle` are designed for support without exposing credentials.
+
+The exported debug bundle can include:
+
+- app version and build
+- macOS version and architecture
+- recent local diagnostics logs
+- safe session metadata such as counts, timestamps, and artifact presence
+
+It must not include:
+
+- OpenAI API keys
+- GitHub tokens
+- Jira tokens
+- raw credentials
+
 ## Reporting Security Concerns
 
 If you find a security issue, avoid posting secrets or exploit details in a public issue. Report the concern privately to the maintainer first.

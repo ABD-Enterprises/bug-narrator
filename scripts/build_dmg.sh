@@ -18,19 +18,60 @@ NOTARIZE="${NOTARIZE:-NO}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
 APP_NAME="${APP_NAME:-BugNarrator}"
+BACKGROUND_DIR_NAME=".background"
+BACKGROUND_IMAGE_NAME="dmg-background.png"
+BACKGROUND_RENDER_SCRIPT="${BACKGROUND_RENDER_SCRIPT:-$ROOT_DIR/scripts/render_dmg_background.swift}"
+DMGBUILD_BIN="${DMGBUILD_BIN:-$ROOT_DIR/build/dmg-venv/bin/dmgbuild}"
+DMGBUILD_SETTINGS_PATH="${DMGBUILD_SETTINGS_PATH:-$ROOT_DIR/scripts/dmgbuild_settings.py}"
+DMG_WINDOW_LEFT="${DMG_WINDOW_LEFT:-180}"
+DMG_WINDOW_TOP="${DMG_WINDOW_TOP:-120}"
+DMG_WINDOW_WIDTH="${DMG_WINDOW_WIDTH:-680}"
+DMG_WINDOW_HEIGHT="${DMG_WINDOW_HEIGHT:-420}"
+DMG_ICON_SIZE="${DMG_ICON_SIZE:-148}"
+DMG_TEXT_SIZE="${DMG_TEXT_SIZE:-16}"
+DMG_APP_ICON_X="${DMG_APP_ICON_X:-170}"
+DMG_APP_ICON_Y="${DMG_APP_ICON_Y:-190}"
+DMG_APPLICATIONS_ICON_X="${DMG_APPLICATIONS_ICON_X:-510}"
+DMG_APPLICATIONS_ICON_Y="${DMG_APPLICATIONS_ICON_Y:-190}"
 MANUAL_DISTRIBUTION_SIGNING="NO"
 VERIFY_MOUNTPOINT=""
+VERIFY_DEVICE=""
 
-cleanup_mountpoint() {
-    if [[ -n "$VERIFY_MOUNTPOINT" && -d "$VERIFY_MOUNTPOINT" ]]; then
-        if mount | grep -Fq "on $VERIFY_MOUNTPOINT "; then
-            hdiutil detach "$VERIFY_MOUNTPOINT" -quiet || true
+detach_attachment() {
+    local target="$1"
+    local mountpoint="$2"
+    local attempt
+
+    if [[ -n "$target" || -n "$mountpoint" ]]; then
+        if [[ -z "$target" ]]; then
+            target="$mountpoint"
         fi
-        rmdir "$VERIFY_MOUNTPOINT" 2>/dev/null || true
+
+        if [[ -n "$mountpoint" && -d "$mountpoint" ]] && mount | grep -Fq "on $mountpoint "; then
+            for attempt in 1 2 3; do
+                if hdiutil detach "$target" -quiet >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+
+            if mount | grep -Fq "on $mountpoint "; then
+                hdiutil detach "$target" -force -quiet >/dev/null 2>&1 || true
+                sleep 1
+            fi
+        fi
+    fi
+
+    if [[ -n "$mountpoint" && -d "$mountpoint" ]]; then
+        rmdir "$mountpoint" 2>/dev/null || true
     fi
 }
 
-trap cleanup_mountpoint EXIT
+cleanup_mountpoints() {
+    detach_attachment "$VERIFY_DEVICE" "$VERIFY_MOUNTPOINT"
+}
+
+trap cleanup_mountpoints EXIT
 
 if [[ "$CODE_SIGN_IDENTITY" == Developer\ ID\ Application* && "$CODE_SIGN_STYLE" == "Automatic" ]]; then
     # Developer ID builds are direct-distribution builds and should not use
@@ -141,6 +182,8 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
 APP_ICON_ICNS_PATH="$APP_PATH/Contents/Resources/AppIcon.icns"
 APP_ASSETS_CAR_PATH="$APP_PATH/Contents/Resources/Assets.car"
+STAGING_BACKGROUND_DIR="$STAGING_DIR/$BACKGROUND_DIR_NAME"
+STAGING_BACKGROUND_PATH="$STAGING_BACKGROUND_DIR/$BACKGROUND_IMAGE_NAME"
 
 if [[ ! -f "$APP_ICON_ICNS_PATH" ]]; then
     echo "error: expected app icon resource at $APP_ICON_ICNS_PATH" >&2
@@ -152,35 +195,58 @@ if [[ ! -f "$APP_ASSETS_CAR_PATH" ]]; then
     exit 1
 fi
 
+if [[ ! -x "$DMGBUILD_BIN" ]]; then
+    echo "error: dmgbuild is not installed at $DMGBUILD_BIN" >&2
+    echo "Create the packaging virtualenv with:" >&2
+    echo "  python3 -m venv build/dmg-venv" >&2
+    echo "  build/dmg-venv/bin/python -m pip install dmgbuild" >&2
+    exit 1
+fi
+
+if [[ ! -f "$DMGBUILD_SETTINGS_PATH" ]]; then
+    echo "error: dmgbuild settings file not found at $DMGBUILD_SETTINGS_PATH" >&2
+    exit 1
+fi
+
 VERSIONED_DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
 STABLE_DMG_NAME="${APP_NAME}-macOS.dmg"
-TEMP_DMG_PATH="$OUTPUT_DIR/${APP_NAME}-temp.dmg"
 VERSIONED_DMG_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME"
 STABLE_DMG_PATH="$OUTPUT_DIR/$STABLE_DMG_NAME"
 
-rm -f "$TEMP_DMG_PATH" "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
+rm -f "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
-ditto "$APP_PATH" "$STAGING_DIR/$APP_NAME.app"
-ln -s /Applications "$STAGING_DIR/Applications"
+mkdir -p "$STAGING_BACKGROUND_DIR"
+swift "$BACKGROUND_RENDER_SCRIPT" "$STAGING_BACKGROUND_PATH"
 
-hdiutil create \
-    -volname "$VOLUME_NAME" \
-    -srcfolder "$STAGING_DIR" \
-    -format UDRW \
-    -ov \
-    "$TEMP_DMG_PATH"
+"$DMGBUILD_BIN" \
+    -s "$DMGBUILD_SETTINGS_PATH" \
+    -D "app_path=$APP_PATH" \
+    -D "background_path=$STAGING_BACKGROUND_PATH" \
+    -D "volume_icon_path=$APP_ICON_ICNS_PATH" \
+    -D "window_left=$DMG_WINDOW_LEFT" \
+    -D "window_top=$DMG_WINDOW_TOP" \
+    -D "window_width=$DMG_WINDOW_WIDTH" \
+    -D "window_height=$DMG_WINDOW_HEIGHT" \
+    -D "icon_size=$DMG_ICON_SIZE" \
+    -D "text_size=$DMG_TEXT_SIZE" \
+    -D "app_icon_x=$DMG_APP_ICON_X" \
+    -D "app_icon_y=$DMG_APP_ICON_Y" \
+    -D "applications_icon_x=$DMG_APPLICATIONS_ICON_X" \
+    -D "applications_icon_y=$DMG_APPLICATIONS_ICON_Y" \
+    "$VOLUME_NAME" \
+    "$VERSIONED_DMG_PATH"
 
-hdiutil convert \
-    "$TEMP_DMG_PATH" \
-    -format UDZO \
-    -imagekey zlib-level=9 \
-    -o "$VERSIONED_DMG_PATH"
-
-rm -f "$TEMP_DMG_PATH"
 rm -rf "$STAGING_DIR"
 
 VERIFY_MOUNTPOINT="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-dmg-check.XXXXXX")"
-hdiutil attach "$VERSIONED_DMG_PATH" -readonly -nobrowse -mountpoint "$VERIFY_MOUNTPOINT" -quiet
+VERIFY_MOUNTPOINT="$(cd "$VERIFY_MOUNTPOINT" && pwd -P)"
+verify_attach_output="$(hdiutil attach "$VERSIONED_DMG_PATH" -readonly -nobrowse -mountpoint "$VERIFY_MOUNTPOINT")"
+VERIFY_DEVICE="$(printf '%s\n' "$verify_attach_output" | awk -v mountpoint="$VERIFY_MOUNTPOINT" '$NF == mountpoint {print $1; exit}')"
+
+if [[ -z "$VERIFY_DEVICE" ]]; then
+    echo "error: could not determine the mounted device for DMG verification" >&2
+    exit 1
+fi
 
 MOUNTED_APP_PATH="$VERIFY_MOUNTPOINT/$APP_NAME.app"
 MOUNTED_APPLICATIONS_LINK="$VERIFY_MOUNTPOINT/Applications"
@@ -205,8 +271,23 @@ if [[ ! -f "$MOUNTED_APP_PATH/Contents/Resources/Assets.car" ]]; then
     exit 1
 fi
 
-cleanup_mountpoint
+if [[ ! -f "$VERIFY_MOUNTPOINT/.VolumeIcon.icns" ]]; then
+    echo "error: mounted DMG is missing .VolumeIcon.icns" >&2
+    exit 1
+fi
+
+if [[ ! -f "$VERIFY_MOUNTPOINT/.background.png" ]]; then
+    echo "error: mounted DMG is missing the custom Finder background image" >&2
+    exit 1
+fi
+
+if [[ "$(GetFileInfo -a "$VERIFY_MOUNTPOINT" 2>/dev/null || true)" != *"C"* ]]; then
+    echo "warning: mounted DMG volume is missing the custom icon flag" >&2
+fi
+
+detach_attachment "$VERIFY_DEVICE" "$VERIFY_MOUNTPOINT"
 VERIFY_MOUNTPOINT=""
+VERIFY_DEVICE=""
 
 if [[ "$NOTARIZE" == "YES" ]]; then
     echo "Submitting DMG for notarization with profile '$NOTARY_PROFILE'..."

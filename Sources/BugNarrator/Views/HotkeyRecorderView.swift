@@ -4,6 +4,7 @@ import SwiftUI
 
 struct HotkeyRecorderView: View {
     @Binding var shortcut: HotkeyShortcut
+    let defaultShortcut: HotkeyShortcut
 
     @State private var isCapturing = false
     @State private var eventMonitor: Any?
@@ -21,7 +22,7 @@ struct HotkeyRecorderView: View {
                 .buttonStyle(.borderedProminent)
 
                 Button("Default") {
-                    shortcut = .default
+                    shortcut = defaultShortcut
                 }
 
                 Button("Disable") {

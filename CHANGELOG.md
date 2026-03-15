@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.0.7 - 2026-03-15
+
+- Replaced the floating recording HUD with a persistent recording controls window and configurable start, stop, marker, and screenshot shortcuts.
+- Added structured local diagnostics, debug bundle export, and copyable debug info for safer GitHub issue reporting without exposing credentials.
+- Added single-instance enforcement plus session-library and detail-view performance improvements for larger local histories.
+- Polished the menu bar, settings, session review workspace, and product copy to make BugNarrator feel more focused and easier to use daily.
+- Upgraded the DMG packaging flow so the mounted disk uses the BugNarrator icon and opens to a cleaner drag-to-Applications Finder window.
+- Removed the duplicate microphone recovery prompt from the menu bar while keeping the direct microphone settings recovery action.
+
 ## 1.0.6 - 2026-03-14
 
 - Added a compact floating recording HUD so marker and screenshot controls stay available without reopening the menu bar window.

@@ -75,6 +75,11 @@ struct AboutBugNarratorView: View {
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Text("BugNarrator is built around one workflow: record a narrated session, review the evidence, refine the issues, then export only what matters.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -87,7 +92,7 @@ struct AboutBugNarratorView: View {
 
             actionRow(
                 title: "GitHub Repository",
-                subtitle: BugNarratorLinks.repository.absoluteString,
+                subtitle: "Source, releases, roadmap, and issue tracking",
                 systemImage: "chevron.left.forwardslash.chevron.right",
                 accessibilityLabel: "Open the BugNarrator GitHub repository",
                 action: appState.openGitHubRepository
@@ -95,7 +100,7 @@ struct AboutBugNarratorView: View {
 
             actionRow(
                 title: "Documentation",
-                subtitle: "Open the full BugNarrator user guide",
+                subtitle: "Read install help, workflow guidance, and troubleshooting notes",
                 systemImage: "book.closed",
                 accessibilityLabel: "Open the BugNarrator documentation",
                 action: appState.openDocumentation
@@ -103,7 +108,7 @@ struct AboutBugNarratorView: View {
 
             actionRow(
                 title: "Report an Issue",
-                subtitle: "Open the GitHub new issue form for bug reports and feature requests",
+                subtitle: "Open the GitHub new issue form for bugs, regressions, and feature requests",
                 systemImage: "ladybug",
                 accessibilityLabel: "Open the BugNarrator issue tracker",
                 action: appState.openIssueReporter
@@ -111,7 +116,7 @@ struct AboutBugNarratorView: View {
 
             actionRow(
                 title: "Check for Updates",
-                subtitle: "Currently opens the GitHub Releases page",
+                subtitle: "Open the GitHub Releases page for the latest notarized DMG",
                 systemImage: "arrow.clockwise.circle",
                 accessibilityLabel: "Open the BugNarrator releases page",
                 action: appState.checkForUpdates
@@ -158,7 +163,7 @@ struct AboutBugNarratorView: View {
             Text("Support Development")
                 .font(.headline)
 
-            Text("If BugNarrator saves you time during review and bug triage, you can support ongoing development through the project’s PayPal donation page.")
+            Text("BugNarrator is free to use. If it saves you time during review and bug triage, you can optionally support ongoing development through the project’s PayPal page.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

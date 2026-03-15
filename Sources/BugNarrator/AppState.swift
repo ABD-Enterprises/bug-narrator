@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     var showAboutWindow: (() -> Void)?
     var showChangelogWindow: (() -> Void)?
     var showSupportWindow: (() -> Void)?
+    var showRecordingControlWindow: (() -> Void)?
 
     private let audioRecorder: any AudioRecording
     private let transcriptionClient: any TranscriptionServing
@@ -33,6 +34,15 @@ final class AppState: ObservableObject {
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
+    private let debugBundleExporter = DebugBundleExporter()
+
+    private let recordingLogger = DiagnosticsLogger(category: .recording)
+    private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
+    private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
+    private let exportLogger = DiagnosticsLogger(category: .export)
+    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
+    private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
+    private let settingsLogger = DiagnosticsLogger(category: .settings)
 
     private var timerTask: Task<Void, Never>?
     private var processActivity: NSObjectProtocol?
@@ -76,10 +86,17 @@ final class AppState: ObservableObject {
             }
         }
 
-        settingsStore.$recordingHotkeyShortcut
+        settingsStore.$startRecordingHotkeyShortcut
             .removeDuplicates()
             .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .toggleRecording)
+                self?.hotkeyManager.register(shortcut: shortcut, for: .startRecording)
+            }
+            .store(in: &cancellables)
+
+        settingsStore.$stopRecordingHotkeyShortcut
+            .removeDuplicates()
+            .sink { [weak self] shortcut in
+                self?.hotkeyManager.register(shortcut: shortcut, for: .stopRecording)
             }
             .store(in: &cancellables)
 
@@ -110,9 +127,19 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        hotkeyManager.register(shortcut: settingsStore.recordingHotkeyShortcut, for: .toggleRecording)
+        hotkeyManager.register(shortcut: settingsStore.startRecordingHotkeyShortcut, for: .startRecording)
+        hotkeyManager.register(shortcut: settingsStore.stopRecordingHotkeyShortcut, for: .stopRecording)
         hotkeyManager.register(shortcut: settingsStore.markerHotkeyShortcut, for: .insertMarker)
         hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
+
+        settingsLogger.info(
+            "app_state_initialized",
+            "BugNarrator finished initializing application state.",
+            metadata: [
+                "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no",
+                "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
+            ]
+        )
     }
 
     var elapsedTimeString: String {
@@ -158,7 +185,15 @@ final class AppState: ObservableObject {
     }
 
     var preferredRecordingWorkflowSummary: String {
-        "Use global hotkeys or the floating HUD while you keep testing. The menu controls are a fallback."
+        "Use the recording controls or global hotkeys while you keep testing. The menu stays available as a fallback."
+    }
+
+    var debugInfoSnapshot: DebugInfoSnapshot {
+        DebugInfoSnapshot(
+            metadata: BugNarratorMetadata(),
+            settingsStore: settingsStore,
+            sessionID: currentDebugSessionID
+        )
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
@@ -203,15 +238,20 @@ final class AppState: ObservableObject {
     }
 
     func startSession() async {
+        recordingLogger.info("session_start_requested", "A feedback session start was requested.")
+
         guard !isStartingSession, !isStoppingSession, !isCancellingSession else {
+            recordingLogger.debug("session_start_ignored", "The start request was ignored because another recording transition is already in progress.")
             return
         }
 
         guard status.phase != .recording, status.phase != .transcribing else {
+            recordingLogger.warning("session_start_rejected", "The start request was rejected because BugNarrator is already busy.")
             return
         }
 
         if let preflightError = await preflightForSessionStart() {
+            permissionsLogger.warning("session_start_preflight_failed", preflightError.userMessage)
             presentError(preflightError)
             return
         }
@@ -246,6 +286,14 @@ final class AppState: ObservableObject {
                 setStatus(.recording(recordingDetail))
                 beginActivity(reason: "Recording a spoken feedback session")
                 startTimer()
+                recordingLogger.info(
+                    "session_started",
+                    "A feedback session started successfully.",
+                    metadata: [
+                        "session_id": sessionID.uuidString,
+                        "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no"
+                    ]
+                )
             } catch {
                 artifactsService.removeArtifactsDirectory(at: artifactsDirectoryURL)
                 throw error
@@ -257,10 +305,12 @@ final class AppState: ObservableObject {
 
     func stopSession() async {
         guard !isStoppingSession, !isCancellingSession else {
+            recordingLogger.debug("session_stop_ignored", "The stop request was ignored because another recording transition is already in progress.")
             return
         }
 
         guard status.phase == .recording else {
+            recordingLogger.warning("session_stop_rejected", "The stop request was rejected because no recording session is active.")
             return
         }
 
@@ -275,10 +325,20 @@ final class AppState: ObservableObject {
         stopTimer(resetElapsed: false)
 
         do {
+            recordingLogger.info(
+                "session_stop_requested",
+                "Stopping the active feedback session.",
+                metadata: ["session_id": recordingSession.sessionID.uuidString]
+            )
             let recordedAudio = try await audioRecorder.stopRecording()
             pendingRecordedAudio = recordedAudio
 
             guard settingsStore.hasAPIKey else {
+                transcriptionLogger.warning(
+                    "transcription_blocked_missing_key",
+                    "Recording finished, but transcription could not start because the OpenAI API key is missing.",
+                    metadata: ["session_id": recordingSession.sessionID.uuidString]
+                )
                 throw AppError.missingAPIKey
             }
 
@@ -318,6 +378,16 @@ final class AppState: ObservableObject {
                 artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
             )
 
+            transcriptionLogger.info(
+                "transcription_completed",
+                "BugNarrator finished transcription and created a transcript session.",
+                metadata: [
+                    "session_id": session.id.uuidString,
+                    "marker_count": "\(session.markerCount)",
+                    "screenshot_count": "\(session.screenshotCount)"
+                ]
+            )
+
             do {
                 try persistCompletedTranscript(session)
             } catch {
@@ -330,6 +400,11 @@ final class AppState: ObservableObject {
                 cleanupPendingRecordedAudioIfNeeded()
                 endActivity()
                 let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+                sessionLibraryLogger.error(
+                    "transcript_persist_failed",
+                    "Transcription succeeded, but saving the transcript locally failed.",
+                    metadata: ["session_id": session.id.uuidString]
+                )
                 setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
                 showTranscriptWindow?()
                 return
@@ -352,6 +427,14 @@ final class AppState: ObservableObject {
                     )
                     session.issueExtraction = extraction
                     try persistUpdatedSession(session)
+                    transcriptionLogger.info(
+                        "issue_extraction_completed_after_transcription",
+                        "Automatic issue extraction completed after transcription.",
+                        metadata: [
+                            "session_id": session.id.uuidString,
+                            "issue_count": "\(extraction.issues.count)"
+                        ]
+                    )
                 } catch {
                     cleanupPendingRecordedAudioIfNeeded()
                     endActivity()
@@ -391,6 +474,7 @@ final class AppState: ObservableObject {
 
     func cancelSession() async {
         guard !isCancellingSession, !isStoppingSession else {
+            recordingLogger.debug("session_cancel_ignored", "The cancel request was ignored because another recording transition is already in progress.")
             return
         }
 
@@ -404,6 +488,11 @@ final class AppState: ObservableObject {
         if let activeRecordingSession {
             artifactsService.removeArtifactsDirectory(at: activeRecordingSession.artifactsDirectoryURL)
             self.activeRecordingSession = nil
+            recordingLogger.info(
+                "session_cancelled",
+                "The active feedback session was discarded.",
+                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+            )
         }
         pendingRecordedAudio = nil
         setStatus(.idle("Session discarded."))
@@ -413,7 +502,22 @@ final class AppState: ObservableObject {
         showTranscriptWindow?()
     }
 
+    func openRecordingControls() {
+        showRecordingControlWindow?()
+    }
+
+    func openRecordingControlsAndStartSession() async {
+        showRecordingControlWindow?()
+
+        guard status.phase != .recording else {
+            return
+        }
+
+        await startSession()
+    }
+
     func openSettings() {
+        settingsLogger.debug("open_settings", "Opening the Settings window.")
         settingsStore.refreshSecretsForUserInitiatedAccess()
         showSettingsWindow?()
     }
@@ -478,6 +582,47 @@ final class AppState: ObservableObject {
         openExternalURL(BugNarratorLinks.releases, label: "releases page")
     }
 
+    func copyDebugInfo() {
+        let snapshot = debugInfoSnapshot
+        clipboardService.copy(snapshot.clipboardText)
+        settingsLogger.info(
+            "debug_info_copied",
+            "Copied debug info to the clipboard.",
+            metadata: ["session_id": snapshot.sessionID?.uuidString ?? "none"]
+        )
+        setStatus(.success("Debug info copied to the clipboard."))
+    }
+
+    func exportDebugBundle() async {
+        let snapshot = await makeDebugBundleSnapshot()
+
+        do {
+            guard let bundleURL = try debugBundleExporter.export(snapshot: snapshot) else {
+                return
+            }
+
+            settingsLogger.info(
+                "debug_bundle_exported",
+                "Exported a local debug bundle.",
+                metadata: [
+                    "session_id": snapshot.sessionMetadata.sessionID?.uuidString ?? "none",
+                    "debug_mode": snapshot.debugInfo.debugModeEnabled ? "enabled" : "disabled"
+                ]
+            )
+            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
+            setStatus(
+                .success(
+                    settingsStore.debugMode
+                        ? "Debug bundle exported with verbose diagnostics."
+                        : "Debug bundle exported."
+                )
+            )
+        } catch {
+            let appError = (error as? AppError) ?? .diagnosticsFailure("BugNarrator could not create the debug bundle.")
+            presentError(appError)
+        }
+    }
+
     func validateAPIKey() async {
         guard !isValidatingAPIKey else {
             return
@@ -486,6 +631,7 @@ final class AppState: ObservableObject {
         settingsStore.refreshOpenAISecretForUserInitiatedAccess()
 
         guard settingsStore.hasAPIKey else {
+            settingsLogger.warning("validate_openai_key_rejected", "OpenAI key validation was requested without a saved key.")
             apiKeyValidationState = .failure(AppError.missingAPIKey.userMessage)
             showSettingsWindow?()
             return
@@ -498,15 +644,18 @@ final class AppState: ObservableObject {
         do {
             try await transcriptionClient.validateAPIKey(settingsStore.trimmedAPIKey)
             apiKeyValidationState = .success("OpenAI accepted this key.")
+            settingsLogger.info("validate_openai_key_succeeded", "The OpenAI API key validation flow succeeded.")
         } catch {
             let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
             apiKeyValidationState = .failure(appError.userMessage)
+            settingsLogger.warning("validate_openai_key_failed", appError.userMessage)
         }
     }
 
     func removeAPIKey() {
         settingsStore.removeAPIKey()
         apiKeyValidationState = .idle
+        settingsLogger.info("openai_key_removed", "The user removed the OpenAI API key.")
     }
 
     func copyDisplayedTranscript() {
@@ -527,6 +676,11 @@ final class AppState: ObservableObject {
         do {
             try transcriptStore.add(currentTranscript)
             selectedTranscriptID = currentTranscript.id
+            sessionLibraryLogger.info(
+                "unsaved_transcript_persisted",
+                "Saved the in-memory transcript into local session history.",
+                metadata: ["session_id": currentTranscript.id.uuidString]
+            )
             setStatus(.success("Transcript saved to session history."))
         } catch {
             presentError(error)
@@ -572,6 +726,11 @@ final class AppState: ObservableObject {
 
             let deletedCount = removedSessions.count + (deletingUnsavedCurrentTranscript ? 1 : 0)
             if deletedCount > 0 {
+                sessionLibraryLogger.info(
+                    "sessions_deleted_from_library",
+                    "Deleted sessions from the library.",
+                    metadata: ["deleted_count": "\(deletedCount)"]
+                )
                 setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
             }
         } catch {
@@ -586,12 +745,14 @@ final class AppState: ObservableObject {
     ) async {
         guard status.phase == .recording, var recordingSession = activeRecordingSession else {
             let error = AppError.noActiveSession("Start a feedback session before inserting a marker.")
+            recordingLogger.warning("marker_insert_rejected", error.userMessage)
             setStatus(.error(error.userMessage), error: error)
             return
         }
 
         if isCapturingScreenshot {
             let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
+            screenshotLogger.warning("marker_insert_rejected_during_capture", error.userMessage)
             setStatus(.recording(error.userMessage), error: error)
             return
         }
@@ -629,6 +790,11 @@ final class AppState: ObservableObject {
                 }
                 statusMessage = "\(markerTitle) was inserted, but the screenshot failed."
                 warningError = appError
+                screenshotLogger.warning(
+                    "marker_screenshot_failed",
+                    appError.userMessage,
+                    metadata: ["session_id": recordingSession.sessionID.uuidString]
+                )
             }
         }
 
@@ -644,18 +810,28 @@ final class AppState: ObservableObject {
         )
 
         activeRecordingSession = recordingSession
+        recordingLogger.info(
+            "marker_inserted",
+            statusMessage,
+            metadata: [
+                "session_id": recordingSession.sessionID.uuidString,
+                "marker_count": "\(recordingSession.markers.count)"
+            ]
+        )
         setStatus(.recording(statusMessage), error: warningError)
     }
 
     func captureScreenshot() async {
         guard status.phase == .recording, let recordingSession = activeRecordingSession else {
             let error = AppError.noActiveSession("Start a feedback session before capturing a screenshot.")
+            screenshotLogger.warning("screenshot_rejected_no_session", error.userMessage)
             setStatus(.error(error.userMessage), error: error)
             return
         }
 
         if isCapturingScreenshot {
             let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
+            screenshotLogger.warning("screenshot_rejected_busy", error.userMessage)
             setStatus(.recording(error.userMessage), error: error)
             return
         }
@@ -691,12 +867,26 @@ final class AppState: ObservableObject {
             )
             latestRecordingSession.screenshots.append(screenshot)
             activeRecordingSession = latestRecordingSession
+            screenshotLogger.info(
+                "screenshot_captured",
+                "Captured a screenshot and inserted the automatic marker.",
+                metadata: [
+                    "session_id": recordingSession.sessionID.uuidString,
+                    "screenshot_index": "\(screenshotIndex)",
+                    "marker_index": "\(markerIndex)"
+                ]
+            )
             setStatus(.recording("Captured Screenshot \(screenshotIndex) and added \(markerTitle) marker."))
         } catch {
             let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
             guard status.phase == .recording else {
                 return
             }
+            screenshotLogger.error(
+                "screenshot_capture_failed",
+                appError.userMessage,
+                metadata: ["session_id": recordingSession.sessionID.uuidString]
+            )
             setStatus(.recording(appError.userMessage), error: appError)
         }
     }
@@ -712,6 +902,11 @@ final class AppState: ObservableObject {
             issueExtractionSessionID = transcriptSession.id
             setStatus(.transcribing("Extracting reviewable issues..."))
             beginActivity(reason: "Extracting review issues")
+            transcriptionLogger.info(
+                "issue_extraction_requested",
+                "Issue extraction was requested for the selected transcript.",
+                metadata: ["session_id": transcriptSession.id.uuidString]
+            )
 
             do {
                 let extraction = try await issueExtractionService.extractIssues(
@@ -726,6 +921,14 @@ final class AppState: ObservableObject {
 
                 issueExtractionSessionID = nil
                 endActivity()
+                transcriptionLogger.info(
+                    "issue_extraction_completed",
+                    "Issue extraction finished successfully.",
+                    metadata: [
+                        "session_id": transcriptSession.id.uuidString,
+                        "issue_count": "\(extraction.issues.count)"
+                    ]
+                )
                 setStatus(.success("Extracted \(extraction.issues.count) review issues."))
                 showTranscriptWindow?()
             } catch {
@@ -736,6 +939,11 @@ final class AppState: ObservableObject {
             return
         }
 
+        transcriptionLogger.warning(
+            "issue_extraction_preflight_failed",
+            preflightError.userMessage,
+            metadata: ["session_id": transcriptSession.id.uuidString]
+        )
         presentError(preflightError)
     }
 
@@ -830,6 +1038,15 @@ final class AppState: ObservableObject {
         exportDestinationInProgress = destination
         setStatus(.transcribing("Exporting \(selectedIssues.count) issues to \(destination.rawValue)..."))
         beginActivity(reason: "Exporting extracted issues")
+        exportLogger.info(
+            "issue_export_requested",
+            "Exporting selected issues.",
+            metadata: [
+                "destination": destination.rawValue,
+                "session_id": currentSession.id.uuidString,
+                "issue_count": "\(selectedIssues.count)"
+            ]
+        )
 
         do {
             let results: [ExportResult]
@@ -861,6 +1078,15 @@ final class AppState: ObservableObject {
 
             exportDestinationInProgress = nil
             endActivity()
+            exportLogger.info(
+                "issue_export_completed",
+                "Finished exporting selected issues.",
+                metadata: [
+                    "destination": destination.rawValue,
+                    "session_id": currentSession.id.uuidString,
+                    "issue_count": "\(results.count)"
+                ]
+            )
             setStatus(.success("Exported \(results.count) issues to \(destination.rawValue)."))
         } catch {
             exportDestinationInProgress = nil
@@ -879,18 +1105,16 @@ final class AppState: ObservableObject {
 
     private func handleHotKeyPressed(_ action: HotkeyAction) {
         switch action {
-        case .toggleRecording:
-            switch status.phase {
-            case .idle, .success, .error:
-                Task {
-                    await startSession()
-                }
-            case .recording:
-                Task {
-                    await stopSession()
-                }
-            case .transcribing:
-                break
+        case .startRecording:
+            Task {
+                await openRecordingControlsAndStartSession()
+            }
+        case .stopRecording:
+            guard status.phase == .recording else {
+                return
+            }
+            Task {
+                await stopSession()
             }
         case .insertMarker:
             Task {
@@ -908,9 +1132,16 @@ final class AppState: ObservableObject {
             presentUtilityActionFailure("BugNarrator could not open the \(label).")
             return
         }
+
+        settingsLogger.info(
+            "external_link_opened",
+            "Opened an external support or documentation link.",
+            metadata: ["label": label]
+        )
     }
 
     private func presentUtilityActionFailure(_ message: String) {
+        settingsLogger.warning("utility_action_failed", message)
         switch status.phase {
         case .recording:
             setStatus(.recording("\(message) Recording is still active."))
@@ -975,6 +1206,7 @@ final class AppState: ObservableObject {
         exportDestinationInProgress = nil
 
         let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
+        logAppError(appError, context: "present_error")
         setStatus(.error(appError.userMessage), error: appError)
 
         switch appError {
@@ -987,6 +1219,7 @@ final class AppState: ObservableObject {
 
     private func presentPostTranscriptionError(_ error: Error) {
         let appError = (error as? AppError) ?? .issueExtractionFailure(error.localizedDescription)
+        logAppError(appError, context: "present_post_transcription_error")
         setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
 
         switch appError {
@@ -1004,6 +1237,17 @@ final class AppState: ObservableObject {
 
         if !settingsStore.debugMode {
             try? FileManager.default.removeItem(at: pendingRecordedAudio.fileURL)
+            recordingLogger.debug(
+                "temporary_audio_removed",
+                "Removed the temporary recorded audio file after use.",
+                metadata: ["file_name": pendingRecordedAudio.fileURL.lastPathComponent]
+            )
+        } else {
+            recordingLogger.debug(
+                "temporary_audio_preserved",
+                "Preserved the temporary recorded audio file because debug mode is enabled.",
+                metadata: ["file_name": pendingRecordedAudio.fileURL.lastPathComponent]
+            )
         }
 
         self.pendingRecordedAudio = nil
@@ -1020,6 +1264,16 @@ final class AppState: ObservableObject {
         if settingsStore.autoCopyTranscript {
             clipboardService.copy(session.transcript)
         }
+
+        sessionLibraryLogger.info(
+            "transcript_persisted",
+            "Persisted a completed transcript session.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "auto_saved": settingsStore.autoSaveTranscript ? "yes" : "no",
+                "auto_copied": settingsStore.autoCopyTranscript ? "yes" : "no"
+            ]
+        )
     }
 
     private func persistUpdatedSession(_ session: TranscriptSession) throws {
@@ -1033,11 +1287,17 @@ final class AppState: ObservableObject {
         }
 
         selectedTranscriptID = session.id
+        sessionLibraryLogger.debug(
+            "session_updated",
+            "Updated a transcript session in memory or local storage.",
+            metadata: ["session_id": session.id.uuidString]
+        )
     }
 
     private func preflightForSessionStart() async -> AppError? {
         switch audioRecorder.microphonePermissionState() {
         case .denied, .restricted:
+            permissionsLogger.warning("session_start_requires_microphone", "Microphone access is required before a recording can start.")
             return .microphonePermissionDenied
         case .authorized, .notDetermined:
             return nil
@@ -1153,6 +1413,53 @@ final class AppState: ObservableObject {
             elapsedTime: elapsedTime,
             filePath: screenshotURL.path,
             associatedMarkerID: associatedMarkerID
+        )
+    }
+
+    private func logAppError(_ error: AppError, context: String) {
+        let metadata = ["context": context]
+
+        switch error {
+        case .microphonePermissionDenied, .screenRecordingPermissionDenied:
+            permissionsLogger.warning("app_error", error.userMessage, metadata: metadata)
+        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
+            settingsLogger.warning("app_error", error.userMessage, metadata: metadata)
+        case .recordingFailure:
+            recordingLogger.error("app_error", error.userMessage, metadata: metadata)
+        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure:
+            transcriptionLogger.error("app_error", error.userMessage, metadata: metadata)
+        case .screenshotCaptureFailure:
+            screenshotLogger.error("app_error", error.userMessage, metadata: metadata)
+        case .exportConfigurationMissing, .exportFailure:
+            exportLogger.error("app_error", error.userMessage, metadata: metadata)
+        case .storageFailure:
+            sessionLibraryLogger.error("app_error", error.userMessage, metadata: metadata)
+        case .noActiveSession:
+            recordingLogger.warning("app_error", error.userMessage, metadata: metadata)
+        case .diagnosticsFailure:
+            settingsLogger.error("app_error", error.userMessage, metadata: metadata)
+        }
+    }
+
+    private var currentDebugSessionID: UUID? {
+        activeRecordingSession?.sessionID ?? displayedTranscript?.id ?? currentTranscript?.id
+    }
+
+    private func currentDebugSessionMetadata() -> DebugSessionMetadata {
+        DebugSessionMetadata.make(
+            currentTranscript: currentTranscript,
+            displayedTranscript: displayedTranscript,
+            activeRecordingSession: activeRecordingSession,
+            status: status,
+            currentError: currentError
+        )
+    }
+
+    private func makeDebugBundleSnapshot() async -> DebugBundleSnapshot {
+        DebugBundleSnapshot(
+            debugInfo: debugInfoSnapshot,
+            sessionMetadata: currentDebugSessionMetadata(),
+            recentLogText: await BugNarratorDiagnostics.recentLogText()
         )
     }
 

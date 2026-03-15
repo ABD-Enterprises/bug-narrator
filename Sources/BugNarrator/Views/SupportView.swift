@@ -20,7 +20,7 @@ struct SupportView: View {
             Text("Support BugNarrator Development")
                 .font(.largeTitle.weight(.bold))
 
-            Text("If BugNarrator helps your development workflow, consider supporting its continued development. Small donations help maintain and improve the project.")
+            Text("BugNarrator is free to use. If it helps your development workflow, you can optionally support continued development through PayPal.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -31,6 +31,10 @@ struct SupportView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Support on PayPal")
                 .font(.headline)
+
+            Text("The donation flow stays entirely outside the app in your default browser.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             Button {
                 appState.openSupportDonationPage()
@@ -58,7 +62,7 @@ struct SupportView: View {
 
     private var footerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Thank you for supporting open-source developer tools.")
+            Text("Thanks for supporting open-source developer tools.")
                 .font(.headline)
 
             Text("BugNarrator never processes payments inside the app and does not store any financial data. The button above opens the PayPal donation page in your default browser.")

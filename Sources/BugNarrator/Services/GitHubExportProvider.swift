@@ -2,6 +2,7 @@ import Foundation
 
 actor GitHubExportProvider {
     private let session: URLSession
+    private let logger = DiagnosticsLogger(category: .export)
 
     init(session: URLSession? = nil) {
         if let session {
@@ -24,6 +25,16 @@ actor GitHubExportProvider {
                 "GitHub export requires a personal access token, repository owner, and repository name."
             )
         }
+
+        logger.info(
+            "github_export_requested",
+            "Exporting selected issues to GitHub.",
+            metadata: [
+                "issue_count": "\(issues.count)",
+                "repository": "\(configuration.owner)/\(configuration.repository)",
+                "session_id": reviewSession.id.uuidString
+            ]
+        )
 
         var results: [ExportResult] = []
 
@@ -49,12 +60,36 @@ actor GitHubExportProvider {
                         remoteURL: payload.htmlURL
                     )
                 )
+                logger.info(
+                    "github_issue_exported",
+                    "Exported one issue to GitHub.",
+                    metadata: [
+                        "source_issue_id": issue.id.uuidString,
+                        "remote_identifier": "#\(payload.number)"
+                    ]
+                )
             } catch {
+                logger.error(
+                    "github_export_failed",
+                    (error as? AppError)?.userMessage ?? error.localizedDescription,
+                    metadata: [
+                        "successful_count": "\(results.count)",
+                        "source_issue_id": issue.id.uuidString
+                    ]
+                )
                 let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
                 throw partialExportError(mappedError, successfulCount: results.count)
             }
         }
 
+        logger.info(
+            "github_export_completed",
+            "Finished exporting issues to GitHub.",
+            metadata: [
+                "issue_count": "\(results.count)",
+                "repository": "\(configuration.owner)/\(configuration.repository)"
+            ]
+        )
         return results
     }
 

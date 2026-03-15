@@ -1,6 +1,6 @@
 import Foundation
 
-struct TranscriptSession: Identifiable, Codable, Equatable {
+struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     let id: UUID
     let createdAt: Date
     var updatedAt: Date
@@ -98,23 +98,11 @@ struct TranscriptSession: Identifiable, Codable, Equatable {
     }
 
     var title: String {
-        let normalized = transcript
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !normalized.isEmpty else {
-            return "Untitled Transcript"
-        }
-
-        return String(normalized.prefix(72))
+        Self.displayTitle(from: transcript)
     }
 
     var preview: String {
-        let normalized = transcript
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return String(normalized.prefix(140))
+        Self.previewText(from: transcript)
     }
 
     var metadataSummary: String {
@@ -139,18 +127,12 @@ struct TranscriptSession: Identifiable, Codable, Equatable {
     }
 
     var searchIndexText: String {
-        [
-            title,
-            preview,
-            transcript,
-            summaryText,
-            markers.map(\.title).joined(separator: " "),
-            markers.compactMap(\.note).joined(separator: " "),
-            issueExtraction?.issues.map(\.title).joined(separator: " ") ?? "",
-            issueExtraction?.issues.map(\.summary).joined(separator: " ") ?? ""
-        ]
-        .joined(separator: "\n")
-        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        Self.makeSearchIndexText(
+            transcript: transcript,
+            summaryText: summaryText,
+            markers: markers,
+            issues: issueExtraction?.issues ?? []
+        )
     }
 
     var artifactsDirectoryURL: URL? {
@@ -375,5 +357,68 @@ struct TranscriptSession: Identifiable, Codable, Equatable {
 
         lines.append("")
         return lines
+    }
+
+    static func displayTitle(from transcript: String) -> String {
+        let normalized = normalizedTranscriptBody(from: transcript)
+
+        guard !normalized.isEmpty else {
+            return "Untitled Session"
+        }
+
+        return truncatedSnippet(from: normalized, limit: 72)
+    }
+
+    static func previewText(from transcript: String) -> String {
+        let normalized = normalizedTranscriptBody(from: transcript)
+        guard !normalized.isEmpty else {
+            return "Transcript preview will appear here after the session is transcribed."
+        }
+
+        return truncatedSnippet(from: normalized, limit: 160)
+    }
+
+    static func makeSearchIndexText(
+        transcript: String,
+        summaryText: String,
+        markers: [SessionMarker],
+        issues: [ExtractedIssue]
+    ) -> String {
+        let title = displayTitle(from: transcript)
+        let preview = previewText(from: transcript)
+
+        return [
+            title,
+            preview,
+            transcript,
+            summaryText,
+            markers.map(\.title).joined(separator: " "),
+            markers.compactMap(\.note).joined(separator: " "),
+            issues.map(\.title).joined(separator: " "),
+            issues.map(\.summary).joined(separator: " ")
+        ]
+        .joined(separator: "\n")
+        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
+    private static func normalizedTranscriptBody(from transcript: String) -> String {
+        transcript
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func truncatedSnippet(from text: String, limit: Int) -> String {
+        guard text.count > limit else {
+            return text
+        }
+
+        let prefix = String(text.prefix(limit))
+        if let boundary = prefix.lastIndex(where: \.isWhitespace),
+           boundary > prefix.startIndex {
+            return String(prefix[..<boundary]).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        }
+
+        return prefix.trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 }

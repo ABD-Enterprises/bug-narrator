@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 @MainActor
@@ -13,10 +12,10 @@ final class WindowCoordinator {
     private var aboutWindowController: NSWindowController?
     private var changelogWindowController: NSWindowController?
     private var supportWindowController: NSWindowController?
-    private var recordingHUDWindowController: NSWindowController?
-    private var cancellables = Set<AnyCancellable>()
+    private var recordingControlWindowController: NSWindowController?
+    private var singleInstanceActivationObserver: NSObjectProtocol?
 
-    private let recordingHUDSize = NSSize(width: 320, height: 132)
+    private let recordingControlSize = NSSize(width: 360, height: 244)
     private let screenshotHideDelayNanoseconds: UInt64 = 250_000_000
 
     init(appState: AppState, transcriptStore: TranscriptStore, settingsStore: SettingsStore) {
@@ -24,15 +23,15 @@ final class WindowCoordinator {
         self.transcriptStore = transcriptStore
         self.settingsStore = settingsStore
 
-        appState.$status
-            .map(\.phase)
-            .removeDuplicates()
-            .sink { [weak self] phase in
-                self?.updateRecordingHUD(for: phase)
+        singleInstanceActivationObserver = DistributedNotificationCenter.default().addObserver(
+            forName: SingleInstanceController.activationNotificationName,
+            object: Bundle.main.bundleIdentifier,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.presentPrimaryInterfaceForReactivation()
             }
-            .store(in: &cancellables)
-
-        updateRecordingHUD(for: appState.status.phase)
+        }
     }
 
     func showTranscriptWindow() {
@@ -130,83 +129,111 @@ final class WindowCoordinator {
         present(windowController)
     }
 
+    func showRecordingControlWindow() {
+        if recordingControlWindowController == nil {
+            recordingControlWindowController = makeRecordingControlWindowController()
+        }
+
+        guard let window = recordingControlWindowController?.window else {
+            return
+        }
+
+        positionRecordingControlWindow(window)
+        present(recordingControlWindowController!)
+    }
+
     private func present(_ windowController: NSWindowController) {
         windowController.showWindow(nil)
         windowController.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func updateRecordingHUD(for phase: AppStatus.Phase) {
-        switch phase {
-        case .recording:
-            showRecordingHUD()
-        case .idle, .success, .error, .transcribing:
-            hideRecordingHUD()
-        }
-    }
-
-    private func showRecordingHUD() {
-        if recordingHUDWindowController == nil {
-            recordingHUDWindowController = makeRecordingHUDWindowController()
-        }
-
-        guard let window = recordingHUDWindowController?.window else {
+    private func presentPrimaryInterfaceForReactivation() {
+        if let recordingControlWindowController,
+           let window = recordingControlWindowController.window,
+           window.isVisible {
+            positionRecordingControlWindow(window)
+            window.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        positionRecordingHUD(window)
-        window.orderFrontRegardless()
+        if let visibleWindowController = [
+            transcriptWindowController,
+            settingsWindowController,
+            aboutWindowController,
+            changelogWindowController,
+            supportWindowController
+        ].compactMap({ $0 }).first(where: { $0.window?.isVisible == true }) {
+            present(visibleWindowController)
+            return
+        }
+
+        if !transcriptStore.sessions.isEmpty || appState.currentTranscript != nil {
+            showTranscriptWindow()
+        } else {
+            showSettingsWindow()
+        }
     }
 
-    private func hideRecordingHUD() {
-        recordingHUDWindowController?.window?.orderOut(nil)
-    }
-
-    private func makeRecordingHUDWindowController() -> NSWindowController {
-        let rootView = RecordingHUDView(
+    private func makeRecordingControlWindowController() -> NSWindowController {
+        let rootView = RecordingControlPanelView(
             appState: appState,
-            onInsertMarker: { [weak self] in
-                self?.handleRecordingHUDMarker()
-            },
-            onCaptureScreenshot: { [weak self] in
-                self?.handleRecordingHUDScreenshot()
+            onStartSession: { [weak self] in
+                self?.handleRecordingControlStart()
             },
             onStopSession: { [weak self] in
-                self?.handleRecordingHUDStop()
+                self?.handleRecordingControlStop()
+            },
+            onInsertMarker: { [weak self] in
+                self?.handleRecordingControlMarker()
+            },
+            onCaptureScreenshot: { [weak self] in
+                self?.handleRecordingControlScreenshot()
+            },
+            onClose: { [weak self] in
+                self?.recordingControlWindowController?.window?.performClose(nil)
             }
         )
-        let hostingController = NSHostingController(rootView: rootView)
-        let panel = RecordingHUDPanel(
-            contentRect: NSRect(origin: .zero, size: recordingHUDSize),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+        let panel = makeWindow(
+            title: "Recording Controls",
+            size: recordingControlSize,
+            rootView: rootView
         )
 
-        panel.contentViewController = hostingController
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.styleMask.remove(.resizable)
+        panel.styleMask.remove(.miniaturizable)
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.level = .floating
-        panel.isMovableByWindowBackground = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.animationBehavior = .utilityWindow
-        panel.sharingType = .none
 
         return NSWindowController(window: panel)
     }
 
-    private func handleRecordingHUDMarker() {
+    private func handleRecordingControlStart() {
         Task { @MainActor [weak self] in
-            await self?.appState.insertMarker()
-            self?.restoreRecordingHUDIfNeeded()
+            self?.showRecordingControlWindow()
+            await self?.appState.startSession()
         }
     }
 
-    private func handleRecordingHUDScreenshot() {
-        hideRecordingHUD()
+    private func handleRecordingControlStop() {
+        Task { @MainActor [weak self] in
+            await self?.appState.stopSession()
+        }
+    }
+
+    private func handleRecordingControlMarker() {
+        Task { @MainActor [weak self] in
+            await self?.appState.insertMarker()
+        }
+    }
+
+    private func handleRecordingControlScreenshot() {
+        recordingControlWindowController?.window?.orderOut(nil)
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -215,30 +242,22 @@ final class WindowCoordinator {
 
             try? await Task.sleep(nanoseconds: self.screenshotHideDelayNanoseconds)
             await self.appState.captureScreenshot()
-            self.restoreRecordingHUDIfNeeded()
+
+            guard let window = self.recordingControlWindowController?.window, window.isVisible == false else {
+                return
+            }
+
+            self.positionRecordingControlWindow(window)
+            window.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
-    private func handleRecordingHUDStop() {
-        Task { @MainActor [weak self] in
-            await self?.appState.stopSession()
-            self?.restoreRecordingHUDIfNeeded()
-        }
-    }
-
-    private func restoreRecordingHUDIfNeeded() {
-        guard appState.status.phase == .recording else {
-            return
-        }
-
-        showRecordingHUD()
-    }
-
-    private func positionRecordingHUD(_ window: NSWindow) {
+    private func positionRecordingControlWindow(_ window: NSWindow) {
         let visibleFrame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
         let origin = CGPoint(
-            x: visibleFrame.maxX - recordingHUDSize.width - 24,
-            y: visibleFrame.maxY - recordingHUDSize.height - 40
+            x: visibleFrame.maxX - recordingControlSize.width - 28,
+            y: visibleFrame.maxY - recordingControlSize.height - 54
         )
         window.setFrameOrigin(origin)
     }
@@ -255,15 +274,5 @@ final class WindowCoordinator {
         window.center()
 
         return window
-    }
-}
-
-private final class RecordingHUDPanel: NSPanel {
-    override var canBecomeKey: Bool {
-        true
-    }
-
-    override var canBecomeMain: Bool {
-        false
     }
 }

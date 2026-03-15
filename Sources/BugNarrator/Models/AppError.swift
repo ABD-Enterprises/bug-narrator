@@ -18,6 +18,7 @@ enum AppError: LocalizedError, Equatable {
     case exportConfigurationMissing(String)
     case exportFailure(String)
     case storageFailure(String)
+    case diagnosticsFailure(String)
 
     var userMessage: String {
         switch self {
@@ -55,6 +56,8 @@ enum AppError: LocalizedError, Equatable {
             return "Export failed: \(message)"
         case .storageFailure(let message):
             return "Could not save local session history: \(message)"
+        case .diagnosticsFailure(let message):
+            return "BugNarrator could not prepare diagnostics: \(message)"
         }
     }
 

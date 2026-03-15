@@ -22,6 +22,7 @@ actor TranscriptionClient: TranscriptionServing {
     private let validationEndpoint = URL(string: "https://api.openai.com/v1/models")!
     private let session: URLSession
     private let fileManager: FileManager
+    private let logger = DiagnosticsLogger(category: .transcription)
 
     init(session: URLSession? = nil, fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -37,6 +38,16 @@ actor TranscriptionClient: TranscriptionServing {
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
         let urlRequest = try makeURLRequest(fileURL: fileURL, apiKey: apiKey, request: request)
+        logger.info(
+            "transcription_requested",
+            "Uploading audio to OpenAI for transcription.",
+            metadata: [
+                "file_name": fileURL.lastPathComponent,
+                "model": request.model,
+                "has_language_hint": request.languageHint == nil ? "no" : "yes",
+                "has_prompt": request.prompt == nil ? "no" : "yes"
+            ]
+        )
 
         do {
             let (data, response) = try await session.data(for: urlRequest)
@@ -47,6 +58,11 @@ actor TranscriptionClient: TranscriptionServing {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                logger.warning(
+                    "transcription_rejected",
+                    "OpenAI rejected the transcription request.",
+                    metadata: ["status_code": "\(httpResponse.statusCode)"]
+                )
                 throw OpenAIErrorMapper.mapResponse(
                     statusCode: httpResponse.statusCode,
                     data: data,
@@ -58,17 +74,31 @@ actor TranscriptionClient: TranscriptionServing {
             let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !transcript.isEmpty else {
+                logger.warning("transcription_empty", "OpenAI returned an empty transcript.")
                 throw AppError.emptyTranscript
             }
 
+            logger.info(
+                "transcription_completed",
+                "OpenAI returned a completed transcript.",
+                metadata: [
+                    "character_count": "\(transcript.count)",
+                    "segments_count": "\(result.segments?.count ?? 0)"
+                ]
+            )
             return TranscriptionResult(text: transcript, segments: result.segments ?? [])
         } catch {
+            logger.error(
+                "transcription_failed",
+                (error as? AppError)?.userMessage ?? error.localizedDescription
+            )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.transcriptionFailure)
         }
     }
 
     func validateAPIKey(_ apiKey: String) async throws {
         let request = makeValidationRequest(apiKey: apiKey)
+        logger.info("openai_key_validation_requested", "Validating the OpenAI API key.")
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -79,13 +109,23 @@ actor TranscriptionClient: TranscriptionServing {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                logger.warning(
+                    "openai_key_validation_rejected",
+                    "The OpenAI API key validation request was rejected.",
+                    metadata: ["status_code": "\(httpResponse.statusCode)"]
+                )
                 throw OpenAIErrorMapper.mapResponse(
                     statusCode: httpResponse.statusCode,
                     data: data,
                     fallback: AppError.transcriptionFailure
                 )
             }
+            logger.info("openai_key_validation_succeeded", "The OpenAI API key was accepted.")
         } catch {
+            logger.error(
+                "openai_key_validation_failed",
+                (error as? AppError)?.userMessage ?? error.localizedDescription
+            )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.transcriptionFailure)
         }
     }
@@ -141,6 +181,7 @@ actor TranscriptionClient: TranscriptionServing {
 
     private func validateAudioFile(at fileURL: URL) throws {
         guard fileManager.fileExists(atPath: fileURL.path) else {
+            logger.error("transcription_audio_missing", "The recorded audio file was missing before upload.", metadata: ["file_name": fileURL.lastPathComponent])
             throw AppError.transcriptionFailure("The recorded audio file could not be found.")
         }
 
@@ -148,8 +189,18 @@ actor TranscriptionClient: TranscriptionServing {
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
 
         guard fileSize > 0 else {
+            logger.error("transcription_audio_empty", "The recorded audio file was empty before upload.", metadata: ["file_name": fileURL.lastPathComponent])
             throw AppError.transcriptionFailure("The recorded audio file was empty.")
         }
+
+        logger.debug(
+            "transcription_audio_validated",
+            "The recorded audio file passed local validation before upload.",
+            metadata: [
+                "file_name": fileURL.lastPathComponent,
+                "file_size_bytes": "\(fileSize)"
+            ]
+        )
     }
 
     private func appendField(named name: String, value: String, boundary: String, to body: inout Data) {

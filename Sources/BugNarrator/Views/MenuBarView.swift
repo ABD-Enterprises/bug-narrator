@@ -6,12 +6,14 @@ struct MenuBarView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
 
+    private let metadata = BugNarratorMetadata()
+
     private var statusPresentation: MenuBarStatusPresentation {
         MenuBarStatusPresentation(status: appState.status, currentError: appState.currentError)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             statusCard
             if appState.needsAPIKeySetup {
                 apiKeyRequirementCard
@@ -45,8 +47,21 @@ struct MenuBarView: View {
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("BugNarrator")
-                    .font(.headline)
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("BugNarrator")
+                        .font(.headline)
+
+                    Text("Session status")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -107,7 +122,7 @@ struct MenuBarView: View {
 
                 statusRecoverySection
             } else {
-                Text("Ready for a spoken software review session.")
+                Text("Ready to start a feedback session.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
@@ -241,27 +256,29 @@ struct MenuBarView: View {
     }
 
     private var controlsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Feedback Session")
+                    .font(.headline)
+
+                Text(sessionControlsSubtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             switch appState.status.phase {
             case .idle, .success, .error:
                 if appState.currentError == .microphonePermissionDenied {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Button("Open Microphone Settings") {
-                                appState.openMicrophonePrivacySettings()
+                        Button("Start Feedback Session") {
+                            runMenuAction {
+                                await appState.openRecordingControlsAndStartSession()
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-
-                            Button("Try Again") {
-                                Task {
-                                    await appState.startSession()
-                                }
-                            }
-                            .buttonStyle(.bordered)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
 
-                        Text("After allowing access, return to BugNarrator and try starting the session again.")
+                        Text("After enabling microphone access above, start the session again.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -269,8 +286,8 @@ struct MenuBarView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button("Start Feedback Session") {
-                                Task {
-                                    await appState.startSession()
+                                runMenuAction {
+                                    await appState.openRecordingControlsAndStartSession()
                                 }
                             }
                             .buttonStyle(.borderedProminent)
@@ -282,7 +299,7 @@ struct MenuBarView: View {
                             .buttonStyle(.bordered)
                         }
 
-                        Text("You can still record without an API key. Add your own OpenAI API key in Settings before stopping if you want transcription.")
+                        Text("You can still record without a key. Add your own OpenAI API key in Settings before stopping if you want transcription.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -290,8 +307,8 @@ struct MenuBarView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button("Start Feedback Session") {
-                                Task {
-                                    await appState.startSession()
+                                runMenuAction {
+                                    await appState.openRecordingControlsAndStartSession()
                                 }
                             }
                             .buttonStyle(.borderedProminent)
@@ -309,8 +326,8 @@ struct MenuBarView: View {
                     }
                 } else {
                     Button("Start Feedback Session") {
-                        Task {
-                            await appState.startSession()
+                        runMenuAction {
+                            await appState.openRecordingControlsAndStartSession()
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -320,40 +337,31 @@ struct MenuBarView: View {
             case .recording:
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label(appState.preferredRecordingWorkflowSummary, systemImage: "keyboard")
+                        Label("Recording controls stay in one place.", systemImage: "rectangle.on.rectangle")
                             .font(.footnote.weight(.semibold))
 
-                        Text("Menu controls stay available as a fallback. Screenshot capture automatically adds a marker.")
+                        Text("Use the recording controls window or the global hotkeys while you keep testing. Screenshot capture automatically adds a marker.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
                     HStack {
+                        Button("Open Recording Controls") {
+                            runMenuAction {
+                                appState.openRecordingControls()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+
                         Button("Stop Feedback Session") {
                             Task {
                                 await appState.stopSession()
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
 
                         Button("Cancel Session") {
                             appState.requestSessionCancel()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    HStack {
-                        Button("Insert Marker") {
-                            runFallbackMenuAction {
-                                await appState.insertMarker()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("Capture Screenshot") {
-                            runFallbackMenuAction {
-                                await appState.captureScreenshot()
-                            }
                         }
                         .buttonStyle(.bordered)
                     }
@@ -369,23 +377,30 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Global Hotkeys")
                     .font(.footnote.weight(.semibold))
 
-                Text("Session hotkey: \(appState.settingsStore.recordingHotkeyShortcut.displayString)")
-                Text("Marker hotkey: \(appState.settingsStore.markerHotkeyShortcut.displayString)")
-                Text("Screenshot hotkey: \(appState.settingsStore.screenshotHotkeyShortcut.displayString)")
+                hotkeyLine(label: "Start", value: appState.settingsStore.startRecordingHotkeyShortcut.displayString)
+                hotkeyLine(label: "Stop", value: appState.settingsStore.stopRecordingHotkeyShortcut.displayString)
+                hotkeyLine(label: "Marker", value: appState.settingsStore.markerHotkeyShortcut.displayString)
+                hotkeyLine(label: "Screenshot", value: appState.settingsStore.screenshotHotkeyShortcut.displayString)
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
+        .padding(14)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func latestTranscriptCard(session: TranscriptSession) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Latest Saved Transcript")
-                .font(.subheadline.weight(.semibold))
+            Text("Latest Session")
+                .font(.headline)
+
+            Text("Jump back into the most recent saved review session.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             Text(session.metadataSummary)
                 .font(.caption)
@@ -395,13 +410,18 @@ struct MenuBarView: View {
                 .font(.subheadline)
                 .lineLimit(3)
 
-            if let issueExtraction = session.issueExtraction {
+            if !session.summaryText.isEmpty {
+                Text(session.summaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else if let issueExtraction = session.issueExtraction {
                 Text("\(issueExtraction.issues.count) extracted issues ready")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Button("Open Transcript Window") {
+            Button("Open Session Library") {
                 appState.openTranscriptHistory()
             }
             .buttonStyle(.link)
@@ -422,13 +442,17 @@ struct MenuBarView: View {
 
             Spacer()
 
+            Text(metadata.versionDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Button("Quit") {
                 NSApp.terminate(nil)
             }
         }
     }
 
-    private func runFallbackMenuAction(
+    private func runMenuAction(
         delayNanoseconds: UInt64 = 250_000_000,
         action: @escaping @MainActor () async -> Void
     ) {
@@ -442,8 +466,12 @@ struct MenuBarView: View {
 
     private var productInfoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Project Info")
-                .font(.subheadline.weight(.semibold))
+            Text("Product Info")
+                .font(.headline)
+
+            Text("Documentation, diagnostics, support, and release notes.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             infoButton(
                 title: "About BugNarrator",
@@ -461,6 +489,10 @@ struct MenuBarView: View {
 
             Divider()
 
+            Text("Help And Support")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+
             infoButton(
                 title: "View Documentation",
                 systemImage: "book.closed",
@@ -473,6 +505,24 @@ struct MenuBarView: View {
                 systemImage: "ladybug",
                 accessibilityLabel: "Open the BugNarrator issue tracker",
                 action: appState.openIssueReporter
+            )
+
+            infoButton(
+                title: "Copy Debug Info",
+                systemImage: "doc.on.doc",
+                accessibilityLabel: "Copy BugNarrator debug info",
+                action: appState.copyDebugInfo
+            )
+
+            infoButton(
+                title: "Export Debug Bundle",
+                systemImage: "archivebox",
+                accessibilityLabel: "Export a BugNarrator debug bundle",
+                action: {
+                    Task {
+                        await appState.exportDebugBundle()
+                    }
+                }
             )
 
             infoButton(
@@ -512,6 +562,33 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var sessionControlsSubtitle: String {
+        switch appState.status.phase {
+        case .idle:
+            return "Start a feedback session, then narrate while you keep testing."
+        case .recording:
+            return "Use the recording controls or hotkeys to capture moments without interrupting your flow."
+        case .transcribing:
+            return "The recording is finished. BugNarrator is preparing the transcript."
+        case .success:
+            return "The latest session is ready for review in the session library."
+        case .error:
+            return "Use the recovery guidance below, then continue the workflow."
+        }
+    }
+
+    private func hotkeyLine(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.footnote, design: .monospaced))
+                .foregroundStyle(.primary)
+        }
+        .font(.footnote)
     }
 
     private var statusTint: Color {

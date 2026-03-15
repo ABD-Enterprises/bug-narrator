@@ -2,6 +2,8 @@
 
 BugNarrator is a macOS menu bar app for narrated software testing sessions. It helps developers, testers, and product owners talk through a workflow, capture evidence, and turn that session into a transcript plus draft issues they can review or export.
 
+BugNarrator intentionally runs as a single-instance app. If you open it again while it is already running, the existing instance should come forward and the second copy should exit. This avoids duplicate menu bar items and protects local session integrity.
+
 ## Getting Help
 
 - [Download the latest macOS release](https://github.com/deffenda/bugnarrator/releases/latest)
@@ -55,7 +57,16 @@ BugNarrator does not ship with a built-in OpenAI API key. Transcription and issu
 
 ### Start A Narrated Testing Session
 
-Start a session from the menu bar or by using your configured recording hotkey. BugNarrator records in the background while you keep working in other apps. During recording, the preferred workflow is to keep using the global hotkeys or the floating recording HUD instead of reopening the menu.
+Start a session from the menu bar or by using your configured start hotkey. BugNarrator records in the background while you keep working in other apps. Starting a session opens a small recording controls window that stays available while you work.
+
+The recording controls window includes:
+
+- `Start Feedback Session`
+- `Stop Feedback Session`
+- `Insert Marker`
+- `Capture Screenshot`
+
+You can keep using the global hotkeys too, but the recording controls window is the main control surface during a live review.
 
 ### Stop A Session
 
@@ -63,7 +74,11 @@ When you finish, stop the session from the menu bar or hotkey. BugNarrator then 
 
 ### Review The Session
 
-After transcription completes, BugNarrator opens the session library so you can inspect the transcript, markers, screenshots, summary, and extracted issues in one place.
+After transcription completes, BugNarrator opens the session library so you can inspect the transcript, markers, screenshots, review summary, and extracted issues in one place.
+
+The intended mental model is:
+
+`record → review → refine → export`
 
 ## Core Features
 
@@ -115,6 +130,30 @@ After you configure your GitHub token, repository owner, and repository name in 
 
 After you configure your Jira Cloud URL, email, API token, project key, and issue type in Settings, you can export selected extracted issues as Jira issues.
 
+### Copy Debug Info
+
+Use `Copy Debug Info` from the menu bar or Settings when you need a quick support summary. It copies:
+
+- BugNarrator version
+- macOS version
+- device architecture
+- active transcription model
+- active issue extraction model
+- log level
+- current session ID when available
+
+### Export Debug Bundle
+
+Use `Export Debug Bundle` when you need a fuller support package for a GitHub issue. The bundle includes:
+
+- `system-info.json`
+- `app-version.txt`
+- `macos-version.txt`
+- `recent-log.txt`
+- `session-metadata.json`
+
+The bundle is local-only and intentionally excludes API keys, GitHub tokens, Jira tokens, and other raw credentials.
+
 ## Session Library
 
 The session library is the main place to revisit earlier work.
@@ -128,6 +167,18 @@ You can:
 - open a detail pane with transcript, markers, screenshots, summary, and extracted issues
 - delete sessions you no longer need
 
+BugNarrator keeps lightweight session-library metadata in memory so bigger histories remain more responsive when you switch filters, search, sort, or jump between sessions quickly.
+
+Treat the session library as an archive of review sessions rather than a plain transcript list. It is where you compare evidence, refine extracted issues, and decide what should be exported.
+
+The right-hand review workspace is organized around clear tabs so you can move between:
+
+- Raw Transcript
+- Review Summary
+- Markers
+- Screenshots
+- Extracted Issues
+
 Deleting a session removes it from the library immediately and also removes local screenshot files that BugNarrator manages for that session. Exported files outside the app are not deleted.
 
 ## Support Development
@@ -135,6 +186,17 @@ Deleting a session removes it from the library immediately and also removes loca
 BugNarrator is free to use. Donations are optional and separate from any OpenAI costs.
 
 - [Open the PayPal support page](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
+
+## Reporting A Bug
+
+If you need help with a problem:
+
+1. Reproduce the issue if you can.
+2. Use `Copy Debug Info` and paste the result into your GitHub issue.
+3. Use `Export Debug Bundle` and attach the bundle.
+4. If the problem affects a specific session, attach an exported session bundle or relevant screenshots too.
+
+BugNarrator keeps diagnostics local until you explicitly export or copy them for support.
 
 ## Troubleshooting
 
@@ -152,11 +214,17 @@ BugNarrator is free to use. Donations are optional and separate from any OpenAI 
 - verify microphone permission is granted to BugNarrator
 - restart the app after changing permission settings if needed
 
+### BugNarrator Opened Twice
+
+- BugNarrator is designed to allow only one running instance
+- if you try to launch a second copy, the existing instance should become active and the new copy should exit
+- if you see two BugNarrator menu bar items at once, quit both copies and relaunch the copy in `Applications`
+
 ### API Key Missing
 
 - open `Settings`
 - paste your own OpenAI API key
-- click `Validate Key` if you want to check it before recording
+- click `Validate Key` if you want to check it before transcription or issue extraction
 - BugNarrator stores the key in macOS Keychain when available
 
 ### API Key Rejected Or Revoked

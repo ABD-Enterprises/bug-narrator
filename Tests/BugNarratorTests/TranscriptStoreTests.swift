@@ -104,6 +104,27 @@ final class TranscriptStoreTests: XCTestCase {
         XCTAssertEqual(recoveredStore.sessions, [session])
     }
 
+    func testTranscriptStoreUpdatesLookupAndLibraryEntriesTogether() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let store = TranscriptStore(storageURL: storageURL)
+        var session = makeSampleTranscriptSession(index: 1)
+
+        try store.add(session)
+
+        XCTAssertEqual(store.session(with: session.id), session)
+        XCTAssertEqual(store.libraryEntries.first?.id, session.id)
+        XCTAssertEqual(store.libraryEntries.first?.title, session.title)
+
+        session.issueExtraction = IssueExtractionResult(summary: "Updated summary", issues: [])
+        try store.add(session)
+
+        XCTAssertEqual(store.session(with: session.id)?.summaryText, "Updated summary")
+        XCTAssertEqual(store.libraryEntries.first?.summaryText, "Updated summary")
+    }
+
     private func makeTempDirectory() -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-TranscriptStoreTests-\(UUID().uuidString)", isDirectory: true)

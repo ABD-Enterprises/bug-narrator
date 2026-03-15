@@ -2,6 +2,8 @@ import Combine
 import Foundation
 
 final class SettingsStore: ObservableObject {
+    private let logger = DiagnosticsLogger(category: .settings)
+
     @Published var apiKey: String = "" {
         didSet {
             guard hasLoaded else { return }
@@ -58,24 +60,31 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    @Published var recordingHotkeyShortcut: HotkeyShortcut = HotkeyAction.toggleRecording.defaultShortcut {
+    @Published var startRecordingHotkeyShortcut: HotkeyShortcut = HotkeyAction.startRecording.defaultShortcut {
         didSet {
             guard hasLoaded else { return }
-            persistHotkey(recordingHotkeyShortcut, key: Keys.recordingHotkeyShortcut)
+            hotkeyDidChange(.startRecording)
+        }
+    }
+
+    @Published var stopRecordingHotkeyShortcut: HotkeyShortcut = HotkeyAction.stopRecording.defaultShortcut {
+        didSet {
+            guard hasLoaded else { return }
+            hotkeyDidChange(.stopRecording)
         }
     }
 
     @Published var markerHotkeyShortcut: HotkeyShortcut = HotkeyAction.insertMarker.defaultShortcut {
         didSet {
             guard hasLoaded else { return }
-            persistHotkey(markerHotkeyShortcut, key: Keys.markerHotkeyShortcut)
+            hotkeyDidChange(.insertMarker)
         }
     }
 
     @Published var screenshotHotkeyShortcut: HotkeyShortcut = HotkeyAction.captureScreenshot.defaultShortcut {
         didSet {
             guard hasLoaded else { return }
-            persistHotkey(screenshotHotkeyShortcut, key: Keys.screenshotHotkeyShortcut)
+            hotkeyDidChange(.captureScreenshot)
         }
     }
 
@@ -146,6 +155,14 @@ final class SettingsStore: ObservableObject {
         didSet {
             guard hasLoaded else { return }
             defaults.set(debugMode, forKey: Keys.debugMode)
+            BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
+            logger.info(
+                "debug_mode_changed",
+                debugMode
+                    ? "Debug mode was enabled. Verbose diagnostics are now recorded locally."
+                    : "Debug mode was disabled. BugNarrator will keep logging info, warnings, and errors.",
+                metadata: ["debug_mode": debugMode ? "enabled" : "disabled"]
+            )
         }
     }
 
@@ -155,6 +172,15 @@ final class SettingsStore: ObservableObject {
 
     var trimmedAPIKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var hotkeyAssignments: [(action: HotkeyAction, shortcut: HotkeyShortcut)] {
+        [
+            (.startRecording, startRecordingHotkeyShortcut),
+            (.stopRecording, stopRecordingHotkeyShortcut),
+            (.insertMarker, markerHotkeyShortcut),
+            (.captureScreenshot, screenshotHotkeyShortcut)
+        ]
     }
 
     var maskedAPIKey: String {
@@ -297,6 +323,7 @@ final class SettingsStore: ObservableObject {
     private let decoder = JSONDecoder()
     private let legacyDefaultsDomains: [String]
     private var hasLoaded = false
+    private var isSynchronizingHotkeys = false
     private var sessionOnlySecrets: [SecretSlot: String] = [:]
 
     init(
@@ -323,30 +350,37 @@ final class SettingsStore: ObservableObject {
     }
 
     func refreshSecretsForUserInitiatedAccess() {
+        logger.debug("refresh_all_secrets", "Refreshing stored secrets after a user-initiated action.")
         reloadSecrets(slots: Array(SecretSlot.allCases), allowInteraction: true, includeLegacyServices: true)
     }
 
     func refreshOpenAISecretForUserInitiatedAccess() {
+        logger.debug("refresh_openai_secret", "Refreshing the OpenAI API key after a user-initiated action.")
         reloadSecrets(slots: [.openAI], allowInteraction: true, includeLegacyServices: true)
     }
 
     func refreshExportSecretsForUserInitiatedAccess() {
+        logger.debug("refresh_export_secrets", "Refreshing export credentials after a user-initiated action.")
         reloadSecrets(slots: [.github, .jira], allowInteraction: true, includeLegacyServices: true)
     }
 
     func removeAPIKey() {
         apiKey = ""
+        logger.info("remove_openai_key", "The OpenAI API key was removed from local storage.")
     }
 
     func removeGitHubToken() {
         githubToken = ""
+        logger.info("remove_github_token", "The GitHub export token was removed from local storage.")
     }
 
     func removeJiraAPIToken() {
         jiraAPIToken = ""
+        logger.info("remove_jira_token", "The Jira API token was removed from local storage.")
     }
 
     private func load() {
+        logger.debug("load_settings", "Loading persisted settings and secure credentials.")
         reloadSecrets(
             slots: Array(SecretSlot.allCases),
             allowInteraction: false,
@@ -366,19 +400,24 @@ final class SettingsStore: ObservableObject {
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
 
-        recordingHotkeyShortcut = loadHotkey(
-            key: Keys.recordingHotkeyShortcut,
-            legacyKey: Keys.legacyRecordingHotkeyShortcut,
-            fallback: HotkeyAction.toggleRecording.defaultShortcut
+        startRecordingHotkeyShortcut = loadHotkey(
+            key: Keys.startRecordingHotkeyShortcut,
+            legacyKeys: [Keys.legacyStartRecordingHotkeyShortcut, Keys.legacyRecordingHotkeyShortcut],
+            fallback: HotkeyAction.startRecording.defaultShortcut
+        )
+        stopRecordingHotkeyShortcut = loadHotkey(
+            key: Keys.stopRecordingHotkeyShortcut,
+            legacyKeys: [],
+            fallback: HotkeyAction.stopRecording.defaultShortcut
         )
         markerHotkeyShortcut = loadHotkey(
             key: Keys.markerHotkeyShortcut,
-            legacyKey: nil,
+            legacyKeys: [],
             fallback: HotkeyAction.insertMarker.defaultShortcut
         )
         screenshotHotkeyShortcut = loadHotkey(
             key: Keys.screenshotHotkeyShortcut,
-            legacyKey: nil,
+            legacyKeys: [],
             fallback: HotkeyAction.captureScreenshot.defaultShortcut
         )
 
@@ -392,6 +431,18 @@ final class SettingsStore: ObservableObject {
         jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? "Task"
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
+        normalizeLoadedHotkeyConflicts()
+        BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
+        logger.info(
+            "settings_loaded",
+            "Settings finished loading.",
+            metadata: [
+                "debug_mode": debugMode ? "enabled" : "disabled",
+                "has_openai_key": hasAPIKey ? "yes" : "no",
+                "has_github_token": hasGitHubToken ? "yes" : "no",
+                "has_jira_token": hasJiraAPIToken ? "yes" : "no"
+            ]
+        )
     }
 
     private func reloadSecrets(
@@ -422,22 +473,115 @@ final class SettingsStore: ObservableObject {
                 jiraTokenPersistenceState = secret.state
             }
         }
+
+        logger.debug(
+            "secrets_reloaded",
+            "Secure values were reloaded from Keychain or memory.",
+            metadata: [
+                "allow_interaction": allowInteraction ? "yes" : "no",
+                "includes_legacy_services": includeLegacyServices ? "yes" : "no",
+                "slot_count": "\(slots.count)"
+            ]
+        )
     }
 
-    private func loadHotkey(key: String, legacyKey: String?, fallback: HotkeyShortcut) -> HotkeyShortcut {
+    private func loadHotkey(key: String, legacyKeys: [String], fallback: HotkeyShortcut) -> HotkeyShortcut {
         if let data = dataValue(forKey: key),
            let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
             return decodedShortcut
         }
 
-        if let legacyKey,
-           let data = dataValue(forKey: legacyKey),
-           let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
-            defaults.set(data, forKey: key)
-            return decodedShortcut
+        for legacyKey in legacyKeys {
+            if let data = dataValue(forKey: legacyKey),
+               let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
+                defaults.set(data, forKey: key)
+                return decodedShortcut
+            }
         }
 
         return fallback
+    }
+
+    private func hotkeyDidChange(_ changedAction: HotkeyAction) {
+        let changedShortcut = shortcut(for: changedAction)
+
+        if isSynchronizingHotkeys {
+            persistHotkey(changedShortcut, key: storageKey(for: changedAction))
+            return
+        }
+
+        isSynchronizingHotkeys = true
+        defer { isSynchronizingHotkeys = false }
+
+        if changedShortcut.isEnabled {
+            for action in HotkeyAction.allCases where action != changedAction && shortcut(for: action) == changedShortcut {
+                setShortcut(.disabled, for: action)
+            }
+        }
+
+        persistHotkey(changedShortcut, key: storageKey(for: changedAction))
+    }
+
+    private func normalizeLoadedHotkeyConflicts() {
+        isSynchronizingHotkeys = true
+
+        var seenShortcuts = Set<HotkeyShortcut>()
+        for action in HotkeyAction.allCases {
+            let shortcut = shortcut(for: action)
+            guard shortcut.isEnabled else {
+                persistHotkey(shortcut, key: storageKey(for: action))
+                continue
+            }
+
+            if seenShortcuts.contains(shortcut) {
+                setShortcut(.disabled, for: action)
+                continue
+            }
+
+            seenShortcuts.insert(shortcut)
+            persistHotkey(shortcut, key: storageKey(for: action))
+        }
+
+        isSynchronizingHotkeys = false
+    }
+
+    private func shortcut(for action: HotkeyAction) -> HotkeyShortcut {
+        switch action {
+        case .startRecording:
+            return startRecordingHotkeyShortcut
+        case .stopRecording:
+            return stopRecordingHotkeyShortcut
+        case .insertMarker:
+            return markerHotkeyShortcut
+        case .captureScreenshot:
+            return screenshotHotkeyShortcut
+        }
+    }
+
+    private func setShortcut(_ shortcut: HotkeyShortcut, for action: HotkeyAction) {
+        switch action {
+        case .startRecording:
+            startRecordingHotkeyShortcut = shortcut
+        case .stopRecording:
+            stopRecordingHotkeyShortcut = shortcut
+        case .insertMarker:
+            markerHotkeyShortcut = shortcut
+        case .captureScreenshot:
+            screenshotHotkeyShortcut = shortcut
+        }
+    }
+
+    private func storageKey(for action: HotkeyAction) -> String {
+        switch action {
+        case .startRecording:
+            return Keys.startRecordingHotkeyShortcut
+        case .stopRecording:
+            return Keys.stopRecordingHotkeyShortcut
+        case .insertMarker:
+            return Keys.markerHotkeyShortcut
+        case .captureScreenshot:
+            return Keys.screenshotHotkeyShortcut
+        }
     }
 
     @discardableResult
@@ -450,6 +594,11 @@ final class SettingsStore: ObservableObject {
                 try? keychainService.deleteValue(service: service, account: slot.account)
             }
             sessionOnlySecrets.removeValue(forKey: slot)
+            logger.info(
+                "secret_cleared",
+                "A secure value was cleared from persistent storage.",
+                metadata: ["slot": slot.redactionSafeName]
+            )
             return .empty
         }
 
@@ -459,9 +608,19 @@ final class SettingsStore: ObservableObject {
                 try? keychainService.deleteValue(service: service, account: slot.account)
             }
             sessionOnlySecrets.removeValue(forKey: slot)
+            logger.info(
+                "secret_persisted",
+                "A secure value was saved to Keychain.",
+                metadata: ["slot": slot.redactionSafeName]
+            )
             return .keychain
         } catch {
             sessionOnlySecrets[slot] = trimmedValue
+            logger.warning(
+                "secret_persisted_in_memory",
+                "Keychain storage was unavailable, so a secure value is only kept in memory for this run.",
+                metadata: ["slot": slot.redactionSafeName]
+            )
             return .sessionOnly
         }
     }
@@ -496,9 +655,22 @@ final class SettingsStore: ObservableObject {
             }
         } catch {
             if let sessionOnlyValue = sessionOnlySecrets[slot], !sessionOnlyValue.isEmpty {
+                logger.warning(
+                    "secret_fallback_to_memory",
+                    "Keychain access failed, so BugNarrator fell back to an in-memory secure value.",
+                    metadata: ["slot": slot.redactionSafeName]
+                )
                 return (sessionOnlyValue, .sessionOnly)
             }
 
+            logger.debug(
+                "secret_unavailable",
+                "A secure value was unavailable during reload.",
+                metadata: [
+                    "slot": slot.redactionSafeName,
+                    "allow_interaction": allowInteraction ? "yes" : "no"
+                ]
+            )
             return ("", .empty)
         }
 
@@ -656,6 +828,17 @@ private enum SecretSlot: Hashable, CaseIterable {
             return "jira-api-token"
         }
     }
+
+    var redactionSafeName: String {
+        switch self {
+        case .openAI:
+            return "openai"
+        case .github:
+            return "github"
+        case .jira:
+            return "jira"
+        }
+    }
 }
 
 private enum Keys {
@@ -667,8 +850,10 @@ private enum Keys {
     static let autoCopyTranscript = "settings.autoCopyTranscript"
     static let autoSaveTranscript = "settings.autoSaveTranscript"
     static let autoExtractIssues = "settings.autoExtractIssues"
-    static let recordingHotkeyShortcut = "settings.recordingHotkeyShortcut"
+    static let startRecordingHotkeyShortcut = "settings.startRecordingHotkeyShortcut"
     static let legacyRecordingHotkeyShortcut = "settings.hotkeyShortcut"
+    static let legacyStartRecordingHotkeyShortcut = "settings.recordingHotkeyShortcut"
+    static let stopRecordingHotkeyShortcut = "settings.stopRecordingHotkeyShortcut"
     static let markerHotkeyShortcut = "settings.markerHotkeyShortcut"
     static let screenshotHotkeyShortcut = "settings.screenshotHotkeyShortcut"
     static let githubRepositoryOwner = "settings.githubRepositoryOwner"
