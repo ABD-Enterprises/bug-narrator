@@ -6,6 +6,9 @@ struct MenuBarView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
 
+    @State private var isOptionKeyPressed = false
+    @State private var modifierKeyMonitor: Any?
+
     private let metadata = BugNarratorMetadata()
 
     private var statusPresentation: MenuBarStatusPresentation {
@@ -20,8 +23,8 @@ struct MenuBarView: View {
             }
             controlsSection
 
-            if let latestSession = transcriptStore.sessions.first {
-                latestTranscriptCard(session: latestSession)
+            if !transcriptStore.sessions.isEmpty {
+                sessionLibraryCard
             }
 
             productInfoSection
@@ -29,6 +32,13 @@ struct MenuBarView: View {
         }
         .padding(16)
         .frame(width: preferredMenuWidth)
+        .onAppear {
+            refreshModifierKeys()
+            startModifierKeyMonitoring()
+        }
+        .onDisappear {
+            stopModifierKeyMonitoring()
+        }
         .alert("Discard this recording?", isPresented: $appState.showDiscardConfirmation) {
             Button("Discard", role: .destructive) {
                 Task {
@@ -312,53 +322,46 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Divider()
+            if !assignedHotkeyLines.isEmpty {
+                Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Global Hotkeys")
-                    .font(.footnote.weight(.semibold))
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Global Hotkeys")
+                        .font(.footnote.weight(.semibold))
 
-                hotkeyLine(label: "Start", value: appState.settingsStore.startRecordingHotkeyShortcut.displayString)
-                hotkeyLine(label: "Stop", value: appState.settingsStore.stopRecordingHotkeyShortcut.displayString)
-                hotkeyLine(label: "Screenshot", value: appState.settingsStore.screenshotHotkeyShortcut.displayString)
+                    ForEach(assignedHotkeyLines, id: \.label) { line in
+                        hotkeyLine(label: line.label, value: line.value)
+                    }
+                }
             }
         }
         .padding(14)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func latestTranscriptCard(session: TranscriptSession) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Latest Session")
-                .font(.headline)
-
-            Text("Jump back into the most recent saved review session.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            Text(session.metadataSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text(session.preview)
-                .font(.subheadline)
-                .lineLimit(3)
-
-            if !session.summaryText.isEmpty {
-                Text(session.summaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            } else if let issueExtraction = session.issueExtraction {
-                Text("\(issueExtraction.issues.count) extracted issues ready")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private var assignedHotkeyLines: [(label: String, value: String)] {
+        [
+            ("Start", appState.settingsStore.startRecordingHotkeyShortcut.displayStringIfEnabled),
+            ("Stop", appState.settingsStore.stopRecordingHotkeyShortcut.displayStringIfEnabled),
+            ("Screenshot", appState.settingsStore.screenshotHotkeyShortcut.displayStringIfEnabled)
+        ]
+        .compactMap { label, value in
+            guard let value else {
+                return nil
             }
 
+            return (label: label, value: value)
+        }
+    }
+
+    private var sessionLibraryCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Button("Open Session Library") {
                 appState.openTranscriptHistory()
             }
-            .buttonStyle(.link)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -368,10 +371,6 @@ struct MenuBarView: View {
         HStack(spacing: 10) {
             Button("Settings") {
                 appState.openSettings()
-            }
-
-            Button("About") {
-                appState.openAbout()
             }
 
             Spacer()
@@ -441,23 +440,18 @@ struct MenuBarView: View {
                 action: appState.openIssueReporter
             )
 
-            infoButton(
-                title: "Copy Debug Info",
-                systemImage: "doc.on.doc",
-                accessibilityLabel: "Copy BugNarrator debug info",
-                action: appState.copyDebugInfo
-            )
-
-            infoButton(
-                title: "Export Debug Bundle",
-                systemImage: "archivebox",
-                accessibilityLabel: "Export a BugNarrator debug bundle",
-                action: {
-                    Task {
-                        await appState.exportDebugBundle()
+            if isOptionKeyPressed {
+                infoButton(
+                    title: "Export Debug Bundle",
+                    systemImage: "archivebox",
+                    accessibilityLabel: "Export a BugNarrator debug bundle",
+                    action: {
+                        Task {
+                            await appState.exportDebugBundle()
+                        }
                     }
-                }
-            )
+                )
+            }
 
             infoButton(
                 title: "Support Development",
@@ -496,6 +490,30 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private func refreshModifierKeys() {
+        isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
+    }
+
+    private func startModifierKeyMonitoring() {
+        guard modifierKeyMonitor == nil else {
+            return
+        }
+
+        modifierKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            isOptionKeyPressed = event.modifierFlags.contains(.option)
+            return event
+        }
+    }
+
+    private func stopModifierKeyMonitoring() {
+        guard let modifierKeyMonitor else {
+            return
+        }
+
+        NSEvent.removeMonitor(modifierKeyMonitor)
+        self.modifierKeyMonitor = nil
     }
 
     private var sessionControlsSubtitle: String {

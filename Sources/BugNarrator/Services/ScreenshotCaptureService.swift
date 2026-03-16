@@ -69,7 +69,14 @@ struct ScreenCaptureKitImageProvider: ScreenCaptureImageProviding {
             throw AppError.screenshotCaptureFailure("The selected display was no longer available for capture.")
         }
 
-        let filter = SCContentFilter(display: shareableDisplay, excludingApplications: [], exceptingWindows: [])
+        let currentProcessID = ProcessInfo.processInfo.processIdentifier
+        let excludedApplications = shareableContent.applications.filter { $0.processID == currentProcessID }
+
+        let filter = SCContentFilter(
+            display: shareableDisplay,
+            excludingApplications: excludedApplications,
+            exceptingWindows: []
+        )
         if #available(macOS 14.2, *) {
             filter.includeMenuBar = true
         }
@@ -212,6 +219,9 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         guard selectionRect.width > 0, selectionRect.height > 0 else {
             throw AppError.screenshotCaptureFailure("Select an area to capture before releasing the mouse.")
         }
+
+        // Give the selection overlay a moment to leave the compositor before capture starts.
+        try? await Task.sleep(nanoseconds: 150_000_000)
 
         screenshotLogger.info(
             "screenshot_capture_requested",
