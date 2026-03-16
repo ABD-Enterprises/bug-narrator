@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.20 - 2026-03-16
+
+- Tightened the review workspace so the tab strip uses less vertical space and no longer leaves a large dead zone above extracted issues content.
+- Simplified menu bar and settings surfaces by removing duplicate About/debug actions, hiding unset hotkeys, and promoting the session library as a first-class action.
+- Kept debug bundle export out of the normal session export flow and hid the menu bar debug-bundle action behind the Option key.
+- Hardened region screenshot capture against intermittent white frames by excluding BugNarrator's own windows from capture and waiting briefly for the selection overlay to leave the compositor.
+
 ## 1.0.19 - 2026-03-15
 
 - Hardened session and debug bundle export so BugNarrator now writes bundles through an atomic staging directory, adds `recent-log.txt` to exported session bundles, and avoids overwriting duplicate screenshot filenames inside an export.
