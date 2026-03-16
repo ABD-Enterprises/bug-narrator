@@ -40,18 +40,10 @@ final class TranscriptExporterTests: XCTestCase {
             )
         )
 
-        let exporter = TranscriptExporter(
-            fileManager: fileManager,
-            recentLogTextProvider: {
-                "2026-03-15T12:00:00Z [INFO] [recording] session_started - Started a session.\n"
-            }
-        )
+        let exporter = TranscriptExporter(fileManager: fileManager)
         let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
 
-        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.txt").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.md").path))
-        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("summary.md").path))
-        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("recent-log.txt").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("screenshots").path))
         XCTAssertTrue(
             fileManager.fileExists(
@@ -59,17 +51,8 @@ final class TranscriptExporterTests: XCTestCase {
             )
         )
 
-        let plainText = try String(contentsOf: bundleURL.appendingPathComponent("transcript.txt"))
-        XCTAssertTrue(plainText.contains("BugNarrator Transcript"))
-        XCTAssertTrue(plainText.contains(session.transcript))
-
-        let summaryMarkdown = try String(contentsOf: bundleURL.appendingPathComponent("summary.md"))
-        XCTAssertTrue(summaryMarkdown.contains("# BugNarrator Review Output"))
-        XCTAssertTrue(summaryMarkdown.contains("## Bug"))
-        XCTAssertTrue(summaryMarkdown.contains("Export button missing"))
-
-        let recentLog = try String(contentsOf: bundleURL.appendingPathComponent("recent-log.txt"))
-        XCTAssertTrue(recentLog.contains("session_started"))
+        let markdown = try String(contentsOf: bundleURL.appendingPathComponent("transcript.md"))
+        XCTAssertTrue(markdown.contains(session.transcript))
     }
 
     func testWriteBundleSkipsMissingScreenshotFilesButStillCreatesScreenshotsDirectory() throws {
@@ -92,10 +75,7 @@ final class TranscriptExporterTests: XCTestCase {
             ]
         )
 
-        let exporter = TranscriptExporter(
-            fileManager: fileManager,
-            recentLogTextProvider: { "No recent BugNarrator diagnostics logs were captured.\n" }
-        )
+        let exporter = TranscriptExporter(fileManager: fileManager)
         let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
         let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots", isDirectory: true)
 
@@ -134,10 +114,7 @@ final class TranscriptExporterTests: XCTestCase {
             ]
         )
 
-        let exporter = TranscriptExporter(
-            fileManager: fileManager,
-            recentLogTextProvider: { "No recent BugNarrator diagnostics logs were captured.\n" }
-        )
+        let exporter = TranscriptExporter(fileManager: fileManager)
         let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
         let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots", isDirectory: true)
         let screenshotContents = try fileManager.contentsOfDirectory(atPath: screenshotsDirectoryURL.path).sorted()

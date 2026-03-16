@@ -19,7 +19,7 @@
 - Verify `Validate Key` reports success for a working key and a clear error for a bad key.
 - Verify `Remove Key` clears the stored OpenAI key.
 - Verify GitHub and Jira tokens remain masked and can be removed.
-- Verify `Copy Debug Info` copies app version, macOS version, architecture, active models, and session ID without any credentials.
+- Verify `Export Debug Bundle` is hidden by default in the menu bar and appears only while the `Option` key is held down.
 - Verify `Export Debug Bundle` writes a local bundle containing `system-info.json`, `app-version.txt`, `macos-version.txt`, `recent-log.txt`, and `session-metadata.json`.
 - Verify the exported debug bundle does not contain API keys, GitHub tokens, Jira tokens, or raw credentials.
 - Confirm microphone permission is requested on the first recording attempt if it has not already been granted.
@@ -44,7 +44,7 @@
 
 ## Product Polish And UX
 
-- Verify the menu bar window feels clearly grouped into status, session controls, recent-session access, and product-info sections.
+- Verify the menu bar window feels clearly grouped into status, recording controls, session-library access, and product-info sections.
 - Verify the primary session action is always visually obvious in Idle, Recording, Transcribing, Success, and Error states.
 - Verify long status and error messages remain readable without awkward clipping.
 - Verify the recording state feels unmistakable through the red indicator, elapsed timer, and control placement.
@@ -64,8 +64,9 @@
 ## Core Workflow
 
 - During any narrated manual test, verify the tester is stating environment, goal, expected behavior, actual behavior, and session-ending outcome clearly enough for the transcript to stand alone.
-- Start a feedback session from the menu bar.
-- Verify the recording controls window opens immediately and no duplicate control windows appear if you click `Start Recording` again.
+- Open `Show Recording Controls` from the menu bar.
+- Verify the recording controls window opens immediately and no duplicate control windows appear if you click `Show Recording Controls` again.
+- Start a session with `Start Recording` from the controls window.
 - Verify the status changes to `Recording`.
 - Verify the red recording indicator and elapsed timer appear and continue updating.
 - Switch between apps, click around, and keep speaking for at least 15 seconds.
@@ -103,17 +104,16 @@
 - Verify the screenshot overlay darkens the screen slightly, shows a live selection rectangle, and completes capture on mouse release.
 - Verify the screenshot overlay shows a lightweight hint and a live size readout while you drag.
 - Verify the screenshot timestamp matches the moment the selection is completed.
-- Verify each screenshot automatically creates a linked timeline marker at the same timestamp.
-- Verify the transcript timeline reflects the screenshot marker event without creating redundant duplicate rows.
+- Verify each screenshot automatically creates a linked timeline moment at the same timestamp.
+- Verify the transcript timeline reflects the screenshot event without creating redundant duplicate rows.
 - Verify the recording controls window shows only `Start Recording`, `Stop Recording`, `Capture Screenshot`, and `Close`.
 - With several screenshots in one session, open the `Screenshots` tab and verify previews load promptly without obvious UI hitching or full-size-image jank.
 - Verify the screenshot shows its linked marker label or timeline label when practical.
 - Click a screenshot thumbnail in the `Screenshots` tab and verify BugNarrator opens the saved image cleanly.
 - Click `Show in Transcript` from a screenshot entry and verify the review workspace switches back to the transcript timeline.
 - Open a captured screenshot from the review window and verify Finder reveals the file.
-- Export a session bundle and verify `transcript.txt`, `transcript.md`, `summary.md`, and the `screenshots` folder are present.
-- Export a session bundle and verify `recent-log.txt` is present and readable.
-- Verify the exported `transcript.txt` contains the raw session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
+- Export a session bundle and verify `transcript.md` and the `screenshots` folder are present.
+- Verify the exported `transcript.md` contains the session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
 - Export a debug bundle during or after a session and verify `session-metadata.json` reflects the right session ID and counts without raw transcript content.
 
 ## Session Deletion
@@ -132,6 +132,7 @@
 
 - Open a completed session and run `Extract Issues`.
 - Verify the `Extracted Issues` tab shows a summary, guidance note, and categorized draft issues.
+- If extraction returns no draft issues, verify the review workspace falls back to `Summary` instead of leaving an empty `Extracted Issues` tab selected.
 - Verify each issue preserves transcript evidence and timestamp context when available.
 - Edit an extracted issue title, summary, or category and confirm the change persists when you switch away and back.
 - Select and deselect issues for export and verify the selection state persists.

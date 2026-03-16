@@ -48,7 +48,8 @@ It helps you:
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Start a session with `Start Recording`.
+5. Click `Show Recording Controls`.
+6. Start a session with `Start Recording`.
 
 BugNarrator does not ship with a built-in OpenAI API key. Transcription and issue extraction use your own OpenAI account and may incur charges under OpenAI pricing.
 
@@ -56,7 +57,7 @@ BugNarrator does not ship with a built-in OpenAI API key. Transcription and issu
 
 ### Start A Narrated Testing Session
 
-Start a session from the menu bar or by using your configured start hotkey if you assigned one. BugNarrator records in the background while you keep working in other apps. Starting a session opens a small recording controls window that stays available while you work.
+Open the recording controls window from the menu bar, or use your configured start hotkey if you assigned one. BugNarrator records in the background while you keep working in other apps. The recording controls window stays available while you work.
 
 The recording controls window includes:
 
@@ -90,7 +91,7 @@ Use this pattern during live testing:
    - `This is an upgraded install over an older version.`
 2. State the goal of the test.
    - `I'm testing first-launch microphone and screen recording permissions.`
-   - `I'm testing that starting and stopping a recording creates a transcript and screenshot markers.`
+   - `I'm testing that starting and stopping a recording creates a transcript and saved screenshots at the right moments.`
 3. Narrate each action as you do it.
    - `I'm clicking Start Recording now.`
    - `I'm opening Settings.`
@@ -111,8 +112,8 @@ Use this pattern during live testing:
    - `The window lost focus after I clicked Start Recording.`
    - `The spinner stayed visible for about twenty seconds.`
 8. Use screenshot capture when something looks wrong, and say why.
-   - `I'm taking a screenshot marker for the missing prompt.`
-   - `I'm taking a screenshot marker for the disabled button state.`
+   - `I'm taking a screenshot here because the permission prompt is missing.`
+   - `I'm taking a screenshot here because this button is disabled unexpectedly.`
 9. End with a one- or two-sentence outcome summary.
    - `Ending test: recording started, but permissions were not granted correctly.`
    - `Ending test: transcript, screenshot, and summary all appeared as expected.`
@@ -127,7 +128,7 @@ You can follow this script almost exactly:
 - `I expected a macOS permission prompt here.`
 - `The prompt did not appear.`
 - `BugNarrator is not listed under Microphone in Privacy & Security.`
-- `I'm taking a screenshot marker for the missing prompt.`
+- `I'm taking a screenshot here because the prompt is missing.`
 - `Ending test: recording started, but permissions were not granted correctly.`
 
 ### Do This / Avoid This
@@ -160,7 +161,7 @@ BugNarrator generates the transcript only after the session ends. It does not tr
 
 ### Screenshot Capture
 
-Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit plus a drag-selection overlay that works like a lightweight macOS capture tool. Press `Capture Screenshot`, drag across the area you want, release to save it, or press `Esc` to cancel. Each screenshot is attached to the current session, automatically creates a timeline marker at the same timestamp, and appears in the `Screenshots` tab with a thumbnail, timestamp, and linked marker when available.
+Use screenshot capture to save visual evidence during a review. On macOS 14 and later, BugNarrator uses ScreenCaptureKit plus a drag-selection overlay that works like a lightweight macOS capture tool. Press `Capture Screenshot`, drag across the area you want, release to save it, or press `Esc` to cancel. Each screenshot is attached to the current session, automatically creates a timeline moment at the same timestamp, and appears in the `Screenshots` tab with a thumbnail, timestamp, and linked context when available.
 
 ### Review Summary
 
@@ -179,15 +180,10 @@ Each extracted item keeps evidence from the transcript and should be reviewed be
 
 ### Export Session Bundle
 
-Use this when you want a portable local copy of the session. The bundle can include:
+Use this when you want a portable local copy of the session. The bundle includes:
 
-- `transcript.txt`
 - `transcript.md`
-- `summary.md`
-- `recent-log.txt`
 - `screenshots/`
-
-`recent-log.txt` contains recent local BugNarrator diagnostics so a tester can attach the bundle to a bug report without exporting a separate debug bundle first.
 
 ### Export To GitHub (Experimental)
 
@@ -197,21 +193,9 @@ After you configure your GitHub token, repository owner, and repository name in 
 
 After you configure your Jira Cloud URL, email, API token, project key, and issue type in Settings, you can export selected extracted issues as Jira issues. This integration is currently experimental.
 
-### Copy Debug Info
-
-Use `Copy Debug Info` from the menu bar or Settings when you need a quick support summary. It copies:
-
-- BugNarrator version
-- macOS version
-- device architecture
-- active transcription model
-- active issue extraction model
-- log level
-- current session ID when available
-
 ### Export Debug Bundle
 
-Use `Export Debug Bundle` when you need a fuller support package for a GitHub issue. The bundle includes:
+Use `Export Debug Bundle` when you need a fuller support package for a GitHub issue. Hold `Option` while the menu bar window is open to reveal the action. The bundle includes:
 
 - `system-info.json`
 - `app-version.txt`
@@ -245,6 +229,8 @@ The right-hand review workspace is organized around clear tabs so you can move b
 - Extracted Issues
 - Review Summary
 
+If issue extraction returns no draft issues, BugNarrator keeps the review flow on `Summary` instead of leaving you in an empty `Extracted Issues` view.
+
 Older sessions that already contain standalone markers still render safely in the transcript timeline and exports.
 
 Deleting a session removes it from the library immediately and also removes local screenshot files that BugNarrator manages for that session. Exported files outside the app are not deleted.
@@ -260,8 +246,8 @@ BugNarrator is free to use. Donations are optional and separate from any OpenAI 
 If you need help with a problem:
 
 1. Reproduce the issue if you can.
-2. Use `Copy Debug Info` and paste the result into your GitHub issue.
-3. Use `Export Debug Bundle` and attach the bundle.
+2. Hold `Option` while the menu bar window is open and use `Export Debug Bundle`.
+3. Attach the bundle to your GitHub issue.
 4. If the problem affects a specific session, attach an exported session bundle or relevant screenshots too.
 
 BugNarrator keeps diagnostics local until you explicitly export or copy them for support.
