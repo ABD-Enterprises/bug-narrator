@@ -11,6 +11,8 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var jiraEmailPersistenceState: SecretPersistenceState = .unknown
+
     @Published var preferredModel: String = "whisper-1" {
         didSet {
             guard hasLoaded else { return }
@@ -119,7 +121,7 @@ final class SettingsStore: ObservableObject {
     @Published var jiraEmail: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(jiraEmail, forKey: Keys.jiraEmail)
+            jiraEmailPersistenceState = persistSecret(jiraEmail, for: .jiraEmail)
         }
     }
 
