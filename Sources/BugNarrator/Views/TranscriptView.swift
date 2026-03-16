@@ -608,12 +608,12 @@ struct TranscriptView: View {
             workspaceHeader(session)
             dividerSection
             workspaceActions(session)
-            dividerSection
             workspaceTabs(session)
             dividerSection
             detailContent(for: session)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -707,13 +707,6 @@ struct TranscriptView: View {
                 Button("Export Session Bundle") {
                     exportBundle(session: session)
                 }
-
-                Button("Export Debug Bundle") {
-                    appState.selectedTranscriptID = session.id
-                    Task {
-                        await appState.exportDebugBundle()
-                    }
-                }
             }
         }
         .buttonStyle(.bordered)
@@ -723,14 +716,30 @@ struct TranscriptView: View {
     }
 
     private func workspaceTabs(_ session: TranscriptSession) -> some View {
-        Picker("Session Detail", selection: $selectedDetailTab) {
+        HStack(spacing: 6) {
             ForEach(ReviewWorkspace.availableTabs(for: session)) { tab in
-                Text(tab.title).tag(tab)
+                Button {
+                    selectedDetailTab = tab
+                } label: {
+                    Text(tab.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selectedDetailTab == tab ? Color.white : Color.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            selectedDetailTab == tab
+                                ? Color.accentColor
+                                : Color(nsColor: .separatorColor).opacity(0.18),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
     }
 
     @ViewBuilder

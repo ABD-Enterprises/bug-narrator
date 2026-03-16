@@ -328,22 +328,6 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        HStack(spacing: 12) {
-                            Button("Copy Debug Info") {
-                                appState.copyDebugInfo()
-                            }
-
-                            Button("Export Debug Bundle") {
-                                Task {
-                                    await appState.exportDebugBundle()
-                                }
-                            }
-
-                            Button("Report an Issue") {
-                                appState.openIssueReporter()
-                            }
-                        }
-
                         Text("Attach the debug bundle and, if relevant, an exported session bundle when reporting an issue. BugNarrator never includes OpenAI, GitHub, or Jira credentials in the debug bundle.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
