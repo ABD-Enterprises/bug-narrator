@@ -106,6 +106,24 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
     }
 
+    func testJiraEmailStaysOutOfUserDefaultsWhenKeychainSucceeds() {
+        let suiteName = "BugNarrator-SettingsJiraEmailNoDefaultsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        store.jiraEmail = "secure@example.com"
+
+        XCTAssertNil(defaults.string(forKey: "settings.jiraEmail"))
+        XCTAssertEqual(store.jiraEmailPersistenceState, .keychain)
+        XCTAssertEqual(
+            keychain.values["BugNarrator.Jira::jira-email"],
+            "secure@example.com"
+        )
+    }
+
     func testAPIKeyFallsBackToSessionOnlyWhenKeychainWriteFails() {
         let suiteName = "BugNarrator-SettingsFallbackTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -176,6 +194,26 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(
             defaults.string(forKey: "settings.githubRepositoryName"),
             "bugnarrator"
+        )
+    }
+
+    func testLegacyPlaintextJiraEmailIsMigratedToSecureStorage() {
+        let suiteName = "BugNarrator-SettingsLegacyJiraEmailTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set("legacy@example.com", forKey: "settings.jiraEmail")
+
+        let keychain = MockKeychainService()
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(store.jiraEmail, "legacy@example.com")
+        XCTAssertEqual(store.jiraEmailPersistenceState, .keychain)
+        XCTAssertNil(defaults.string(forKey: "settings.jiraEmail"))
+        XCTAssertEqual(
+            keychain.values["BugNarrator.Jira::jira-email"],
+            "legacy@example.com"
         )
     }
 

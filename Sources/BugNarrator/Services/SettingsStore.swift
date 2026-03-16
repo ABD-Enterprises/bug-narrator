@@ -11,7 +11,7 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    @Published var jiraEmailPersistenceState: SecretPersistenceState = .unknown
+    @Published private(set) var jiraEmailPersistenceState: APIKeyPersistenceState = .empty
 
     @Published var preferredModel: String = "whisper-1" {
         didSet {
@@ -356,7 +356,7 @@ final class SettingsStore: ObservableObject {
 
     func refreshExportSecretsForUserInitiatedAccess() {
         logger.debug("refresh_export_secrets", "Refreshing export credentials after a user-initiated action.")
-        reloadSecrets(slots: [.github, .jira], allowInteraction: true, includeLegacyServices: true)
+        reloadSecrets(slots: [.github, .jiraEmail, .jira], allowInteraction: true, includeLegacyServices: true)
     }
 
     func removeAPIKey() {
@@ -414,9 +414,9 @@ final class SettingsStore: ObservableObject {
         githubDefaultLabels = stringValue(forKey: Keys.githubDefaultLabels) ?? ""
 
         jiraBaseURL = stringValue(forKey: Keys.jiraBaseURL) ?? ""
-        jiraEmail = stringValue(forKey: Keys.jiraEmail) ?? ""
         jiraProjectKey = stringValue(forKey: Keys.jiraProjectKey) ?? ""
         jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? "Task"
+        migrateLegacyPlaintextJiraEmailIfNeeded()
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
         migrateLegacyBuiltInHotkeysIfNeeded()
@@ -457,6 +457,9 @@ final class SettingsStore: ObservableObject {
             case .github:
                 githubToken = secret.value
                 githubTokenPersistenceState = secret.state
+            case .jiraEmail:
+                jiraEmail = secret.value
+                jiraEmailPersistenceState = secret.state
             case .jira:
                 jiraAPIToken = secret.value
                 jiraTokenPersistenceState = secret.state
@@ -726,6 +729,27 @@ final class SettingsStore: ObservableObject {
         defaults.set(data, forKey: key)
     }
 
+    private func migrateLegacyPlaintextJiraEmailIfNeeded() {
+        let legacyEmail = stringValue(forKey: Keys.jiraEmail)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard !legacyEmail.isEmpty else {
+            defaults.removeObject(forKey: Keys.jiraEmail)
+            return
+        }
+
+        if jiraEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            jiraEmail = legacyEmail
+            jiraEmailPersistenceState = persistSecret(legacyEmail, for: .jiraEmail)
+        }
+
+        defaults.removeObject(forKey: Keys.jiraEmail)
+        logger.info(
+            "migrated_plaintext_jira_email",
+            "Migrated the Jira export email out of plain preferences storage.",
+            metadata: ["persistence_state": String(describing: jiraEmailPersistenceState)]
+        )
+    }
+
     private func storageDescription(for state: APIKeyPersistenceState, empty: String) -> String {
         switch state {
         case .empty:
@@ -831,6 +855,7 @@ final class SettingsStore: ObservableObject {
 private enum SecretSlot: Hashable, CaseIterable {
     case openAI
     case github
+    case jiraEmail
     case jira
 
     var service: String {
@@ -839,6 +864,8 @@ private enum SecretSlot: Hashable, CaseIterable {
             return "BugNarrator.OpenAI"
         case .github:
             return "BugNarrator.GitHub"
+        case .jiraEmail:
+            return "BugNarrator.Jira"
         case .jira:
             return "BugNarrator.Jira"
         }
@@ -850,6 +877,8 @@ private enum SecretSlot: Hashable, CaseIterable {
             return ["SessionMic.OpenAI", "FeedbackMic.OpenAI"]
         case .github:
             return ["SessionMic.GitHub", "FeedbackMic.GitHub"]
+        case .jiraEmail:
+            return ["SessionMic.Jira", "FeedbackMic.Jira"]
         case .jira:
             return ["SessionMic.Jira", "FeedbackMic.Jira"]
         }
@@ -861,6 +890,8 @@ private enum SecretSlot: Hashable, CaseIterable {
             return "openai-api-key"
         case .github:
             return "github-token"
+        case .jiraEmail:
+            return "jira-email"
         case .jira:
             return "jira-api-token"
         }
@@ -872,6 +903,8 @@ private enum SecretSlot: Hashable, CaseIterable {
             return "openai"
         case .github:
             return "github"
+        case .jiraEmail:
+            return "jira-email"
         case .jira:
             return "jira"
         }
