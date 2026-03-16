@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.21 - 2026-03-16
+
+- Trimmed `Export Session Bundle` so it now writes only `transcript.md` and the `screenshots/` folder.
+- Refreshed the README, quickstart, user guide, testing notes, QA checklist, and release checklist so they match the current control-window, screenshot-first, and debug-support workflow.
+- Hardened the session-library review pane so the right-hand workspace adapts more cleanly to narrow widths instead of collapsing metadata, actions, and review rows into unreadable vertical fragments.
+
 ## 1.0.20 - 2026-03-16
 
 - Tightened the review workspace so the tab strip uses less vertical space and no longer leaves a large dead zone above extracted issues content.
