@@ -8,6 +8,7 @@
 - Simplified menu bar and settings surfaces by removing duplicate About/debug actions, hiding unset hotkeys, and promoting the session library as a first-class action.
 - Kept debug bundle export out of the normal session export flow and hid the menu bar debug-bundle action behind the Option key.
 - Hardened region screenshot capture against intermittent white frames by excluding BugNarrator's own windows from capture and waiting briefly for the selection overlay to leave the compositor.
+- Moved Jira export email persistence out of plain preferences storage, migrated legacy saved values into secure storage, and added regression coverage for the secure Jira-email path.
 
 ## 1.0.19 - 2026-03-15
 
