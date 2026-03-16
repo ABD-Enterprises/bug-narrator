@@ -2,38 +2,27 @@
 
 ## Automated Validation
 
-- Build command run: `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO build`
-- Build result: passed
-- Packaging command run: `./scripts/build_dmg.sh`
-- Packaging result: passed
-- Packaging validation: generated `dist/BugNarrator-v1.0.1-macOS.dmg` and `dist/BugNarrator-macOS.dmg`, mounted the DMG successfully, and verified it contains `BugNarrator.app` plus an `Applications` shortcut
-- Test command run: `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test`
-- Test result: passed
-- Test count: 91
+Use these commands as the current release-readiness baseline:
+
+- `./scripts/release_smoke_test.sh`
+- `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test`
+- `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Release CODE_SIGNING_ALLOWED=NO build`
+- `./scripts/build_dmg.sh`
+
+For public-release validation, also run the signed and notarized DMG workflow documented in [Distribution.md](Distribution.md).
 
 ## What The Tests Cover
 
-- core recording state transitions and repeated back-to-back sessions
-- missing API key and denied microphone preflight handling
-- duplicate start and duplicate stop protection
-- marker insertion and screenshot capture state updates
-- automatic issue extraction after transcription
-- export preflight validation and successful GitHub export dispatch
-- GitHub request construction and repository/auth failure mapping
-- Jira request construction and validation failure mapping
-- issue extraction response mapping into structured draft issues
-- session-library date bucket filtering, search, empty states, and sort order
-- transcript history persistence, deletion, and 500-session retention
-- transcript-store rollback on persistence failure and recovery from backup history files
-- session-artifact path sanitization and safe managed-directory cleanup
-- secure settings persistence, masking, and token removal
-- transcription request construction and OpenAI error mapping
-- About window/changelog action wiring and external project-link dispatch
-- version/build metadata formatting and changelog highlight parsing
-- support window callback wiring and PayPal support-page URL dispatch
-- partial-success export failure reporting for GitHub and Jira issue creation
-- screenshot open failure handling that preserves app-state truthfulness during active sessions
-- ScreenCaptureKit screenshot metadata generation, output-directory creation, permission-denied handling, and repeated capture protection
+- recording state transitions, duplicate-start protection, repeated sessions, and single-instance behavior
+- microphone preflight, denied/restricted handling, and local-build permission recovery messaging
+- screenshot region selection, Screen Recording preflight, screenshot metadata creation, and repeated capture protection
+- screenshot-driven timeline event generation and review-workspace tab behavior
+- issue extraction parsing, empty-result fallback, and export selection state
+- GitHub and Jira export validation plus partial-success failure reporting
+- session-library filtering, search, sorting, deletion, and persistence recovery
+- transcript export, session bundle export, and debug bundle export
+- secure settings persistence, token masking, and optional hotkey assignment behavior
+- About/changelog/support/documentation link wiring and version/build metadata formatting
 
 ## Manual Validation Still Required
 
@@ -43,7 +32,7 @@
 - real GitHub export against a repository you control
 - real Jira Cloud export against a project you control
 - opening the generated DMG in Finder and validating the drag-to-Applications flow
-- visual review of the session library layout and menu bar UX
+- visual review of the session library layout, compact review workspace, and menu bar UX
 - live multi-display screenshot capture with Screen Recording permission granted on the release build
 
 ## Notes
@@ -51,3 +40,4 @@
 - The automated suite does not exercise the live SwiftUI UI layer or AVFoundation microphone pipeline.
 - Screenshot capture now uses ScreenCaptureKit on the app's supported macOS 14+ target. Permission prompting still relies on the macOS Screen Recording TCC helpers so the app can explain recovery steps before a capture attempt fails.
 - The unsigned build and test commands are intentional so the repo does not depend on a personal Apple signing team in project defaults.
+- If local Xcode or DerivedData builds are cluttering Launch Services or TCC during manual permission testing, run `./scripts/cleanup_local_build_apps.sh` so only the installed `/Applications/BugNarrator.app` remains in normal tester paths.

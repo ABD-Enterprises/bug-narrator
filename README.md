@@ -61,7 +61,7 @@ Important:
 - OpenAI usage may cost money on your account
 - the app stores your key in macOS Keychain when available
 - the key is not bundled into the source code or compiled app
-- global hotkeys are optional and start as `Not Set` until you assign them
+- global hotkeys are optional and start unassigned until you assign them
 
 ## Install On macOS
 
@@ -70,7 +70,7 @@ Important:
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
 5. If Gatekeeper warns about the app, open `Applications`, Control-click `BugNarrator.app`, choose `Open`, then confirm once.
-6. On first run, expect microphone permission and OpenAI API key setup.
+6. On first run, expect OpenAI API key setup. Microphone permission is requested the first time you try to start recording.
 7. If you use screenshot capture, expect Screen Recording permission on first use.
 8. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
 9. If you try to launch BugNarrator a second time, macOS should bring the existing BugNarrator instance forward instead of opening another menu bar copy.
@@ -81,12 +81,13 @@ Important:
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Click `Start Recording`.
-6. Speak while you continue reviewing the target app. For better transcripts and bug reports, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide).
-7. When the recording controls window opens, keep it available as your small session control panel while you review. Use it or any global hotkeys you explicitly assign in Settings to stop recording and capture screenshots without reopening the menu.
-8. Click `Stop Recording`.
-9. Review the transcript, review summary, screenshots, and extracted issues in the session library.
-10. Export a session bundle or selected issues when needed.
+5. Click `Show Recording Controls`.
+6. Click `Start Recording`.
+7. Speak while you continue reviewing the target app. For better transcripts and bug reports, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide).
+8. Keep the recording controls window available while you review. Use it, or any global hotkeys you explicitly assign in Settings, to stop recording and capture screenshots without reopening the menu.
+9. Click `Stop Recording`.
+10. Review the transcript, summary, screenshots, and extracted issues in the session library.
+11. Export a session bundle or selected issues when needed.
 
 ## Session Workflow
 
@@ -94,7 +95,7 @@ Important:
 
 BugNarrator records in the background while you switch apps and continue normal mouse or keyboard interaction. It does not type live dictation into the frontmost app.
 
-Clicking `Start Recording` opens a persistent recording controls window. That window is the primary place to:
+Click `Show Recording Controls` from the menu bar to open the persistent recording controls window. That window is the primary place to:
 
 - start the session
 - stop the session
@@ -138,12 +139,9 @@ Think of the session library as your review archive, not just a transcript list.
 
 ### Export Session Bundle
 
-Use `Export Session Bundle` when you want a local package of the review session. The bundle can include:
+Use `Export Session Bundle` when you want a local package of the review session. The bundle includes:
 
-- `transcript.txt`
 - `transcript.md`
-- `summary.md`
-- `recent-log.txt`
 - `screenshots/`
 
 ### Export To GitHub (Experimental)
@@ -202,8 +200,8 @@ BugNarrator does not include automatic telemetry or remote log collection. Diagn
 If you need help or want to file a GitHub issue:
 
 1. Open BugNarrator and reproduce the problem.
-2. Use `Copy Debug Info` from the menu bar or Settings and paste that into the issue.
-3. Use `Export Debug Bundle` to create a safe local diagnostics bundle.
+2. Hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
+3. Export a safe local diagnostics bundle.
 4. Attach the debug bundle and, if relevant, a session bundle or screenshots.
 
 The debug bundle includes version info, macOS info, recent local logs, and safe session metadata. It does not include API keys, GitHub tokens, Jira tokens, or other raw credentials.

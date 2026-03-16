@@ -15,10 +15,11 @@
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Start a session with `Start Recording`.
-6. Keep the recording controls window open while you review, or assign your own optional global hotkeys in Settings if you want keyboard control for stopping and screenshot capture.
-7. Stop the session and review the session library.
-8. If you are recording a real test pass, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide) so the transcript, summary, and extracted issues stay clear.
+5. Click `Show Recording Controls`.
+6. Start a session with `Start Recording`.
+7. Keep the recording controls window open while you review, or assign your own optional global hotkeys in Settings if you want keyboard control for stopping and screenshot capture.
+8. Stop the session and review the session library.
+9. If you are recording a real test pass, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide) so the transcript, summary, and extracted issues stay clear.
 
 ## Important Notes
 
@@ -30,7 +31,7 @@
 - If you are testing unsigned local builds from Xcode, keep launching the same app copy when possible. macOS can treat different build paths as different apps for microphone approval.
 - Screenshot capture may ask for Screen Recording permission on first use. If you deny it, recording can still continue without screenshots.
 - If OpenAI rejects your key, BugNarrator sends you back to `Settings` so you can replace it.
-- If you hit a bug, use `Copy Debug Info` or `Export Debug Bundle` from the menu bar or Settings before filing an issue.
+- If support asks for diagnostics, hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
 - For manual testing sessions, use the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide) so BugNarrator captures better repro steps and summaries.
 - GitHub and Jira issue export are available, but both integrations are currently experimental.
 - BugNarrator intentionally runs as a single-instance app to prevent duplicate menu bar items and competing session state.

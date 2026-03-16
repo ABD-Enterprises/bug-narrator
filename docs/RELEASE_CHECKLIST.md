@@ -23,7 +23,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Capture at least one screenshot during the session and confirm it creates a visible timeline moment in review.
 - Stop the session and confirm transcription succeeds.
 - Confirm the transcript, review summary, screenshots, and extracted issues appear in the session library.
-- Export a session bundle and verify the expected files are created.
+- Export a session bundle and verify `transcript.md` plus the `screenshots` folder are created.
 
 ## Export Integrations
 
@@ -56,6 +56,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Open `About BugNarrator` and verify version/build info is correct.
 - Open `View Documentation`, `Report an Issue`, `Support Development`, `What's New`, and `Check for Updates`.
 - Confirm every link opens the expected external destination.
+- Hold `Option` while the menu bar is open and confirm `Export Debug Bundle` appears only in that modified state.
 - Review the README, user guide, changelog, and support links for stale wording or placeholder text.
 - Review the `Download` and `Support Development` sections in `README.md` for visibility and accuracy.
 - Confirm the top-of-README quick links for documentation, issue reporting, and support all work.

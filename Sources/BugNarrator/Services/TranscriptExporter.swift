@@ -38,16 +38,11 @@ enum TranscriptExportFormat {
 struct TranscriptExporter {
     private let fileManager: FileManager
     private let bundleWriter: AtomicBundleDirectoryWriter
-    private let recentLogTextProvider: () -> String
     private let logger = DiagnosticsLogger(category: .export)
 
-    init(
-        fileManager: FileManager = .default,
-        recentLogTextProvider: @escaping () -> String = { BugNarratorDiagnostics.exportableRecentLogText() }
-    ) {
+    init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
         self.bundleWriter = AtomicBundleDirectoryWriter(fileManager: fileManager)
-        self.recentLogTextProvider = recentLogTextProvider
     }
 
     func export(session: TranscriptSession, as format: TranscriptExportFormat) throws {
@@ -97,7 +92,6 @@ struct TranscriptExporter {
     }
 
     func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {
-        let recentLogText = recentLogTextProvider()
         var copiedScreenshotCount = 0
         var missingScreenshotCount = 0
 
@@ -105,23 +99,8 @@ struct TranscriptExporter {
             in: destinationRoot,
             suggestedName: session.suggestedBundleDirectoryName
         ) { bundleDirectoryURL in
-            try session.plainTextContent.write(
-                to: bundleDirectoryURL.appendingPathComponent("transcript.txt"),
-                atomically: true,
-                encoding: .utf8
-            )
             try session.markdownContent.write(
                 to: bundleDirectoryURL.appendingPathComponent("transcript.md"),
-                atomically: true,
-                encoding: .utf8
-            )
-            try session.summaryMarkdownContent.write(
-                to: bundleDirectoryURL.appendingPathComponent("summary.md"),
-                atomically: true,
-                encoding: .utf8
-            )
-            try recentLogText.write(
-                to: bundleDirectoryURL.appendingPathComponent("recent-log.txt"),
                 atomically: true,
                 encoding: .utf8
             )
