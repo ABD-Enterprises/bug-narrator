@@ -13,6 +13,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - support / donation UX inconsistencies
 - permission-recovery and error-message usability gaps
 - review-workspace and validation regressions discovered during late-stage hardening
+- session-bundle integrity regressions that make exported evidence less trustworthy
 
 ## Issues Surfaced Since 1.0.0
 
@@ -31,6 +32,7 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | Unreleased |
 | `BN-P1-012` | BugNarrator could still reject recording with a microphone-denied error after preflight passed because the recorder repeated its own permission gate using stale local-build state. | Users could stay blocked from testing for multiple local builds even when System Settings already showed microphone access enabled. | Fixed | Unreleased |
 | `BN-P1-013` | The old standalone marker shortcut and related settings copy remained after screenshots became the primary way to mark timeline moments. | Settings and QA flows described controls that no longer belonged in the simplified review model, which increased maintenance risk and UX confusion. | Fixed | Unreleased |
+| `BN-P1-014` | Exported macOS session bundles can reportedly mention screenshots in the transcript that are missing from the bundle's `screenshots/` folder. | Reviewers can lose the visual evidence tied to the transcript, which makes exported bundles harder to trust for bug triage or async handoff. | Open | -- |
 
 ## Notes Per Issue
 
@@ -114,6 +116,14 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 - Symptom: after the product shifted to screenshot-driven timeline moments, older settings/tests/docs still acted like a separate marker shortcut and marker-first workflow were active.
 - Root cause: the user-facing marker button had been removed, but the legacy marker hotkey storage key, runtime registration path, and some supporting copy were still present.
 - Fix: the standalone marker hotkey path was removed from runtime registration and settings, legacy stored marker shortcuts are now cleared during settings load, and the QA/release docs now describe the screenshot-driven workflow consistently.
+
+### BN-P1-014: Exported session bundle can omit screenshots that the transcript still references
+
+- Symptom: a tester reported macOS session bundles where `transcript.md` mentions screenshot artifacts that are not present in the exported `screenshots/` folder.
+- User impact: the transcript still points reviewers at screenshot evidence, but the actual image files are missing from the handoff package, which weakens the value of the exported bundle.
+- Evidence note: the specific shared bundle at `//Mac/Home/Downloads/Session Bundle/BugNarrator` did not reproduce the mismatch when checked directly because its one referenced screenshot was present. This issue is logged as a tester-reported macOS export-integrity bug affecting other bundles from the same testing pass.
+- Suspected area: the macOS session-bundle export path copies only screenshots whose source files still exist at export time, so metadata, transcript shaping, and on-disk screenshot lifecycle may be drifting apart for some sessions.
+- Fix status: not fixed yet.
 
 ## Current State
 

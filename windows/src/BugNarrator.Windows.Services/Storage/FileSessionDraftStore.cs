@@ -49,12 +49,16 @@ public sealed class FileSessionDraftStore : ISessionDraftStore
 
     public async Task SaveAsync(RecordingSessionDraft draft, CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(draft.SessionDirectory);
-
-        var temporaryMetadataPath = $"{draft.MetadataFilePath}.tmp";
+        var sessionDirectory = StoragePathGuards.EnsureDirectoryPathUnderRoot(
+            storagePaths.SessionsDirectory,
+            draft.SessionDirectory,
+            "recording session draft directory");
+        var metadataFilePath = StoragePathGuards.EnsureFilePathUnderRoot(
+            sessionDirectory,
+            draft.MetadataFilePath,
+            "recording session draft metadata");
         var json = JsonSerializer.Serialize(draft, JsonOptions);
 
-        await File.WriteAllTextAsync(temporaryMetadataPath, json, cancellationToken);
-        File.Move(temporaryMetadataPath, draft.MetadataFilePath, overwrite: true);
+        await AtomicFileOperations.WriteAllTextAsync(metadataFilePath, json, cancellationToken);
     }
 }

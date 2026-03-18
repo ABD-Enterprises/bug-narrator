@@ -48,7 +48,8 @@ It helps you:
 2. Open `Settings`.
 3. Paste your own `OpenAI API Key`.
 4. Optionally click `Validate Key`.
-5. Click `Show Recording Controls`.
+5. Optionally assign global hotkeys for `Start Recording`, `Stop Recording`, and `Capture Screenshot`. They begin as `Not Set` until you choose them.
+6. Click `Show Recording Controls`.
 6. Start a session with `Start Recording`.
 
 BugNarrator does not ship with a built-in OpenAI API key. Transcription and issue extraction use your own OpenAI account and may incur charges under OpenAI pricing.
@@ -57,7 +58,7 @@ BugNarrator does not ship with a built-in OpenAI API key. Transcription and issu
 
 ### Start A Narrated Testing Session
 
-Open the recording controls window from the menu bar, or use your configured start hotkey if you assigned one. BugNarrator records in the background while you keep working in other apps. The recording controls window stays available while you work.
+Open the recording controls window from the menu bar, or use your configured start hotkey if you assigned one. Global hotkeys are optional and start as `Not Set`, while the recording controls window remains the main control surface. BugNarrator records in the background while you keep working in other apps.
 
 The recording controls window includes:
 
@@ -65,7 +66,7 @@ The recording controls window includes:
 - `Stop Recording`
 - `Capture Screenshot`
 
-You can keep using global hotkeys if you assign them in Settings, but the recording controls window is the main control surface during a live review.
+You can keep using global hotkeys if you assign them in Settings, but the recording controls window is still the main control surface during a live review.
 
 ### Stop A Session
 
