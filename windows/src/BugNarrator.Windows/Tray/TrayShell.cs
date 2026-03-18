@@ -40,6 +40,15 @@ public sealed class TrayShell : IDisposable
         diagnostics.Info("tray", "tray shell initialized");
     }
 
+    public void ShowWarning(string title, string message)
+    {
+        notifyIcon.ShowBalloonTip(
+            5000,
+            title,
+            message,
+            Forms.ToolTipIcon.Warning);
+    }
+
     public void Dispose()
     {
         notifyIcon.Visible = false;
