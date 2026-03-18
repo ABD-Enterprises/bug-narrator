@@ -3,20 +3,27 @@ using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Permissions;
+using BugNarrator.Windows.Services.Secrets;
+using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
+using BugNarrator.Windows.Services.Transcription;
 
 namespace BugNarrator.Windows.Services.Audio;
 
 public sealed class RecordingLifecycleService : IRecordingLifecycleService
 {
     private readonly IAudioRecorderService audioRecorderService;
+    private readonly ICompletedSessionStore completedSessionStore;
     private readonly WindowsDiagnostics diagnostics;
     private readonly IMicrophonePreflightService microphonePreflightService;
     private readonly IScreenCapturePreflightService screenCapturePreflightService;
+    private readonly ISecretStore secretStore;
     private readonly ISessionDraftStore sessionDraftStore;
     private readonly IScreenshotImageCaptureService screenshotImageCaptureService;
     private readonly IScreenshotSelectionOverlayService screenshotSelectionOverlayService;
+    private readonly IWindowsAppSettingsStore settingsStore;
     private readonly object syncRoot = new();
+    private readonly ITranscriptionClient transcriptionClient;
 
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
@@ -25,17 +32,25 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         IAudioRecorderService audioRecorderService,
         IMicrophonePreflightService microphonePreflightService,
         ISessionDraftStore sessionDraftStore,
+        ICompletedSessionStore completedSessionStore,
         IScreenCapturePreflightService screenCapturePreflightService,
         IScreenshotSelectionOverlayService screenshotSelectionOverlayService,
         IScreenshotImageCaptureService screenshotImageCaptureService,
+        IWindowsAppSettingsStore settingsStore,
+        ISecretStore secretStore,
+        ITranscriptionClient transcriptionClient,
         WindowsDiagnostics diagnostics)
     {
         this.audioRecorderService = audioRecorderService;
         this.microphonePreflightService = microphonePreflightService;
         this.sessionDraftStore = sessionDraftStore;
+        this.completedSessionStore = completedSessionStore;
         this.screenCapturePreflightService = screenCapturePreflightService;
         this.screenshotSelectionOverlayService = screenshotSelectionOverlayService;
         this.screenshotImageCaptureService = screenshotImageCaptureService;
+        this.settingsStore = settingsStore;
+        this.secretStore = secretStore;
+        this.transcriptionClient = transcriptionClient;
         this.diagnostics = diagnostics;
     }
 
@@ -67,7 +82,9 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         cancellationToken.ThrowIfCancellationRequested();
         diagnostics.Info("recording", "recording start requested");
 
-        if (CurrentState.WorkflowState is RecordingWorkflowState.Recording or RecordingWorkflowState.Stopping)
+        if (CurrentState.WorkflowState is RecordingWorkflowState.Recording
+            or RecordingWorkflowState.Stopping
+            or RecordingWorkflowState.Saving)
         {
             diagnostics.Warning("recording", "duplicate start request ignored");
             PublishState(CurrentState with
@@ -147,7 +164,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (CurrentState.WorkflowState == RecordingWorkflowState.Stopping)
+        if (CurrentState.WorkflowState is RecordingWorkflowState.Stopping or RecordingWorkflowState.Saving)
         {
             diagnostics.Warning("recording", "duplicate stop request ignored while already stopping");
             return;
@@ -176,23 +193,43 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         {
             await audioRecorderService.StopAsync(cancellationToken);
 
-            var completedDraft = activeSession with
+            var stoppedDraft = activeSession with
             {
                 FailureMessage = null,
                 RecordingStoppedAt = DateTimeOffset.UtcNow,
+                State = RecordingWorkflowState.Saving,
+            };
+            activeSession = stoppedDraft;
+
+            await sessionDraftStore.SaveAsync(stoppedDraft, cancellationToken);
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Saving,
+                CanStart: false,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                "Preparing session review...",
+                stoppedDraft));
+
+            var completedSession = await BuildCompletedSessionAsync(stoppedDraft, cancellationToken);
+            var finalizedDraft = stoppedDraft with
+            {
+                FailureMessage = completedSession.TranscriptionStatus == SessionTranscriptionStatus.Failed
+                    ? completedSession.TranscriptionFailureMessage
+                    : null,
                 State = RecordingWorkflowState.Completed,
             };
 
-            await sessionDraftStore.SaveAsync(completedDraft, cancellationToken);
+            await sessionDraftStore.SaveAsync(finalizedDraft, cancellationToken);
+            await completedSessionStore.SaveAsync(completedSession, cancellationToken);
             activeSession = null;
 
-            diagnostics.Info("recording", "recording stopped");
+            diagnostics.Info("recording", $"recording stopped and review session saved: {completedSession.MetadataFilePath}");
             PublishState(new RecordingControlState(
                 RecordingWorkflowState.Completed,
                 CanStart: true,
                 CanStop: false,
                 CanCaptureScreenshot: false,
-                $"Recording saved to {completedDraft.SessionDirectory}",
+                BuildCompletedStatusMessage(completedSession),
                 ActiveSession: null));
         }
         catch (Exception exception)
@@ -338,5 +375,141 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         }
 
         StateChanged?.Invoke(this, nextState);
+    }
+
+    private async Task<CompletedSession> BuildCompletedSessionAsync(
+        RecordingSessionDraft draft,
+        CancellationToken cancellationToken)
+    {
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var request = new OpenAiTranscriptionRequest(
+            settings.EffectiveTranscriptionModel,
+            settings.EffectiveLanguageHint,
+            settings.EffectiveTranscriptionPrompt);
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            diagnostics.Warning("transcription", "transcription skipped because the OpenAI API key is not configured");
+            return CreateCompletedSession(
+                draft,
+                request,
+                transcriptText: string.Empty,
+                transcriptionStatus: SessionTranscriptionStatus.NotConfigured,
+                transcriptionFailureMessage: null);
+        }
+
+        try
+        {
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Saving,
+                CanStart: false,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                "Transcribing session with OpenAI...",
+                draft));
+
+            diagnostics.Info("transcription", $"transcription requested using model {request.Model}");
+            var transcriptText = await transcriptionClient.TranscribeToTextAsync(
+                draft.AudioFilePath,
+                apiKey,
+                request,
+                cancellationToken);
+
+            diagnostics.Info("transcription", "transcription completed");
+            return CreateCompletedSession(
+                draft,
+                request,
+                transcriptText,
+                SessionTranscriptionStatus.Completed,
+                transcriptionFailureMessage: null);
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("transcription", "transcription failed", exception);
+            return CreateCompletedSession(
+                draft,
+                request,
+                transcriptText: string.Empty,
+                transcriptionStatus: SessionTranscriptionStatus.Failed,
+                transcriptionFailureMessage: exception.Message);
+        }
+    }
+
+    private static CompletedSession CreateCompletedSession(
+        RecordingSessionDraft draft,
+        OpenAiTranscriptionRequest request,
+        string transcriptText,
+        SessionTranscriptionStatus transcriptionStatus,
+        string? transcriptionFailureMessage)
+    {
+        var metadataFilePath = Path.Combine(draft.SessionDirectory, "session.json");
+        var transcriptMarkdownFilePath = Path.Combine(draft.SessionDirectory, "transcript.md");
+        var stoppedAt = draft.RecordingStoppedAt ?? draft.CreatedAt;
+        var reviewSummary = SessionSummaryBuilder.Build(
+            transcriptText,
+            transcriptionStatus,
+            transcriptionFailureMessage,
+            draft.Screenshots.Count,
+            stoppedAt - draft.RecordingStartedAt);
+
+        return new CompletedSession(
+            SessionId: draft.SessionId,
+            Title: BuildSessionTitle(draft.Title, transcriptText),
+            CreatedAt: draft.CreatedAt,
+            RecordingStartedAt: draft.RecordingStartedAt,
+            RecordingStoppedAt: stoppedAt,
+            SessionDirectory: draft.SessionDirectory,
+            AudioFilePath: draft.AudioFilePath,
+            MetadataFilePath: metadataFilePath,
+            TranscriptMarkdownFilePath: transcriptMarkdownFilePath,
+            TranscriptText: transcriptText,
+            ReviewSummary: reviewSummary,
+            TranscriptionStatus: transcriptionStatus,
+            TranscriptionModel: request.Model,
+            LanguageHint: request.LanguageHint,
+            Prompt: request.Prompt,
+            TranscriptionFailureMessage: transcriptionFailureMessage,
+            IssueExtraction: null,
+            Screenshots: draft.Screenshots.ToArray(),
+            TimelineMoments: draft.TimelineMoments.OrderBy(moment => moment.ElapsedSeconds).ToArray());
+    }
+
+    private static string BuildCompletedStatusMessage(CompletedSession session)
+    {
+        return session.TranscriptionStatus switch
+        {
+            SessionTranscriptionStatus.Completed =>
+                $"Recording transcribed and saved to {session.SessionDirectory}",
+            SessionTranscriptionStatus.NotConfigured =>
+                $"Recording saved to {session.SessionDirectory}. Add an OpenAI API key in Settings to enable transcription.",
+            SessionTranscriptionStatus.Failed =>
+                $"Recording saved to {session.SessionDirectory}, but transcription failed: {session.TranscriptionFailureMessage}",
+            _ => $"Recording saved to {session.SessionDirectory}",
+        };
+    }
+
+    private static string BuildSessionTitle(string fallbackTitle, string transcriptText)
+    {
+        if (string.IsNullOrWhiteSpace(transcriptText))
+        {
+            return fallbackTitle;
+        }
+
+        var trimmedTranscript = transcriptText.Trim();
+        var sentenceBreak = trimmedTranscript.IndexOfAny(['.', '!', '?', '\r', '\n']);
+        var title = sentenceBreak >= 0
+            ? trimmedTranscript[..sentenceBreak]
+            : trimmedTranscript;
+
+        title = title.Trim();
+        if (title.Length == 0)
+        {
+            return fallbackTitle;
+        }
+
+        return title.Length <= 80
+            ? title
+            : $"{title[..80].Trim()}...";
     }
 }

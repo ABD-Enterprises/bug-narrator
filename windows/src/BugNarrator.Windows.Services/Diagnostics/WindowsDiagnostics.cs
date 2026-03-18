@@ -41,7 +41,8 @@ public sealed class WindowsDiagnostics
 
     private void Write(string level, string category, string message)
     {
-        var logLine = $"{DateTimeOffset.UtcNow:O} [{level}] [{category}] {message}{Environment.NewLine}";
+        var sanitizedMessage = SensitiveDataRedactor.Redact(message);
+        var logLine = $"{DateTimeOffset.UtcNow:O} [{level}] [{category}] {sanitizedMessage}{Environment.NewLine}";
         lock (syncRoot)
         {
             File.AppendAllText(logFilePath, logLine);
