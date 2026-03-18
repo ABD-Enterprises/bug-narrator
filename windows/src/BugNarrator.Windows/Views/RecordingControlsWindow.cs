@@ -9,6 +9,7 @@ namespace BugNarrator.Windows.Views;
 public sealed class RecordingControlsWindow : Window
 {
     private readonly WindowsDiagnostics diagnostics;
+    private readonly Action openSessionLibrary;
     private readonly IRecordingLifecycleService recordingLifecycleService;
     private readonly Button startButton;
     private readonly Button stopButton;
@@ -18,23 +19,26 @@ public sealed class RecordingControlsWindow : Window
 
     public RecordingControlsWindow(
         IRecordingLifecycleService recordingLifecycleService,
-        WindowsDiagnostics diagnostics)
+        WindowsDiagnostics diagnostics,
+        Action openSessionLibrary)
     {
         this.recordingLifecycleService = recordingLifecycleService;
         this.diagnostics = diagnostics;
+        this.openSessionLibrary = openSessionLibrary;
 
         Title = "BugNarrator Controls";
-        Width = 420;
-        Height = 340;
-        MinWidth = 360;
+        Width = 460;
+        MinWidth = 420;
         MinHeight = 300;
+        MaxHeight = SystemParameters.WorkArea.Height - 40;
+        SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         startButton = new Button
         {
             Content = "Start Recording",
             Height = 38,
-            Margin = new Thickness(0, 0, 0, 10),
+            Margin = new Thickness(0, 0, 6, 0),
         };
         startButton.Click += OnStartRecordingClicked;
 
@@ -42,7 +46,7 @@ public sealed class RecordingControlsWindow : Window
         {
             Content = "Stop Recording",
             Height = 38,
-            Margin = new Thickness(0, 0, 0, 10),
+            Margin = new Thickness(6, 0, 0, 0),
         };
         stopButton.Click += OnStopRecordingClicked;
 
@@ -50,8 +54,9 @@ public sealed class RecordingControlsWindow : Window
         {
             Content = "Capture Screenshot",
             Height = 38,
-            Margin = new Thickness(0, 0, 0, 14),
+            Margin = new Thickness(0, 0, 6, 0),
             IsEnabled = false,
+            ToolTip = "Available while a recording is active.",
         };
         screenshotButton.Click += OnCaptureScreenshotClicked;
 
@@ -66,62 +71,115 @@ public sealed class RecordingControlsWindow : Window
             TextWrapping = TextWrapping.Wrap,
         };
 
-        var closeButton = new Button
+        var openLibraryButton = new Button
         {
-            Content = "Close",
-            Height = 34,
-            Margin = new Thickness(0, 18, 0, 0),
+            Content = "Open Session Library",
+            Height = 38,
+            Margin = new Thickness(6, 0, 0, 0),
         };
-        closeButton.Click += (_, _) => Close();
+        openLibraryButton.Click += OnOpenSessionLibraryClicked;
 
-        Content = new Border
+        var contentGrid = new Grid
         {
-            Padding = new Thickness(24),
+            RowDefinitions =
+            {
+                new RowDefinition
+                {
+                    Height = GridLength.Auto,
+                },
+                new RowDefinition
+                {
+                    Height = GridLength.Auto,
+                },
+                new RowDefinition
+                {
+                    Height = GridLength.Auto,
+                },
+                new RowDefinition
+                {
+                    Height = GridLength.Auto,
+                },
+            },
+        };
+
+        var headerPanel = new StackPanel
+        {
+            Children =
+            {
+                new TextBlock
+                {
+                    FontSize = 28,
+                    FontWeight = FontWeights.Bold,
+                    Text = "Recording Controls",
+                },
+                new TextBlock
+                {
+                    Margin = new Thickness(0, 8, 0, 0),
+                    Foreground = System.Windows.Media.Brushes.DimGray,
+                    Text = "Live capture happens here. Use Session Library for review and export.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            },
+        };
+
+        var statusPanel = new Border
+        {
+            Margin = new Thickness(0, 16, 0, 0),
+            Padding = new Thickness(12, 10, 12, 10),
+            BorderThickness = new Thickness(1),
+            BorderBrush = System.Windows.Media.Brushes.LightGray,
+            CornerRadius = new CornerRadius(8),
             Child = new StackPanel
             {
                 Children =
                 {
-                    new TextBlock
-                    {
-                        FontSize = 28,
-                        FontWeight = FontWeights.Bold,
-                        Text = "Recording Controls",
-                    },
-                    new TextBlock
-                    {
-                        Margin = new Thickness(0, 12, 0, 0),
-                        Text = "Milestone 4 adds drag-select screenshot capture, screenshot metadata, and screenshot-linked timeline moments while keeping recording stable.",
-                        TextWrapping = TextWrapping.Wrap,
-                    },
-                    new TextBlock
-                    {
-                        Margin = new Thickness(0, 16, 0, 0),
-                        Foreground = System.Windows.Media.Brushes.DimGray,
-                        Text = "Source-of-truth docs: windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md and docs/CROSS_PLATFORM_GUIDELINES.md",
-                        TextWrapping = TextWrapping.Wrap,
-                    },
-                    new Border
-                    {
-                        Margin = new Thickness(0, 18, 0, 18),
-                        Padding = new Thickness(12),
-                        BorderThickness = new Thickness(1),
-                        BorderBrush = System.Windows.Media.Brushes.LightGray,
-                        CornerRadius = new CornerRadius(8),
-                        Child = new StackPanel
-                        {
-                            Children =
-                            {
-                                stateTextBlock,
-                                statusTextBlock,
-                            },
-                        },
-                    },
-                    startButton,
-                    stopButton,
-                    screenshotButton,
-                    closeButton,
+                    stateTextBlock,
+                    statusTextBlock,
                 },
             },
+        };
+
+        var actionGrid = new Grid
+        {
+            Margin = new Thickness(0, 16, 0, 0),
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(),
+                new ColumnDefinition(),
+            },
+        };
+        Grid.SetColumn(startButton, 0);
+        Grid.SetColumn(stopButton, 1);
+        actionGrid.Children.Add(startButton);
+        actionGrid.Children.Add(stopButton);
+
+        var secondaryActionGrid = new Grid
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(),
+                new ColumnDefinition(),
+            },
+        };
+        Grid.SetColumn(screenshotButton, 0);
+        Grid.SetColumn(openLibraryButton, 1);
+        secondaryActionGrid.Children.Add(screenshotButton);
+        secondaryActionGrid.Children.Add(openLibraryButton);
+
+        Grid.SetRow(headerPanel, 0);
+        Grid.SetRow(statusPanel, 1);
+        Grid.SetRow(actionGrid, 2);
+        Grid.SetRow(secondaryActionGrid, 3);
+        contentGrid.Children.Add(headerPanel);
+        contentGrid.Children.Add(statusPanel);
+        contentGrid.Children.Add(actionGrid);
+        contentGrid.Children.Add(secondaryActionGrid);
+
+        Content = new Border
+        {
+            Padding = new Thickness(24),
+            Child = contentGrid,
         };
 
         recordingLifecycleService.StateChanged += OnStateChanged;
@@ -158,6 +216,18 @@ public sealed class RecordingControlsWindow : Window
     private void OnStateChanged(object? sender, RecordingControlState state)
     {
         Dispatcher.Invoke(() => ApplyState(state));
+    }
+
+    private void OnOpenSessionLibraryClicked(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            openSessionLibrary();
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("ui", "open session library click failed", exception);
+        }
     }
 
     private async void OnStopRecordingClicked(object? sender, RoutedEventArgs e)
