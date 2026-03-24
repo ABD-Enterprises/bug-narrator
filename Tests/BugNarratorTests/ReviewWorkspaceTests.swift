@@ -131,6 +131,30 @@ final class ReviewWorkspaceTests: XCTestCase {
         XCTAssertEqual(entries.last?.text, "Legacy marker")
     }
 
+    func testPendingTranscriptionSessionUsesRecoveryTimelineEntry() {
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            transcript: "",
+            duration: 5,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 1_700_000_010)
+            )
+        )
+
+        let entries = ReviewWorkspace.timelineEntries(for: session)
+
+        XCTAssertEqual(entries.first?.title, "Transcription Pending")
+        XCTAssertEqual(
+            entries.first?.text,
+            "Recording saved locally. Add your OpenAI API key in Settings, then retry transcription from this session."
+        )
+    }
+
     func testSelectedIssueSummaryCountsOnlySelectedIssues() {
         let issues = [
             ExtractedIssue(

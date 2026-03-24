@@ -1,5 +1,10 @@
 # BugNarrator Distribution
 
+Structured counterparts:
+
+- [docs/operations/deployment.md](operations/deployment.md)
+- [docs/release/release-process.md](release/release-process.md)
+
 This document explains how to build the BugNarrator release app, package it as a distributable macOS DMG, and validate it before publishing on GitHub Releases.
 
 ## What This Produces

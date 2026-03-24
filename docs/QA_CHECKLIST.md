@@ -1,5 +1,7 @@
 # BugNarrator QA Checklist
 
+Structured counterpart: [docs/testing/testing.md](testing/testing.md)
+
 ## Setup
 
 - For manual recording-based QA, ask testers to follow the [Tester Narration Guide](UserGuide.md#tester-narration-guide) so transcripts and extracted issues include clear repro context.
@@ -52,6 +54,20 @@
 - Verify the detail pane makes the distinction between raw transcript, review summary, screenshots, and extracted issues easy to understand.
 - Verify Settings feels intentionally grouped and not like an unstructured admin panel.
 - Verify About, documentation, changelog, issue reporting, and support surfaces feel visually and tonally consistent with the rest of the app.
+
+## Accessibility
+
+- Navigate the menu bar window, recording controls window, settings window, and session library using only the keyboard.
+- Verify focus order feels logical and no core action requires the mouse.
+- Verify the default action in the recording controls window follows the enabled primary action and `Esc` closes the window.
+- Verify the session-library filter list and review-tab strip announce selected state correctly.
+- Verify session rows announce title, date, duration, screenshot count, issue count, and retry-needed or unsaved state clearly enough to choose the right session without visual scanning.
+- Verify extracted-issue export checkboxes announce the issue title and selected state.
+- Verify extracted-issue category menus announce both the issue title and current category.
+- Verify settings fields for OpenAI, GitHub, Jira, and transcription defaults announce explicit labels instead of only placeholder text.
+- Verify hotkey assignment controls announce which BugNarrator action they apply to when assigning, changing, or clearing a shortcut.
+- Verify transient toast messages in the recording controls window are announced to VoiceOver instead of being visual-only.
+- Verify no decorative status dot or repeated screenshot action label becomes a noisy standalone VoiceOver stop.
 
 ## Download And Install Experience
 
@@ -172,7 +188,7 @@
 - Remove the OpenAI API key and attempt to start a session.
   Expected: recording can still start after microphone permission is granted, but the app explains that transcription will require the user's own OpenAI API key before the session can be finished with OpenAI features.
 - Start recording, remove the OpenAI API key from Settings, then stop the session.
-  Expected: the app fails gracefully, explains that the key is missing, and remains usable for the next session.
+  Expected: the app preserves the finished session and audio, explains that the key is missing, keeps the session available in the library, and allows transcription to be retried after the key is restored.
 - Deny microphone permission and attempt to start a session.
   Expected: recording does not start, the error explains how to re-enable access in System Settings, and `Open Microphone Settings` opens the expected privacy pane or a safe fallback.
 - Force or simulate a restricted microphone state if practical.
@@ -194,7 +210,7 @@
 - Disconnect networking or force a timeout during transcription.
   Expected: transcription ends in a clear timeout or API error state and the app returns to a usable state.
 - Use an invalid OpenAI API key.
-  Expected: transcription or issue extraction ends in a clear invalid-key error, Settings opens, and the menu bar offers a direct `Open Settings` recovery action.
+  Expected: transcription or issue extraction ends in a clear invalid-key error, Settings opens, and the preserved session remains available so transcription can be retried after the key is replaced.
 - Simulate a local history write failure after a successful transcription if practical.
   Expected: the transcript window still opens, the completed session remains available as an unsaved session, screenshots remain accessible, and `Save to History` can be retried later after storage is fixed.
 - Cancel an active recording.

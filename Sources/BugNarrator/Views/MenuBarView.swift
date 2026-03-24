@@ -86,6 +86,7 @@ struct MenuBarView: View {
                         Circle()
                             .fill(.red)
                             .frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
 
                         Text("Recording in progress")
                             .font(.subheadline.weight(.medium))
@@ -292,6 +293,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .accessibilityHint("Opens the recording controls window.")
 
             switch appState.status.phase {
             case .idle:
@@ -362,6 +364,42 @@ struct MenuBarView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityHint("Opens the session library window.")
+
+            if transcriptStore.pendingTranscriptionSessionCount > 0 {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(pendingTranscriptionSummary)
+                        .font(.footnote.weight(.semibold))
+
+                    Text("Restore or replace the OpenAI API key in Settings if needed, then reopen the saved session to retry transcription.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 10) {
+                        if appState.settingsStore.hasAPIKey {
+                            Button("Open Retry Needed Session") {
+                                openPendingTranscriptionSession()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        } else {
+                            Button("Open Settings") {
+                                appState.openSettings()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        Button("View Library") {
+                            appState.openTranscriptHistory()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
         }
         .padding(14)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -531,6 +569,21 @@ struct MenuBarView: View {
         }
     }
 
+    private var pendingTranscriptionSummary: String {
+        let count = transcriptStore.pendingTranscriptionSessionCount
+        return count == 1
+            ? "1 saved session is waiting for transcription retry."
+            : "\(count) saved sessions are waiting for transcription retry."
+    }
+
+    private func openPendingTranscriptionSession() {
+        if let sessionID = transcriptStore.latestPendingTranscriptionSession?.id {
+            appState.selectedTranscriptID = sessionID
+        }
+
+        appState.openTranscriptHistory()
+    }
+
     private func hotkeyLine(label: String, value: String) -> some View {
         HStack {
             Text(label)
@@ -541,6 +594,9 @@ struct MenuBarView: View {
                 .foregroundStyle(.primary)
         }
         .font(.footnote)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) hotkey")
+        .accessibilityValue(value)
     }
 
     private var statusTint: Color {

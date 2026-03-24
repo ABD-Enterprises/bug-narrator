@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RecordingControlPanelView: View {
@@ -37,6 +38,9 @@ struct RecordingControlPanelView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: appState.transientToast)
         .accessibilityElement(children: .contain)
+        .onChange(of: appState.transientToast?.message) { _, newMessage in
+            announceAccessibilityMessage(newMessage)
+        }
     }
 
     private var header: some View {
@@ -65,6 +69,7 @@ struct RecordingControlPanelView: View {
                     Circle()
                         .fill(.red)
                         .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
                 }
 
                 Text(statusHeadline)
@@ -103,6 +108,9 @@ struct RecordingControlPanelView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Recording status")
+        .accessibilityValue(statusSummaryAccessibilityValue)
     }
 
     private var controlGrid: some View {
@@ -146,6 +154,8 @@ struct RecordingControlPanelView: View {
 
             Button("Close", action: onClose)
                 .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityHint("Closes the recording controls window.")
         }
     }
 
@@ -303,14 +313,74 @@ struct RecordingControlPanelView: View {
         }
 
         if prominence == .primary {
-            button
-                .buttonStyle(.borderedProminent)
-                .disabled(!enabled)
+            if enabled {
+                button
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityLabel(title)
+                    .accessibilityHint(actionButtonAccessibilityHint(shortcut: shortcut, enabled: enabled))
+            } else {
+                button
+                    .buttonStyle(.borderedProminent)
+                    .disabled(true)
+                    .accessibilityLabel(title)
+                    .accessibilityHint(actionButtonAccessibilityHint(shortcut: shortcut, enabled: enabled))
+            }
         } else {
             button
                 .buttonStyle(.bordered)
                 .disabled(!enabled)
+                .accessibilityLabel(title)
+                .accessibilityHint(actionButtonAccessibilityHint(shortcut: shortcut, enabled: enabled))
         }
+    }
+
+    private var statusSummaryAccessibilityValue: String {
+        var components = [statusHeadline]
+
+        if appState.status.phase == .recording {
+            components.append("Elapsed time \(appState.elapsedTimeString)")
+        }
+
+        components.append(statusMessage)
+
+        if let localTestingNote {
+            components.append(localTestingNote)
+        }
+
+        if appState.status.phase == .recording {
+            components.append("\(appState.activeTimelineMomentCount) timeline moments")
+            components.append("\(appState.activeScreenshotCount) screenshots")
+        }
+
+        return components.joined(separator: ". ")
+    }
+
+    private func actionButtonAccessibilityHint(shortcut: String?, enabled: Bool) -> String {
+        if !enabled {
+            return "Currently unavailable."
+        }
+
+        if let shortcut, !shortcut.isEmpty {
+            return "Keyboard shortcut: \(shortcut)."
+        }
+
+        return "Available from the recording controls window."
+    }
+
+    private func announceAccessibilityMessage(_ message: String?) {
+        guard let message, !message.isEmpty else {
+            return
+        }
+
+        NSAccessibility.post(
+            element: NSApp as Any,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: message,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue
+            ]
+        )
     }
 }
 

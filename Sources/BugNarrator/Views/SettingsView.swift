@@ -38,6 +38,7 @@ struct SettingsView: View {
                             SecureField("sk-...", text: $settingsStore.apiKey)
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(secureControlsDisabled)
+                                .accessibilityLabel("OpenAI API Key")
                         }
 
                         HStack(spacing: 12) {
@@ -83,11 +84,13 @@ struct SettingsView: View {
                         labeledField(title: "Model") {
                             TextField("whisper-1", text: $settingsStore.preferredModel)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Transcription model")
                         }
 
                         labeledField(title: "Language Hint") {
                             TextField("Optional, for example en", text: $settingsStore.languageHint)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Transcription language hint")
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -101,6 +104,7 @@ struct SettingsView: View {
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .stroke(.quaternary, lineWidth: 1)
                                 )
+                                .accessibilityLabel("Transcription prompt")
                         }
 
                         Text("Transcription uses the OpenAI audio transcription API. Keep prompt guidance short and use the language hint only when it improves recognition.")
@@ -116,6 +120,7 @@ struct SettingsView: View {
                         labeledField(title: "Extraction Model") {
                             TextField("gpt-4.1-mini", text: $settingsStore.issueExtractionModel)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Issue extraction model")
                         }
 
                         Toggle("Run issue extraction automatically after transcription", isOn: $settingsStore.autoExtractIssues)
@@ -188,6 +193,7 @@ struct SettingsView: View {
                             SecureField("github_pat_...", text: $settingsStore.githubToken)
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(secureControlsDisabled)
+                                .accessibilityLabel("GitHub personal access token")
                         }
 
                         HStack(spacing: 12) {
@@ -206,16 +212,19 @@ struct SettingsView: View {
                         labeledField(title: "Repository Owner") {
                             TextField("for example acme", text: $settingsStore.githubRepositoryOwner)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("GitHub repository owner")
                         }
 
                         labeledField(title: "Repository Name") {
                             TextField("for example bugnarrator", text: $settingsStore.githubRepositoryName)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("GitHub repository name")
                         }
 
                         labeledField(title: "Default Labels") {
                             TextField("Comma-separated labels", text: $settingsStore.githubDefaultLabels)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("GitHub default labels")
                         }
 
                         Text(settingsStore.githubTokenStorageDescription)
@@ -235,17 +244,20 @@ struct SettingsView: View {
                         labeledField(title: "Jira Cloud URL") {
                             TextField("your-domain.atlassian.net", text: $settingsStore.jiraBaseURL)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Jira Cloud URL")
                         }
 
                         labeledField(title: "Email") {
                             TextField("you@example.com", text: $settingsStore.jiraEmail)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Jira email")
                         }
 
                         labeledField(title: "API Token") {
                             SecureField("Atlassian API token", text: $settingsStore.jiraAPIToken)
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(secureControlsDisabled)
+                                .accessibilityLabel("Jira API token")
                         }
 
                         HStack(spacing: 12) {
@@ -264,11 +276,13 @@ struct SettingsView: View {
                         labeledField(title: "Project Key") {
                             TextField("for example FM", text: $settingsStore.jiraProjectKey)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Jira project key")
                         }
 
                         labeledField(title: "Issue Type") {
                             TextField("for example Task", text: $settingsStore.jiraIssueType)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Jira issue type")
                         }
 
                         Text(settingsStore.jiraTokenStorageDescription)
@@ -356,8 +370,9 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(action.title)
                 .font(.subheadline.weight(.medium))
-            HotkeyRecorderView(shortcut: shortcut)
+            HotkeyRecorderView(actionTitle: action.title, shortcut: shortcut)
         }
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder

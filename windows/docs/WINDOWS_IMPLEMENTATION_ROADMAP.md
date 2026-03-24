@@ -4,7 +4,9 @@
 
 This document defines the Windows MVP direction for BugNarrator and turns it into an implementation plan that is ready to execute in milestones.
 
-The BugNarrator Spec and the current macOS implementation remain the product source of truth. This document translates that product into a practical Windows-first plan without changing the core direction.
+The shared BugNarrator product source of truth is [docs/architecture/product-spec.md](../../docs/architecture/product-spec.md). This document translates that product into a practical Windows-first implementation plan without changing the core direction.
+
+Cross-platform deviations and parity status are tracked in [docs/architecture/parity-matrix.md](../../docs/architecture/parity-matrix.md).
 
 The Windows version should preserve the same durable workflow:
 
@@ -50,9 +52,9 @@ Build a Windows desktop version of BugNarrator that allows a tester to:
 - MVVM helpers: CommunityToolkit.Mvvm
 - Tray integration: WPF plus a tray icon host
 - Audio recording: NAudio or Media Foundation
-- Region screenshot capture: Windows Graphics Capture plus a custom region-selection overlay
+- Region screenshot capture: a WPF region-selection overlay plus selected-region desktop capture today, with room to adopt Windows Graphics Capture later if needed
 - Secret storage: Windows Credential Manager or DPAPI
-- Local storage: JSON and files under `%AppData%` or `%LocalAppData%`
+- Local storage: JSON and files under `%LocalAppData%`
 - Logging: `Microsoft.Extensions.Logging` plus local rolling log files
 - Packaging: signed installer `.exe` first, MSIX later if needed
 
@@ -168,7 +170,7 @@ The `Screenshots` tab should act as both:
 
 ### Export
 
-Session bundle export should match current product behavior:
+Session bundle export should match the canonical product spec:
 
 - `transcript.md`
 - `screenshots/`
@@ -317,7 +319,7 @@ Outcomes:
 
 - screenshot capture works during an active session
 - cancelled screenshots do not break recording
-- the saved artifact model matches the current product direction
+- the saved artifact model matches the canonical product spec
 
 Current implementation findings:
 
@@ -518,9 +520,8 @@ As of March 18, 2026, the current Windows branch is in strong parity with the cu
 ```text
 windows/
   docs/
-    WINDOWS_MVP_SPEC.md
     WINDOWS_IMPLEMENTATION_ROADMAP.md
-    WINDOWS_SIGNING_AND_RELEASE.md
+    WINDOWS_VALIDATION_CHECKLIST.md
   src/
     BugNarrator.Core/
       Models/
@@ -708,7 +709,7 @@ These prompts are intended for iterative implementation, not one-shot generation
 ### Prompt 1: Solution Scaffold
 
 ```md
-Use the BugNarrator Spec, the current macOS repo, and `windows/docs/WINDOWS_MVP_SPEC.md` as the source of truth.
+Use `docs/architecture/product-spec.md`, `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`, and `docs/CROSS_PLATFORM_GUIDELINES.md` as the source of truth. Use the current macOS repo only as a reference implementation when needed.
 
 Execute Milestone 1 for the Windows version of BugNarrator.
 
@@ -750,7 +751,7 @@ Return:
 ### Prompt 2: Tray App And Single Instance
 
 ```md
-Use the BugNarrator Spec, the current macOS repo, and `windows/docs/WINDOWS_MVP_SPEC.md` as the source of truth.
+Use `docs/architecture/product-spec.md`, `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`, and `docs/CROSS_PLATFORM_GUIDELINES.md` as the source of truth. Use the current macOS repo only as a reference implementation when needed.
 
 Execute Milestone 2 for the Windows version of BugNarrator.
 
@@ -790,7 +791,7 @@ Return:
 ### Prompt 3: Recording Controls And Mic Recording
 
 ```md
-Use the BugNarrator Spec, the current macOS repo, and `windows/docs/WINDOWS_MVP_SPEC.md` as the source of truth.
+Use `docs/architecture/product-spec.md`, `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`, and `docs/CROSS_PLATFORM_GUIDELINES.md` as the source of truth. Use the current macOS repo only as a reference implementation when needed.
 
 Execute Milestone 3 for the Windows version of BugNarrator.
 
@@ -836,12 +837,14 @@ Return:
 ### Prompt 4: Screenshot Region Capture
 
 ```md
-Use the current Windows branch plus these repo documents as the source of truth:
-- `README.md`
-- `docs/UserGuide.md`
+Use these docs as the source of truth:
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
 - `docs/CROSS_PLATFORM_GUIDELINES.md`
 - `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
 - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Use the current macOS repo and companion user docs only as a reference implementation when needed.
 
 Execute Phase 4 of the Windows MVP, which maps to Milestone 4: `Screenshot Region Capture`.
 
@@ -900,12 +903,14 @@ Return:
 ### Prompt 5: Transcription, Session Library, Review Workspace
 
 ```md
-Use the current Windows branch plus these repo documents as the source of truth:
-- `README.md`
-- `docs/UserGuide.md`
+Use these docs as the source of truth:
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
 - `docs/CROSS_PLATFORM_GUIDELINES.md`
 - `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
 - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Use the current macOS repo and companion user docs only as a reference implementation when needed.
 
 Execute Milestone 5 for the Windows version of BugNarrator.
 
@@ -988,14 +993,15 @@ Return:
 ### Prompt 6: Extraction, Exports, Diagnostics, Packaging
 
 ```md
-Use the current Windows branch plus these repo documents as the source of truth:
-
-- `README.md`
-- `docs/UserGuide.md`
+Use these docs as the source of truth:
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
 - `docs/CROSS_PLATFORM_GUIDELINES.md`
 - `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
 - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
 - `windows/docs/WINDOWS_SIGNING_AND_RELEASE.md`
+
+Use the current macOS repo and companion user docs only as a reference implementation when needed.
 
 Execute Milestone 6 for the Windows version of BugNarrator.
 
@@ -1177,7 +1183,7 @@ Return:
 
 ## Recommended Immediate Next Steps
 
-1. accept this roadmap and the MVP spec
+1. accept the canonical product spec and this Windows roadmap
 2. create the Windows solution skeleton
 3. validate the tray app and single-instance spike on a real Windows machine or VM
 4. only then begin feature implementation

@@ -133,6 +133,7 @@ struct TranscriptView: View {
     private var sessionListColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
             sessionListHeader
+            pendingTranscriptionBanner
 
             if let emptyState {
                 ContentUnavailableView {
@@ -232,6 +233,7 @@ struct TranscriptView: View {
                 Label {
                     TextField("Search title, transcript, or summary", text: $searchText)
                         .textFieldStyle(.plain)
+                        .accessibilityLabel("Search sessions")
                 } icon: {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
@@ -246,6 +248,7 @@ struct TranscriptView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .accessibilityLabel("Clear search")
                 }
 
                 Button(role: .destructive) {
@@ -255,6 +258,39 @@ struct TranscriptView: View {
                 }
                 .disabled(selectedSession == nil)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var pendingTranscriptionBanner: some View {
+        if transcriptStore.pendingTranscriptionSessionCount > 0 {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(pendingTranscriptionBannerTitle, systemImage: "arrow.clockwise.circle")
+                    .font(.subheadline.weight(.semibold))
+
+                Text("These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your OpenAI API key.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 10) {
+                    Button("Open Latest Retry Needed Session") {
+                        openLatestPendingTranscriptionSession()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    if !appState.settingsStore.hasAPIKey {
+                        Button("Open Settings") {
+                            appState.openSettings()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -293,6 +329,7 @@ struct TranscriptView: View {
             .menuStyle(.borderlessButton)
             .fixedSize(horizontal: true, vertical: false)
             .accessibilityLabel("Sort sessions")
+            .accessibilityValue(sortOrder.rawValue)
         }
     }
 
@@ -351,6 +388,11 @@ struct TranscriptView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(filter.rawValue)
+        .accessibilityValue("\(count(for: filter)) sessions")
+        .accessibilityHint(selectedFilter == filter ? "Current session filter." : "Filters the session list.")
+        .accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])
     }
 
     private var selectionBinding: Binding<UUID?> {
@@ -439,11 +481,21 @@ struct TranscriptView: View {
 
     private var sessionCountSummary: String {
         let count = filteredEntries.count
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return count == 1 ? "1 session" : "\(count) sessions"
+        let pendingRetryCount = transcriptStore.pendingTranscriptionSessionCount
+        let pendingRetrySuffix: String
+        if pendingRetryCount > 0 {
+            pendingRetrySuffix = pendingRetryCount == 1
+                ? " • 1 needs retry"
+                : " • \(pendingRetryCount) need retry"
+        } else {
+            pendingRetrySuffix = ""
         }
 
-        return count == 1 ? "1 result for “\(searchText)”" : "\(count) results for “\(searchText)”"
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return (count == 1 ? "1 session" : "\(count) sessions") + pendingRetrySuffix
+        }
+
+        return (count == 1 ? "1 result for “\(searchText)”" : "\(count) results for “\(searchText)”") + pendingRetrySuffix
     }
 
     private var sessionIDSignature: String {
@@ -510,6 +562,21 @@ struct TranscriptView: View {
         appState.selectedTranscriptID = filteredEntries.first?.id
     }
 
+    private var pendingTranscriptionBannerTitle: String {
+        let count = transcriptStore.pendingTranscriptionSessionCount
+        return count == 1
+            ? "1 session needs transcription retry"
+            : "\(count) sessions need transcription retry"
+    }
+
+    private func openLatestPendingTranscriptionSession() {
+        selectedFilter = .allSessions
+        searchText = ""
+        appState.selectedTranscriptID = transcriptStore.latestPendingTranscriptionSession?.id
+        syncSelection()
+        syncDetailTabSelection()
+    }
+
     private func syncDetailTabSelection() {
         selectedDetailTab = ReviewWorkspace.clampedTab(selectedDetailTab, for: selectedSession)
     }
@@ -538,12 +605,22 @@ struct TranscriptView: View {
 
                 Spacer()
 
-                if isUnsaved(entry.id) {
-                    Text("Unsaved")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(.orange.opacity(0.14), in: Capsule())
+                HStack(spacing: 6) {
+                    if entry.isPendingTranscription {
+                        Text("Retry Needed")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(.yellow.opacity(0.16), in: Capsule())
+                    }
+
+                    if isUnsaved(entry.id) {
+                        Text("Unsaved")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(.orange.opacity(0.14), in: Capsule())
+                    }
                 }
             }
 
@@ -581,6 +658,10 @@ struct TranscriptView: View {
         }
         .padding(12)
         .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.title)
+        .accessibilityValue(sessionRowAccessibilitySummary(for: entry))
+        .accessibilityHint("Selects this session and updates the detail pane.")
     }
 
     private func metricChip(systemImage: String, title: String) -> some View {
@@ -632,7 +713,34 @@ struct TranscriptView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
 
-            if isUnsaved(session.id) {
+            if session.requiresTranscriptionRetry {
+                HStack(alignment: .center, spacing: 10) {
+                    Label(
+                        session.transcriptionRecoveryMessage ?? "Retry transcription after restoring your OpenAI API key.",
+                        systemImage: "arrow.clockwise.circle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    if appState.settingsStore.hasAPIKey {
+                        Button("Retry Transcription") {
+                            Task {
+                                await appState.retryPendingTranscription(for: session.id)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    } else {
+                        Button("Open Settings") {
+                            appState.openSettings()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            } else if isUnsaved(session.id) {
                 HStack(spacing: 10) {
                     Label("Only stored in memory until you save it.", systemImage: "tray")
                         .font(.footnote)
@@ -728,6 +836,10 @@ struct TranscriptView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(tab.title)
+                    .accessibilityValue(selectedDetailTab == tab ? "Selected" : "Not selected")
+                    .accessibilityHint("Shows the \(tab.title.lowercased()) view for the selected session.")
+                    .accessibilityAddTraits(selectedDetailTab == tab ? .isSelected : [])
                 }
             }
         }
@@ -875,6 +987,7 @@ struct TranscriptView: View {
                         appState.openScreenshot(screenshot)
                     }
                     .buttonStyle(.link)
+                    .accessibilityLabel(screenshotActionLabel(for: screenshot, index: nil, action: "Open"))
                 }
             }
 
@@ -916,11 +1029,13 @@ struct TranscriptView: View {
                             selectedDetailTab = .rawTranscript
                         }
                         .buttonStyle(.link)
+                        .accessibilityLabel("Show Screenshot \(index + 1) in transcript")
 
                         Button("Open Screenshot") {
                             appState.openScreenshot(screenshot)
                         }
                         .buttonStyle(.link)
+                        .accessibilityLabel(screenshotActionLabel(for: screenshot, index: index, action: "Open"))
                     }
                 }
             } else {
@@ -934,11 +1049,13 @@ struct TranscriptView: View {
                             selectedDetailTab = .rawTranscript
                         }
                         .buttonStyle(.link)
+                        .accessibilityLabel("Show Screenshot \(index + 1) in transcript")
 
                         Button("Open Screenshot") {
                             appState.openScreenshot(screenshot)
                         }
                         .buttonStyle(.link)
+                        .accessibilityLabel(screenshotActionLabel(for: screenshot, index: index, action: "Open"))
                     }
                 }
             }
@@ -949,7 +1066,8 @@ struct TranscriptView: View {
                 screenshotPreview(screenshot)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Open Screenshot \(index + 1)")
+            .accessibilityLabel(screenshotActionLabel(for: screenshot, index: index, action: "Open"))
+            .accessibilityHint("Opens the saved screenshot file.")
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1117,7 +1235,7 @@ struct TranscriptView: View {
                 await appState.extractIssuesForDisplayedTranscript()
             }
         }
-        .disabled(appState.isExtractingIssues(for: session))
+        .disabled(appState.isExtractingIssues(for: session) || session.requiresTranscriptionRetry)
     }
 
     private func copyTranscriptButton(for session: TranscriptSession) -> some View {
@@ -1125,6 +1243,7 @@ struct TranscriptView: View {
             appState.selectedTranscriptID = session.id
             appState.copyDisplayedTranscript()
         }
+        .disabled(session.requiresTranscriptionRetry || !session.hasTranscriptContent)
     }
 
     private func exportMenu(session: TranscriptSession) -> some View {
@@ -1141,6 +1260,7 @@ struct TranscriptView: View {
                 exportBundle(session: session)
             }
         }
+        .disabled(session.requiresTranscriptionRetry || !session.hasTranscriptContent)
     }
 
     private func issueSelectionToggle(issue: ExtractedIssue, session: TranscriptSession) -> some View {
@@ -1154,6 +1274,9 @@ struct TranscriptView: View {
             )
         )
         .toggleStyle(.checkbox)
+        .accessibilityLabel("Select issue \(issue.title) for export")
+        .accessibilityValue((extractedIssue(sessionID: session.id, issueID: issue.id)?.isSelectedForExport ?? issue.isSelectedForExport) ? "Selected" : "Not selected")
+        .accessibilityHint("Controls whether this extracted issue is included in GitHub or Jira export.")
     }
 
     @ViewBuilder
@@ -1168,6 +1291,7 @@ struct TranscriptView: View {
                         text: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.title, fallback: issue.title)
                     )
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Issue title for \(issue.title)")
 
                     issueReviewBadge(issue: issue, session: session)
                 }
@@ -1183,6 +1307,7 @@ struct TranscriptView: View {
                         text: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.title, fallback: issue.title)
                     )
                     .textFieldStyle(.plain)
+                    .accessibilityLabel("Issue title for \(issue.title)")
 
                     Spacer()
 
@@ -1228,6 +1353,7 @@ struct TranscriptView: View {
                             appState.openScreenshot(screenshot)
                         }
                         .buttonStyle(.link)
+                        .accessibilityLabel("Open related screenshot \(screenshot.fileName)")
                     }
                 }
             }
@@ -1245,6 +1371,8 @@ struct TranscriptView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
+        .accessibilityLabel("Issue category for \(issue.title)")
+        .accessibilityValue((extractedIssue(sessionID: session.id, issueID: issue.id)?.category ?? issue.category).rawValue)
     }
 
     @ViewBuilder
@@ -1332,6 +1460,41 @@ struct TranscriptView: View {
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )
+    }
+
+    private func sessionRowAccessibilitySummary(for entry: SessionLibraryEntry) -> String {
+        var components = [
+            entry.createdAt.formatted(date: .abbreviated, time: .shortened),
+            "Duration \(ElapsedTimeFormatter.string(from: entry.duration))"
+        ]
+
+        if entry.screenshotCount > 0 {
+            components.append("\(entry.screenshotCount) screenshot\(entry.screenshotCount == 1 ? "" : "s")")
+        }
+
+        if entry.issueCount > 0 {
+            components.append("\(entry.issueCount) extracted issue\(entry.issueCount == 1 ? "" : "s")")
+        }
+
+        if entry.isPendingTranscription {
+            components.append("Retry needed before transcription is complete")
+        }
+
+        if isUnsaved(entry.id) {
+            components.append("Unsaved")
+        }
+
+        let preview = entry.preview.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !preview.isEmpty {
+            components.append(preview)
+        }
+
+        return components.joined(separator: ". ")
+    }
+
+    private func screenshotActionLabel(for screenshot: SessionScreenshot, index: Int?, action: String) -> String {
+        let ordinal = index.map { "Screenshot \($0 + 1)" } ?? "Screenshot"
+        return "\(action) \(ordinal) at \(screenshot.timeLabel)"
     }
 
 }

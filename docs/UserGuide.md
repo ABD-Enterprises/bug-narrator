@@ -1,5 +1,7 @@
 # BugNarrator User Guide
 
+Structured counterpart: [docs/user/user-manual.md](user/user-manual.md)
+
 BugNarrator is a macOS menu bar app for narrated software testing sessions. It helps developers, testers, and product owners talk through a workflow, capture evidence, and turn that session into a transcript plus draft issues they can review or export.
 
 BugNarrator intentionally runs as a single-instance app. If you open it again while it is already running, the existing instance should come forward and the second copy should exit. This avoids duplicate menu bar items and protects local session integrity.
@@ -70,7 +72,9 @@ You can keep using global hotkeys if you assign them in Settings, but the record
 
 ### Stop A Session
 
-When you finish, stop the session from the control window or a stop hotkey you explicitly assigned. BugNarrator then uploads the recorded audio to OpenAI and waits for the transcript result.
+When you finish, stop the session from the control window or a stop hotkey you explicitly assigned. BugNarrator then preserves the finished audio inside the session artifacts and, when your OpenAI API key is available, uploads the recorded audio to OpenAI and waits for the transcript result.
+
+If the key is missing, invalid, or revoked at stop time, the session still stays in the library as a retryable item. Restore or replace the key in `Settings`, then open the session again and retry transcription from the preserved session.
 
 ### Review The Session
 
@@ -285,13 +289,14 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - paste your own OpenAI API key
 - click `Validate Key` if you want to check it before transcription or issue extraction
 - BugNarrator stores the key in macOS Keychain when available
+- if a completed session could not be transcribed because the key was missing at stop time, keep the session and retry after adding the key back
 
 ### API Key Rejected Or Revoked
 
 - open `Settings`
 - replace the key or remove it and paste a new one
 - click `Validate Key`
-- try the session again after OpenAI accepts the new key
+- try the preserved session again after OpenAI accepts the new key
 
 ### Screenshots Not Appearing
 

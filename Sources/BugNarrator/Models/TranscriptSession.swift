@@ -1,5 +1,52 @@
 import Foundation
 
+enum PendingTranscriptionFailureReason: String, Codable, Equatable {
+    case missingAPIKey
+    case invalidAPIKey
+    case revokedAPIKey
+
+    init?(appError: AppError) {
+        switch appError {
+        case .missingAPIKey:
+            self = .missingAPIKey
+        case .invalidAPIKey:
+            self = .invalidAPIKey
+        case .revokedAPIKey:
+            self = .revokedAPIKey
+        default:
+            return nil
+        }
+    }
+
+    var recoveryMessage: String {
+        switch self {
+        case .missingAPIKey:
+            return "Recording saved locally. Add your OpenAI API key in Settings, then retry transcription from this session."
+        case .invalidAPIKey:
+            return "Recording saved locally. Replace the rejected OpenAI API key in Settings, then retry transcription from this session."
+        case .revokedAPIKey:
+            return "Recording saved locally. Add a new OpenAI API key in Settings, then retry transcription from this session."
+        }
+    }
+
+    var appError: AppError {
+        switch self {
+        case .missingAPIKey:
+            return .missingAPIKey
+        case .invalidAPIKey:
+            return .invalidAPIKey
+        case .revokedAPIKey:
+            return .revokedAPIKey
+        }
+    }
+}
+
+struct PendingTranscription: Codable, Equatable {
+    let audioFileName: String
+    var failureReason: PendingTranscriptionFailureReason
+    var preservedAt: Date
+}
+
 struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     let id: UUID
     let createdAt: Date
@@ -13,6 +60,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     let screenshots: [SessionScreenshot]
     let sections: [TranscriptSection]
     var issueExtraction: IssueExtractionResult?
+    var pendingTranscription: PendingTranscription?
     let artifactsDirectoryPath: String?
 
     init(
@@ -27,6 +75,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         screenshots: [SessionScreenshot] = [],
         sections: [TranscriptSection] = [],
         issueExtraction: IssueExtractionResult? = nil,
+        pendingTranscription: PendingTranscription? = nil,
         updatedAt: Date? = nil,
         artifactsDirectoryPath: String? = nil
     ) {
@@ -42,6 +91,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         self.screenshots = screenshots
         self.sections = sections
         self.issueExtraction = issueExtraction
+        self.pendingTranscription = pendingTranscription
         self.artifactsDirectoryPath = artifactsDirectoryPath
     }
 
@@ -61,6 +111,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         self.screenshots = try container.decodeIfPresent([SessionScreenshot].self, forKey: .screenshots) ?? []
         self.sections = try container.decodeIfPresent([TranscriptSection].self, forKey: .sections) ?? []
         self.issueExtraction = try container.decodeIfPresent(IssueExtractionResult.self, forKey: .issueExtraction)
+        self.pendingTranscription = try container.decodeIfPresent(PendingTranscription.self, forKey: .pendingTranscription)
         self.artifactsDirectoryPath = try container.decodeIfPresent(String.self, forKey: .artifactsDirectoryPath)
     }
 
@@ -78,6 +129,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         try container.encode(screenshots, forKey: .screenshots)
         try container.encode(sections, forKey: .sections)
         try container.encodeIfPresent(issueExtraction, forKey: .issueExtraction)
+        try container.encodeIfPresent(pendingTranscription, forKey: .pendingTranscription)
         try container.encodeIfPresent(artifactsDirectoryPath, forKey: .artifactsDirectoryPath)
     }
 
@@ -94,15 +146,24 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         case screenshots
         case sections
         case issueExtraction
+        case pendingTranscription
         case artifactsDirectoryPath
     }
 
     var title: String {
-        Self.displayTitle(from: transcript)
+        if requiresTranscriptionRetry {
+            return "Transcription Pending"
+        }
+
+        return Self.displayTitle(from: transcript)
     }
 
     var preview: String {
-        Self.previewText(from: transcript)
+        if let pendingTranscription {
+            return pendingTranscription.failureReason.recoveryMessage
+        }
+
+        return Self.previewText(from: transcript)
     }
 
     var metadataSummary: String {
@@ -122,6 +183,18 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         issueExtraction?.issues.count ?? 0
     }
 
+    var requiresTranscriptionRetry: Bool {
+        pendingTranscription != nil
+    }
+
+    var hasTranscriptContent: Bool {
+        !Self.normalizedTranscriptBody(from: transcript).isEmpty
+    }
+
+    var transcriptionRecoveryMessage: String? {
+        pendingTranscription?.failureReason.recoveryMessage
+    }
+
     var summaryText: String {
         issueExtraction?.summary.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
@@ -131,7 +204,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
             transcript: transcript,
             summaryText: summaryText,
             markers: markers,
-            issues: issueExtraction?.issues ?? []
+            issues: issueExtraction?.issues ?? [],
+            pendingTranscription: pendingTranscription
         )
     }
 
@@ -141,6 +215,14 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         }
 
         return URL(fileURLWithPath: artifactsDirectoryPath, isDirectory: true)
+    }
+
+    var pendingTranscriptionAudioURL: URL? {
+        guard let artifactsDirectoryURL, let pendingTranscription else {
+            return nil
+        }
+
+        return artifactsDirectoryURL.appendingPathComponent(pendingTranscription.audioFileName)
     }
 
     func suggestedFileName(fileExtension: String) -> String {
@@ -181,6 +263,11 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
             lines.append("Prompt: \(prompt)")
         }
 
+        if let transcriptionRecoveryMessage {
+            lines.append("Transcription Status: Pending retry")
+            lines.append("Recovery: \(transcriptionRecoveryMessage)")
+        }
+
         if !markers.isEmpty {
             lines.append("Markers:")
             for marker in markers {
@@ -216,7 +303,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
         lines.append("")
         lines.append("Raw Transcript")
-        lines.append(transcript)
+        lines.append(hasTranscriptContent ? transcript : "Transcript not available yet.")
 
         return lines.joined(separator: "\n")
     }
@@ -236,6 +323,11 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
         if let prompt, !prompt.isEmpty {
             lines.append("- Prompt: \(prompt)")
+        }
+
+        if let transcriptionRecoveryMessage {
+            lines.append("- Transcription Status: Pending retry")
+            lines.append("- Recovery: \(transcriptionRecoveryMessage)")
         }
 
         lines.append("")
@@ -281,7 +373,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
         lines.append("## Raw Transcript")
         lines.append("")
-        lines.append(transcript)
+        lines.append(hasTranscriptContent ? transcript : "Transcript not available yet.")
 
         return lines.joined(separator: "\n")
     }
@@ -382,16 +474,18 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         transcript: String,
         summaryText: String,
         markers: [SessionMarker],
-        issues: [ExtractedIssue]
+        issues: [ExtractedIssue],
+        pendingTranscription: PendingTranscription?
     ) -> String {
-        let title = displayTitle(from: transcript)
-        let preview = previewText(from: transcript)
+        let title = pendingTranscription == nil ? displayTitle(from: transcript) : "Transcription Pending"
+        let preview = pendingTranscription?.failureReason.recoveryMessage ?? previewText(from: transcript)
 
         return [
             title,
             preview,
             transcript,
             summaryText,
+            pendingTranscription?.failureReason.recoveryMessage ?? "",
             markers.map(\.title).joined(separator: " "),
             markers.compactMap(\.note).joined(separator: " "),
             issues.map(\.title).joined(separator: " "),

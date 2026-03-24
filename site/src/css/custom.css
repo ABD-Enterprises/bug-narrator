@@ -1,0 +1,11 @@
+:root {
+  --ifm-color-primary: #126de6;
+  --ifm-color-primary-dark: #0f61cc;
+  --ifm-color-primary-darker: #0d59bc;
+  --ifm-color-primary-light: #2b7ced;
+  --ifm-color-primary-lighter: #4189ef;
+}
+
+body {
+  font-feature-settings: "liga" 1, "kern" 1;
+}

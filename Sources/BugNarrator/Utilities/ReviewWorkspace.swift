@@ -35,7 +35,20 @@ enum ReviewWorkspace {
     static func timelineEntries(for session: TranscriptSession) -> [ReviewWorkspaceTimelineEntry] {
         var entries: [ReviewWorkspaceTimelineEntry] = []
 
-        if session.sections.isEmpty {
+        if session.requiresTranscriptionRetry {
+            entries.append(
+                ReviewWorkspaceTimelineEntry(
+                    id: session.id,
+                    timestamp: 0,
+                    kind: .transcript,
+                    title: "Transcription Pending",
+                    text: session.transcriptionRecoveryMessage ?? "Retry transcription after restoring your OpenAI API key.",
+                    secondaryText: "The finished audio was preserved with this session.",
+                    index: nil,
+                    screenshotID: nil
+                )
+            )
+        } else if session.sections.isEmpty {
             entries.append(
                 ReviewWorkspaceTimelineEntry(
                     id: session.id,

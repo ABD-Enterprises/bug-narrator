@@ -27,11 +27,11 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 | `BN-P1-006` | When microphone permission was denied, BugNarrator only showed an error message and did not help the user recover. | Users could get stuck without a direct path to fix the problem. | Fixed | `1.0.2` |
 | `BN-P1-007` | Long error messages could be truncated in the top status card of the menu bar window. | Important recovery guidance was cut off exactly when the user needed it most. | Fixed | `1.0.2` |
 | `BN-P1-008` | After enabling microphone access in System Settings, BugNarrator could keep showing the stale denied state until the user manually retried or restarted. | Made the app appear blocked even after the permission issue was already fixed. | Fixed | `1.0.3` |
-| `BN-P1-009` | The review workspace could stay on a tab that no longer existed for the newly selected session, leaving the right-hand pane confusing or stale. | Users switching between sessions could see mismatched content or an invalid tab state in the review area. | Fixed | Unreleased |
-| `BN-P1-010` | Screenshot-heavy sessions could decode full-size images repeatedly in the review workspace instead of using thumbnails. | Larger sessions could feel sluggish and waste memory while reviewing screenshots. | Fixed | Unreleased |
-| `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | Unreleased |
-| `BN-P1-012` | BugNarrator could still reject recording with a microphone-denied error after preflight passed because the recorder repeated its own permission gate using stale local-build state. | Users could stay blocked from testing for multiple local builds even when System Settings already showed microphone access enabled. | Fixed | Unreleased |
-| `BN-P1-013` | The old standalone marker shortcut and related settings copy remained after screenshots became the primary way to mark timeline moments. | Settings and QA flows described controls that no longer belonged in the simplified review model, which increased maintenance risk and UX confusion. | Fixed | Unreleased |
+| `BN-P1-009` | The review workspace could stay on a tab that no longer existed for the newly selected session, leaving the right-hand pane confusing or stale. | Users switching between sessions could see mismatched content or an invalid tab state in the review area. | Fixed | `1.0.9` |
+| `BN-P1-010` | Screenshot-heavy sessions could decode full-size images repeatedly in the review workspace instead of using thumbnails. | Larger sessions could feel sluggish and waste memory while reviewing screenshots. | Fixed | `1.0.9` |
+| `BN-P1-011` | Single-instance enforcement could kill the XCTest app host if another BugNarrator copy was already running during local validation. | Automated testing could fail for the wrong reason, which reduced trust in the release-validation workflow. | Fixed | `1.0.9` |
+| `BN-P1-012` | BugNarrator could still reject recording with a microphone-denied error after preflight passed because the recorder repeated its own permission gate using stale local-build state. | Users could stay blocked from testing for multiple local builds even when System Settings already showed microphone access enabled. | Fixed | `1.0.10` |
+| `BN-P1-013` | The old standalone marker shortcut and related settings copy remained after screenshots became the primary way to mark timeline moments. | Settings and QA flows described controls that no longer belonged in the simplified review model, which increased maintenance risk and UX confusion. | Fixed | `1.0.11` |
 | `BN-P1-014` | Exported macOS session bundles can reportedly mention screenshots in the transcript that are missing from the bundle's `screenshots/` folder. | Reviewers can lose the visual evidence tied to the transcript, which makes exported bundles harder to trust for bug triage or async handoff. | Open | -- |
 
 ## Notes Per Issue
@@ -127,11 +127,11 @@ After `1.0.0`, the bugs surfaced fell into four buckets:
 
 ## Current State
 
-As of the current local workspace state:
+As of the current shipped product direction:
 
 - `1.0.1` already covers the icon pipeline, support-flow simplification, and first-run credential-prompt fix.
 - `1.0.2` covers the microphone-recovery UX, multiline status-card sizing, and the ScreenCaptureKit screenshot modernization.
-- the current diagnostics and supportability pass adds structured local diagnostics logging, `Copy Debug Info`, and `Export Debug Bundle` so user-reported issues can carry better support context without exposing credentials.
+- the diagnostics and supportability pass adds structured local diagnostics logging and `Export Debug Bundle` so user-reported issues can carry better support context without exposing credentials.
 - the microphone-permissions maturity pass replaces the old ad hoc recording-start check with a dedicated microphone permission service, structured preflight results, denied vs restricted vs unavailable states, and clearer local-testing guidance for unsigned builds.
 - the release-hardening pass now keeps successfully transcribed sessions visible as unsaved drafts if local history persistence fails, and it prevents exports from running against stale or deleted session snapshots.
 - the DMG packaging script now validates icon resources in both the built app and the mounted DMG, which reduces regression risk for the original icon-shipping bugs.
@@ -145,6 +145,6 @@ As of the current local workspace state:
 
 ## Remaining Spec-Alignment / Release Notes
 
-These items were reviewed during the release-hardening audit and were left as documented limitations rather than changed in this pass:
+These items were reviewed during the release-hardening audit. The first item was addressed in RR-001; the rest remain as historical context or active limitations:
 
-- If a user removes or invalidates their OpenAI API key while a recording is already in progress, BugNarrator still does not preserve that finished audio for a later transcription retry. The user must restore the key and record the session again.
+- If a user removes or invalidates their OpenAI API key while a recording is already in progress, BugNarrator now preserves the finished audio for a later transcription retry. The user can restore the key and retry transcription from the preserved session instead of re-recording.

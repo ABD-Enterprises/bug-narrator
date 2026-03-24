@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed_release:
+        description: "Build a signed, notarized, stapled DMG"
+        required: true
+        default: false
+        type: boolean
+      publish_release:
+        description: "Create or update a GitHub Release from this run"
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: "Release tag to publish, for example v1.0.22"
+        required: false
+        type: string
+
+jobs:
+  package-macos:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dmgbuild
+        run: |
+          python3 -m venv build/dmg-venv
+          build/dmg-venv/bin/python -m pip install --upgrade pip
+          build/dmg-venv/bin/python -m pip install dmgbuild
+
+      - name: Run release smoke test
+        run: ./scripts/release_smoke_test.sh
+
+      - name: Run accessibility regression check
+        run: ./scripts/accessibility_regression_check.sh
+
+      - name: Prepare signing keychain
+        if: ${{ inputs.signed_release }}
+        env:
+          APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          test -n "$APPLE_DEVELOPER_ID_P12_BASE64"
+          test -n "$APPLE_DEVELOPER_ID_P12_PASSWORD"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          echo "$APPLE_DEVELOPER_ID_P12_BASE64" | base64 --decode > build/developer-id.p12
+          security import build/developer-id.p12 -k build.keychain -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s build.keychain login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      - name: Store notary credentials
+        if: ${{ inputs.signed_release }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          test -n "$APPLE_ID"
+          test -n "$APPLE_TEAM_ID"
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
+          xcrun notarytool store-credentials BugNarratorCI \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+
+      - name: Build unsigned DMG
+        if: ${{ !inputs.signed_release }}
+        run: ./scripts/build_dmg.sh
+
+      - name: Build signed and notarized DMG
+        if: ${{ inputs.signed_release }}
+        env:
+          CODE_SIGNING_ALLOWED: "YES"
+          CODE_SIGN_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          ALLOW_PROVISIONING_UPDATES: "YES"
+          NOTARIZE: "YES"
+          NOTARY_PROFILE: BugNarratorCI
+        run: ./scripts/build_dmg.sh
+
+      - name: Generate release summary seed
+        run: |
+          python3 scripts/generate_release_summary.py \
+            --version "${{ inputs.release_tag || github.ref_name }}" \
+            --output build/release-summary.md
+
+      - name: Attach release summary to run summary
+        run: cat build/release-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload DMG artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugnarrator-dmg
+          path: |
+            dist/BugNarrator-macOS.dmg
+            dist/BugNarrator-v*-macOS.dmg
+
+      - name: Upload release summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugnarrator-release-summary
+          path: build/release-summary.md
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.publish_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: |
+            dist/BugNarrator-macOS.dmg
+            dist/BugNarrator-v*-macOS.dmg
+          generate_release_notes: true

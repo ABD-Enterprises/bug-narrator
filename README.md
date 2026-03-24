@@ -22,13 +22,20 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 
 ## Help And Project Links
 
-- [Read the user guide](docs/UserGuide.md)
+- [Read the user manual](docs/user/user-manual.md)
+- [Canonical product spec](docs/architecture/product-spec.md)
+- [Getting started for maintainers and testers](docs/onboarding/getting-started.md)
+- [Release process](docs/release/release-process.md)
+- [Roadmap and planned phases](docs/roadmap/roadmap.md)
+- [Detailed user guide](docs/UserGuide.md)
 - [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
 - [Hosted documentation](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
 - [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
 - [View the changelog](CHANGELOG.md)
 
 ## What BugNarrator Does
+
+The canonical product contract lives in [docs/architecture/product-spec.md](docs/architecture/product-spec.md). Use that spec for behavior, terminology, artifact contracts, and cross-platform parity expectations.
 
 BugNarrator is built for software-review and software-testing workflows where you want to keep clicking through an app while speaking your notes out loud.
 
@@ -218,6 +225,8 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 
 ## Build From Source
 
+For the structured maintainer setup guide, see [docs/development/setup.md](docs/development/setup.md).
+
 Open `BugNarrator.xcodeproj` in Xcode and build the `BugNarrator` scheme, or use:
 
 ```bash
@@ -231,6 +240,11 @@ xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Deb
 ```
 
 ## Build The DMG
+
+For the canonical structured release and deployment docs, see:
+
+- [docs/operations/deployment.md](docs/operations/deployment.md)
+- [docs/release/release-process.md](docs/release/release-process.md)
 
 BugNarrator includes a repeatable local packaging script:
 
@@ -265,7 +279,6 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 
 - transcription and issue extraction require network access
 - BugNarrator does not yet support offline Whisper
-- if you remove or invalidate the OpenAI API key while a recording is already in progress, BugNarrator cannot yet hold that finished audio for a later retry
 - GitHub and Jira export include screenshot references in issue bodies instead of uploading attachments automatically
 - session deletion is permanent today
 

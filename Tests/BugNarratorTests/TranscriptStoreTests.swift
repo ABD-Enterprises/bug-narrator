@@ -125,6 +125,65 @@ final class TranscriptStoreTests: XCTestCase {
         XCTAssertEqual(store.libraryEntries.first?.summaryText, "Updated summary")
     }
 
+    func testTranscriptStorePersistsPendingTranscriptionMetadataAcrossReloads() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let store = TranscriptStore(storageURL: storageURL)
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            transcript: "",
+            duration: 12,
+            model: "gpt-4o-transcribe",
+            languageHint: nil,
+            prompt: nil,
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 1_700_000_100)
+            ),
+            artifactsDirectoryPath: "/tmp/bugnarrator/session-1"
+        )
+
+        try store.add(session)
+
+        let reloadedStore = TranscriptStore(storageURL: storageURL)
+        let reloadedSession = try XCTUnwrap(reloadedStore.sessions.first)
+
+        XCTAssertEqual(reloadedSession.pendingTranscription?.audioFileName, "recording.m4a")
+        XCTAssertEqual(reloadedStore.libraryEntries.first?.isPendingTranscription, true)
+    }
+
+    func testTranscriptStoreTracksPendingTranscriptionSessionsForRecoverySurfacing() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let store = TranscriptStore(storageURL: storageURL)
+        let completedSession = makeSampleTranscriptSession(index: 1)
+        let pendingSession = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_500),
+            transcript: "",
+            duration: 18,
+            model: "gpt-4o-transcribe",
+            languageHint: nil,
+            prompt: nil,
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 1_700_000_600)
+            ),
+            artifactsDirectoryPath: "/tmp/bugnarrator/session-pending"
+        )
+
+        try store.add(completedSession)
+        try store.add(pendingSession)
+
+        XCTAssertEqual(store.pendingTranscriptionSessionCount, 1)
+        XCTAssertEqual(store.latestPendingTranscriptionSession?.id, pendingSession.id)
+    }
+
     private func makeTempDirectory() -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-TranscriptStoreTests-\(UUID().uuidString)", isDirectory: true)
