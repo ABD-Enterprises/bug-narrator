@@ -5,6 +5,18 @@ final class TranscriptStore: ObservableObject {
     @Published private(set) var libraryEntries: [SessionLibraryEntry] = []
     private let logger = DiagnosticsLogger(category: .sessionLibrary)
 
+    var pendingTranscriptionSessions: [TranscriptSession] {
+        sessions.filter(\.requiresTranscriptionRetry)
+    }
+
+    var pendingTranscriptionSessionCount: Int {
+        pendingTranscriptionSessions.count
+    }
+
+    var latestPendingTranscriptionSession: TranscriptSession? {
+        pendingTranscriptionSessions.first
+    }
+
     private enum StoragePolicy {
         static let maximumStoredSessions = 500
     }

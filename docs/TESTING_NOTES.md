@@ -1,5 +1,7 @@
 # Testing Notes
 
+Structured counterpart: [docs/testing/testing.md](testing/testing.md)
+
 ## Automated Validation
 
 Use these commands as the current release-readiness baseline:

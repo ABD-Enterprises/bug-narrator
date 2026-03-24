@@ -1,5 +1,7 @@
 # BugNarrator Release Checklist
 
+Structured counterpart: [docs/release/release-process.md](release/release-process.md)
+
 Use this checklist before cutting a public test build or release candidate.
 
 ## Build And Signing
@@ -46,9 +48,10 @@ Use this checklist before cutting a public test build or release candidate.
 
 - Quit and relaunch the app and confirm existing sessions reload correctly.
 - If local history storage fails after a successful transcription, confirm the transcript still opens as an unsaved session and can be saved later after storage is restored.
+- If transcription cannot start because the OpenAI key is missing, invalid, or revoked after recording finishes, confirm the finished audio stays preserved in the session artifacts and the session remains retryable after the key is restored.
 - Delete a session with screenshots and verify the local managed screenshot folder is removed.
 - Confirm exported bundles outside the app remain untouched after deletion.
-- In non-debug mode, verify temporary audio files are cleaned up after success, failure, and cancellation.
+- In non-debug mode, verify temporary audio files are cleaned up after success, failure, and cancellation, except for preserved retryable sessions where the finished audio is intentionally retained until transcription succeeds or the session is deleted.
 - In debug mode, verify temporary audio files are retained intentionally.
 
 ## Product Surfaces

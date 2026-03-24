@@ -173,6 +173,10 @@ protocol IssueExporting: Sendable {
 
 protocol SessionArtifactsManaging {
     func createArtifactsDirectory(for sessionID: UUID) throws -> URL
+    func makeRecordedAudioURL(
+        in directoryURL: URL,
+        sourceFileURL: URL
+    ) -> URL
     func makeScreenshotURL(
         in directoryURL: URL,
         prefix: String,

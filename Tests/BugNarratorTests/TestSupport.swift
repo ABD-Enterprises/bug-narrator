@@ -304,6 +304,16 @@ final class MockArtifactsService: SessionArtifactsManaging {
         return directoryURL
     }
 
+    func makeRecordedAudioURL(
+        in directoryURL: URL,
+        sourceFileURL: URL
+    ) -> URL {
+        let fileExtension = sourceFileURL.pathExtension.isEmpty ? "m4a" : sourceFileURL.pathExtension
+        return directoryURL
+            .appendingPathComponent("recording")
+            .appendingPathExtension(fileExtension)
+    }
+
     func makeScreenshotURL(
         in directoryURL: URL,
         prefix: String,

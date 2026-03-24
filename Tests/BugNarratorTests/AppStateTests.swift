@@ -478,7 +478,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
     }
 
-    func testStopSessionWithoutAPIKeyAfterRecordingFailsGracefully() async throws {
+    func testStopSessionWithoutAPIKeyAfterRecordingPreservesRetryableSession() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
@@ -490,8 +490,96 @@ final class AppStateTests: XCTestCase {
         await harness.appState.stopSession()
 
         XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertEqual(harness.appState.status.detail, AppError.missingAPIKey.userMessage)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Recording saved locally. Add your OpenAI API key in Settings, then retry transcription from this session."
+        )
         XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
+        XCTAssertEqual(harness.transcriptStore.sessions.count, 1)
+
+        let session = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        XCTAssertTrue(session.requiresTranscriptionRetry)
+        XCTAssertEqual(session.pendingTranscription?.failureReason, .missingAPIKey)
+        XCTAssertEqual(session.screenshotCount, 0)
+        XCTAssertEqual(session.markerCount, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
+    }
+
+    func testStopSessionWithRejectedAPIKeyPreservesRetryableSession() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "invalid-key-on-stop")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        await harness.transcriptionClient.enqueue(.failure(AppError.invalidAPIKey))
+
+        await harness.appState.startSession()
+        await harness.appState.stopSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Recording saved locally. Replace the rejected OpenAI API key in Settings, then retry transcription from this session."
+        )
+
+        let session = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        XCTAssertEqual(session.pendingTranscription?.failureReason, .invalidAPIKey)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
+    }
+
+    func testRetryPendingTranscriptionCompletesPreservedSession() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-pending-session")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let preservedSession = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        XCTAssertTrue(preservedSession.requiresTranscriptionRetry)
+
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Recovered transcript", segments: []))
+        )
+
+        await harness.appState.retryPendingTranscription(for: preservedSession.id)
+
+        let completedSession = try XCTUnwrap(harness.transcriptStore.session(with: preservedSession.id))
+        XCTAssertFalse(completedSession.requiresTranscriptionRetry)
+        XCTAssertEqual(completedSession.transcript, "Recovered transcript")
+        XCTAssertEqual(harness.appState.status.phase, .success)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(preservedSession.pendingTranscriptionAudioURL).path))
+    }
+
+    func testRetryPendingTranscriptionHonorsAutoIssueExtraction() async throws {
+        let harness = AppStateHarness(autoExtractIssues: true)
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-pending-session-auto-extract")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let preservedSession = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Recovered transcript", segments: []))
+        )
+        await harness.issueExtractionService.setResult(
+            IssueExtractionResult(summary: "Recovered summary", issues: [])
+        )
+
+        await harness.appState.retryPendingTranscription(for: preservedSession.id)
+
+        let completedSession = try XCTUnwrap(harness.transcriptStore.session(with: preservedSession.id))
+        XCTAssertEqual(completedSession.issueExtraction?.summary, "Recovered summary")
+        XCTAssertEqual(harness.appState.status.detail, "Transcript and extracted issues are ready.")
     }
 
     func testValidateAPIKeyUpdatesValidationStateOnSuccess() async {

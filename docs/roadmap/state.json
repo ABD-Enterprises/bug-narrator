@@ -1,0 +1,490 @@
+{
+  "completed_phases": [
+    {
+      "id": "PF-001",
+      "name": "Delivery Foundation Bootstrap",
+      "completed_on": "2026-03-23",
+      "summary": "Bootstrapped the structured docs tree, persistent roadmap state, CI and release workflow scaffolding, Terraform scaffolding, and a Docusaurus site scaffold."
+    },
+    {
+      "id": "RR-001",
+      "name": "macOS Session Recovery Hardening",
+      "completed_on": "2026-03-23",
+      "summary": "Preserved finished recordings when transcription cannot start because the OpenAI key is missing, invalid, or revoked at stop time, kept the session retryable in the library, and added regression coverage for retry success."
+    },
+    {
+      "id": "RR-003",
+      "name": "Accessibility Audit And Interaction Hardening",
+      "completed_on": "2026-03-23",
+      "summary": "Hardened the macOS menu bar, recording controls, session library, extracted-issue review, and settings surfaces with clearer accessibility labels, selected-state semantics, keyboard affordances, and updated accessibility documentation."
+    },
+    {
+      "id": "RR-004",
+      "name": "Product Spec Consolidation",
+      "completed_on": "2026-03-23",
+      "summary": "Created a canonical BugNarrator product spec, clarified the authority split between product behavior, roadmap state, and release history, and updated maintainer and Windows docs to reference the spec directly."
+    },
+    {
+      "id": "OPS-003",
+      "name": "Recovery Surface Polish",
+      "completed_on": "2026-03-23",
+      "summary": "Surfaced retry-needed sessions in the menu bar window and at the top of the session-library list, and added retry counts to library summaries so preserved-session recovery stays visible after relaunch."
+    },
+    {
+      "id": "OPS-004",
+      "name": "Accessibility Automation Seed",
+      "completed_on": "2026-03-23",
+      "summary": "Added a lightweight accessibility regression script, wired it into CI and release workflow scaffolding, and documented the boundary between the new automation seed and the remaining live assistive-technology validation work."
+    },
+    {
+      "id": "OPS-005",
+      "name": "Spec-Driven Parity Matrix",
+      "completed_on": "2026-03-23",
+      "summary": "Created a cross-platform parity matrix and linked macOS, Windows, and architecture docs back to named product-spec contracts instead of ad hoc parity notes."
+    },
+    {
+      "id": "OPS-006",
+      "name": "Docs Site Sync And Build Validation",
+      "completed_on": "2026-03-23",
+      "summary": "Synced the docs site to the canonical onboarding, user, and product-spec content, fixed the site shell and favicon configuration, generated a lockfile, and validated a strict Docusaurus production build locally."
+    },
+    {
+      "id": "OPS-007",
+      "name": "Release Summary Automation Seed",
+      "completed_on": "2026-03-23",
+      "summary": "Added an internal release-summary generator based on the changelog and roadmap state, surfaced it in the release workflow as a run artifact and step summary, and documented it as a maintainer aid rather than a public release-note replacement."
+    }
+  ],
+  "upcoming_phases": [
+    {
+      "id": "WIN-005",
+      "name": "Windows Transcription And Session Library",
+      "priority": "medium",
+      "depends_on": [
+        "RR-002"
+      ],
+      "scope": [
+        "OpenAI key storage",
+        "transcription client",
+        "completed-session persistence",
+        "session library",
+        "review workspace"
+      ]
+    },
+    {
+      "id": "WIN-006",
+      "name": "Windows Review, Extraction, And Export",
+      "priority": "medium",
+      "depends_on": [
+        "WIN-005"
+      ],
+      "scope": [
+        "summary generation",
+        "issue extraction",
+        "session bundle export",
+        "experimental GitHub/Jira export"
+      ]
+    },
+    {
+      "id": "OPS-008",
+      "name": "Docs Site Publication",
+      "priority": "low",
+      "depends_on": [
+        "OPS-006"
+      ],
+      "scope": [
+        "publish the validated docs site",
+        "wire hosting or deployment for the site",
+        "run hosted docs smoke validation"
+      ]
+    },
+    {
+      "id": "OPS-009",
+      "name": "Release Summary Promotion",
+      "priority": "low",
+      "depends_on": [
+        "OPS-007"
+      ],
+      "scope": [
+        "promote the internal release-summary seed into a maintainer-reviewed release note draft flow",
+        "decide how much roadmap state belongs in public release notes",
+        "attach release-summary generation to the release checklist"
+      ]
+    },
+    {
+      "id": "OPS-010",
+      "name": "Retry-Needed Session Filter",
+      "priority": "low",
+      "depends_on": [
+        "OPS-003"
+      ],
+      "scope": [
+        "add a dedicated retry-needed session-library filter or saved view",
+        "keep recovery discovery visible in larger histories",
+        "consider explicit retry-needed counts in date-filter metadata"
+      ]
+    }
+  ],
+  "risk_remediation_phases": [
+    {
+      "id": "RR-002",
+      "name": "Windows Runtime Validation And Hardening",
+      "priority": "high",
+      "grouped_risks": [
+        "RISK-WIN-001",
+        "RISK-WIN-002"
+      ],
+      "scope": "Validate Milestones 2-4 on real Windows hardware and fix tray, recording, and screenshot runtime issues discovered there."
+    },
+    {
+      "id": "RR-005",
+      "name": "Assistive Technology Runtime And Docs Validation",
+      "priority": "low",
+      "grouped_risks": [
+        "RISK-ACC-002"
+      ],
+      "scope": "Run a real VoiceOver-driven validation pass on the release-candidate macOS UI and validate docs-site accessibility once the Docusaurus site is published."
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "OPP-001",
+      "description": "Publish the validated Docusaurus docs site and keep a hosted smoke-check flow once deployment is wired.",
+      "impact": "medium",
+      "effort": "medium",
+      "affected_components": [
+        "site",
+        "docs",
+        "github-workflows"
+      ],
+      "recommended_future_phase": "OPS-008"
+    },
+    {
+      "id": "OPP-002",
+      "description": "Expand CI to include release-style artifact validation and richer Windows runtime confidence once runner support is proven.",
+      "impact": "high",
+      "effort": "medium",
+      "affected_components": [
+        "github-workflows",
+        "scripts",
+        "windows"
+      ],
+      "recommended_future_phase": "RR-002"
+    },
+    {
+      "id": "OPP-003",
+      "description": "Promote the new internal release-summary seed into a maintainer-reviewed public release-note drafting flow.",
+      "impact": "medium",
+      "effort": "low",
+      "affected_components": [
+        "docs",
+        "release-process",
+        "scripts",
+        "github-workflows"
+      ],
+      "recommended_future_phase": "OPS-009"
+    },
+    {
+      "id": "OPP-007",
+      "description": "Add a dedicated retry-needed filter or saved view so preserved-session recovery stays easy to find in larger histories.",
+      "impact": "medium",
+      "effort": "low",
+      "affected_components": [
+        "menu-bar-ui",
+        "session-library",
+        "review-workspace"
+      ],
+      "recommended_future_phase": "OPS-010"
+    }
+  ],
+  "risks": [
+    {
+      "id": "RISK-DLV-001",
+      "description": "The repo was missing structured delivery docs, persistent roadmap state, CI/release workflow files, infra scaffolding, and a docs-site scaffold.",
+      "severity": "medium",
+      "impact": "Future phases, release decisions, and remediation planning would drift because key delivery state lived only in ad hoc notes.",
+      "mitigation": "Resolved in PF-001 by creating the structured docs tree, state.json, workflow scaffolding, Terraform scaffold, and site scaffold.",
+      "affected_components": [
+        "docs",
+        "github-workflows",
+        "infra",
+        "site"
+      ],
+      "phase_association": "PF-001",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-MAC-001",
+      "description": "If the OpenAI key is removed or invalidated during a recording, the finished audio can be lost when transcription cannot start at stop time.",
+      "severity": "high",
+      "impact": "Users can lose a completed recording session and have to re-record important testing evidence.",
+      "mitigation": "Resolved in RR-001 by preserving finished audio inside session artifacts, persisting retryable session metadata in the library, and allowing transcription retry after the key is restored or replaced.",
+      "affected_components": [
+        "AppState",
+        "AudioRecorder",
+        "TranscriptStore",
+        "session-persistence",
+        "TranscriptView",
+        "SessionArtifactsService"
+      ],
+      "phase_association": "RR-001",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-WIN-001",
+      "description": "Windows tray shell, recording, and screenshot workflows have been scaffolded but not yet validated on real Windows hardware.",
+      "severity": "high",
+      "impact": "The Windows workspace may compile conceptually while failing in real tray, permission, or capture behavior.",
+      "mitigation": "Track and fix in RR-002 with real Windows validation and runtime hardening.",
+      "affected_components": [
+        "windows",
+        "BugNarrator.Windows",
+        "BugNarrator.Windows.Services"
+      ],
+      "phase_association": "RR-002",
+      "status": "unresolved"
+    },
+    {
+      "id": "RISK-WIN-002",
+      "description": "CI does not yet prove full Windows runtime behavior or fully prove signed release automation.",
+      "severity": "medium",
+      "impact": "Build confidence is improving, but key Windows and release-time behaviors can still regress outside local maintainer workflows.",
+      "mitigation": "Track and improve in RR-002 and OPS-002 by expanding validation once runner-side support is confirmed.",
+      "affected_components": [
+        "github-workflows",
+        "windows",
+        "release-automation"
+      ],
+      "phase_association": "RR-002",
+      "status": "unresolved"
+    },
+    {
+      "id": "RISK-ACC-001",
+      "description": "The live app still lacks a complete accessibility and 508-style interaction audit across keyboard flow, focus management, and assistive-technology behavior.",
+      "severity": "medium",
+      "impact": "Accessibility regressions could ship unnoticed because most validation is still manual and scenario-based.",
+      "mitigation": "Resolved in RR-003 by hardening keyboard-first controls, explicit labels and selected-state semantics, settings-field labeling, transient toast announcements, and accessibility-specific QA/testing documentation for the current macOS app surfaces.",
+      "affected_components": [
+        "menu-bar-ui",
+        "recording-controls",
+        "session-library",
+        "review-workspace",
+        "settings"
+      ],
+      "phase_association": "RR-003",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-ACC-002",
+      "description": "A real VoiceOver-driven runtime pass and docs-site accessibility validation still have not been executed on a published docs site or release-candidate macOS build.",
+      "severity": "low",
+      "impact": "Semantic hardening is in place, but live assistive-technology behavior and hosted docs accessibility can still regress without an end-to-end manual validation pass.",
+      "mitigation": "Track in RR-005 and complete once the docs site is published and the next release candidate is ready for a live assistive-technology pass.",
+      "affected_components": [
+        "menu-bar-ui",
+        "recording-controls",
+        "session-library",
+        "review-workspace",
+        "site"
+      ],
+      "phase_association": "RR-005",
+      "status": "unresolved"
+    },
+    {
+      "id": "RISK-DOC-001",
+      "description": "The repo still lacks a single canonical BugNarrator product spec document, even though multiple docs and prompts refer to one as a source of truth.",
+      "severity": "medium",
+      "impact": "Platform plans, user docs, and future prompts can drift because the product contract is distributed across multiple files instead of one maintained spec.",
+      "mitigation": "Resolved in RR-004 by creating docs/architecture/product-spec.md as the canonical product contract and updating roadmap, release, maintainer, and Windows docs to reference it directly instead of an implied spec or the current macOS implementation.",
+      "affected_components": [
+        "docs",
+        "windows-docs",
+        "roadmap"
+      ],
+      "phase_association": "RR-004",
+      "status": "resolved"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "INC-2026-03-23-001",
+      "date": "2026-03-23",
+      "description": "Phase bootstrap detected missing persistent state, structured delivery docs, workflow automation files, and infrastructure scaffolding required for disciplined multi-phase delivery.",
+      "severity": "medium",
+      "status": "resolved",
+      "remediation": "Executed PF-001 Delivery Foundation Bootstrap."
+    },
+    {
+      "id": "INC-2026-03-23-002",
+      "date": "2026-03-23",
+      "description": "RR-001 confirmed that a completed recording could be discarded when transcription could not start because the OpenAI key was missing, invalid, or revoked at stop time.",
+      "severity": "high",
+      "status": "resolved",
+      "remediation": "Executed RR-001 macOS Session Recovery Hardening."
+    },
+    {
+      "id": "INC-2026-03-23-003",
+      "date": "2026-03-23",
+      "description": "RR-003 found unlabeled extracted-issue export controls, weak selected-state semantics in custom session-library controls, and keyboard-only affordance gaps in the recording controls and settings flows.",
+      "severity": "medium",
+      "status": "resolved",
+      "remediation": "Executed RR-003 Accessibility Audit And Interaction Hardening."
+    },
+    {
+      "id": "INC-2026-03-23-004",
+      "date": "2026-03-23",
+      "description": "RR-004 confirmed that multiple maintainer, roadmap, and Windows docs referred to a BugNarrator spec as a source of truth even though no canonical product spec file existed in the repo.",
+      "severity": "medium",
+      "status": "resolved",
+      "remediation": "Executed RR-004 Product Spec Consolidation."
+    },
+    {
+      "id": "INC-2026-03-23-005",
+      "date": "2026-03-23",
+      "description": "Retry-needed sessions were preserved after RR-001, but they still depended too heavily on opening the session detail pane before the recovery state became obvious again.",
+      "severity": "medium",
+      "status": "resolved",
+      "remediation": "Executed OPS-003 Recovery Surface Polish."
+    },
+    {
+      "id": "INC-2026-03-23-006",
+      "date": "2026-03-23",
+      "description": "The repo still lacked any automated regression tripwire for accessibility-sensitive macOS surfaces, leaving the RR-003 baseline fully dependent on manual review.",
+      "severity": "low",
+      "status": "resolved",
+      "remediation": "Executed OPS-004 Accessibility Automation Seed."
+    },
+    {
+      "id": "INC-2026-03-23-007",
+      "date": "2026-03-23",
+      "description": "Cross-platform parity rules were documented in prose, but there was no single parity ledger that mapped named product-spec contracts to macOS and Windows status.",
+      "severity": "low",
+      "status": "resolved",
+      "remediation": "Executed OPS-005 Spec-Driven Parity Matrix."
+    },
+    {
+      "id": "INC-2026-03-23-008",
+      "date": "2026-03-23",
+      "description": "The Docusaurus site scaffold was not yet synced to the canonical structured docs and initially failed a strict production build because the site shell still linked to a missing homepage route.",
+      "severity": "medium",
+      "status": "resolved",
+      "remediation": "Executed OPS-006 Docs Site Sync And Build Validation."
+    },
+    {
+      "id": "INC-2026-03-23-009",
+      "date": "2026-03-23",
+      "description": "The release workflow had no internal seed artifact summarizing the current changelog and roadmap state, so maintainers still had to reconstruct that context manually during packaging.",
+      "severity": "low",
+      "status": "resolved",
+      "remediation": "Executed OPS-007 Release Summary Automation Seed."
+    }
+  ],
+  "current_phase": null,
+  "decisions": [
+    {
+      "date": "2026-03-23",
+      "summary": "Selected PF-001 Delivery Foundation Bootstrap as the next phase because persistent roadmap state, structured docs, CI/release workflow files, infra scaffold, and site scaffold were blocking dependencies."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Kept the application version at 1.0.21 because PF-001 is internal delivery-foundation work and is not being released as a new app build."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Preserved the current locally controlled signed-release process while adding GitHub workflow scaffolding, rather than claiming the new workflow is already the only production release path."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Selected RR-001 macOS Session Recovery Hardening next because RISK-MAC-001 was the highest-severity unresolved risk that was feasible to remediate in the current local macOS workspace."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Used the existing transcript library with explicit pending-transcription metadata for preserved sessions so the recovery path stays visible in the current review workflow without inventing a second recovery UI surface in this phase."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Removed preserved retry audio after a successful retry in normal mode to limit raw-audio retention while still keeping debug-mode preservation available for diagnostics."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Selected RR-003 Accessibility Audit And Interaction Hardening next because RR-002 requires real Windows runtime validation, while the accessibility risk was fully actionable in the current macOS workspace."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Closed the baseline accessibility remediation work in RR-003, but split the remaining live VoiceOver and hosted docs-site validation into RR-005 so residual assistive-technology risk stays explicitly planned."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Selected RR-004 Product Spec Consolidation next because RR-002 remains blocked on real Windows runtime validation, while the missing canonical product contract was fully actionable in the current workspace."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Established docs/architecture/product-spec.md as the canonical source of truth for product behavior, kept docs/roadmap/state.json as the planning and risk source of truth, and kept CHANGELOG.md as the shipped change-history source of truth."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Skipped RR-002 and RR-005 in this run because they still require real Windows runtime validation and a live assistive-technology pass that cannot be completed honestly in the current macOS workspace."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Completed the next five executable opportunity phases instead: OPS-003 through OPS-007, covering recovery surfacing, accessibility regression automation, parity tracking, docs-site sync/build validation, and release-summary seed tooling."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Kept OPS-003 narrowly scoped to menu bar and session-library visibility improvements instead of adding a new dedicated retry-needed filter in the same pass; the remaining filter idea is now planned as OPS-010."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Used a lightweight code-level accessibility regression script for OPS-004 and explicitly left live VoiceOver and hosted docs-site validation in RR-005 so the automation seed does not overclaim coverage."
+    },
+    {
+      "date": "2026-03-23",
+      "summary": "Split the original docs-site and release-summary opportunity work into executable local phases first, then left site publication and public release-note promotion as explicit future phases after local validation passed."
+    }
+  ],
+  "version": "1.0.22",
+  "environment_status": {
+    "dev": {
+      "status": "local-development-workspace",
+      "version": "1.0.22"
+    },
+    "test": {
+      "status": "local-regression-docs-site-and-workflow-validation-passed",
+      "version": "1.0.22"
+    },
+    "prod": {
+      "status": "github-releases",
+      "version": "1.0.22"
+    }
+  },
+  "deployment_history": [
+    {
+      "version": "1.0.22",
+      "environment": "prod",
+      "date": "2026-03-24",
+      "notes": "Released through GitHub Releases as the current production DMG."
+    },
+    {
+      "version": "1.0.21",
+      "environment": "prod",
+      "date": "2026-03-16",
+      "notes": "Released through GitHub Releases as the current production DMG."
+    }
+  ],
+  "promotion_history": [
+    {
+      "version": "1.0.22",
+      "from": "test",
+      "to": "prod",
+      "date": "2026-03-24",
+      "notes": "Manual promotion through the signed/notarized GitHub release process."
+    },
+    {
+      "version": "1.0.21",
+      "from": "test",
+      "to": "prod",
+      "date": "2026-03-16",
+      "notes": "Manual promotion through the signed/notarized GitHub release process."
+    }
+  ]
+}

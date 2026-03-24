@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+jobs:
+  macos-validation:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Run release smoke test
+        run: ./scripts/release_smoke_test.sh
+
+      - name: Run accessibility regression check
+        run: ./scripts/accessibility_regression_check.sh
+
+  docs-site-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install docs site dependencies
+        run: npm ci --prefix site
+
+      - name: Build docs site
+        run: npm run build --prefix site
+
+  windows-workspace-validation:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore Windows solution
+        run: dotnet restore windows/BugNarrator.Windows.sln
+
+      - name: Build Windows solution
+        run: dotnet build windows/BugNarrator.Windows.sln -c Debug --no-restore
+
+      - name: Run Windows core tests
+        run: dotnet test windows/tests/BugNarrator.Core.Tests/BugNarrator.Core.Tests.csproj -c Debug --no-build

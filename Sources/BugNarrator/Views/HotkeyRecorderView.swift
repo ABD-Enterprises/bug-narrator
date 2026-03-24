@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 import SwiftUI
 
 struct HotkeyRecorderView: View {
+    let actionTitle: String
     @Binding var shortcut: HotkeyShortcut
 
     @State private var isCapturing = false
@@ -24,11 +25,15 @@ struct HotkeyRecorderView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel(isCapturing ? "Press shortcut for \(actionTitle)" : "\(shortcut.isEnabled ? "Change" : "Assign") shortcut for \(actionTitle)")
+                .accessibilityHint(isCapturing ? "Press the new shortcut or press Escape to cancel." : "Opens shortcut capture for \(actionTitle).")
 
                 Button("Clear") {
                     shortcut = .disabled
                 }
                 .disabled(shortcut == .disabled)
+                .accessibilityLabel("Clear shortcut for \(actionTitle)")
+                .accessibilityHint("Removes the assigned shortcut for \(actionTitle).")
             }
 
             Text(
@@ -41,6 +46,7 @@ struct HotkeyRecorderView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .contain)
         .onDisappear {
             stopCapture()
         }

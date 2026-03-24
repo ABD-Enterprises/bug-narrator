@@ -4,16 +4,24 @@ This directory contains the Windows implementation workspace for BugNarrator.
 
 Source-of-truth documents for Windows work:
 
+- [Canonical Product Spec](../docs/architecture/product-spec.md)
+- [Cross-Platform Parity Matrix](../docs/architecture/parity-matrix.md)
 - [Windows Implementation Roadmap](docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [Windows Validation Checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md)
 - [Windows Signing And Release](docs/WINDOWS_SIGNING_AND_RELEASE.md)
 - [Cross-Platform Guidelines](../docs/CROSS_PLATFORM_GUIDELINES.md)
 
-## Milestone 1 Scope
-- establish the Windows solution structure
-- create the core, Windows shell, and Windows services projects
-- keep platform-neutral logic out of the WPF project
-- avoid speculative feature implementation
+## Current Workspace Status
+
+The Windows workspace currently includes:
+
+- solution and project scaffolding
+- tray shell and single-instance wiring
+- recording lifecycle scaffolding
+- screenshot-capture scaffolding
+- Windows validation guidance for real Windows machines or VMs
+
+The next Windows priority is runtime validation on Windows, followed by the next roadmap milestone.
 
 ## Build Notes
 This workspace targets:

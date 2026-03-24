@@ -24,7 +24,7 @@ The apps do not need identical visuals or identical implementation details. They
 
 ## Enforce
 - Define a clear product spec.
-  - The BugNarrator spec is the source of truth for behavior, terminology, workflows, and feature intent.
+  - [docs/architecture/product-spec.md](architecture/product-spec.md) is the source of truth for behavior, terminology, workflows, and feature intent.
   - New work should map back to the spec explicitly.
 
 - Keep data formats stable.
@@ -40,6 +40,7 @@ The apps do not need identical visuals or identical implementation details. They
     - why it differs
     - whether the difference is temporary or permanent
   - Maintain an explicit parity note, roadmap entry, or issue record for meaningful differences.
+  - Use [docs/architecture/parity-matrix.md](architecture/parity-matrix.md) as the default cross-platform parity ledger.
 
 - Separate platform UI from shared domain rules.
   - Business rules, session state rules, export rules, and issue extraction behavior should not live inside SwiftUI views or WPF views.

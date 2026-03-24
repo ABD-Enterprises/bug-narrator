@@ -17,6 +17,7 @@ struct SessionLibraryEntry: SessionLibraryItem, Equatable {
     let markerCount: Int
     let screenshotCount: Int
     let issueCount: Int
+    let isPendingTranscription: Bool
     let searchIndexText: String
 
     init(session: TranscriptSession) {
@@ -30,6 +31,7 @@ struct SessionLibraryEntry: SessionLibraryItem, Equatable {
         markerCount = session.markerCount
         screenshotCount = session.screenshotCount
         issueCount = session.issueCount
+        isPendingTranscription = session.requiresTranscriptionRetry
         searchIndexText = session.searchIndexText
     }
 }

@@ -4,6 +4,8 @@ Use this checklist on a real Windows machine or VM to validate the current BugNa
 
 Source-of-truth documents:
 
+- [Canonical Product Spec](../../docs/architecture/product-spec.md)
+- [Cross-Platform Parity Matrix](../../docs/architecture/parity-matrix.md)
 - [Windows Implementation Roadmap](WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [Cross-Platform Guidelines](../../docs/CROSS_PLATFORM_GUIDELINES.md)
 

@@ -1,5 +1,8 @@
 # Security Notes
 
+Structured security documentation now lives in [docs/security/security.md](docs/security/security.md).
+This top-level note remains the concise repository summary.
+
 BugNarrator is distributed as a local macOS app. Release builds and DMGs should be signed and notarized before public distribution whenever practical.
 
 ## Permissions
@@ -30,6 +33,7 @@ BugNarrator sends data to OpenAI only when you trigger an OpenAI-backed action.
 That includes:
 
 - recorded session audio after you stop a session and request transcription
+- transcript context when you request a review summary
 - transcript, markers, and screenshot references when you run issue extraction
 
 The app does not stream live dictation into other apps and does not upload audio continuously while you are still recording.
@@ -77,7 +81,7 @@ BugNarrator does not include automatic telemetry or background log uploads. Diag
 
 ## Debug Bundle Safety
 
-`Copy Debug Info` and `Export Debug Bundle` are designed for support without exposing credentials.
+`Export Debug Bundle` is designed for support without exposing credentials.
 
 The exported debug bundle can include:
 
