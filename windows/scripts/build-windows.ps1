@@ -14,7 +14,7 @@ try {
         throw "dotnet restore failed."
     }
 
-    dotnet build "windows/BugNarrator.Windows.sln" -c $Configuration
+    dotnet build "windows/BugNarrator.Windows.sln" -c $Configuration --no-restore
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build failed."
     }

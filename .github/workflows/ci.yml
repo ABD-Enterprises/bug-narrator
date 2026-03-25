@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "phase/**"
       - "codex/**"
   pull_request:
 
@@ -53,11 +54,24 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore Windows solution
-        run: dotnet restore windows/BugNarrator.Windows.sln
-
       - name: Build Windows solution
-        run: dotnet build windows/BugNarrator.Windows.sln -c Debug --no-restore
+        shell: pwsh
+        run: ./windows/scripts/build-windows.ps1 -Configuration Debug
 
-      - name: Run Windows core tests
-        run: dotnet test windows/tests/BugNarrator.Core.Tests/BugNarrator.Core.Tests.csproj -c Debug --no-build
+      - name: Run Windows tests
+        shell: pwsh
+        run: ./windows/scripts/test-windows.ps1 -Configuration Debug -NoBuild
+
+      - name: Package Windows workspace artifact
+        shell: pwsh
+        run: ./windows/scripts/package-windows.ps1 -Configuration Release
+
+      - name: Validate Windows package artifact
+        shell: pwsh
+        run: ./windows/scripts/validate-windows-package.ps1 -Runtime win-x64
+
+      - name: Upload Windows package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugnarrator-windows-package
+          path: windows/artifacts/packages/BugNarrator-windows-win-x64.zip

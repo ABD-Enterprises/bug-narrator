@@ -5,8 +5,8 @@ This document is the human-readable roadmap companion to [state.json](state.json
 ## Current Status
 
 - current production app version: `1.0.22`
-- latest completed phase in this run: `OPS-007 Release Summary Automation Seed`
-- phase outcome: five local non-release phases completed with build, test, workflow, docs-site, and state validation, and not released as a new app version
+- current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
+- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, Windows package artifact validation, and package artifact upload in CI without claiming real hardware runtime validation
 
 ## Completed Phases
 
@@ -119,6 +119,14 @@ Grouped risks:
 
 - WPF tray, recording, and screenshot milestones have not yet been validated on real Windows
 - CI and runtime confidence for Windows remain lower than macOS
+
+Current execution slice:
+
+- run Windows CI on `phase/*` branches so the required phase-branch workflow is actually exercised
+- build the Windows solution through the scripted entrypoint instead of ad hoc CI commands
+- run both `BugNarrator.Core.Tests` and `BugNarrator.Windows.Tests` in the scripted Windows baseline
+- package a Windows `Release` zip in CI and validate that the published artifact contains the expected executable and runtime metadata
+- keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
 
 ### RR-005 Assistive Technology Runtime And Docs Validation
 

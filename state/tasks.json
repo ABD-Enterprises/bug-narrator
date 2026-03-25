@@ -1,0 +1,32 @@
+{
+  "updated_on": "2026-03-24",
+  "active": [
+    {
+      "id": "RR-002-T4",
+      "phase": "RR-002",
+      "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
+      "status": "pending",
+      "blocking_for_phase_completion": true
+    }
+  ],
+  "completed": [
+    {
+      "id": "RR-002-T1",
+      "phase": "RR-002",
+      "title": "Expand CI trigger coverage to include phase branches",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T2",
+      "phase": "RR-002",
+      "title": "Run both Windows test projects through the scripted validation baseline",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T3",
+      "phase": "RR-002",
+      "title": "Package and validate the Windows zip artifact in CI",
+      "status": "completed"
+    }
+  ]
+}
