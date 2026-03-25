@@ -1,0 +1,27 @@
+{
+  "updated_on": "2026-03-24",
+  "resolved": [],
+  "unresolved": [
+    {
+      "id": "RISK-WIN-001",
+      "severity": "high",
+      "status": "unresolved",
+      "assigned_phase": "RR-002",
+      "note": "Real Windows desktop validation is still required for tray, recording, screenshot, and hotkey behavior."
+    },
+    {
+      "id": "RISK-WIN-002",
+      "severity": "medium",
+      "status": "unresolved",
+      "assigned_phase": "RR-002",
+      "note": "CI now covers phase branches, both Windows test projects, and package validation, but full runtime behavior and signed-release proof remain unresolved."
+    },
+    {
+      "id": "RISK-ACC-002",
+      "severity": "low",
+      "status": "unresolved",
+      "assigned_phase": "RR-005",
+      "note": "Live VoiceOver and hosted docs-site accessibility validation still remain for a later remediation phase."
+    }
+  ]
+}

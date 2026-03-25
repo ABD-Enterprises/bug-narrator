@@ -235,7 +235,7 @@
       "description": "Windows tray shell, recording, and screenshot workflows have been scaffolded but not yet validated on real Windows hardware.",
       "severity": "high",
       "impact": "The Windows workspace may compile conceptually while failing in real tray, permission, or capture behavior.",
-      "mitigation": "Track and fix in RR-002 with real Windows validation and runtime hardening.",
+      "mitigation": "Track and fix in RR-002. This phase now improves CI and packaged artifact validation, but real Windows desktop validation is still required before the risk can be closed.",
       "affected_components": [
         "windows",
         "BugNarrator.Windows",
@@ -249,7 +249,7 @@
       "description": "CI does not yet prove full Windows runtime behavior or fully prove signed release automation.",
       "severity": "medium",
       "impact": "Build confidence is improving, but key Windows and release-time behaviors can still regress outside local maintainer workflows.",
-      "mitigation": "Track and improve in RR-002 and OPS-002 by expanding validation once runner-side support is confirmed.",
+      "mitigation": "Track and improve in RR-002 and OPS-002. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, and packaged zip validation, but signed release proof and real runtime behavior are still unresolved.",
       "affected_components": [
         "github-workflows",
         "windows",
@@ -379,7 +379,14 @@
       "remediation": "Executed OPS-007 Release Summary Automation Seed."
     }
   ],
-  "current_phase": null,
+  "current_phase": {
+    "id": "RR-002",
+    "name": "Windows Runtime Validation And Hardening",
+    "status": "in_progress",
+    "started_on": "2026-03-24",
+    "summary": "Expanding Windows build, test, and packaging validation on a dedicated phase branch while real hardware runtime validation remains pending."
+  },
+  "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
   "decisions": [
     {
       "date": "2026-03-23",
@@ -440,6 +447,10 @@
     {
       "date": "2026-03-23",
       "summary": "Split the original docs-site and release-summary opportunity work into executable local phases first, then left site publication and public release-note promotion as explicit future phases after local validation passed."
+    },
+    {
+      "date": "2026-03-24",
+      "summary": "Resumed RR-002 on a dedicated phase branch and scoped it to the feasible Windows confidence slice in this macOS workspace: phase-branch CI coverage, explicit Windows test-project execution, and packaged zip validation, while leaving real Windows desktop runtime validation explicitly unresolved."
     }
   ],
   "version": "1.0.22",

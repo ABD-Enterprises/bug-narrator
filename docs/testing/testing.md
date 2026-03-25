@@ -22,9 +22,10 @@ xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Rel
 Current Windows workspace validation baseline on Windows:
 
 ```powershell
-dotnet restore windows/BugNarrator.Windows.sln
-dotnet build windows/BugNarrator.Windows.sln -c Debug
 dotnet test windows/tests/BugNarrator.Core.Tests/BugNarrator.Core.Tests.csproj -c Debug
+dotnet test windows/tests/BugNarrator.Windows.Tests/BugNarrator.Windows.Tests.csproj -c Debug
+powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
+powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64
 ```
 
 ## What Is Covered
@@ -40,6 +41,7 @@ Automated coverage currently focuses on:
 - secure settings persistence
 - transcript export and debug bundle export
 - Windows core and service-layer compilation plus core tests
+- Windows service-layer tests plus packaged zip validation on Windows CI
 
 ## Manual Validation Still Required
 

@@ -21,7 +21,8 @@ Run on Windows:
 ```powershell
 dotnet restore windows/BugNarrator.Windows.sln
 dotnet build windows/BugNarrator.Windows.sln -c Debug
-dotnet test windows/BugNarrator.Windows.sln -c Debug
+dotnet test windows/tests/BugNarrator.Core.Tests/BugNarrator.Core.Tests.csproj -c Debug
+dotnet test windows/tests/BugNarrator.Windows.Tests/BugNarrator.Windows.Tests.csproj -c Debug
 ```
 
 Scripted equivalents:
@@ -30,6 +31,7 @@ Scripted equivalents:
 powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
+powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64
 ```
 
 Optional run command:
@@ -41,7 +43,8 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
 - `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
-- Current passing automated coverage on this branch is `9` core tests and `27` Windows tests.
+- CI now restores, builds, runs both Windows test projects, packages a `Release` zip, and validates the packaged artifact contents on `windows-latest`.
+- Current passing automated coverage on this branch is `9` core tests and `27` Windows tests when run on Windows.
 - Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live OpenAI transcription, live OpenAI issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
 ## Milestone 2: Tray Shell And Single Instance
@@ -168,6 +171,8 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Confirm the selected issues export and the status message reports the first remote URL.
 - Run `powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release`.
 - Confirm `windows/artifacts/packages/BugNarrator-windows-win-x64.zip` is created.
+- Run `powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64`.
+- Confirm the validation script reports that the package contains the expected executable, DLL, and runtime metadata files.
 
 ## Artifact Validation
 Inspect:
