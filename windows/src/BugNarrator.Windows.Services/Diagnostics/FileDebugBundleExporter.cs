@@ -153,17 +153,7 @@ public sealed class FileDebugBundleExporter : IDebugBundleExporter
 
     private static string BuildVersionDescription()
     {
-        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var informationalVersion = assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion;
-
-        if (!string.IsNullOrWhiteSpace(informationalVersion))
-        {
-            return informationalVersion;
-        }
-
-        return assembly.GetName().Version?.ToString() ?? "0.0.0";
+        return BuildVersionDescriptionProvider.GetVersionDescription();
     }
 
     private sealed record DebugSystemInfoDocument(

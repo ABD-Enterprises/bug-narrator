@@ -43,8 +43,8 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
 - `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
-- CI now restores, builds, runs both Windows test projects, packages a `Release` zip, and validates the packaged artifact contents on `windows-latest`.
-- Current passing automated coverage on this branch is `9` core tests and `27` Windows tests when run on Windows.
+- CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, and launches the packaged executable in a headless smoke mode.
+- Current passing automated coverage on this branch is `9` core tests and `29` Windows tests when run on Windows.
 - Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live OpenAI transcription, live OpenAI issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
 ## Milestone 2: Tray Shell And Single Instance
@@ -172,7 +172,7 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Run `powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release`.
 - Confirm `windows/artifacts/packages/BugNarrator-windows-win-x64.zip` is created.
 - Run `powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64`.
-- Confirm the validation script reports that the package contains the expected executable, DLL, and runtime metadata files.
+- Confirm the validation script reports that the package contains the expected executable, DLL, and runtime metadata files, then validates the packaged app's smoke-report JSON.
 
 ## Artifact Validation
 Inspect:

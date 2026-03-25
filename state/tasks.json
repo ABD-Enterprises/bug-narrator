@@ -27,6 +27,18 @@
       "phase": "RR-002",
       "title": "Package and validate the Windows zip artifact in CI",
       "status": "completed"
+    },
+    {
+      "id": "RR-002-T5",
+      "phase": "RR-002",
+      "title": "Run the packaged Windows executable in a headless smoke mode and validate the emitted report",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T6",
+      "phase": "RR-002",
+      "title": "Fix Windows-targeted service compile blockers discovered while running the Windows test project",
+      "status": "completed"
     }
   ]
 }

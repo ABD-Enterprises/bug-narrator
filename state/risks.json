@@ -1,6 +1,14 @@
 {
   "updated_on": "2026-03-24",
-  "resolved": [],
+  "resolved": [
+    {
+      "id": "RISK-WIN-003",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "RR-002",
+      "note": "Resolved by replacing ambiguous string-splitting calls with explicit character arrays so the Windows-targeted test project compiles cleanly."
+    }
+  ],
   "unresolved": [
     {
       "id": "RISK-WIN-001",
@@ -14,7 +22,7 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "RR-002",
-      "note": "CI now covers phase branches, both Windows test projects, and package validation, but full runtime behavior and signed-release proof remain unresolved."
+      "note": "CI now covers phase branches, both Windows test projects, package validation, and packaged-app smoke execution, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
     },
     {
       "id": "RISK-ACC-002",

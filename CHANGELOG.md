@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Expanded the Windows validation baseline so CI now runs on `phase/*` branches, executes both Windows test projects, packages the Windows workspace, and validates the packaged zip contents before treating the artifact as healthy.
+- Expanded the Windows validation baseline so CI now runs on `phase/*` branches, executes both Windows test projects, packages the Windows workspace, validates the packaged zip contents, and launches the packaged Windows app in a headless smoke mode before treating the artifact as healthy.
 
 ## 1.0.22 - 2026-03-24
 

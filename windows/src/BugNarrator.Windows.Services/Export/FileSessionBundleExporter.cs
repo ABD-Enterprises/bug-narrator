@@ -120,7 +120,7 @@ public sealed class FileSessionBundleExporter : ISessionBundleExporter
 
         builder = string.Join(
             "-",
-            builder.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            builder.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         return string.IsNullOrWhiteSpace(builder)
             ? "session"

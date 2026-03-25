@@ -59,7 +59,7 @@ Current Windows milestone status:
 - the post-MVP Windows global hotkey parity milestone is implemented, including optional `Start Recording`, `Stop Recording`, and `Capture Screenshot` shortcuts that start as `Not Set`, save locally, register on app startup, and surface clear conflict/unavailable status in Settings
 - the post-MVP hardening milestone is implemented, including shared atomic file writes, root-bound session path validation, corrupted-secret tolerance, diagnostic redaction, safer export/session loading, friendlier network failure messages, and defensive screenshot preview handling
 - stopping a recording now saves the session even when no OpenAI API key is configured and preserves a clear failure state if transcription fails
-- automated coverage currently includes `9` core tests and `27` Windows tests
+- automated coverage currently includes `9` core tests and `29` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
-- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata before CI treats the package as healthy
+- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, then launches the packaged app in a headless smoke mode that writes a structured report and exits cleanly
 - manual validation is still required for live OpenAI transcription, live issue extraction, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop

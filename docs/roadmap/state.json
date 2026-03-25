@@ -259,6 +259,19 @@
       "status": "unresolved"
     },
     {
+      "id": "RISK-WIN-003",
+      "description": "The Windows service layer contained ambiguous string-splitting calls that prevented the Windows-targeted test project from compiling when RR-002 validation began exercising it directly.",
+      "severity": "medium",
+      "impact": "Windows validation could fail before runtime checks even started, hiding real desktop issues behind avoidable compile errors.",
+      "mitigation": "Resolved in RR-002 by replacing the ambiguous collection-expression separators with explicit character arrays in Windows settings and session-bundle export code.",
+      "affected_components": [
+        "BugNarrator.Windows.Services",
+        "windows-tests"
+      ],
+      "phase_association": "RR-002",
+      "status": "resolved"
+    },
+    {
       "id": "RISK-ACC-001",
       "description": "The live app still lacks a complete accessibility and 508-style interaction audit across keyboard flow, focus management, and assistive-technology behavior.",
       "severity": "medium",
@@ -384,7 +397,7 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Expanding Windows build, test, and packaging validation on a dedicated phase branch while real hardware runtime validation remains pending."
+    "summary": "Expanding Windows build, test, packaging, and packaged-app smoke validation on a dedicated phase branch while real hardware runtime validation remains pending."
   },
   "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
   "decisions": [
@@ -450,7 +463,11 @@
     },
     {
       "date": "2026-03-24",
-      "summary": "Resumed RR-002 on a dedicated phase branch and scoped it to the feasible Windows confidence slice in this macOS workspace: phase-branch CI coverage, explicit Windows test-project execution, and packaged zip validation, while leaving real Windows desktop runtime validation explicitly unresolved."
+      "summary": "Resumed RR-002 on a dedicated phase branch and scoped it to the feasible Windows confidence slice in this macOS workspace: phase-branch CI coverage, explicit Windows test-project execution, packaged zip validation, and headless packaged-app smoke execution, while leaving real Windows desktop runtime validation explicitly unresolved."
+    },
+    {
+      "date": "2026-03-24",
+      "summary": "While exercising the Windows-targeted test project, fixed ambiguous string-splitting calls in the Windows service layer so RR-002 validation no longer fails at compile time before runtime checks begin."
     }
   ],
   "version": "1.0.22",
