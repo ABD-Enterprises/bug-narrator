@@ -6,7 +6,7 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 - current production app version: `1.0.22`
 - current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
-- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, Windows package artifact validation, and package artifact upload in CI without claiming real hardware runtime validation
+- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, and kept package artifact validation/upload in CI without claiming real hardware runtime validation
 
 ## Completed Phases
 
@@ -125,7 +125,8 @@ Current execution slice:
 - run Windows CI on `phase/*` branches so the required phase-branch workflow is actually exercised
 - build the Windows solution through the scripted entrypoint instead of ad hoc CI commands
 - run both `BugNarrator.Core.Tests` and `BugNarrator.Windows.Tests` in the scripted Windows baseline
-- package a Windows `Release` zip in CI and validate that the published artifact contains the expected executable and runtime metadata
+- fix Windows-targeted service compile blockers discovered while exercising the Windows test project from the phase branch
+- package a Windows `Release` zip in CI, validate that the published artifact contains the expected executable and runtime metadata, and run the packaged executable in a headless smoke mode
 - keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
 
 ### RR-005 Assistive Technology Runtime And Docs Validation

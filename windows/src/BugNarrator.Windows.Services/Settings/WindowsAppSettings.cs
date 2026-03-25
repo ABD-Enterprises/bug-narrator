@@ -65,7 +65,7 @@ public sealed record WindowsAppSettings(
 
     public IReadOnlyList<string> GitHubDefaultLabelsList =>
         (GitHubDefaultLabels ?? string.Empty)
-        .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(label => !string.IsNullOrWhiteSpace(label))
         .ToArray();
 

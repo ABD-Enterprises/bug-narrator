@@ -29,6 +29,21 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        try
+        {
+            if (WindowsSmokeProbe.TryWriteReport(e.Args, out var smokeExitCode))
+            {
+                Shutdown(smokeExitCode);
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"BugNarrator Windows smoke probe failed: {exception.Message}");
+            Shutdown(1);
+            return;
+        }
+
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         var storagePaths = AppStoragePathProvider.CreateDefault();

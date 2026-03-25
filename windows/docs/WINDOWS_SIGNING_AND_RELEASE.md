@@ -17,7 +17,7 @@ That script publishes `BugNarrator.Windows.csproj` for `win-x64` by default and 
 
 This is sufficient for internal validation and external handoff while installer work remains deferred.
 
-CI now validates the packaged zip contents before uploading the Windows artifact from `windows-latest`. This improves release-candidate confidence, but it does not replace a real desktop validation pass for tray, microphone, screenshot, or hotkey behavior.
+CI now validates the packaged zip contents and launches the packaged Windows executable in a headless smoke mode before uploading the Windows artifact from `windows-latest`. This improves release-candidate confidence, but it does not replace a real desktop validation pass for tray, microphone, screenshot, or hotkey behavior.
 
 ## Build And Test
 
@@ -26,6 +26,7 @@ Run:
 - `powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug`
 - `powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug`
 - `powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64`
+- `powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64` now also runs the packaged executable with `--smoke-output <path>` and validates the emitted JSON report.
 
 For release packaging, run:
 

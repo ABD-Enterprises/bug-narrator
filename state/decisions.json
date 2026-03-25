@@ -5,6 +5,16 @@
       "date": "2026-03-24",
       "phase": "RR-002",
       "summary": "Executed the feasible RR-002 slice in the macOS workspace by hardening Windows CI and scripted validation instead of claiming real hardware validation that was not run."
+    },
+    {
+      "date": "2026-03-24",
+      "phase": "RR-002",
+      "summary": "Added a headless Windows smoke mode plus package-script validation so CI can exercise the packaged executable itself without pretending tray or capture UX was validated."
+    },
+    {
+      "date": "2026-03-24",
+      "phase": "RR-002",
+      "summary": "Treated the Windows-targeted compile failure as a real RR-002 defect and fixed it in scope instead of deferring it behind the broader runtime-validation risk."
     }
   ]
 }

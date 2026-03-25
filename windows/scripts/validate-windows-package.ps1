@@ -45,4 +45,33 @@ finally {
     $archive.Dispose()
 }
 
+$smokeExecutable = Join-Path $publishDirectory "BugNarrator.Windows.exe"
+$smokeOutputPath = Join-Path $publishDirectory "bugnarrator-smoke-report.json"
+
+if (Test-Path $smokeOutputPath) {
+    Remove-Item $smokeOutputPath -Force
+}
+
+& $smokeExecutable --smoke-output $smokeOutputPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Packaged smoke executable exited with code $LASTEXITCODE."
+}
+
+if (-not (Test-Path $smokeOutputPath)) {
+    throw "Smoke probe output was not created: $smokeOutputPath"
+}
+
+$smokeReport = Get-Content $smokeOutputPath -Raw | ConvertFrom-Json
+if ($smokeReport.mode -ne "smoke") {
+    throw "Unexpected smoke report mode: $($smokeReport.mode)"
+}
+
+if ($smokeReport.appName -ne "BugNarrator.Windows") {
+    throw "Unexpected smoke report appName: $($smokeReport.appName)"
+}
+
+if (-not $smokeReport.version) {
+    throw "Smoke report did not include a version."
+}
+
 Write-Host "Windows package validation passed for $packagePath"

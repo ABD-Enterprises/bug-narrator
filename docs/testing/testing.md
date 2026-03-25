@@ -41,7 +41,7 @@ Automated coverage currently focuses on:
 - secure settings persistence
 - transcript export and debug bundle export
 - Windows core and service-layer compilation plus core tests
-- Windows service-layer tests plus packaged zip validation on Windows CI
+- Windows service-layer tests plus packaged zip validation and packaged-app smoke execution on Windows CI
 
 ## Manual Validation Still Required
 
