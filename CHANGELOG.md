@@ -2,13 +2,12 @@
 
 ## Unreleased
 
-- Expanded the Windows validation baseline so CI now runs on `phase/*` branches, executes both Windows test projects, packages the Windows workspace, validates the packaged zip contents, and launches the packaged Windows app in a headless smoke mode before treating the artifact as healthy.
-
-## 1.0.22 - 2026-03-24
+## 1.0.22 - 2026-03-28
 
 - Preserved finished recordings when transcription cannot start because the OpenAI API key is missing, invalid, or revoked, and surfaced retry-needed sessions more clearly in the menu bar and session library so recovery is easier after relaunch.
 - Hardened keyboard and VoiceOver behavior across the menu bar, recording controls, session library, extracted issues, and settings, and added a lightweight accessibility regression check for the most accessibility-sensitive app surfaces.
 - Added a canonical product spec, a cross-platform parity matrix, synced the docs site to the main onboarding, user, and product pages, and seeded internal release-summary automation to tighten future release execution.
+- Expanded the Windows validation baseline so CI now runs on `phase/*` branches, executes both Windows test projects, packages the Windows workspace, validates the packaged zip contents, and launches the packaged Windows app in a headless smoke mode before treating the artifact as healthy.
 
 ## 1.0.21 - 2026-03-16
 

@@ -489,7 +489,7 @@
     {
       "version": "1.0.22",
       "environment": "prod",
-      "date": "2026-03-24",
+      "date": "2026-03-28",
       "notes": "Released through GitHub Releases as the current production DMG."
     },
     {
@@ -504,7 +504,7 @@
       "version": "1.0.22",
       "from": "test",
       "to": "prod",
-      "date": "2026-03-24",
+      "date": "2026-03-28",
       "notes": "Manual promotion through the signed/notarized GitHub release process."
     },
     {
