@@ -17,7 +17,7 @@ final class DebugBundleExporterTests: XCTestCase {
 
         let keychainService = MockKeychainService()
         let settingsStore = SettingsStore(defaults: defaults, keychainService: keychainService)
-        settingsStore.apiKey = "sk-secret"
+        settingsStore.apiKey = "fixture-openai-key"
         settingsStore.preferredModel = "whisper-1"
         settingsStore.issueExtractionModel = "gpt-4.1-mini"
         settingsStore.debugMode = true
@@ -71,14 +71,14 @@ final class DebugBundleExporterTests: XCTestCase {
 
         let sessionMetadata = try String(contentsOf: bundleURL.appendingPathComponent("session-metadata.json"))
         XCTAssertTrue(sessionMetadata.contains("\"issueCount\" : 4"))
-        XCTAssertFalse(sessionMetadata.contains("sk-secret"))
+        XCTAssertFalse(sessionMetadata.contains("fixture-openai-key"))
 
         let systemInfo = try String(contentsOf: bundleURL.appendingPathComponent("system-info.json"))
         XCTAssertTrue(systemInfo.contains("\"activeTranscriptionModel\" : \"whisper-1\""))
-        XCTAssertFalse(systemInfo.contains("sk-secret"))
+        XCTAssertFalse(systemInfo.contains("fixture-openai-key"))
 
         let recentLog = try String(contentsOf: bundleURL.appendingPathComponent("recent-log.txt"))
         XCTAssertTrue(recentLog.contains("debug bundle"))
-        XCTAssertFalse(recentLog.contains("sk-secret"))
+        XCTAssertFalse(recentLog.contains("fixture-openai-key"))
     }
 }

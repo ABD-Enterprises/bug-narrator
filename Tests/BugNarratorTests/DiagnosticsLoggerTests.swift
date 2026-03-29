@@ -12,11 +12,11 @@ final class DiagnosticsLoggerTests: XCTestCase {
 
         logger.info(
             "credential_event",
-            "Validation failed for sk-secret and Bearer github_pat_secret",
+            "Validation failed for fixture-openai-key and Bearer fixture-github-pat",
             metadata: [
-                "apiKey": "sk-secret",
-                "githubToken": "github_pat_secret",
-                "note": "Bearer github_pat_secret"
+                "apiKey": "fixture-openai-key",
+                "githubToken": "fixture-github-pat",
+                "note": "Bearer fixture-github-pat"
             ]
         )
 
@@ -26,8 +26,8 @@ final class DiagnosticsLoggerTests: XCTestCase {
         XCTAssertEqual(entry?.metadata["apiKey"], "<redacted>")
         XCTAssertEqual(entry?.metadata["githubToken"], "<redacted>")
         XCTAssertEqual(entry?.metadata["note"], "<redacted>")
-        XCTAssertFalse(entry?.message.contains("sk-secret") ?? true)
-        XCTAssertFalse(entry?.message.contains("github_pat_secret") ?? true)
+        XCTAssertFalse(entry?.message.contains("fixture-openai-key") ?? true)
+        XCTAssertFalse(entry?.message.contains("fixture-github-pat") ?? true)
 
         await store.clear()
         BugNarratorDiagnostics.setDebugModeEnabled(false)

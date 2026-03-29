@@ -33,7 +33,7 @@ final class JiraExportProviderTests: XCTestCase {
             configuration: JiraExportConfiguration(
                 baseURL: URL(string: "https://acme.atlassian.net")!,
                 email: "you@example.com",
-                apiToken: "jira-token",
+                apiToken: "fixture-jira-token",
                 projectKey: "FM",
                 issueType: "Task"
             )
@@ -87,7 +87,7 @@ final class JiraExportProviderTests: XCTestCase {
                 configuration: JiraExportConfiguration(
                     baseURL: URL(string: "https://acme.atlassian.net")!,
                     email: "you@example.com",
-                    apiToken: "jira-token",
+                    apiToken: "fixture-jira-token",
                     projectKey: "FM",
                     issueType: "Task"
                 )
@@ -149,7 +149,7 @@ final class JiraExportProviderTests: XCTestCase {
                 configuration: JiraExportConfiguration(
                     baseURL: URL(string: "https://acme.atlassian.net")!,
                     email: "you@example.com",
-                    apiToken: "jira-token",
+                    apiToken: "fixture-jira-token",
                     projectKey: "FM",
                     issueType: "Task"
                 )

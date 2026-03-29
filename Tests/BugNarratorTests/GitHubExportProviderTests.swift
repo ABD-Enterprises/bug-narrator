@@ -32,7 +32,7 @@ final class GitHubExportProviderTests: XCTestCase {
             issue: issue,
             session: session,
             configuration: GitHubExportConfiguration(
-                token: "github-token",
+                token: "fixture-github-token",
                 owner: "acme",
                 repository: "bugnarrator",
                 labels: ["bug", "triage"]
@@ -41,7 +41,7 @@ final class GitHubExportProviderTests: XCTestCase {
 
         XCTAssertEqual(request.url?.absoluteString, "https://api.github.com/repos/acme/bugnarrator/issues")
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer github-token")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-github-token")
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "BugNarrator")
 
         let body = try XCTUnwrap(request.httpBody)
@@ -82,7 +82,7 @@ final class GitHubExportProviderTests: XCTestCase {
                 issues: [issue],
                 session: session,
                 configuration: GitHubExportConfiguration(
-                    token: "github-token",
+                    token: "fixture-github-token",
                     owner: "acme",
                     repository: "bugnarrator",
                     labels: []
@@ -143,7 +143,7 @@ final class GitHubExportProviderTests: XCTestCase {
                 issues: [firstIssue, secondIssue],
                 session: session,
                 configuration: GitHubExportConfiguration(
-                    token: "github-token",
+                    token: "fixture-github-token",
                     owner: "acme",
                     repository: "bugnarrator",
                     labels: []

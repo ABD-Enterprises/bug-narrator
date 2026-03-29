@@ -82,12 +82,12 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
             diagnostics,
             new HttpClient(handler));
 
-        var result = await service.ExtractAsync(session, "test-key", "gpt-4.1-mini");
+        var result = await service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini");
 
         Assert.NotNull(capturedRequest);
         Assert.Equal("https://api.openai.com/v1/chat/completions", capturedRequest!.RequestUri!.AbsoluteUri);
         Assert.Equal("Bearer", capturedRequest.Headers.Authorization?.Scheme);
-        Assert.Equal("test-key", capturedRequest.Headers.Authorization?.Parameter);
+        Assert.Equal("fixture-openai-key", capturedRequest.Headers.Authorization?.Parameter);
         Assert.Equal("One draft issue was extracted.", result.Summary);
         Assert.Equal("Review before export.", result.GuidanceNote);
 
@@ -109,7 +109,7 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
                 throw new HttpRequestException("No route to host"))));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.ExtractAsync(session, "test-key", "gpt-4.1-mini"));
+            service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini"));
 
         Assert.Contains("could not reach OpenAI issue extraction", exception.Message, StringComparison.OrdinalIgnoreCase);
     }

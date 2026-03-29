@@ -45,13 +45,13 @@ final class SettingsStoreTests: XCTestCase {
             keyCode: 1,
             modifiers: NSEvent.ModifierFlags.command.union(.option).union(.control).rawValue
         )
-        firstStore.githubToken = "github-token"
+        firstStore.githubToken = "fixture-github-token"
         firstStore.githubRepositoryOwner = "acme"
         firstStore.githubRepositoryName = "bugnarrator"
         firstStore.githubDefaultLabels = "bug,triage"
         firstStore.jiraBaseURL = "acme.atlassian.net"
         firstStore.jiraEmail = "you@example.com"
-        firstStore.jiraAPIToken = "jira-token"
+        firstStore.jiraAPIToken = "fixture-jira-token"
         firstStore.jiraProjectKey = "FM"
         firstStore.jiraIssueType = "Task"
 
@@ -81,13 +81,13 @@ final class SettingsStoreTests: XCTestCase {
             secondStore.screenshotHotkeyShortcut.modifiers,
             NSEvent.ModifierFlags.command.union(.option).union(.control).rawValue
         )
-        XCTAssertEqual(secondStore.githubToken, "github-token")
+        XCTAssertEqual(secondStore.githubToken, "fixture-github-token")
         XCTAssertEqual(secondStore.githubRepositoryOwner, "acme")
         XCTAssertEqual(secondStore.githubRepositoryName, "bugnarrator")
         XCTAssertEqual(secondStore.githubDefaultLabelsList, ["bug", "triage"])
         XCTAssertEqual(secondStore.jiraBaseURL, "acme.atlassian.net")
         XCTAssertEqual(secondStore.jiraEmail, "you@example.com")
-        XCTAssertEqual(secondStore.jiraAPIToken, "jira-token")
+        XCTAssertEqual(secondStore.jiraAPIToken, "fixture-jira-token")
         XCTAssertEqual(secondStore.jiraProjectKey, "FM")
         XCTAssertEqual(secondStore.jiraIssueType, "Task")
     }
@@ -149,7 +149,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
-        store.apiKey = "sk-test-secret-1234"
+        store.apiKey = "fixture-openai-key-1234"
 
         XCTAssertEqual(store.maskedAPIKey, "••••••••1234")
     }
@@ -346,8 +346,8 @@ final class SettingsStoreTests: XCTestCase {
         let keychain = MockKeychainService()
         let legacyGitHubKey = "SessionMic.GitHub::github-token"
         let legacyJiraKey = "SessionMic.Jira::jira-api-token"
-        keychain.values[legacyGitHubKey] = "legacy-github-token"
-        keychain.values[legacyJiraKey] = "legacy-jira-token"
+        keychain.values[legacyGitHubKey] = "legacy-fixture-github-token"
+        keychain.values[legacyJiraKey] = "legacy-fixture-jira-token"
         keychain.interactionRequiredKeys = [legacyGitHubKey, legacyJiraKey]
 
         let store = SettingsStore(defaults: defaults, keychainService: keychain)
@@ -367,8 +367,8 @@ final class SettingsStoreTests: XCTestCase {
 
         store.refreshExportSecretsForUserInitiatedAccess()
 
-        XCTAssertEqual(store.githubToken, "legacy-github-token")
-        XCTAssertEqual(store.jiraAPIToken, "legacy-jira-token")
+        XCTAssertEqual(store.githubToken, "legacy-fixture-github-token")
+        XCTAssertEqual(store.jiraAPIToken, "legacy-fixture-jira-token")
         XCTAssertTrue(
             keychain.readRequests.contains {
                 $0.service == "SessionMic.GitHub" && $0.allowInteraction
@@ -381,11 +381,11 @@ final class SettingsStoreTests: XCTestCase {
         )
         XCTAssertEqual(
             keychain.values["BugNarrator.GitHub::github-token"],
-            "legacy-github-token"
+            "legacy-fixture-github-token"
         )
         XCTAssertEqual(
             keychain.values["BugNarrator.Jira::jira-api-token"],
-            "legacy-jira-token"
+            "legacy-fixture-jira-token"
         )
     }
 
@@ -396,8 +396,8 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
-        store.githubToken = "github-secret-9876"
-        store.jiraAPIToken = "x"
+        store.githubToken = "fixture-github-token-9876"
+        store.jiraAPIToken = "fixture-jira-token-4321"
 
         XCTAssertEqual(store.maskedGitHubToken, "••••••••9876")
         XCTAssertEqual(store.maskedJiraAPIToken, "••••••••4321")

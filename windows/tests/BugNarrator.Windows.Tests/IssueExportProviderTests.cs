@@ -40,7 +40,7 @@ public sealed class IssueExportProviderTests : IDisposable
             issue,
             session,
             new GitHubExportConfiguration(
-                Token: "github-token",
+                Token: "fixture-github-token",
                 Owner: "acme",
                 Repository: "bugnarrator",
                 Labels: ["bug", "triage"]));
@@ -50,7 +50,7 @@ public sealed class IssueExportProviderTests : IDisposable
 
         Assert.Equal("https://api.github.com/repos/acme/bugnarrator/issues", request.RequestUri!.AbsoluteUri);
         Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
-        Assert.Equal("github-token", request.Headers.Authorization?.Parameter);
+        Assert.Equal("fixture-github-token", request.Headers.Authorization?.Parameter);
         Assert.Equal("Save button clips in the modal", document.RootElement.GetProperty("title").GetString());
         Assert.Equal(2, document.RootElement.GetProperty("labels").GetArrayLength());
         Assert.Contains("Transcript time", document.RootElement.GetProperty("body").GetString());
@@ -97,7 +97,7 @@ public sealed class IssueExportProviderTests : IDisposable
                 session.IssueExtraction!.Issues,
                 session,
                 new GitHubExportConfiguration(
-                    Token: "github-token",
+                    Token: "fixture-github-token",
                     Owner: "acme",
                     Repository: "bugnarrator",
                     Labels: Array.Empty<string>())));
@@ -121,7 +121,7 @@ public sealed class IssueExportProviderTests : IDisposable
             new JiraExportConfiguration(
                 BaseUrl: new Uri("https://acme.atlassian.net/"),
                 Email: "you@example.com",
-                ApiToken: "jira-token",
+                ApiToken: "fixture-jira-token",
                 ProjectKey: "BN",
                 IssueType: "Task"));
 
@@ -160,7 +160,7 @@ public sealed class IssueExportProviderTests : IDisposable
                 new JiraExportConfiguration(
                     BaseUrl: new Uri("https://acme.atlassian.net/"),
                     Email: "you@example.com",
-                    ApiToken: "jira-token",
+                    ApiToken: "fixture-jira-token",
                     ProjectKey: "BN",
                     IssueType: "Task")));
 

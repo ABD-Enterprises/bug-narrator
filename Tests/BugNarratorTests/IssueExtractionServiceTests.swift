@@ -33,13 +33,13 @@ final class IssueExtractionServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
 
             return (self.successResponse(for: request), self.makeChatCompletionData(content: content))
         }
 
         let service = IssueExtractionService(session: makeMockURLSession())
-        let result = try await service.extractIssues(from: session, apiKey: "test-key", model: "gpt-4.1-mini")
+        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
 
         XCTAssertEqual(result.summary, "Two draft review items were extracted.")
         XCTAssertEqual(result.guidanceNote, "Review these before export.")
@@ -94,7 +94,7 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
 
         let service = IssueExtractionService(session: makeMockURLSession())
-        let result = try await service.extractIssues(from: session, apiKey: "test-key", model: "gpt-4.1-mini")
+        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
 
         XCTAssertEqual(result.summary, "One draft issue was extracted.")
         XCTAssertEqual(result.guidanceNote, "Review before export.")
@@ -124,7 +124,7 @@ final class IssueExtractionServiceTests: XCTestCase {
 
         let service = IssueExtractionService(session: makeMockURLSession())
         do {
-            _ = try await service.extractIssues(from: session, apiKey: "test-key", model: "gpt-4.1-mini")
+            _ = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
             XCTFail("Expected issue extraction to fail for malformed payload.")
         } catch {
             XCTAssertEqual(

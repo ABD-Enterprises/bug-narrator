@@ -15,7 +15,7 @@ final class TranscriptionClientTests: XCTestCase {
         let client = TranscriptionClient(session: makeMockURLSession())
         let request = try await client.makeURLRequest(
             fileURL: fileURL,
-            apiKey: "test-key",
+            apiKey: "fixture-openai-key",
             request: TranscriptionRequest(
                 model: "whisper-1",
                 languageHint: "en",
@@ -28,7 +28,7 @@ final class TranscriptionClientTests: XCTestCase {
 
         XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/audio/transcriptions")
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
         XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
         XCTAssertTrue(bodyString.contains("name=\"model\""))
         XCTAssertTrue(bodyString.contains("whisper-1"))
@@ -53,7 +53,7 @@ final class TranscriptionClientTests: XCTestCase {
         do {
             _ = try await client.transcribe(
                 fileURL: fileURL,
-                apiKey: "test-key",
+                apiKey: "fixture-openai-key",
                 request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
             )
             XCTFail("Expected an error for an empty audio file.")
@@ -98,7 +98,7 @@ final class TranscriptionClientTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/models")
             XCTAssertEqual(request.httpMethod, "GET")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
 
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Data(#"{"data":[]}"#.utf8))
@@ -106,7 +106,7 @@ final class TranscriptionClientTests: XCTestCase {
 
         let client = TranscriptionClient(session: makeMockURLSession())
 
-        try await client.validateAPIKey("test-key")
+        try await client.validateAPIKey("fixture-openai-key")
     }
 
     func testValidateAPIKeyMapsRevokedKeyResponse() async throws {
@@ -142,7 +142,7 @@ final class TranscriptionClientTests: XCTestCase {
         do {
             _ = try await client.transcribe(
                 fileURL: fileURL,
-                apiKey: "test-key",
+                apiKey: "fixture-openai-key",
                 request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
             )
             XCTFail("Expected a timeout error.")
@@ -169,7 +169,7 @@ final class TranscriptionClientTests: XCTestCase {
         do {
             _ = try await client.transcribe(
                 fileURL: fileURL,
-                apiKey: "test-key",
+                apiKey: "fixture-openai-key",
                 request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
             )
             XCTFail("Expected an empty transcript error.")

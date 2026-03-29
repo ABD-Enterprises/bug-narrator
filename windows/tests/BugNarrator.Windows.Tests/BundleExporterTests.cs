@@ -51,7 +51,7 @@ public sealed class BundleExporterTests : IDisposable
         var session = ReviewSessionTestData.CreateCompletedSession(
             rootDirectory,
             issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
-        diagnostics.Info("export", "Authorization: Bearer sk-secret github_pat_123456789012345678901234567890");
+        diagnostics.Info("export", "Authorization: Bearer fixture-openai-key fixture-github-pat");
 
         var exporter = new FileDebugBundleExporter(
             storagePaths,
@@ -67,12 +67,12 @@ public sealed class BundleExporterTests : IDisposable
 
         var sessionMetadata = await File.ReadAllTextAsync(Path.Combine(bundlePath, "session-metadata.json"));
         Assert.Contains("\"issueCount\": 1", sessionMetadata);
-        Assert.DoesNotContain("sk-secret", sessionMetadata, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fixture-openai-key", sessionMetadata, StringComparison.OrdinalIgnoreCase);
 
         var recentLog = await File.ReadAllTextAsync(Path.Combine(bundlePath, "recent-log.txt"));
         Assert.Contains("[REDACTED]", recentLog, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("sk-secret", recentLog, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("github_pat_", recentLog, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fixture-openai-key", recentLog, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fixture-github-pat", recentLog, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

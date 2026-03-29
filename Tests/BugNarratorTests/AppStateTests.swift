@@ -953,7 +953,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertNoThrow(try harness.transcriptStore.add(session))
         harness.appState.selectedTranscriptID = session.id
 
-        harness.settingsStore.githubToken = "github-token"
+        harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
 
@@ -1004,7 +1004,7 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.githubToken = "github-token"
+        harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
 
@@ -1048,7 +1048,7 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.githubToken = "github-token"
+        harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
         await harness.exportService.setGitHubResults([
