@@ -150,10 +150,9 @@
       "name": "Dependency Alert Remediation",
       "priority": "medium",
       "grouped_risks": [
-        "RISK-SEC-001",
-        "RISK-ENV-001"
+        "RISK-SEC-001"
       ],
-      "scope": "Review and remediate the open Dependabot alerts on the default branch, rerun CI after dependency updates, and stabilize or work around local npm toolchain failures that block normal lockfile refreshes."
+      "scope": "Review and remediate the open Dependabot alerts on the default branch, validate the patched dependency graph on the tracked branch, and promote the remediation so GitHub clears the default-branch alerts."
     }
   ],
   "opportunities": [
@@ -402,14 +401,14 @@
       "description": "The local npm 11.12.1 / Node 25.9.0 toolchain can fail registry fetches with EBADF during docs-site dependency remediation, preventing a normal npm install or lockfile refresh path in this macOS workspace.",
       "severity": "medium",
       "impact": "Security or dependency updates can stall locally even when the registry is reachable, forcing manual tarball-based workarounds and reducing confidence in repeatable package-management flows.",
-      "mitigation": "Track in OPS-012. Use the direct tarball workaround only as a temporary measure, then restore a reliable local package-manager path or pin a stable toolchain before closing the phase.",
+      "mitigation": "Resolved in OPS-012 by adding site/.node-version plus scripts/site_npm.sh, which downloads and reuses the current official Node 22 toolchain under build/tooling and runs docs-site npm commands through that pinned path instead of the broken system npm 11 / Node 25 combination.",
       "affected_components": [
         "site",
         "dependencies",
         "packaging-env"
       ],
       "phase_association": "OPS-012",
-      "status": "unresolved"
+      "status": "resolved"
     }
   ],
   "incidents": [
@@ -491,15 +490,14 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while phase/bootstrap advanced OPS-012 by patching the docs-site dependency tree for the four recorded Dependabot alerts, validating the patched tree with a production site build, and recording the remaining default-branch merge plus hosted-CI follow-up. A local npm 11 / Node 25 registry-fetch defect was discovered during the remediation and is now tracked separately inside OPS-012."
+    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 now has a pushed dependency-remediation commit, a passing hosted CI run (23988782016), and a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The remaining OPS-012 follow-up is promoting the dependency patch to the default branch so the Dependabot alerts can close there."
   },
   "current_phase_branch": "phase/bootstrap",
   "last_updated": "2026-04-04",
   "tasks": {
     "active": [
       "RR-002-T4",
-      "OPS-012-T2",
-      "OPS-012-T3"
+      "OPS-012-T4"
     ],
     "completed": [
       "OPS-011-T1",
@@ -516,7 +514,9 @@
       "BOOTSTRAP-T2",
       "OPS-011-T4",
       "OPS-011-T2",
-      "OPS-012-T1"
+      "OPS-012-T1",
+      "OPS-012-T2",
+      "OPS-012-T3"
     ]
   },
   "decisions": [
@@ -631,6 +631,14 @@
     {
       "date": "2026-04-04",
       "summary": "Started OPS-012 because RR-002 remains blocked on real Windows validation, patched the docs-site dependency tree to replace the four vulnerable Dependabot versions, validated the patched tree with npm ls plus a Docusaurus production build, and recorded the local npm 11 / Node 25 EBADF fetch defect as a separate OPS-012 environment risk."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Validated the OPS-012 dependency-remediation commit on hosted CI run 23988782016 after pushing phase/bootstrap, then kept the phase open only for default-branch promotion and the local npm 11 / Node 25 toolchain defect."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Closed OPS-012-T3 by replacing the broken system npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper aligned to the docs-site CI runtime, then validated npm ci and the production site build through that pinned toolchain."
     }
   ],
   "version": "1.0.22",

@@ -2,6 +2,9 @@
   "name": "bugnarrator-docs-site",
   "private": true,
   "version": "0.0.1",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "start": "docusaurus start",
     "build": "docusaurus build",

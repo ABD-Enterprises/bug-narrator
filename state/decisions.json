@@ -75,6 +75,16 @@
       "date": "2026-04-04",
       "phase": "OPS-012",
       "summary": "Because RR-002 is still blocked on real Windows hardware validation, started OPS-012 by patching the docs-site dependency graph locally with targeted overrides and direct tarball replacements, validated the patched versions with npm ls and a production Docusaurus build, and logged the local npm 11 / Node 25 EBADF fetch failure as a separate environment risk instead of treating it as successful package-manager remediation."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Validated hosted CI run 23988782016 on commit 5369212 after pushing the docs-site dependency remediation, then narrowed the remaining OPS-012 work to default-branch promotion for alert closure and the unresolved local npm 11 / Node 25 EBADF environment defect."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper pinned in site/.node-version, then validated a clean docs-site reinstall and production build through that path before closing the environment risk."
     }
   ]
 }

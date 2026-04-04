@@ -11,7 +11,7 @@
     "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 remains blocked on real Windows runtime validation, so phase/bootstrap advanced OPS-012 by patching the docs-site dependency tree to remediate the four recorded Dependabot alerts locally. npm install failed under npm 11.12.1 / Node 25.9.0 with EBADF registry-fetch errors, so the remediation used direct tarball replacement, then validated the patched dependency graph with npm ls and a production Docusaurus build.",
+  "execution_summary": "RR-002 remains blocked on real Windows runtime validation, so OPS-012 now includes a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The dependency remediation stays in progress only for default-branch promotion and Dependabot alert closure.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -209,6 +209,46 @@
       "command": "npm run build --prefix site",
       "result": "PASS",
       "summary": "Validated a production Docusaurus build on the patched dependency graph."
+    },
+    {
+      "id": "OPS-012-E4",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "github-hosted-ci",
+      "type": "validation",
+      "command": "GitHub Actions CI run 23988782016 on phase/bootstrap commit 5369212",
+      "result": "PASS",
+      "summary": "Hosted CI passed for the dependency-remediation branch commit, including runtime guardrails, docs-site validation, macOS validation, and Windows workspace validation."
+    },
+    {
+      "id": "OPS-012-E5",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-pinned-toolchain",
+      "type": "validation",
+      "command": "./scripts/site_npm.sh --version && ./build/tooling/node-v22.22.2-darwin-arm64/bin/node --version",
+      "result": "PASS",
+      "summary": "Validated that the repo-local wrapper uses npm 10.9.7 on the pinned official Node v22.22.2 toolchain."
+    },
+    {
+      "id": "OPS-012-E6",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-package-manager",
+      "type": "build",
+      "command": "./scripts/site_npm.sh ci --ignore-scripts --no-audit --no-fund",
+      "result": "PASS",
+      "summary": "Reinstalled the docs-site dependencies successfully through the repo-local Node 22 wrapper after removing site/node_modules."
+    },
+    {
+      "id": "OPS-012-E7",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "./scripts/site_npm.sh run build",
+      "result": "PASS",
+      "summary": "Validated the production Docusaurus build through the repo-local Node 22 wrapper."
     }
   ]
 }
