@@ -95,6 +95,11 @@
       "date": "2026-04-04",
       "phase": "OPS-012",
       "summary": "Split the two newly surfaced default-branch lodash alerts into a new follow-up risk and task inside OPS-012, and pinned lodash to the non-deprecated patched release 4.18.1 after 4.18.0 reported a registry deprecation notice during the first branch-local test."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Kept the initial hosted CI failure on commit 64633e9 as evidence of the guardrail catching stale state, synced the canonical state files, and then reran hosted CI successfully on commit 40ddf31 before leaving only the default-branch promotion step open."
     }
   ]
 }

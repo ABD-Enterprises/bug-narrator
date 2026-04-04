@@ -78,7 +78,7 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "OPS-012",
-      "note": "After the original four alerts were cleared on main, GitHub still reported two open lodash alerts on the default branch (#6 high, #5 medium). phase/bootstrap now contains commit 64633e9 with a lodash 4.18.1 override plus passing local dependency-tree and docs-site build validation, but the follow-up hosted CI rerun and default-branch promotion still remain."
+      "note": "After the original four alerts were cleared on main, GitHub still reported two open lodash alerts on the default branch (#6 high, #5 medium). phase/bootstrap now contains the lodash 4.18.1 override, synced phase state, and a passing hosted CI run 23989366196 on commit 40ddf31; the remaining work is promoting that follow-up remediation to the default branch and confirming the alerts close there."
     }
   ]
 }
