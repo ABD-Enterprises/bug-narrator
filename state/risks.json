@@ -29,7 +29,14 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "RR-002",
-      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, and the packaged-smoke exit-code path, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
+      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, and uploaded validation evidence artifacts, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
+    },
+    {
+      "id": "RISK-CI-002",
+      "severity": "medium",
+      "status": "unresolved",
+      "assigned_phase": "OPS-011",
+      "note": "The passing April 4, 2026 CI run emitted GitHub-hosted Node 20 deprecation warnings for actions/checkout@v4, actions/setup-node@v4, actions/setup-dotnet@v4, and actions/upload-artifact@v4. Workflow compatibility with the Node 24 runtime switch still needs a dedicated follow-up."
     },
     {
       "id": "RISK-ACC-002",
