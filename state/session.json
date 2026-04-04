@@ -11,7 +11,7 @@
     "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 remains blocked on real Windows runtime validation, so OPS-012 now includes a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The dependency remediation stays in progress only for default-branch promotion and Dependabot alert closure.",
+  "execution_summary": "RR-002 remains blocked on real Windows runtime validation. OPS-012 has already promoted the original dependency remediation to main and cleared that first alert set there, and the current follow-up slice now carries a branch-local lodash 4.18.1 patch with passing local docs-site validation while the remaining work is a clean hosted CI rerun plus default-branch promotion for the new alert pair.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -249,6 +249,59 @@
       "command": "./scripts/site_npm.sh run build",
       "result": "PASS",
       "summary": "Validated the production Docusaurus build through the repo-local Node 22 wrapper."
+    },
+    {
+      "id": "OPS-012-E8",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "default-branch-promotion",
+      "type": "validation",
+      "command": "gh pr view 6 --json state,mergedAt,mergeCommit",
+      "result": "PASS",
+      "summary": "Confirmed PR #6 merged phase/bootstrap into main at merge commit dc7a66aa7b2fc42a0b05edddec6169c0f6a88135, promoting the original dependency remediation and workflow hardening to the default branch."
+    },
+    {
+      "id": "OPS-012-E9",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "default-branch-alert-audit",
+      "type": "validation",
+      "command": "gh api repos/deffenda/bug-narrator/dependabot/alerts --paginate --jq '[.[] | select(.state==\"open\") | {number:.number, dependency:.dependency.package.name, manifest:.dependency.manifest_path, severity:.security_advisory.severity}]'",
+      "result": "PASS",
+      "summary": "Confirmed the original four Dependabot alerts no longer appeared on the default branch and identified only the two remaining lodash alerts (#6 high, #5 medium)."
+    },
+    {
+      "id": "OPS-012-E10",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-dependency-tree",
+      "type": "validation",
+      "command": "./scripts/site_npm.sh ls path-to-regexp serialize-javascript brace-expansion lodash",
+      "result": "PASS",
+      "summary": "Confirmed the docs-site dependency tree now resolves serialize-javascript 7.0.5, brace-expansion 1.1.13, express path-to-regexp 0.1.13, and lodash 4.18.1 on the branch."
+    },
+    {
+      "id": "OPS-012-E11",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "./scripts/site_npm.sh run build",
+      "result": "PASS",
+      "summary": "Validated a production Docusaurus build after adding the lodash 4.18.1 override."
+    },
+    {
+      "id": "OPS-012-E12",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "github-hosted-ci",
+      "type": "validation",
+      "command": "GitHub Actions CI run 23989339794 on phase/bootstrap commit 64633e9",
+      "result": "FAIL",
+      "risk_ids": [
+        "RISK-SEC-002"
+      ],
+      "summary": "Hosted CI failed immediately in runtime-guardrails because the canonical state files had not yet been updated after the new lodash remediation work."
     }
   ]
 }

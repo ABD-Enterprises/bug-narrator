@@ -6,7 +6,7 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 - current production app version: `1.0.22`
 - current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
-- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, completed the hosted Node24 workflow validation slice, and advanced OPS-012 with a pushed docs-site dependency-remediation commit, a passing hosted CI run, and a repo-local Node 22 wrapper for docs-site installs while the remaining RR-002 blocker stays real Windows desktop runtime validation
+- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, completed the hosted Node24 workflow validation slice, promoted the original OPS-012 remediation to `main`, and advanced the follow-up docs-site dependency work with a repo-local Node 22 wrapper plus a branch-local `lodash` `4.18.1` patch while the remaining RR-002 blocker stays real Windows desktop runtime validation
 
 ## Execution System
 
@@ -153,13 +153,13 @@ Priority: Medium
 
 Grouped risks:
 
-- GitHub reported four open Dependabot alerts on the default branch during push operations on April 4, 2026
+- GitHub still reports two open `lodash` Dependabot alerts on the default branch after the original four-alert remediation was promoted and verified on `main`
 
 Current execution slice:
 
-- patch the docs-site dependency tree with targeted overrides for `serialize-javascript`, `brace-expansion`, and the Express `path-to-regexp` line
-- validate the patched dependency graph with `npm ls`, a production Docusaurus build, hosted CI on `phase/bootstrap`, and the repo-local `./scripts/site_npm.sh` wrapper pinned to Node `v22.22.2`
-- keep the phase open until the remediation is promoted to the default branch and GitHub clears the default-branch alerts
+- patch the docs-site dependency tree with a `lodash` `4.18.1` override after the original `serialize-javascript`, `brace-expansion`, and Express `path-to-regexp` remediation cleared the first alert set on `main`
+- validate the patched dependency graph with `./scripts/site_npm.sh ls`, a production Docusaurus build, and a fresh hosted CI run on `phase/bootstrap`
+- keep the phase open until the follow-up `lodash` remediation is promoted to the default branch and GitHub clears the remaining alerts
 
 ## Upcoming Feature / Opportunity Phases
 

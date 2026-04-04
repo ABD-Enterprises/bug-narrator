@@ -85,6 +85,16 @@
       "date": "2026-04-04",
       "phase": "OPS-012",
       "summary": "Replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper pinned in site/.node-version, then validated a clean docs-site reinstall and production build through that path before closing the environment risk."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Promoted the original OPS-012 remediation to main via PR #6, verified the original four default-branch Dependabot alerts were gone, and closed RISK-SEC-001 instead of leaving the already-cleared alert set open."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Split the two newly surfaced default-branch lodash alerts into a new follow-up risk and task inside OPS-012, and pinned lodash to the non-deprecated patched release 4.18.1 after 4.18.0 reported a registry deprecation notice during the first branch-local test."
     }
   ]
 }
