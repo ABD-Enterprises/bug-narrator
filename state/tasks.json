@@ -45,6 +45,12 @@
       "phase": "RR-002",
       "title": "Fix inherited CI validation blockers in diagnostics redaction and Windows packaged-smoke exit handling",
       "status": "completed"
+    },
+    {
+      "id": "RR-002-T8",
+      "phase": "RR-002",
+      "title": "Emit machine-readable Windows validation evidence from CI and verify the artifact-producing workflow run",
+      "status": "completed"
     }
   ]
 }

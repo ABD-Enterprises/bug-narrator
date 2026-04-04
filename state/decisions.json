@@ -25,6 +25,16 @@
       "date": "2026-04-04",
       "phase": "RR-002",
       "summary": "Treated the inherited diagnostics-redaction failure and packaged-smoke exit-code bug as RR-002 work because they blocked the package/runtime signal, then reran DiagnosticsLoggerTests and release_smoke_test.sh on the phase branch before updating state."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Extended RR-002 package validation by checking packaged-file hashes against the publish outputs and by uploading a machine-readable Windows validation manifest plus smoke report from the CI run."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Captured the GitHub Actions Node 20 deprecation warnings from the successful phase-branch run as a separate follow-up risk instead of expanding RR-002 into workflow-runtime maintenance."
     }
   ]
 }
