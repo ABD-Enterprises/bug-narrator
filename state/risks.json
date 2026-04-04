@@ -29,7 +29,7 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "RR-002",
-      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, and uploaded validation evidence artifacts, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
+      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, uploaded validation evidence artifacts, and a Windows Codex handoff artifact, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
     },
     {
       "id": "RISK-CI-002",

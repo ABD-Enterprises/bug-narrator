@@ -6,6 +6,7 @@ Source-of-truth documents for Windows work:
 
 - [Canonical Product Spec](../docs/architecture/product-spec.md)
 - [Cross-Platform Parity Matrix](../docs/architecture/parity-matrix.md)
+- [Windows Codex Handoff](docs/WINDOWS_CODEX_HANDOFF.md)
 - [Windows Implementation Roadmap](docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [Windows Validation Checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md)
 - [Windows Signing And Release](docs/WINDOWS_SIGNING_AND_RELEASE.md)
@@ -22,6 +23,8 @@ The Windows workspace currently includes:
 - Windows validation guidance for real Windows machines or VMs
 
 The next Windows priority is runtime validation on Windows, followed by the next roadmap milestone.
+
+If Codex is taking over Windows development, start with [Windows Codex Handoff](docs/WINDOWS_CODEX_HANDOFF.md).
 
 ## Build Notes
 This workspace targets:
@@ -44,6 +47,7 @@ dotnet test windows/BugNarrator.Windows.sln -c Debug
 Scripted equivalents:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline
 powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
@@ -61,5 +65,7 @@ Current Windows milestone status:
 - stopping a recording now saves the session even when no OpenAI API key is configured and preserves a clear failure state if transcription fails
 - automated coverage currently includes `9` core tests and `29` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
-- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, then launches the packaged app in a headless smoke mode that writes a structured report and exits cleanly
+- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, checks packaged-file hash parity against the publish output, then launches the packaged app in a headless smoke mode that writes a structured report and exits cleanly
+- `windows/scripts/invoke-windows-codex-handoff.ps1` writes `windows/artifacts/handoff/windows-codex-handoff.json` so a Codex instance on Windows can load the active phase, tasks, risks, artifacts, and recommended commands from one report
+- CI now uploads `bugnarrator-windows-package`, `bugnarrator-windows-validation`, and `bugnarrator-windows-handoff` artifacts from the Windows runner
 - manual validation is still required for live OpenAI transcription, live issue extraction, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop
