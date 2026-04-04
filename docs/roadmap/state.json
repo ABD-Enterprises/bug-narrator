@@ -272,6 +272,20 @@
       "status": "resolved"
     },
     {
+      "id": "RISK-CI-001",
+      "description": "Inherited validation defects caused RR-002 macOS and Windows CI signal to fail before the phase branch could prove the intended package and smoke checks.",
+      "severity": "medium",
+      "impact": "Release smoke and packaged-app validation could fail for unrelated reasons, masking the remaining real Windows runtime risk behind broken validation plumbing.",
+      "mitigation": "Resolved in RR-002 by redacting exact sensitive metadata values from diagnostics free-form text and by capturing packaged smoke exit codes with Start-Process -PassThru -Wait in the Windows package validator.",
+      "affected_components": [
+        "diagnostics-logging",
+        "windows-package-validation",
+        "github-workflows"
+      ],
+      "phase_association": "RR-002",
+      "status": "resolved"
+    },
+    {
       "id": "RISK-ACC-001",
       "description": "The live app still lacks a complete accessibility and 508-style interaction audit across keyboard flow, focus management, and assistive-technology behavior.",
       "severity": "medium",
@@ -397,7 +411,7 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Expanding Windows build, test, packaging, and packaged-app smoke validation on a dedicated phase branch while real hardware runtime validation remains pending."
+    "summary": "Continuing RR-002 on the dedicated phase branch by hardening package and smoke validation signal, fixing inherited CI blockers, and keeping real Windows desktop runtime validation as the remaining blocker."
   },
   "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
   "decisions": [
@@ -468,6 +482,14 @@
     {
       "date": "2026-03-24",
       "summary": "While exercising the Windows-targeted test project, fixed ambiguous string-splitting calls in the Windows service layer so RR-002 validation no longer fails at compile time before runtime checks begin."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Kept RR-002 on phase/RR-002-windows-runtime-hardening and cherry-picked only the targeted validation-fix commit so the phase record stays isolated from unrelated feature-branch work."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Treated the inherited diagnostics-redaction failure and packaged-smoke exit-code bug as in-scope RR-002 work because they blocked the package/runtime signal, then revalidated DiagnosticsLoggerTests and release_smoke_test.sh on the phase branch before updating state."
     }
   ],
   "version": "1.0.22",
