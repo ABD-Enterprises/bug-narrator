@@ -343,3 +343,16 @@ test("validator requires risk_ids for NOT RUN evidence outside docs phases", () 
     /Evidence entry OPS-TEST-E1 must reference risk_ids when result is NOT RUN\./
   );
 });
+
+test("validator fails when code changes skip canonical state updates", () => {
+  const fixtureRoot = buildFixtureRoot();
+
+  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
+
+  const result = runValidator(fixtureRoot);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.output,
+    /Work progressed without updating the canonical state files\./
+  );
+});
