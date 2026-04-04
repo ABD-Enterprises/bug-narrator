@@ -35,6 +35,25 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
     }
 
+    func testOpenSettingsDoesNotForceInteractiveSecretRefresh() {
+        let harness = AppStateHarness(apiKey: "")
+        defer { harness.cleanup() }
+
+        var didOpenSettings = false
+        harness.appState.showSettingsWindow = {
+            didOpenSettings = true
+        }
+
+        harness.appState.openSettings()
+
+        XCTAssertTrue(didOpenSettings)
+        XCTAssertFalse(
+            harness.keychainService.readRequests.contains {
+                $0.allowInteraction
+            }
+        )
+    }
+
     func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }

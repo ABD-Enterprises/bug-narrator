@@ -6,7 +6,15 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 - current production app version: `1.0.22`
 - current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
-- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, and kept package artifact validation/upload in CI without claiming real hardware runtime validation
+- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, and upgraded workflow action majors plus validator enforcement for the GitHub-hosted Node24 transition
+
+## Execution System
+
+- execution state lives in `/state/*.json` and is summarized in `docs/roadmap/state.json`
+- reusable execution roles live in `/agents/*.md`
+- reusable execution prompts live in `/prompts/*.md`
+- `tools/validators/enforce-runtime-guardrails.js` is the repo-local gatekeeper for execution, evidence, risk persistence, and phase-aware validation
+- repo execution state stays local to this repository and does not depend on external environment-management systems
 
 ## Completed Phases
 
@@ -128,6 +136,7 @@ Current execution slice:
 - fix Windows-targeted service compile blockers discovered while exercising the Windows test project from the phase branch
 - package a Windows `Release` zip in CI, validate that the published artifact contains the expected executable and runtime metadata, and run the packaged executable in a headless smoke mode
 - emit Windows validation and Codex-handoff artifacts from CI so a Codex instance on Windows can load the current RR-002 state and artifact paths without reconstructing them from chat history
+- keep GitHub Actions workflows on Node24-compatible action majors while RR-002 remains open, so CI evidence does not degrade under the hosted-runner runtime cutover
 - keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
 
 ### RR-005 Assistive Technology Runtime And Docs Validation
@@ -171,4 +180,6 @@ Effort: Low
 - every opportunity must belong to a future phase
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
 - roadmap state in `state.json` is the source of truth for planning, risks, incidents, and phase status
+- `/state/session.json`, `/state/tasks.json`, `/state/risks.json`, and `/state/decisions.json` are the canonical execution ledger for evidence, task flow, unresolved-risk persistence, and execution decisions
+- `tools/validators/enforce-runtime-guardrails.js` is the authoritative PR gatekeeper for runtime guardrails and phase-aware evidence enforcement
 - `CHANGELOG.md` is the source of truth for shipped change history

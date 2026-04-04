@@ -18,12 +18,15 @@ on:
         required: false
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   package-macos:
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -80,11 +83,14 @@ jobs:
 
       - name: Build unsigned DMG
         if: ${{ !inputs.signed_release }}
+        env:
+          REQUIRE_RELEASE_SMOKE_TEST: "NO"
         run: ./scripts/build_dmg.sh
 
       - name: Build signed and notarized DMG
         if: ${{ inputs.signed_release }}
         env:
+          REQUIRE_RELEASE_SMOKE_TEST: "NO"
           CODE_SIGNING_ALLOWED: "YES"
           CODE_SIGN_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
           DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
@@ -103,15 +109,17 @@ jobs:
         run: cat build/release-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload DMG artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bugnarrator-dmg
           path: |
             dist/BugNarrator-macOS.dmg
+            dist/BugNarrator-macOS.dmg.sha256
             dist/BugNarrator-v*-macOS.dmg
+            dist/BugNarrator-v*-macOS.dmg.sha256
 
       - name: Upload release summary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bugnarrator-release-summary
           path: build/release-summary.md
@@ -123,5 +131,7 @@ jobs:
           tag_name: ${{ inputs.release_tag }}
           files: |
             dist/BugNarrator-macOS.dmg
+            dist/BugNarrator-macOS.dmg.sha256
             dist/BugNarrator-v*-macOS.dmg
+            dist/BugNarrator-v*-macOS.dmg.sha256
           generate_release_notes: true

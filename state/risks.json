@@ -14,6 +14,20 @@
       "status": "resolved",
       "assigned_phase": "RR-002",
       "note": "Resolved by redacting exact sensitive metadata values from diagnostics free-form text so DiagnosticsLoggerTests and release smoke pass again, and by capturing packaged-smoke exit codes with Start-Process -PassThru -Wait in the Windows package validator."
+    },
+    {
+      "id": "RISK-DPL-001",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "OPS-011",
+      "note": "Resolved by making scripts/build_dmg.sh invoke dmgbuild through the active virtualenv Python module instead of the fragile bin/dmgbuild entrypoint, which carried a stale shebang from another checkout and broke local DMG packaging."
+    },
+    {
+      "id": "RISK-DPL-002",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "OPS-011",
+      "note": "Resolved by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which now includes the startup keychain smoke; local DMG packaging was rerun successfully through that hardened preflight path."
     }
   ],
   "unresolved": [
@@ -36,7 +50,7 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "OPS-011",
-      "note": "The passing April 4, 2026 CI run emitted GitHub-hosted Node 20 deprecation warnings for actions/checkout@v4, actions/setup-node@v4, actions/setup-dotnet@v4, and actions/upload-artifact@v4. Workflow compatibility with the Node 24 runtime switch still needs a dedicated follow-up."
+      "note": "The workflow actions were upgraded locally to actions/checkout@v6, actions/setup-node@v6, actions/setup-dotnet@v5, and actions/upload-artifact@v6, and the runtime guardrails validator now enforces that floor plus FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 in both workflows. Hosted GitHub Actions evidence for the upgraded workflows is still pending, so OPS-011 remains open."
     },
     {
       "id": "RISK-ACC-002",

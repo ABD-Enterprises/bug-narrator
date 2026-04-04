@@ -352,6 +352,34 @@
       ],
       "phase_association": "RR-004",
       "status": "resolved"
+    },
+    {
+      "id": "RISK-DPL-002",
+      "description": "Local DMG packaging could bypass the release smoke and startup keychain regression checks because scripts/build_dmg.sh built and packaged the app without enforcing scripts/release_smoke_test.sh first.",
+      "severity": "medium",
+      "impact": "A startup keychain-prompt regression could slip into candidate DMG artifacts even if the lower-level fix and unit tests existed, because the packaging entrypoint itself was not proving the symptom path.",
+      "mitigation": "Resolved in OPS-011 by making scripts/build_dmg.sh require release_smoke_test.sh by default, which now includes the startup keychain smoke, and by rerunning unsigned DMG packaging through that hardened path.",
+      "affected_components": [
+        "scripts",
+        "release-process",
+        "github-workflows"
+      ],
+      "phase_association": "OPS-011",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-DPL-001",
+      "description": "Local DMG packaging depended on the dmgbuild virtualenv entrypoint script, which could carry a stale shebang from another checkout and fail before producing release artifacts.",
+      "severity": "medium",
+      "impact": "Local release preparation could fail before producing any DMG artifacts, blocking maintainers from validating or packaging candidate builds.",
+      "mitigation": "Resolved in OPS-011 by making scripts/build_dmg.sh invoke dmgbuild through the active virtualenv Python module instead of the fragile bin/dmgbuild wrapper.",
+      "affected_components": [
+        "scripts",
+        "release-process",
+        "packaging-env"
+      ],
+      "phase_association": "OPS-011",
+      "status": "resolved"
     }
   ],
   "incidents": [
@@ -433,9 +461,31 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Continuing RR-002 on the dedicated phase branch by hardening Windows package validation, uploading machine-readable validation and Codex handoff artifacts from CI, and keeping real Windows desktop runtime validation as the remaining blocker."
+    "summary": "Continuing RR-002 on the dedicated phase branch by hardening Windows package validation, uploading machine-readable validation and Codex handoff artifacts from CI, keeping real Windows desktop runtime validation as the remaining blocker, and using blocked macOS slices to advance OPS-011 GitHub Actions Node24 compatibility plus local DMG release-packaging hardening with a startup-keychain-smoke preflight."
   },
   "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
+  "last_updated": "2026-04-04",
+  "tasks": {
+    "active": [
+      "OPS-011-T2",
+      "RR-002-T4"
+    ],
+    "completed": [
+      "OPS-011-T1",
+      "OPS-011-T3",
+      "RR-002-T1",
+      "RR-002-T2",
+      "RR-002-T3",
+      "RR-002-T5",
+      "RR-002-T6",
+      "RR-002-T7",
+      "RR-002-T8",
+      "RR-002-T9",
+      "BOOTSTRAP-T1",
+      "BOOTSTRAP-T2",
+      "OPS-011-T4"
+    ]
+  },
   "decisions": [
     {
       "date": "2026-03-23",
@@ -524,6 +574,22 @@
     {
       "date": "2026-04-04",
       "summary": "Added a repo-native Windows Codex handoff document and script that summarize the active RR-002 state, can run the scripted Windows baseline on a real Windows machine, and emit a machine-readable handoff report for takeover work."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Created a repo-local execution bootstrap on phase/bootstrap by adding reusable agent and prompt contracts, normalizing roadmap state with last_updated and task summaries, and making a single runtime guardrails validator the CI gatekeeper instead of introducing a parallel enforcement system."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Because RR-002 remains blocked on real Windows validation in this macOS workspace, used the next unblocked execution slice to advance OPS-011 by upgrading workflow action majors to Node24-compatible releases, forcing Node24 in CI and release workflows, and teaching the runtime guardrails validator to enforce that floor."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Treated the stale dmgbuild entrypoint shebang as a release-environment defect, switched scripts/build_dmg.sh to invoke dmgbuild through the active virtualenv Python module, reran release_smoke_test.sh, rebuilt the unsigned DMG successfully, and generated a fresh release-summary seed without claiming a public signed/notarized release."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Hardened the local packaging entrypoint by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which carries the startup keychain smoke into DMG preflight; then reran workflow lint and unsigned DMG packaging through that exact path before recording release status."
     }
   ],
   "version": "1.0.22",
@@ -533,7 +599,7 @@
       "version": "1.0.22"
     },
     "test": {
-      "status": "local-regression-docs-site-and-workflow-validation-passed",
+      "status": "local-unsigned-release-package-preflight-validated",
       "version": "1.0.22"
     },
     "prod": {

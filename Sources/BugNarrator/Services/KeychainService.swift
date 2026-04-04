@@ -3,7 +3,19 @@ import LocalAuthentication
 import Security
 
 final class KeychainService: KeychainServicing {
-    func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
+    static func shouldBypassSystemKeychain(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+    }
+
+    static func makeReadQuery(
+        forService service: String,
+        account: String,
+        allowInteraction: Bool
+    ) -> [CFString: Any] {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -16,10 +28,47 @@ final class KeychainService: KeychainServicing {
             let context = LAContext()
             context.interactionNotAllowed = true
             query[kSecUseAuthenticationContext] = context
+            query[kSecUseAuthenticationUI] = "u_AuthUIF" as CFString
         }
 
+        return query
+    }
+
+    private static func performWithoutKeychainUserInteraction<T>(_ operation: () -> T) -> T {
+        var previousInteractionAllowed = DarwinBoolean(true)
+        let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
+        let disableStatus = SecKeychainSetUserInteractionAllowed(false)
+
+        defer {
+            if disableStatus == errSecSuccess {
+                let restoreState = previousStatus == errSecSuccess ? previousInteractionAllowed.boolValue : true
+                _ = SecKeychainSetUserInteractionAllowed(restoreState)
+            }
+        }
+
+        return operation()
+    }
+
+    func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
+        if Self.shouldBypassSystemKeychain() {
+            return nil
+        }
+
+        let query = Self.makeReadQuery(
+            forService: service,
+            account: account,
+            allowInteraction: allowInteraction
+        )
+
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        let status: OSStatus
+        if allowInteraction {
+            status = SecItemCopyMatching(query as CFDictionary, &item)
+        } else {
+            status = Self.performWithoutKeychainUserInteraction {
+                SecItemCopyMatching(query as CFDictionary, &item)
+            }
+        }
 
         switch status {
         case errSecSuccess:
@@ -30,9 +79,6 @@ final class KeychainService: KeychainServicing {
         case errSecItemNotFound:
             return nil
         case errSecInteractionNotAllowed, errSecAuthFailed:
-            if !allowInteraction {
-                return nil
-            }
             throw KeychainError.interactionRequired
         default:
             throw KeychainError.unhandledStatus(status)
@@ -40,6 +86,10 @@ final class KeychainService: KeychainServicing {
     }
 
     func setString(_ value: String, service: String, account: String) throws {
+        if Self.shouldBypassSystemKeychain() {
+            return
+        }
+
         let data = Data(value.utf8)
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -70,6 +120,10 @@ final class KeychainService: KeychainServicing {
     }
 
     func deleteValue(service: String, account: String) throws {
+        if Self.shouldBypassSystemKeychain() {
+            return
+        }
+
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,

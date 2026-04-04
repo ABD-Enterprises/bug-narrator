@@ -1,10 +1,175 @@
 {
   "updated_on": "2026-04-04",
   "phase": {
+    "id": "OPS-011",
+    "name": "GitHub Actions Node 24 Compatibility",
+    "status": "in_progress"
+  },
+  "roadmap_phase_context": {
     "id": "RR-002",
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress"
   },
-  "branch": "phase/RR-002-windows-runtime-hardening",
-  "execution_summary": "Continued RR-002 on the dedicated phase branch by adding Windows validation and Codex handoff artifacts, documenting the Windows takeover path, and keeping real Windows desktop validation as the remaining phase blocker."
+  "branch": "phase/bootstrap",
+  "execution_summary": "RR-002 still remains blocked on real Windows runtime validation in this macOS workspace, so this run advanced OPS-011 by making scripts/build_dmg.sh enforce release_smoke_test.sh as a local packaging preflight, carrying the startup keychain smoke into DMG generation, rerunning workflow lint, and rebuilding unsigned 1.0.22 DMG artifacts through the hardened release path without claiming a public signed/notarized release.",
+  "evidence": [
+    {
+      "id": "BOOTSTRAP-E1",
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "scope": "runtime-guardrails",
+      "type": "validation",
+      "command": "node tools/validators/enforce-runtime-guardrails.js --base-ref origin/main",
+      "result": "PASS",
+      "summary": "Validated the bootstrap branch against the repo-local runtime guardrails after state normalization."
+    },
+    {
+      "id": "BOOTSTRAP-E2",
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "npm run build --prefix site",
+      "result": "PASS",
+      "summary": "Built the Docusaurus site successfully after wiring the execution-system docs and prompts."
+    },
+    {
+      "id": "BOOTSTRAP-E3",
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "scope": "macos-accessibility-regression",
+      "type": "validation",
+      "command": "bash scripts/accessibility_regression_check.sh",
+      "result": "PASS",
+      "summary": "Kept the accessibility regression tripwire green after the CI gatekeeper update."
+    },
+    {
+      "id": "BOOTSTRAP-E4",
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "scope": "macos-release-smoke",
+      "type": "test",
+      "command": "bash scripts/release_smoke_test.sh",
+      "result": "PASS",
+      "summary": "Verified the release smoke path still passes after adding validator-enforced CI."
+    },
+    {
+      "id": "OPS-011-E1",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "workflow-lint",
+      "type": "validation",
+      "command": "actionlint",
+      "result": "PASS",
+      "summary": "Validated the upgraded CI and release workflows with actionlint after moving to Node24-compatible action majors."
+    },
+    {
+      "id": "OPS-011-E2",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "npm run build --prefix site",
+      "result": "PASS",
+      "summary": "Confirmed the docs site still builds after the workflow and validator upgrades."
+    },
+    {
+      "id": "OPS-011-E3",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "macos-accessibility-regression",
+      "type": "validation",
+      "command": "bash scripts/accessibility_regression_check.sh",
+      "result": "PASS",
+      "summary": "Confirmed the accessibility regression tripwire remains green after the workflow and validator changes."
+    },
+    {
+      "id": "OPS-011-E4",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "macos-release-smoke",
+      "type": "test",
+      "command": "bash scripts/release_smoke_test.sh",
+      "result": "PASS",
+      "summary": "Confirmed the repo release smoke path still passes after the workflow and validator changes."
+    },
+    {
+      "id": "OPS-011-E5",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "github-hosted-node24-ci",
+      "type": "validation",
+      "command": "GitHub-hosted CI run for upgraded Node24-compatible workflows",
+      "result": "NOT RUN",
+      "risk_ids": [
+        "RISK-CI-002"
+      ],
+      "summary": "Hosted GitHub Actions evidence for the upgraded workflows has not yet been executed from this workspace."
+    },
+    {
+      "id": "OPS-011-E6",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "macos-release-smoke",
+      "type": "test",
+      "command": "bash scripts/release_smoke_test.sh",
+      "result": "PASS",
+      "summary": "Revalidated the release smoke path immediately before local DMG packaging."
+    },
+    {
+      "id": "OPS-011-E7",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "macos-unsigned-dmg-package",
+      "type": "build",
+      "command": "bash scripts/build_dmg.sh",
+      "result": "PASS",
+      "summary": "Built and self-verified unsigned BugNarrator 1.0.22 DMG artifacts after switching dmgbuild execution to the active virtualenv Python module."
+    },
+    {
+      "id": "OPS-011-E8",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "release-summary-seed",
+      "type": "build",
+      "command": "python3 scripts/generate_release_summary.py --version v1.0.22 --output build/release-summary.md",
+      "result": "PASS",
+      "summary": "Generated a fresh internal release-summary seed for the current production version."
+    },
+    {
+      "id": "OPS-011-E9",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "public-signed-release",
+      "type": "deploy",
+      "command": "Signed/notarized DMG build and GitHub Release publish",
+      "result": "NOT RUN",
+      "risk_ids": [
+        "RISK-WIN-001",
+        "RISK-WIN-002",
+        "RISK-CI-002"
+      ],
+      "summary": "Public release promotion was not executed from this workspace because the signed/notarized path was not run and release blockers remain open."
+    },
+    {
+      "id": "OPS-011-E10",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "release-workflow-lint",
+      "type": "validation",
+      "command": "actionlint",
+      "result": "PASS",
+      "summary": "Validated the release workflow after teaching scripts/build_dmg.sh to require release_smoke_test.sh by default and explicitly disabling the duplicate preflight inside the GitHub release job."
+    },
+    {
+      "id": "OPS-011-E11",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "macos-unsigned-dmg-package-preflight",
+      "type": "build",
+      "command": "DERIVED_DATA_PATH=/tmp/bugnarrator-dmg-preflight OUTPUT_DIR=/tmp/bugnarrator-dmg-dist STAGING_DIR=/tmp/bugnarrator-dmg-staging bash scripts/build_dmg.sh",
+      "result": "PASS",
+      "summary": "Built unsigned 1.0.22 DMG artifacts through the hardened packaging path, which now enforces release_smoke_test.sh and the startup keychain smoke before packaging."
+    }
+  ]
 }

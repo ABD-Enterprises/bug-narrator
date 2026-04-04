@@ -385,7 +385,7 @@ final class MockKeychainService: KeychainServicing {
 
         let key = key(forService: service, account: account)
         if interactionRequiredKeys.contains(key), !allowInteraction {
-            return nil
+            throw KeychainError.interactionRequired
         }
 
         return values[key]

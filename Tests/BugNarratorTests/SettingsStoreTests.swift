@@ -302,6 +302,32 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(keychain.values["SessionMic.OpenAI::openai-api-key"])
     }
 
+    func testStartupShowsKeychainLockedStateWithoutUnlockPrompt() {
+        let suiteName = "BugNarrator-SettingsKeychainLockedTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        keychain.values["BugNarrator.OpenAI::openai-api-key"] = "locked-api-key"
+        keychain.interactionRequiredKeys = ["BugNarrator.OpenAI::openai-api-key"]
+
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(store.apiKey, "")
+        XCTAssertEqual(store.apiKeyPersistenceState, .keychainLocked)
+        XCTAssertEqual(store.maskedAPIKey, "Saved key locked")
+        XCTAssertEqual(
+            store.apiKeyStorageDescription,
+            "Stored in your macOS Keychain. BugNarrator will only prompt to unlock it when you validate the key or run an action that needs it."
+        )
+        XCTAssertTrue(
+            keychain.readRequests.contains {
+                $0.service == "BugNarrator.OpenAI" && !$0.allowInteraction
+            }
+        )
+    }
+
     func testStartupSkipsInteractiveLegacyKeychainPromptUntilUserInitiatesAccess() {
         let suiteName = "BugNarrator-SettingsDeferredLegacyKeychainTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -316,6 +342,7 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.apiKey, "")
+        XCTAssertEqual(store.apiKeyPersistenceState, .keychainLocked)
         XCTAssertTrue(
             keychain.readRequests.contains {
                 $0.service == "SessionMic.OpenAI" && !$0.allowInteraction
@@ -354,6 +381,8 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.githubToken, "")
         XCTAssertEqual(store.jiraAPIToken, "")
+        XCTAssertEqual(store.githubTokenPersistenceState, .keychainLocked)
+        XCTAssertEqual(store.jiraTokenPersistenceState, .keychainLocked)
         XCTAssertTrue(
             keychain.readRequests.contains {
                 $0.service == "SessionMic.GitHub" && !$0.allowInteraction

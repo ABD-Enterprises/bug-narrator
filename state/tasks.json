@@ -2,6 +2,13 @@
   "updated_on": "2026-04-04",
   "active": [
     {
+      "id": "OPS-011-T2",
+      "phase": "OPS-011",
+      "title": "Run GitHub-hosted CI on the upgraded workflows and clear the remaining Node24 compatibility risk with hosted evidence",
+      "status": "pending",
+      "blocking_for_phase_completion": true
+    },
+    {
       "id": "RR-002-T4",
       "phase": "RR-002",
       "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
@@ -10,6 +17,30 @@
     }
   ],
   "completed": [
+    {
+      "id": "OPS-011-T1",
+      "phase": "OPS-011",
+      "title": "Upgrade CI and release workflows plus runtime guardrails enforcement to Node24-compatible action majors",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T3",
+      "phase": "OPS-011",
+      "title": "Harden local DMG packaging against stale virtualenv entrypoints and revalidate unsigned release artifact generation",
+      "status": "completed"
+    },
+    {
+      "id": "BOOTSTRAP-T1",
+      "phase": "bootstrap",
+      "title": "Normalize roadmap and execution state, and add reusable agent and prompt contracts",
+      "status": "completed"
+    },
+    {
+      "id": "BOOTSTRAP-T2",
+      "phase": "bootstrap",
+      "title": "Add the authoritative runtime guardrails validator and make it the pull-request gatekeeper",
+      "status": "completed"
+    },
     {
       "id": "RR-002-T1",
       "phase": "RR-002",
@@ -56,6 +87,12 @@
       "id": "RR-002-T9",
       "phase": "RR-002",
       "title": "Add a Windows Codex handoff script, handoff doc, and CI artifact so takeover work can continue on a real Windows machine",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T4",
+      "phase": "OPS-011",
+      "title": "Enforce release-smoke preflight in scripts/build_dmg.sh and revalidate unsigned DMG packaging through that hardened path",
       "status": "completed"
     }
   ]

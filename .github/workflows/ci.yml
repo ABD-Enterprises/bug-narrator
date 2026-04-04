@@ -8,12 +8,32 @@ on:
       - "codex/**"
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
+  runtime-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Run runtime guardrails validator
+        run: node tools/validators/enforce-runtime-guardrails.js
+
   macos-validation:
+    needs: runtime-guardrails
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -25,13 +45,14 @@ jobs:
         run: ./scripts/accessibility_regression_check.sh
 
   docs-site-validation:
+    needs: runtime-guardrails
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -44,13 +65,14 @@ jobs:
         run: npm run build --prefix site
 
   windows-workspace-validation:
+    needs: runtime-guardrails
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -75,7 +97,7 @@ jobs:
         run: ./windows/scripts/invoke-windows-codex-handoff.ps1
 
       - name: Upload Windows validation evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bugnarrator-windows-validation
           if-no-files-found: error
@@ -84,14 +106,14 @@ jobs:
             windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json
 
       - name: Upload Windows Codex handoff artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bugnarrator-windows-handoff
           if-no-files-found: error
           path: windows/artifacts/handoff/windows-codex-handoff.json
 
       - name: Upload Windows package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bugnarrator-windows-package
           path: windows/artifacts/packages/BugNarrator-windows-win-x64.zip

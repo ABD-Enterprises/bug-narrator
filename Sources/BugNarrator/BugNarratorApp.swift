@@ -11,6 +11,7 @@ struct BugNarratorApp: App {
 
     init() {
         let runtimeEnvironment = AppRuntimeEnvironment()
+        let bootstrap = AppBootstrap(runtimeEnvironment: runtimeEnvironment)
 
         if !runtimeEnvironment.shouldBypassSingleInstanceEnforcement {
             guard SingleInstanceController.enforcePrimaryInstance() else {
@@ -18,8 +19,8 @@ struct BugNarratorApp: App {
             }
         }
 
-        let settingsStore = SettingsStore()
-        let transcriptStore = TranscriptStore()
+        let settingsStore = bootstrap.settingsStore
+        let transcriptStore = bootstrap.transcriptStore
         let appState = AppState(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,

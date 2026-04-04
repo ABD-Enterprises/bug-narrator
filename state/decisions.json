@@ -40,6 +40,31 @@
       "date": "2026-04-04",
       "phase": "OPS-011",
       "summary": "Captured the GitHub Actions Node 20 deprecation warnings from the successful phase-branch run as a separate follow-up risk instead of expanding RR-002 into workflow-runtime maintenance."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "summary": "Kept RR-002 as the canonical product roadmap phase while using phase/bootstrap to add repo-local execution scaffolding, so roadmap delivery state and execution-system bootstrap work stay explicit instead of overwriting each other."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "summary": "Made tools/validators/enforce-runtime-guardrails.js the single CI gatekeeper and reused the existing roadmap and state ledgers instead of creating a second validator or external-state dependency."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Because RR-002 still needs real Windows hardware validation that cannot be completed honestly from this macOS workspace, advanced the next unblocked risk-remediation slice by upgrading core workflow actions to Node24-compatible majors and teaching the runtime guardrails validator to enforce those versions across both CI and release workflows."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Treated the stale dmgbuild shebang as a release-environment defect, switched scripts/build_dmg.sh to run dmgbuild through the virtualenv Python module, and revalidated release_smoke_test.sh plus unsigned DMG packaging before recording release readiness."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Hardened the local packaging entrypoint by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which carries the startup keychain smoke into DMG preflight; then reran workflow lint and unsigned DMG packaging through that exact path before recording release status."
     }
   ]
 }

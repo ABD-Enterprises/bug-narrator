@@ -573,7 +573,6 @@ final class AppState: ObservableObject {
 
     func openSettings() {
         settingsLogger.debug("open_settings", "Opening the Settings window.")
-        settingsStore.refreshSecretsForUserInitiatedAccess()
         showSettingsWindow?()
     }
 

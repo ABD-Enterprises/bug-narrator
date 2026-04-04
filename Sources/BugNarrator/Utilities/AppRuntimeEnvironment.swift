@@ -30,4 +30,16 @@ struct AppRuntimeEnvironment: Equatable {
     var shouldBypassSingleInstanceEnforcement: Bool {
         isRunningUnderTests
     }
+
+    var testIsolationScope: String {
+        let rawScope = environment["XCTestSessionIdentifier"]
+            ?? environment["XCTestConfigurationFilePath"]
+            ?? ProcessInfo.processInfo.globallyUniqueString
+
+        return rawScope.replacingOccurrences(
+            of: #"[^A-Za-z0-9._-]+"#,
+            with: "-",
+            options: .regularExpression
+        )
+    }
 }
