@@ -262,6 +262,7 @@ for (const workflowFile of workflowFiles) {
   const usesTrackedAction = [
     validateActionVersion(workflowFile, content, "actions/checkout", 5),
     validateActionVersion(workflowFile, content, "actions/setup-node", 5),
+    validateActionVersion(workflowFile, content, "actions/setup-python", 6),
     validateActionVersion(workflowFile, content, "actions/setup-dotnet", 5),
     validateActionVersion(workflowFile, content, "actions/upload-artifact", 6)
   ].some(Boolean);
