@@ -48,12 +48,16 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            Button(appState.apiKeyValidationState == .validating ? "Validating..." : "Validate Key") {
+                            Button(apiKeyActionTitle) {
                                 Task {
                                     await appState.validateAPIKey()
                                 }
                             }
-                            .disabled(secureControlsDisabled || !settingsStore.hasAPIKey || appState.apiKeyValidationState == .validating)
+                            .disabled(
+                                secureControlsDisabled ||
+                                (!settingsStore.hasAPIKey && settingsStore.apiKeyPersistenceState != .keychainLocked) ||
+                                appState.apiKeyValidationState == .validating
+                            )
 
                             Button("Remove Key", role: .destructive) {
                                 appState.removeAPIKey()
@@ -69,7 +73,12 @@ struct SettingsView: View {
 
                         Text(settingsStore.apiKeyStorageDescription)
                             .font(.footnote)
-                            .foregroundStyle(settingsStore.apiKeyPersistenceState == .sessionOnly ? .orange : .secondary)
+                            .foregroundStyle(
+                                settingsStore.apiKeyPersistenceState == .sessionOnly ||
+                                settingsStore.apiKeyPersistenceState == .keychainLocked
+                                    ? .orange
+                                    : .secondary
+                            )
 
                         Text("BugNarrator stores the key in your macOS Keychain when available and never bundles it with the app or source code.")
                             .font(.footnote)
@@ -360,6 +369,16 @@ struct SettingsView: View {
 
     private var secureControlsDisabled: Bool {
         appState.status.phase == .recording || appState.status.phase == .transcribing
+    }
+
+    private var apiKeyActionTitle: String {
+        if appState.apiKeyValidationState == .validating {
+            return "Validating..."
+        }
+
+        return settingsStore.apiKeyPersistenceState == .keychainLocked && !settingsStore.hasAPIKey
+            ? "Unlock Key"
+            : "Validate Key"
     }
 
     private var debugInfoSnapshot: DebugInfoSnapshot {

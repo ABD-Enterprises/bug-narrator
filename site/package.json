@@ -2,6 +2,9 @@
   "name": "bugnarrator-docs-site",
   "private": true,
   "version": "0.0.1",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "start": "docusaurus start",
     "build": "docusaurus build",
@@ -14,5 +17,19 @@
     "clsx": "^2.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
+  },
+  "overrides": {
+    "copy-webpack-plugin": {
+      "serialize-javascript": "7.0.5"
+    },
+    "css-minimizer-webpack-plugin": {
+      "serialize-javascript": "7.0.5"
+    },
+    "express": {
+      "path-to-regexp": "0.1.13"
+    },
+    "minimatch": {
+      "brace-expansion": "1.1.13"
+    }
   }
 }

@@ -179,7 +179,12 @@ final class SettingsStore: ObservableObject {
     }
 
     var maskedAPIKey: String {
-        mask(secret: trimmedAPIKey, emptyPlaceholder: "No key saved")
+        mask(
+            secret: trimmedAPIKey,
+            persistenceState: apiKeyPersistenceState,
+            emptyPlaceholder: "No key saved",
+            lockedPlaceholder: "Saved key locked"
+        )
     }
 
     var apiKeyStorageDescription: String {
@@ -220,7 +225,12 @@ final class SettingsStore: ObservableObject {
     }
 
     var maskedGitHubToken: String {
-        mask(secret: trimmedGitHubToken, emptyPlaceholder: "No token saved")
+        mask(
+            secret: trimmedGitHubToken,
+            persistenceState: githubTokenPersistenceState,
+            emptyPlaceholder: "No token saved",
+            lockedPlaceholder: "Saved token locked"
+        )
     }
 
     var githubTokenStorageDescription: String {
@@ -266,7 +276,12 @@ final class SettingsStore: ObservableObject {
     }
 
     var maskedJiraAPIToken: String {
-        mask(secret: trimmedJiraAPIToken, emptyPlaceholder: "No token saved")
+        mask(
+            secret: trimmedJiraAPIToken,
+            persistenceState: jiraTokenPersistenceState,
+            emptyPlaceholder: "No token saved",
+            lockedPlaceholder: "Saved token locked"
+        )
     }
 
     var jiraTokenStorageDescription: String {
@@ -703,6 +718,18 @@ final class SettingsStore: ObservableObject {
                 return (sessionOnlyValue, .sessionOnly)
             }
 
+            if case KeychainError.interactionRequired = error {
+                logger.debug(
+                    "secret_locked",
+                    "A secure value remains in Keychain, but BugNarrator skipped the unlock prompt until a user-initiated action needs it.",
+                    metadata: [
+                        "slot": slot.redactionSafeName,
+                        "allow_interaction": allowInteraction ? "yes" : "no"
+                    ]
+                )
+                return ("", .keychainLocked)
+            }
+
             logger.debug(
                 "secret_unavailable",
                 "A secure value was unavailable during reload.",
@@ -756,14 +783,21 @@ final class SettingsStore: ObservableObject {
             return empty
         case .keychain:
             return "Stored securely in your macOS Keychain."
+        case .keychainLocked:
+            return "Stored in your macOS Keychain. BugNarrator will only prompt to unlock it when you validate the key or run an action that needs it."
         case .sessionOnly:
             return "Keychain storage was unavailable, so this value is only kept in memory until you quit BugNarrator."
         }
     }
 
-    private func mask(secret: String, emptyPlaceholder: String) -> String {
+    private func mask(
+        secret: String,
+        persistenceState: APIKeyPersistenceState,
+        emptyPlaceholder: String,
+        lockedPlaceholder: String
+    ) -> String {
         guard !secret.isEmpty else {
-            return emptyPlaceholder
+            return persistenceState == .keychainLocked ? lockedPlaceholder : emptyPlaceholder
         }
 
         let suffixCount = min(4, secret.count)
@@ -940,5 +974,6 @@ private enum Keys {
 enum APIKeyPersistenceState: Equatable {
     case empty
     case keychain
+    case keychainLocked
     case sessionOnly
 }

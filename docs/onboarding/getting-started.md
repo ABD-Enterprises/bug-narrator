@@ -28,6 +28,7 @@ Use these docs first:
 
 - [Product Spec](../architecture/product-spec.md)
 - [windows/README.md](../../windows/README.md)
+- [windows/docs/WINDOWS_CODEX_HANDOFF.md](../../windows/docs/WINDOWS_CODEX_HANDOFF.md)
 - [windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md](../../windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [windows/docs/WINDOWS_VALIDATION_CHECKLIST.md](../../windows/docs/WINDOWS_VALIDATION_CHECKLIST.md)
 - [Cross-Platform Guidelines](../CROSS_PLATFORM_GUIDELINES.md)

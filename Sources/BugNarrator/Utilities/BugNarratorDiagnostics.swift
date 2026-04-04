@@ -224,11 +224,12 @@ struct DiagnosticsLogger: Sendable {
             return
         }
 
+        let sensitiveValues = DiagnosticsRedactor.sensitiveValues(in: metadata)
         let sanitizedEntry = DiagnosticsLogEntry(
             level: level,
             category: category,
-            event: DiagnosticsRedactor.sanitizeFreeformText(event),
-            message: DiagnosticsRedactor.sanitizeFreeformText(message),
+            event: DiagnosticsRedactor.sanitizeFreeformText(event, redactingExactValues: sensitiveValues),
+            message: DiagnosticsRedactor.sanitizeFreeformText(message, redactingExactValues: sensitiveValues),
             metadata: DiagnosticsRedactor.sanitizeMetadata(metadata)
         )
 
@@ -330,19 +331,32 @@ private enum DiagnosticsRedactor {
         try! NSRegularExpression(pattern: #"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
     ]
 
+    static func sensitiveValues(in metadata: [String: String]) -> [String] {
+        var values = Set<String>()
+
+        for (key, value) in metadata {
+            let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedValue.isEmpty else { continue }
+
+            if shouldRedactMetadataValue(for: normalizedKey, value: trimmedValue) {
+                values.insert(trimmedValue)
+            }
+        }
+
+        return values.sorted { lhs, rhs in
+            if lhs.count == rhs.count {
+                return lhs < rhs
+            }
+
+            return lhs.count > rhs.count
+        }
+    }
+
     static func sanitizeMetadata(_ metadata: [String: String]) -> [String: String] {
         Dictionary(uniqueKeysWithValues: metadata.map { key, value in
             let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-            let lowercasedKey = normalizedKey.lowercased()
-            if explicitSensitiveKeys.contains(normalizedKey) ||
-                explicitSensitiveKeys.contains(lowercasedKey) ||
-                lowercasedKey.contains("token") ||
-                lowercasedKey.contains("apikey") ||
-                lowercasedKey.contains("api-key") ||
-                lowercasedKey.contains("authorization") ||
-                lowercasedKey.contains("password") ||
-                lowercasedKey.contains("secret") ||
-                lowercasedKey.contains("transcript") {
+            if shouldRedactMetadataValue(for: normalizedKey, value: value) {
                 return (normalizedKey, "<redacted>")
             }
 
@@ -355,7 +369,7 @@ private enum DiagnosticsRedactor {
         })
     }
 
-    static func sanitizeFreeformText(_ text: String) -> String {
+    static func sanitizeFreeformText(_ text: String, redactingExactValues exactValues: [String] = []) -> String {
         var sanitized = text
         for pattern in tokenPatterns {
             let range = NSRange(sanitized.startIndex..., in: sanitized)
@@ -366,6 +380,28 @@ private enum DiagnosticsRedactor {
                 withTemplate: "<redacted>"
             )
         }
+
+        for exactValue in exactValues where !exactValue.isEmpty {
+            sanitized = sanitized.replacingOccurrences(of: exactValue, with: "<redacted>")
+        }
+
         return sanitized
+    }
+
+    private static func shouldRedactMetadataValue(for key: String, value: String) -> Bool {
+        let lowercasedKey = key.lowercased()
+        if explicitSensitiveKeys.contains(key) ||
+            explicitSensitiveKeys.contains(lowercasedKey) ||
+            lowercasedKey.contains("token") ||
+            lowercasedKey.contains("apikey") ||
+            lowercasedKey.contains("api-key") ||
+            lowercasedKey.contains("authorization") ||
+            lowercasedKey.contains("password") ||
+            lowercasedKey.contains("secret") ||
+            lowercasedKey.contains("transcript") {
+            return true
+        }
+
+        return sanitizeFreeformText(value) != value
     }
 }

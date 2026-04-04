@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-03-24",
+  "updated_on": "2026-04-04",
   "active": [
     {
       "id": "RR-002-T4",
@@ -7,9 +7,40 @@
       "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
       "status": "pending",
       "blocking_for_phase_completion": true
+    },
+    {
+      "id": "OPS-012-T4",
+      "phase": "OPS-012",
+      "title": "Promote the dependency remediation to the default branch and confirm the Dependabot alerts close there",
+      "status": "pending",
+      "blocking_for_phase_completion": true
     }
   ],
   "completed": [
+    {
+      "id": "OPS-011-T1",
+      "phase": "OPS-011",
+      "title": "Upgrade CI and release workflows plus runtime guardrails enforcement to Node24-compatible action majors",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T3",
+      "phase": "OPS-011",
+      "title": "Harden local DMG packaging against stale virtualenv entrypoints and revalidate unsigned release artifact generation",
+      "status": "completed"
+    },
+    {
+      "id": "BOOTSTRAP-T1",
+      "phase": "bootstrap",
+      "title": "Normalize roadmap and execution state, and add reusable agent and prompt contracts",
+      "status": "completed"
+    },
+    {
+      "id": "BOOTSTRAP-T2",
+      "phase": "bootstrap",
+      "title": "Add the authoritative runtime guardrails validator and make it the pull-request gatekeeper",
+      "status": "completed"
+    },
     {
       "id": "RR-002-T1",
       "phase": "RR-002",
@@ -38,6 +69,54 @@
       "id": "RR-002-T6",
       "phase": "RR-002",
       "title": "Fix Windows-targeted service compile blockers discovered while running the Windows test project",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T7",
+      "phase": "RR-002",
+      "title": "Fix inherited CI validation blockers in diagnostics redaction and Windows packaged-smoke exit handling",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T8",
+      "phase": "RR-002",
+      "title": "Emit machine-readable Windows validation evidence from CI and verify the artifact-producing workflow run",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T9",
+      "phase": "RR-002",
+      "title": "Add a Windows Codex handoff script, handoff doc, and CI artifact so takeover work can continue on a real Windows machine",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T4",
+      "phase": "OPS-011",
+      "title": "Enforce release-smoke preflight in scripts/build_dmg.sh and revalidate unsigned DMG packaging through that hardened path",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T2",
+      "phase": "OPS-011",
+      "title": "Run GitHub-hosted CI on the upgraded workflows and clear the remaining Node24 compatibility risk with hosted evidence",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T1",
+      "phase": "OPS-012",
+      "title": "Patch the docs-site dependency tree to remediate the four recorded Dependabot alerts and validate the updated versions locally",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T2",
+      "phase": "OPS-012",
+      "title": "Push the dependency remediation to the tracked branch and validate hosted CI before default-branch promotion",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T3",
+      "phase": "OPS-012",
+      "title": "Stabilize or replace the local npm install path after the Node 25 / npm 11 EBADF registry-fetch failure",
       "status": "completed"
     }
   ]

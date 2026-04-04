@@ -144,6 +144,15 @@
         "RISK-ACC-002"
       ],
       "scope": "Run a real VoiceOver-driven validation pass on the release-candidate macOS UI and validate docs-site accessibility once the Docusaurus site is published."
+    },
+    {
+      "id": "OPS-012",
+      "name": "Dependency Alert Remediation",
+      "priority": "medium",
+      "grouped_risks": [
+        "RISK-SEC-001"
+      ],
+      "scope": "Review and remediate the open Dependabot alerts on the default branch, validate the patched dependency graph on the tracked branch, and promote the remediation so GitHub clears the default-branch alerts."
     }
   ],
   "opportunities": [
@@ -249,7 +258,7 @@
       "description": "CI does not yet prove full Windows runtime behavior or fully prove signed release automation.",
       "severity": "medium",
       "impact": "Build confidence is improving, but key Windows and release-time behaviors can still regress outside local maintainer workflows.",
-      "mitigation": "Track and improve in RR-002 and OPS-002. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, and packaged zip validation, but signed release proof and real runtime behavior are still unresolved.",
+      "mitigation": "Track and improve in RR-002 and OPS-002. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, packaged zip validation, packaged-app smoke execution, packaged-file hash parity checks, and uploaded validation evidence, but signed release proof and real runtime behavior are still unresolved.",
       "affected_components": [
         "github-workflows",
         "windows",
@@ -257,6 +266,20 @@
       ],
       "phase_association": "RR-002",
       "status": "unresolved"
+    },
+    {
+      "id": "RISK-CI-002",
+      "description": "GitHub Actions workflow runtimes needed hosted validation after the Node24 compatibility upgrade because the initial hosted Release run still surfaced a Node 20 deprecation annotation from actions/setup-python@v5.",
+      "severity": "medium",
+      "impact": "CI and release evidence could still degrade under the hosted-runner Node 24 cutover unless every action pin was validated on GitHub-hosted runners.",
+      "mitigation": "Resolved by running GitHub-hosted CI run 23988211616 and unsigned Release workflow run 23988213079 on commit eca6ba9 after upgrading actions/setup-python to v6; both workflows completed successfully without the prior Node 20 deprecation annotation.",
+      "affected_components": [
+        "github-workflows",
+        "ci",
+        "release-workflow"
+      ],
+      "phase_association": "OPS-011",
+      "status": "resolved"
     },
     {
       "id": "RISK-WIN-003",
@@ -267,6 +290,20 @@
       "affected_components": [
         "BugNarrator.Windows.Services",
         "windows-tests"
+      ],
+      "phase_association": "RR-002",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-CI-001",
+      "description": "Inherited validation defects caused RR-002 macOS and Windows CI signal to fail before the phase branch could prove the intended package and smoke checks.",
+      "severity": "medium",
+      "impact": "Release smoke and packaged-app validation could fail for unrelated reasons, masking the remaining real Windows runtime risk behind broken validation plumbing.",
+      "mitigation": "Resolved in RR-002 by redacting exact sensitive metadata values from diagnostics free-form text and by capturing packaged smoke exit codes with Start-Process -PassThru -Wait in the Windows package validator.",
+      "affected_components": [
+        "diagnostics-logging",
+        "windows-package-validation",
+        "github-workflows"
       ],
       "phase_association": "RR-002",
       "status": "resolved"
@@ -315,6 +352,62 @@
         "roadmap"
       ],
       "phase_association": "RR-004",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-DPL-002",
+      "description": "Local DMG packaging could bypass the release smoke and startup keychain regression checks because scripts/build_dmg.sh built and packaged the app without enforcing scripts/release_smoke_test.sh first.",
+      "severity": "medium",
+      "impact": "A startup keychain-prompt regression could slip into candidate DMG artifacts even if the lower-level fix and unit tests existed, because the packaging entrypoint itself was not proving the symptom path.",
+      "mitigation": "Resolved in OPS-011 by making scripts/build_dmg.sh require release_smoke_test.sh by default, which now includes the startup keychain smoke, and by rerunning unsigned DMG packaging through that hardened path.",
+      "affected_components": [
+        "scripts",
+        "release-process",
+        "github-workflows"
+      ],
+      "phase_association": "OPS-011",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-DPL-001",
+      "description": "Local DMG packaging depended on the dmgbuild virtualenv entrypoint script, which could carry a stale shebang from another checkout and fail before producing release artifacts.",
+      "severity": "medium",
+      "impact": "Local release preparation could fail before producing any DMG artifacts, blocking maintainers from validating or packaging candidate builds.",
+      "mitigation": "Resolved in OPS-011 by making scripts/build_dmg.sh invoke dmgbuild through the active virtualenv Python module instead of the fragile bin/dmgbuild wrapper.",
+      "affected_components": [
+        "scripts",
+        "release-process",
+        "packaging-env"
+      ],
+      "phase_association": "OPS-011",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-SEC-001",
+      "description": "GitHub reported four open Dependabot alerts on the default branch during push operations on 2026-04-04 (2 high, 2 moderate).",
+      "severity": "medium",
+      "impact": "Open dependency vulnerabilities can leave the repo and release workflows exposed until the affected packages or action pins are remediated and revalidated.",
+      "mitigation": "Track in OPS-012. The phase/bootstrap branch now patches the docs-site dependency graph locally with targeted overrides and verified build evidence, but the risk remains open until the remediation is merged to the default branch and the hosted CI/default-branch alert state is revalidated.",
+      "affected_components": [
+        "github-workflows",
+        "dependencies",
+        "default-branch"
+      ],
+      "phase_association": "OPS-012",
+      "status": "unresolved"
+    },
+    {
+      "id": "RISK-ENV-001",
+      "description": "The local npm 11.12.1 / Node 25.9.0 toolchain can fail registry fetches with EBADF during docs-site dependency remediation, preventing a normal npm install or lockfile refresh path in this macOS workspace.",
+      "severity": "medium",
+      "impact": "Security or dependency updates can stall locally even when the registry is reachable, forcing manual tarball-based workarounds and reducing confidence in repeatable package-management flows.",
+      "mitigation": "Resolved in OPS-012 by adding site/.node-version plus scripts/site_npm.sh, which downloads and reuses the current official Node 22 toolchain under build/tooling and runs docs-site npm commands through that pinned path instead of the broken system npm 11 / Node 25 combination.",
+      "affected_components": [
+        "site",
+        "dependencies",
+        "packaging-env"
+      ],
+      "phase_association": "OPS-012",
       "status": "resolved"
     }
   ],
@@ -397,9 +490,35 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Expanding Windows build, test, packaging, and packaged-app smoke validation on a dedicated phase branch while real hardware runtime validation remains pending."
+    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 now has a pushed dependency-remediation commit, a passing hosted CI run (23988782016), and a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The remaining OPS-012 follow-up is promoting the dependency patch to the default branch so the Dependabot alerts can close there."
   },
-  "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
+  "current_phase_branch": "phase/bootstrap",
+  "last_updated": "2026-04-04",
+  "tasks": {
+    "active": [
+      "RR-002-T4",
+      "OPS-012-T4"
+    ],
+    "completed": [
+      "OPS-011-T1",
+      "OPS-011-T3",
+      "RR-002-T1",
+      "RR-002-T2",
+      "RR-002-T3",
+      "RR-002-T5",
+      "RR-002-T6",
+      "RR-002-T7",
+      "RR-002-T8",
+      "RR-002-T9",
+      "BOOTSTRAP-T1",
+      "BOOTSTRAP-T2",
+      "OPS-011-T4",
+      "OPS-011-T2",
+      "OPS-012-T1",
+      "OPS-012-T2",
+      "OPS-012-T3"
+    ]
+  },
   "decisions": [
     {
       "date": "2026-03-23",
@@ -468,6 +587,58 @@
     {
       "date": "2026-03-24",
       "summary": "While exercising the Windows-targeted test project, fixed ambiguous string-splitting calls in the Windows service layer so RR-002 validation no longer fails at compile time before runtime checks begin."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Kept RR-002 on phase/RR-002-windows-runtime-hardening and cherry-picked only the targeted validation-fix commit so the phase record stays isolated from unrelated feature-branch work."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Treated the inherited diagnostics-redaction failure and packaged-smoke exit-code bug as in-scope RR-002 work because they blocked the package/runtime signal, then revalidated DiagnosticsLoggerTests and release_smoke_test.sh on the phase branch before updating state."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Expanded RR-002 CI evidence by validating packaged-file hashes against publish outputs, emitting a machine-readable Windows validation manifest, and uploading that manifest plus the smoke report as GitHub Actions artifacts from the passing phase-branch run."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Tracked the new GitHub Actions Node 20 deprecation warning as RISK-CI-002 in OPS-011 instead of folding that maintenance work into RR-002."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Added a repo-native Windows Codex handoff document and script that summarize the active RR-002 state, can run the scripted Windows baseline on a real Windows machine, and emit a machine-readable handoff report for takeover work."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Created a repo-local execution bootstrap on phase/bootstrap by adding reusable agent and prompt contracts, normalizing roadmap state with last_updated and task summaries, and making a single runtime guardrails validator the CI gatekeeper instead of introducing a parallel enforcement system."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Because RR-002 remains blocked on real Windows validation in this macOS workspace, used the next unblocked execution slice to advance OPS-011 by upgrading workflow action majors to Node24-compatible releases, forcing Node24 in CI and release workflows, and teaching the runtime guardrails validator to enforce that floor."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Treated the stale dmgbuild entrypoint shebang as a release-environment defect, switched scripts/build_dmg.sh to invoke dmgbuild through the active virtualenv Python module, reran release_smoke_test.sh, rebuilt the unsigned DMG successfully, and generated a fresh release-summary seed without claiming a public signed/notarized release."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Hardened the local packaging entrypoint by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which carries the startup keychain smoke into DMG preflight; then reran workflow lint and unsigned DMG packaging through that exact path before recording release status."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Closed OPS-011 after hosted CI run 23988211616 and hosted Release workflow run 23988213079 both succeeded on commit eca6ba9; upgraded actions/setup-python to v6 when the first hosted Release run still emitted a Node 20 deprecation annotation."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Started OPS-012 because RR-002 remains blocked on real Windows validation, patched the docs-site dependency tree to replace the four vulnerable Dependabot versions, validated the patched tree with npm ls plus a Docusaurus production build, and recorded the local npm 11 / Node 25 EBADF fetch defect as a separate OPS-012 environment risk."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Validated the OPS-012 dependency-remediation commit on hosted CI run 23988782016 after pushing phase/bootstrap, then kept the phase open only for default-branch promotion and the local npm 11 / Node 25 toolchain defect."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Closed OPS-012-T3 by replacing the broken system npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper aligned to the docs-site CI runtime, then validated npm ci and the production site build through that pinned toolchain."
     }
   ],
   "version": "1.0.22",
@@ -477,7 +648,7 @@
       "version": "1.0.22"
     },
     "test": {
-      "status": "local-regression-docs-site-and-workflow-validation-passed",
+      "status": "local-unsigned-release-package-preflight-validated",
       "version": "1.0.22"
     },
     "prod": {

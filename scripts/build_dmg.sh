@@ -22,7 +22,7 @@ APP_NAME="${APP_NAME:-BugNarrator}"
 BACKGROUND_DIR_NAME=".background"
 BACKGROUND_IMAGE_NAME="dmg-background.png"
 BACKGROUND_RENDER_SCRIPT="${BACKGROUND_RENDER_SCRIPT:-$ROOT_DIR/scripts/render_dmg_background.swift}"
-DMGBUILD_BIN="${DMGBUILD_BIN:-$ROOT_DIR/build/dmg-venv/bin/dmgbuild}"
+DMGBUILD_PYTHON_BIN="${DMGBUILD_PYTHON_BIN:-$ROOT_DIR/build/dmg-venv/bin/python}"
 DMGBUILD_SETTINGS_PATH="${DMGBUILD_SETTINGS_PATH:-$ROOT_DIR/scripts/dmgbuild_settings.py}"
 DMG_WINDOW_LEFT="${DMG_WINDOW_LEFT:-180}"
 DMG_WINDOW_TOP="${DMG_WINDOW_TOP:-120}"
@@ -34,6 +34,9 @@ DMG_APP_ICON_X="${DMG_APP_ICON_X:-170}"
 DMG_APP_ICON_Y="${DMG_APP_ICON_Y:-190}"
 DMG_APPLICATIONS_ICON_X="${DMG_APPLICATIONS_ICON_X:-510}"
 DMG_APPLICATIONS_ICON_Y="${DMG_APPLICATIONS_ICON_Y:-190}"
+REQUIRE_RELEASE_SMOKE_TEST="${REQUIRE_RELEASE_SMOKE_TEST:-YES}"
+RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-YES}"
+RELEASE_SMOKE_TEST_SCRIPT="${RELEASE_SMOKE_TEST_SCRIPT:-$ROOT_DIR/scripts/release_smoke_test.sh}"
 MANUAL_DISTRIBUTION_SIGNING="NO"
 VERIFY_MOUNTPOINT=""
 VERIFY_DEVICE=""
@@ -133,6 +136,20 @@ fi
 if [[ "$NOTARIZE" == "YES" && -z "$NOTARY_PROFILE" ]]; then
     echo "error: notarization requires NOTARY_PROFILE to be set" >&2
     exit 1
+fi
+
+if [[ "$REQUIRE_RELEASE_SMOKE_TEST" == "YES" ]]; then
+    if [[ ! -f "$RELEASE_SMOKE_TEST_SCRIPT" ]]; then
+        echo "error: release smoke test script not found at $RELEASE_SMOKE_TEST_SCRIPT" >&2
+        exit 1
+    fi
+
+    echo "Running release smoke preflight..."
+    PROJECT_PATH="$PROJECT_PATH" \
+    SCHEME="$SCHEME" \
+    DERIVED_DATA_PATH="$DERIVED_DATA_PATH" \
+    RUN_STARTUP_KEYCHAIN_SMOKE="$RUN_STARTUP_KEYCHAIN_SMOKE" \
+    bash "$RELEASE_SMOKE_TEST_SCRIPT"
 fi
 
 rm -rf "$STAGING_DIR"
@@ -248,11 +265,18 @@ if [[ ! -f "$APP_ASSETS_CAR_PATH" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$DMGBUILD_BIN" ]]; then
-    echo "error: dmgbuild is not installed at $DMGBUILD_BIN" >&2
+if [[ ! -x "$DMGBUILD_PYTHON_BIN" ]]; then
+    echo "error: dmgbuild virtualenv python was not found at $DMGBUILD_PYTHON_BIN" >&2
     echo "Create the packaging virtualenv with:" >&2
     echo "  python3 -m venv build/dmg-venv" >&2
     echo "  build/dmg-venv/bin/python -m pip install dmgbuild" >&2
+    exit 1
+fi
+
+if ! "$DMGBUILD_PYTHON_BIN" -c 'import dmgbuild' >/dev/null 2>&1; then
+    echo "error: dmgbuild is not importable from $DMGBUILD_PYTHON_BIN" >&2
+    echo "Refresh the packaging virtualenv with:" >&2
+    echo "  build/dmg-venv/bin/python -m pip install --upgrade pip dmgbuild" >&2
     exit 1
 fi
 
@@ -265,13 +289,15 @@ VERSIONED_DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
 STABLE_DMG_NAME="${APP_NAME}-macOS.dmg"
 VERSIONED_DMG_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME"
 STABLE_DMG_PATH="$OUTPUT_DIR/$STABLE_DMG_NAME"
+VERSIONED_DMG_CHECKSUM_PATH="$OUTPUT_DIR/${VERSIONED_DMG_NAME}.sha256"
+STABLE_DMG_CHECKSUM_PATH="$OUTPUT_DIR/${STABLE_DMG_NAME}.sha256"
 
-rm -f "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
+rm -f "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH" "$VERSIONED_DMG_CHECKSUM_PATH" "$STABLE_DMG_CHECKSUM_PATH"
 
 mkdir -p "$STAGING_BACKGROUND_DIR"
 swift "$BACKGROUND_RENDER_SCRIPT" "$STAGING_BACKGROUND_PATH"
 
-"$DMGBUILD_BIN" \
+"$DMGBUILD_PYTHON_BIN" -m dmgbuild \
     -s "$DMGBUILD_SETTINGS_PATH" \
     -D "app_path=$APP_PATH" \
     -D "background_path=$STAGING_BACKGROUND_PATH" \
@@ -368,6 +394,12 @@ fi
 
 cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
+(
+    cd "$OUTPUT_DIR"
+    shasum -a 256 "$VERSIONED_DMG_NAME" >"$(basename "$VERSIONED_DMG_CHECKSUM_PATH")"
+    shasum -a 256 "$STABLE_DMG_NAME" >"$(basename "$STABLE_DMG_CHECKSUM_PATH")"
+)
+
 echo "Built $APP_NAME $VERSION ($BUILD_NUMBER)"
 if [[ -n "$SIGNING_AUTHORITY" ]]; then
     echo "Signing authority: $SIGNING_AUTHORITY"
@@ -375,3 +407,5 @@ fi
 echo "Release app: $APP_PATH"
 echo "Versioned DMG: $VERSIONED_DMG_PATH"
 echo "Stable DMG: $STABLE_DMG_PATH"
+echo "Versioned DMG checksum: $VERSIONED_DMG_CHECKSUM_PATH"
+echo "Stable DMG checksum: $STABLE_DMG_CHECKSUM_PATH"

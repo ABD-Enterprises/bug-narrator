@@ -6,6 +6,7 @@ PROJECT_PATH="${PROJECT_PATH:-$ROOT_DIR/BugNarrator.xcodeproj}"
 SCHEME="${SCHEME:-BugNarrator}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
 CLEAN_LOCAL_BUILD_APPS="${CLEAN_LOCAL_BUILD_APPS:-NO}"
+RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-YES}"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/BugNarrator.app"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 
@@ -57,6 +58,11 @@ MICROPHONE_USAGE_DESCRIPTION="$(/usr/libexec/PlistBuddy -c 'Print :NSMicrophoneU
 if [[ -z "$MICROPHONE_USAGE_DESCRIPTION" ]]; then
     echo "error: release app Info.plist is missing NSMicrophoneUsageDescription" >&2
     exit 1
+fi
+
+if [[ "$RUN_STARTUP_KEYCHAIN_SMOKE" == "YES" ]]; then
+    echo "Running startup keychain smoke test..."
+    APP_PATH="$APP_PATH" "$ROOT_DIR/scripts/keychain_startup_smoke_test.sh"
 fi
 
 echo "Release smoke test passed."
