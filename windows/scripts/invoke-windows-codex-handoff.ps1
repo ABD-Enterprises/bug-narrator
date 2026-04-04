@@ -102,9 +102,9 @@ $phaseRisks = @($riskState.unresolved | Where-Object { $_.assigned_phase -eq $cu
 $allUnresolvedRisks = @($riskState.unresolved)
 $phaseDecisions = @($decisionState.entries | Where-Object { $_.phase -eq $currentPhaseId } | Select-Object -Last 5)
 $windowsArtifacts = @(
-    Join-Path $repoRoot "windows/artifacts/packages/BugNarrator-windows-win-x64.zip",
-    Join-Path $repoRoot "windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json",
-    Join-Path $repoRoot "windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json"
+    (Join-Path $repoRoot "windows/artifacts/packages/BugNarrator-windows-win-x64.zip")
+    (Join-Path $repoRoot "windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json")
+    (Join-Path $repoRoot "windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json")
 )
 $artifactSnapshot = foreach ($artifactPath in $windowsArtifacts) {
     [PSCustomObject]@{
