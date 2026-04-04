@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-03-24",
+  "updated_on": "2026-04-04",
   "entries": [
     {
       "date": "2026-03-24",
@@ -15,6 +15,16 @@
       "date": "2026-03-24",
       "phase": "RR-002",
       "summary": "Treated the Windows-targeted compile failure as a real RR-002 defect and fixed it in scope instead of deferring it behind the broader runtime-validation risk."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Kept RR-002 on phase/RR-002-windows-runtime-hardening and cherry-picked only the targeted validation-fix commit so the phase record stays isolated from unrelated feature-branch work."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Treated the inherited diagnostics-redaction failure and packaged-smoke exit-code bug as RR-002 work because they blocked the package/runtime signal, then reran DiagnosticsLoggerTests and release_smoke_test.sh on the phase branch before updating state."
     }
   ]
 }

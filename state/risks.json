@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-03-24",
+  "updated_on": "2026-04-04",
   "resolved": [
     {
       "id": "RISK-WIN-003",
@@ -7,6 +7,13 @@
       "status": "resolved",
       "assigned_phase": "RR-002",
       "note": "Resolved by replacing ambiguous string-splitting calls with explicit character arrays so the Windows-targeted test project compiles cleanly."
+    },
+    {
+      "id": "RISK-CI-001",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "RR-002",
+      "note": "Resolved by redacting exact sensitive metadata values from diagnostics free-form text so DiagnosticsLoggerTests and release smoke pass again, and by capturing packaged-smoke exit codes with Start-Process -PassThru -Wait in the Windows package validator."
     }
   ],
   "unresolved": [
@@ -22,7 +29,7 @@
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "RR-002",
-      "note": "CI now covers phase branches, both Windows test projects, package validation, and packaged-app smoke execution, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
+      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, and the packaged-smoke exit-code path, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
     },
     {
       "id": "RISK-ACC-002",
