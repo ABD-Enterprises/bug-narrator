@@ -433,7 +433,7 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Continuing RR-002 on the dedicated phase branch by hardening Windows package validation, uploading machine-readable validation evidence from CI, and keeping real Windows desktop runtime validation as the remaining blocker."
+    "summary": "Continuing RR-002 on the dedicated phase branch by hardening Windows package validation, uploading machine-readable validation and Codex handoff artifacts from CI, and keeping real Windows desktop runtime validation as the remaining blocker."
   },
   "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
   "decisions": [
@@ -520,6 +520,10 @@
     {
       "date": "2026-04-04",
       "summary": "Tracked the new GitHub Actions Node 20 deprecation warning as RISK-CI-002 in OPS-011 instead of folding that maintenance work into RR-002."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Added a repo-native Windows Codex handoff document and script that summarize the active RR-002 state, can run the scripted Windows baseline on a real Windows machine, and emit a machine-readable handoff report for takeover work."
     }
   ],
   "version": "1.0.22",

@@ -51,6 +51,12 @@
       "phase": "RR-002",
       "title": "Emit machine-readable Windows validation evidence from CI and verify the artifact-producing workflow run",
       "status": "completed"
+    },
+    {
+      "id": "RR-002-T9",
+      "phase": "RR-002",
+      "title": "Add a Windows Codex handoff script, handoff doc, and CI artifact so takeover work can continue on a real Windows machine",
+      "status": "completed"
     }
   ]
 }

@@ -78,12 +78,15 @@ The Windows workspace is intentionally isolated under `windows/`.
 On a Windows machine:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline
 dotnet restore windows/BugNarrator.Windows.sln
 dotnet build windows/BugNarrator.Windows.sln -c Debug
 dotnet test windows/tests/BugNarrator.Core.Tests/BugNarrator.Core.Tests.csproj -c Debug
 ```
 
 On macOS, you can prepare or edit the Windows workspace, but you cannot honestly validate the WPF app shell.
+
+If Codex is taking over Windows development, treat [windows/docs/WINDOWS_CODEX_HANDOFF.md](../../windows/docs/WINDOWS_CODEX_HANDOFF.md) as the first Windows-specific handoff document.
 
 ## Development Rules
 
@@ -101,3 +104,4 @@ On macOS, you can prepare or edit the Windows workspace, but you cannot honestly
 - [Testing Guide](../testing/testing.md)
 - [Release Process](../release/release-process.md)
 - [Windows Workspace README](../../windows/README.md)
+- [Windows Codex Handoff](../../windows/docs/WINDOWS_CODEX_HANDOFF.md)

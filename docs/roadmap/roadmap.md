@@ -127,6 +127,7 @@ Current execution slice:
 - run both `BugNarrator.Core.Tests` and `BugNarrator.Windows.Tests` in the scripted Windows baseline
 - fix Windows-targeted service compile blockers discovered while exercising the Windows test project from the phase branch
 - package a Windows `Release` zip in CI, validate that the published artifact contains the expected executable and runtime metadata, and run the packaged executable in a headless smoke mode
+- emit Windows validation and Codex-handoff artifacts from CI so a Codex instance on Windows can load the current RR-002 state and artifact paths without reconstructing them from chat history
 - keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
 
 ### RR-005 Assistive Technology Runtime And Docs Validation

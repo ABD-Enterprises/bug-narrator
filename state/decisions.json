@@ -33,6 +33,11 @@
     },
     {
       "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Captured the Windows takeover path in-repo with a dedicated handoff doc, a handoff script, and a CI-produced handoff artifact so Codex on Windows can continue RR-002 from repo state instead of chat-only context."
+    },
+    {
+      "date": "2026-04-04",
       "phase": "OPS-011",
       "summary": "Captured the GitHub Actions Node 20 deprecation warnings from the successful phase-branch run as a separate follow-up risk instead of expanding RR-002 into workflow-runtime maintenance."
     }
