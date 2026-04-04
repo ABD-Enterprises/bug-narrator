@@ -52,9 +52,16 @@ if (Test-Path $smokeOutputPath) {
     Remove-Item $smokeOutputPath -Force
 }
 
-& $smokeExecutable --smoke-output $smokeOutputPath
-if ($LASTEXITCODE -ne 0) {
-    throw "Packaged smoke executable exited with code $LASTEXITCODE."
+$smokeProcess = Start-Process `
+    -FilePath $smokeExecutable `
+    -ArgumentList @("--smoke-output", $smokeOutputPath) `
+    -WorkingDirectory $publishDirectory `
+    -WindowStyle Hidden `
+    -PassThru `
+    -Wait
+
+if ($smokeProcess.ExitCode -ne 0) {
+    throw "Packaged smoke executable exited with code $($smokeProcess.ExitCode)."
 }
 
 if (-not (Test-Path $smokeOutputPath)) {
