@@ -4,7 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const repoRoot = path.resolve(__dirname, "..", "..");
+const repoRoot = process.env.RUNTIME_GUARDRAILS_REPO_ROOT
+  ? path.resolve(process.env.RUNTIME_GUARDRAILS_REPO_ROOT)
+  : path.resolve(__dirname, "..", "..");
 process.chdir(repoRoot);
 
 const failures = [];
