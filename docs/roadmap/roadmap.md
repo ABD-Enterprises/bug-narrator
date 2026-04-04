@@ -6,7 +6,7 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 - current production app version: `1.0.22`
 - current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
-- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, and upgraded workflow action majors plus validator enforcement for the GitHub-hosted Node24 transition
+- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, completed the hosted Node24 workflow validation slice, and started OPS-012 by patching the docs-site dependency tree for the four recorded Dependabot alerts while the remaining RR-002 blocker stays real Windows desktop runtime validation
 
 ## Execution System
 
@@ -146,6 +146,21 @@ Priority: Low
 Grouped risks:
 
 - a real VoiceOver-driven runtime pass and docs-site accessibility validation still need to be run once the site is published and release-candidate UI is exercised live
+
+### OPS-012 Dependency Alert Remediation
+
+Priority: Medium
+
+Grouped risks:
+
+- GitHub reported four open Dependabot alerts on the default branch during push operations on April 4, 2026
+- local npm 11 / Node 25 registry fetches can fail with `EBADF` during docs-site dependency refreshes in this macOS workspace
+
+Current execution slice:
+
+- patch the docs-site dependency tree with targeted overrides for `serialize-javascript`, `brace-expansion`, and the Express `path-to-regexp` line
+- validate the patched dependency graph with `npm ls` and a production Docusaurus build
+- keep the phase open until the remediation is pushed through hosted CI and promoted to the default branch
 
 ## Upcoming Feature / Opportunity Phases
 

@@ -2,18 +2,25 @@
   "updated_on": "2026-04-04",
   "active": [
     {
-      "id": "OPS-011-T2",
-      "phase": "OPS-011",
-      "title": "Run GitHub-hosted CI on the upgraded workflows and clear the remaining Node24 compatibility risk with hosted evidence",
-      "status": "pending",
-      "blocking_for_phase_completion": true
-    },
-    {
       "id": "RR-002-T4",
       "phase": "RR-002",
       "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
       "status": "pending",
       "blocking_for_phase_completion": true
+    },
+    {
+      "id": "OPS-012-T2",
+      "phase": "OPS-012",
+      "title": "Push the dependency remediation to the tracked branch and validate hosted CI before default-branch promotion",
+      "status": "pending",
+      "blocking_for_phase_completion": true
+    },
+    {
+      "id": "OPS-012-T3",
+      "phase": "OPS-012",
+      "title": "Stabilize or replace the local npm install path after the Node 25 / npm 11 EBADF registry-fetch failure",
+      "status": "pending",
+      "blocking_for_phase_completion": false
     }
   ],
   "completed": [
@@ -93,6 +100,18 @@
       "id": "OPS-011-T4",
       "phase": "OPS-011",
       "title": "Enforce release-smoke preflight in scripts/build_dmg.sh and revalidate unsigned DMG packaging through that hardened path",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-011-T2",
+      "phase": "OPS-011",
+      "title": "Run GitHub-hosted CI on the upgraded workflows and clear the remaining Node24 compatibility risk with hosted evidence",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T1",
+      "phase": "OPS-012",
+      "title": "Patch the docs-site dependency tree to remediate the four recorded Dependabot alerts and validate the updated versions locally",
       "status": "completed"
     }
   ]

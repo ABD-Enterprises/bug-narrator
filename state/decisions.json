@@ -65,6 +65,16 @@
       "date": "2026-04-04",
       "phase": "OPS-011",
       "summary": "Hardened the local packaging entrypoint by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which carries the startup keychain smoke into DMG preflight; then reran workflow lint and unsigned DMG packaging through that exact path before recording release status."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Closed OPS-011 after hosted CI run 23988211616 and hosted Release workflow run 23988213079 both succeeded on commit eca6ba9; upgraded actions/setup-python to v6 when the first hosted Release run still emitted a Node 20 deprecation annotation."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Because RR-002 is still blocked on real Windows hardware validation, started OPS-012 by patching the docs-site dependency graph locally with targeted overrides and direct tarball replacements, validated the patched versions with npm ls and a production Docusaurus build, and logged the local npm 11 / Node 25 EBADF fetch failure as a separate environment risk instead of treating it as successful package-manager remediation."
     }
   ]
 }

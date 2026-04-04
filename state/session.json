@@ -1,17 +1,17 @@
 {
   "updated_on": "2026-04-04",
   "phase": {
-    "id": "OPS-011",
-    "name": "GitHub Actions Node 24 Compatibility",
+    "id": "OPS-012",
+    "name": "Dependency Alert Remediation",
     "status": "in_progress"
   },
   "roadmap_phase_context": {
     "id": "RR-002",
     "name": "Windows Runtime Validation And Hardening",
-    "status": "in_progress"
+    "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 still remains blocked on real Windows runtime validation in this macOS workspace, so this run advanced OPS-011 by making scripts/build_dmg.sh enforce release_smoke_test.sh as a local packaging preflight, carrying the startup keychain smoke into DMG generation, rerunning workflow lint, and rebuilding unsigned 1.0.22 DMG artifacts through the hardened release path without claiming a public signed/notarized release.",
+  "execution_summary": "RR-002 remains blocked on real Windows runtime validation, so phase/bootstrap advanced OPS-012 by patching the docs-site dependency tree to remediate the four recorded Dependabot alerts locally. npm install failed under npm 11.12.1 / Node 25.9.0 with EBADF registry-fetch errors, so the remediation used direct tarball replacement, then validated the patched dependency graph with npm ls and a production Docusaurus build.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -100,11 +100,8 @@
       "scope": "github-hosted-node24-ci",
       "type": "validation",
       "command": "GitHub-hosted CI run for upgraded Node24-compatible workflows",
-      "result": "NOT RUN",
-      "risk_ids": [
-        "RISK-CI-002"
-      ],
-      "summary": "Hosted GitHub Actions evidence for the upgraded workflows has not yet been executed from this workspace."
+      "result": "PASS",
+      "summary": "Hosted GitHub Actions CI run 23988211616 passed on commit eca6ba9 after the Node24 workflow upgrades."
     },
     {
       "id": "OPS-011-E6",
@@ -146,8 +143,7 @@
       "result": "NOT RUN",
       "risk_ids": [
         "RISK-WIN-001",
-        "RISK-WIN-002",
-        "RISK-CI-002"
+        "RISK-WIN-002"
       ],
       "summary": "Public release promotion was not executed from this workspace because the signed/notarized path was not run and release blockers remain open."
     },
@@ -170,6 +166,49 @@
       "command": "DERIVED_DATA_PATH=/tmp/bugnarrator-dmg-preflight OUTPUT_DIR=/tmp/bugnarrator-dmg-dist STAGING_DIR=/tmp/bugnarrator-dmg-staging bash scripts/build_dmg.sh",
       "result": "PASS",
       "summary": "Built unsigned 1.0.22 DMG artifacts through the hardened packaging path, which now enforces release_smoke_test.sh and the startup keychain smoke before packaging."
+    },
+    {
+      "id": "OPS-011-E12",
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "scope": "github-hosted-release-workflow",
+      "type": "validation",
+      "command": "GitHub Release workflow run 23988213079 on phase/bootstrap with signed_release=false and publish_release=false",
+      "result": "PASS",
+      "summary": "Hosted Release workflow run 23988213079 passed on commit eca6ba9 after upgrading actions/setup-python to v6."
+    },
+    {
+      "id": "OPS-012-E1",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-package-manager",
+      "type": "build",
+      "command": "npm install --prefix site --ignore-scripts --no-audit --no-fund --cache /tmp/bugnarrator-npm-cache --verbose",
+      "result": "FAIL",
+      "risk_ids": [
+        "RISK-ENV-001"
+      ],
+      "summary": "Local npm 11.12.1 / Node 25.9.0 failed to fetch serialize-javascript from the npm registry with EBADF, so the normal lockfile-refresh path could not be completed in this workspace."
+    },
+    {
+      "id": "OPS-012-E2",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-dependency-tree",
+      "type": "validation",
+      "command": "npm ls path-to-regexp serialize-javascript brace-expansion --prefix site",
+      "result": "PASS",
+      "summary": "Confirmed the patched docs-site dependency tree now resolves serialize-javascript 7.0.5, brace-expansion 1.1.13, and express path-to-regexp 0.1.13."
+    },
+    {
+      "id": "OPS-012-E3",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "npm run build --prefix site",
+      "result": "PASS",
+      "summary": "Validated a production Docusaurus build on the patched dependency graph."
     }
   ]
 }

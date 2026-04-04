@@ -28,6 +28,13 @@
       "status": "resolved",
       "assigned_phase": "OPS-011",
       "note": "Resolved by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which now includes the startup keychain smoke; local DMG packaging was rerun successfully through that hardened preflight path."
+    },
+    {
+      "id": "RISK-CI-002",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "OPS-011",
+      "note": "Resolved by running GitHub-hosted CI run 23988211616 and unsigned Release workflow run 23988213079 on commit eca6ba9 after upgrading actions/setup-python to v6; both workflows completed successfully without the prior Node 20 deprecation annotation."
     }
   ],
   "unresolved": [
@@ -46,18 +53,25 @@
       "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, uploaded validation evidence artifacts, and a Windows Codex handoff artifact, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
     },
     {
-      "id": "RISK-CI-002",
-      "severity": "medium",
-      "status": "unresolved",
-      "assigned_phase": "OPS-011",
-      "note": "The workflow actions were upgraded locally to actions/checkout@v6, actions/setup-node@v6, actions/setup-dotnet@v5, and actions/upload-artifact@v6, and the runtime guardrails validator now enforces that floor plus FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 in both workflows. Hosted GitHub Actions evidence for the upgraded workflows is still pending, so OPS-011 remains open."
-    },
-    {
       "id": "RISK-ACC-002",
       "severity": "low",
       "status": "unresolved",
       "assigned_phase": "RR-005",
       "note": "Live VoiceOver and hosted docs-site accessibility validation still remain for a later remediation phase."
+    },
+    {
+      "id": "RISK-SEC-001",
+      "severity": "medium",
+      "status": "unresolved",
+      "assigned_phase": "OPS-012",
+      "note": "phase/bootstrap now patches the docs-site dependency tree locally for serialize-javascript 7.0.5, brace-expansion 1.1.13, and express-path-to-regexp 0.1.13, and the Docusaurus production build passed on the patched graph; the risk remains open until the remediation is pushed through hosted CI and merged to the default branch."
+    },
+    {
+      "id": "RISK-ENV-001",
+      "severity": "medium",
+      "status": "unresolved",
+      "assigned_phase": "OPS-012",
+      "note": "Local npm 11.12.1 on Node 25.9.0 fails registry fetches with EBADF during npm install for the docs site even though curl can reach registry.npmjs.org; OPS-012 used direct tarball extraction as a temporary workaround, but the standard npm install path is still unreliable in this workspace."
     }
   ]
 }
