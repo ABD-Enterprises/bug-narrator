@@ -165,6 +165,25 @@ function buildFixtureRoot() {
   return fixtureRoot;
 }
 
+function writeFixtureSession(fixtureRoot, evidence, phase = { id: "OPS-TEST", name: "Validator Fixture" }) {
+  writeJson(path.join(fixtureRoot, "state", "session.json"), {
+    updated_on: "2026-04-04",
+    phase: {
+      id: phase.id,
+      name: phase.name,
+      status: "in_progress"
+    },
+    roadmap_phase_context: {
+      id: phase.id,
+      name: phase.name,
+      status: "in_progress"
+    },
+    branch: "main",
+    execution_summary: "Fixture summary.",
+    evidence
+  });
+}
+
 function runValidator(fixtureRoot) {
   try {
     const stdout = execFileSync("node", [validatorPath], {
@@ -191,33 +210,18 @@ test("validator fails when FAIL evidence omits risk_ids", () => {
   const fixtureRoot = buildFixtureRoot();
 
   writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeJson(path.join(fixtureRoot, "state", "session.json"), {
-    updated_on: "2026-04-04",
-    phase: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    roadmap_phase_context: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    branch: "main",
-    execution_summary: "Fixture summary.",
-    evidence: [
-      {
-        id: "OPS-TEST-E1",
-        date: "2026-04-04",
-        phase: "OPS-TEST",
-        scope: "fixture-validation",
-        type: "validation",
-        command: "node tools/validators/enforce-runtime-guardrails.js",
-        result: "FAIL",
-        summary: "Missing risk IDs should fail validation."
-      }
-    ]
-  });
+  writeFixtureSession(fixtureRoot, [
+    {
+      id: "OPS-TEST-E1",
+      date: "2026-04-04",
+      phase: "OPS-TEST",
+      scope: "fixture-validation",
+      type: "validation",
+      command: "node tools/validators/enforce-runtime-guardrails.js",
+      result: "FAIL",
+      summary: "Missing risk IDs should fail validation."
+    }
+  ]);
 
   const result = runValidator(fixtureRoot);
   assert.equal(result.status, 1);
@@ -231,36 +235,111 @@ test("validator passes when FAIL evidence includes risk_ids", () => {
   const fixtureRoot = buildFixtureRoot();
 
   writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeJson(path.join(fixtureRoot, "state", "session.json"), {
-    updated_on: "2026-04-04",
-    phase: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    roadmap_phase_context: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    branch: "main",
-    execution_summary: "Fixture summary.",
-    evidence: [
-      {
-        id: "OPS-TEST-E1",
-        date: "2026-04-04",
-        phase: "OPS-TEST",
-        scope: "fixture-validation",
-        type: "validation",
-        command: "node tools/validators/enforce-runtime-guardrails.js",
-        result: "FAIL",
-        risk_ids: ["RISK-TEST-001"],
-        summary: "Known failure with mapped risk."
-      }
-    ]
-  });
+  writeFixtureSession(fixtureRoot, [
+    {
+      id: "OPS-TEST-E1",
+      date: "2026-04-04",
+      phase: "OPS-TEST",
+      scope: "fixture-validation",
+      type: "validation",
+      command: "node tools/validators/enforce-runtime-guardrails.js",
+      result: "FAIL",
+      risk_ids: ["RISK-TEST-001"],
+      summary: "Known failure with mapped risk."
+    }
+  ]);
 
   const result = runValidator(fixtureRoot);
   assert.equal(result.status, 0);
   assert.match(result.output, /^PASS/m);
+});
+
+test("validator allows NOT RUN evidence without risk_ids in docs phases", () => {
+  const fixtureRoot = buildFixtureRoot();
+
+  writeJson(path.join(fixtureRoot, "docs", "roadmap", "state.json"), {
+    current_phase: {
+      id: "DOC-TEST",
+      name: "Documentation Follow-up",
+      status: "in_progress"
+    },
+    risk_remediation_phases: [
+      {
+        id: "OPS-TEST",
+        name: "Validator Fixture",
+        priority: "low",
+        grouped_risks: ["RISK-TEST-001"],
+        scope: "Fixture scope."
+      }
+    ],
+    upcoming_phases: [],
+    completed_phases: [],
+    opportunities: [],
+    incidents: [],
+    risks: [
+      {
+        id: "RISK-TEST-001",
+        description: "Fixture risk",
+        severity: "medium",
+        impact: "Fixture impact",
+        mitigation: "Fixture mitigation",
+        affected_components: ["tests"],
+        phase_association: "OPS-TEST",
+        status: "unresolved"
+      }
+    ],
+    tasks: {
+      active: ["OPS-TEST-T1"],
+      completed: []
+    },
+    decisions: [],
+    last_updated: "2026-04-04"
+  });
+
+  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
+  writeFixtureSession(
+    fixtureRoot,
+    [
+      {
+        id: "DOC-TEST-E1",
+        date: "2026-04-04",
+        phase: "DOC-TEST",
+        scope: "docs-validation",
+        type: "validation",
+        command: "node tools/validators/enforce-runtime-guardrails.js",
+        result: "NOT RUN",
+        summary: "Docs-phase evidence can defer execution without a mapped risk."
+      }
+    ],
+    { id: "DOC-TEST", name: "Documentation Follow-up" }
+  );
+
+  const result = runValidator(fixtureRoot);
+  assert.equal(result.status, 0);
+  assert.match(result.output, /^PASS/m);
+});
+
+test("validator requires risk_ids for NOT RUN evidence outside docs phases", () => {
+  const fixtureRoot = buildFixtureRoot();
+
+  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
+  writeFixtureSession(fixtureRoot, [
+    {
+      id: "OPS-TEST-E1",
+      date: "2026-04-04",
+      phase: "OPS-TEST",
+      scope: "fixture-validation",
+      type: "validation",
+      command: "node tools/validators/enforce-runtime-guardrails.js",
+      result: "NOT RUN",
+      summary: "Non-docs NOT RUN entries must carry risks."
+    }
+  ]);
+
+  const result = runValidator(fixtureRoot);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.output,
+    /Evidence entry OPS-TEST-E1 must reference risk_ids when result is NOT RUN\./
+  );
 });
