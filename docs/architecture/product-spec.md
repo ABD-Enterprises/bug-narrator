@@ -169,6 +169,7 @@ Settings owns:
 - transcription defaults
 - issue-extraction defaults
 - workflow defaults
+- launch-at-login preference
 - permission guidance
 - optional hotkey assignment
 - experimental GitHub and Jira export configuration

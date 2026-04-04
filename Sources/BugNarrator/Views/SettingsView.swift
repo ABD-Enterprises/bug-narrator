@@ -146,7 +146,15 @@ struct SettingsView: View {
 
                         Toggle("Auto-copy transcript to clipboard", isOn: $settingsStore.autoCopyTranscript)
                         Toggle("Auto-save transcript to local history", isOn: $settingsStore.autoSaveTranscript)
+                        Toggle("Open BugNarrator at startup", isOn: $settingsStore.openAtStartup)
+                            .disabled(!settingsStore.openAtStartupSupported)
                         Toggle("Debug mode enables verbose local diagnostics", isOn: $settingsStore.debugMode)
+
+                        if let openAtStartupStatusMessage = settingsStore.openAtStartupStatusMessage {
+                            Text(openAtStartupStatusMessage)
+                                .font(.footnote)
+                                .foregroundStyle(calloutColor(for: settingsStore.openAtStartupStatusTone))
+                        }
 
                         Text("Screenshot capture prompts for Screen Recording permission the first time you use it if macOS requires access.")
                             .font(.footnote)
@@ -407,5 +415,16 @@ struct SettingsView: View {
         Text(text)
             .font(.footnote)
             .foregroundStyle(.secondary)
+    }
+
+    private func calloutColor(for tone: SettingsCalloutTone) -> Color {
+        switch tone {
+        case .secondary:
+            return .secondary
+        case .warning:
+            return .orange
+        case .error:
+            return .red
+        }
     }
 }
