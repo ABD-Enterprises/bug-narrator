@@ -1,8 +1,8 @@
 {
-  "observed_on": "2026-03-24",
+  "observed_on": "2026-04-05",
   "repository_detected": true,
-  "branch": "phase/RR-002-windows-runtime-hardening",
-  "head_at_phase_start": "6e23d1a",
+  "branch": "codex/open-at-startup-toggle",
+  "head_at_phase_start": "fb69f1f",
   "phase": "RR-002",
-  "status": "phase branch active"
+  "status": "pull request branch active"
 }

@@ -4,37 +4,44 @@
 
 ### T1
 
-Title: Run the `RR-002-T4` real Windows validation pass and record the first concrete defect or PASS result.
+Title: Align PR #5 branch state and validation evidence with the latest runtime guardrails contract.
 
 Files likely in scope:
 
-- `windows/scripts/invoke-windows-codex-handoff.ps1`
-- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+- `ai/tasks.md`
+- `ai/acceptance.md`
+- `state/artifacts.json`
+- `state/controller.md`
 - `state/current_task.md`
+- `state/handoff.json`
+- `state/repo.json`
+- `state/tasks.json`
+- `artifacts/pr-driven-workflow/*`
 
 Done when:
 
-- the scripted Windows baseline has been run from a real Windows machine or VM
-- the live tray, recording, screenshot, and hotkey checks are recorded with concrete PASS or FAIL details
+- the branch-local execution state reflects PR #5 instead of the old `phase/bootstrap` task
+- `./scripts/validate.sh 9a0048fc6397f1be3086b3753b2afa4a912399d2` passes
+- targeted `SettingsStore` validation already has passing evidence on the branch
 - the pull request is ready for GitHub review
 
-Status: pending
+Status: completed
 
 ---
 
 ### T2
 
-Title: Fix the first Windows runtime defect found by `T1` and rerun the relevant validation.
+Title: Fix any follow-up PR #5 CI or review failures without reopening planning.
 
 Files likely in scope:
 
-- `windows/src/BugNarrator.Windows/**`
-- `windows/src/BugNarrator.Windows.Services/**`
-- `windows/tests/BugNarrator.Windows.Tests/**`
+- `Sources/BugNarrator/**`
+- `Tests/BugNarratorTests/**`
+- `state/**`
 
 Done when:
 
-- one concrete Windows runtime defect from pull request review or CI is fixed
+- one concrete PR failure from GitHub review or CI is fixed
 - the relevant local preflight commands are rerun
 - the branch is ready for the next review pass
 
