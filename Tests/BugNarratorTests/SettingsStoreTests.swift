@@ -528,6 +528,34 @@ final class SettingsStoreTests: XCTestCase {
             "BugNarrator couldn't update the Open at Startup setting. The login item could not be registered."
         )
     }
+
+    func testLaunchAtLoginFailurePreservesStatusMessageWhenServiceProvidesOne() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginFailureStatusTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService(status: .requiresApproval)
+        launchAtLoginService.setEnabledError = NSError(
+            domain: "LaunchAtLoginTests",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "The login item could not be updated."]
+        )
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        store.openAtStartup = false
+
+        XCTAssertTrue(store.openAtStartup)
+        XCTAssertEqual(store.openAtStartupStatusTone, .error)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
+        )
+    }
 }
 
 private final class MockLaunchAtLoginService: LaunchAtLoginControlling {

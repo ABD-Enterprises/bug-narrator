@@ -351,12 +351,12 @@ final class SettingsStore: ObservableObject {
     init(
         defaults: UserDefaults = .standard,
         keychainService: KeychainServicing = KeychainService(),
-        launchAtLoginService: (any LaunchAtLoginControlling)? = nil,
+        launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
         legacyDefaultsDomains: [String]? = nil
     ) {
         self.defaults = defaults
         self.keychainService = keychainService
-        self.launchAtLoginService = launchAtLoginService ?? Self.defaultLaunchAtLoginService()
+        self.launchAtLoginService = launchAtLoginService
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
         } else if defaults === UserDefaults.standard {
@@ -671,7 +671,7 @@ final class SettingsStore: ObservableObject {
             let status = launchAtLoginService.currentStatus()
             syncLaunchAtLoginState(status)
             openAtStartupStatusTone = .error
-            openAtStartupStatusMessage = "BugNarrator couldn't update the Open at Startup setting. \(error.localizedDescription)"
+            openAtStartupStatusMessage = launchAtLoginFailureMessage(status: status, error: error)
             logger.error(
                 "launch_at_login_update_failed",
                 "Updating the launch-at-login setting failed.",
@@ -681,6 +681,20 @@ final class SettingsStore: ObservableObject {
                 ]
             )
         }
+    }
+
+    private func launchAtLoginFailureMessage(status: LaunchAtLoginStatus, error: Error) -> String {
+        let errorDetails = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !errorDetails.isEmpty else {
+            return status.message ?? "BugNarrator couldn't update the Open at Startup setting."
+        }
+
+        if let statusMessage = status.message {
+            return "\(statusMessage) Details: \(errorDetails)"
+        }
+
+        return "BugNarrator couldn't update the Open at Startup setting. \(errorDetails)"
     }
 
     private func syncLaunchAtLoginState(_ status: LaunchAtLoginStatus) {
@@ -943,17 +957,6 @@ final class SettingsStore: ObservableObject {
         }
 
         return nil
-    }
-
-    private static func defaultLaunchAtLoginService() -> any LaunchAtLoginControlling {
-        let environment = ProcessInfo.processInfo.environment
-        if environment["XCTestConfigurationFilePath"] != nil ||
-            environment["XCTestBundlePath"] != nil ||
-            environment["XCTestSessionIdentifier"] != nil {
-            return TestingLaunchAtLoginService()
-        }
-
-        return SystemLaunchAtLoginService()
     }
 }
 
