@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-04-05T11:52:00.230Z",
-  "summary": "Canonical execution now follows the latest enterprise-ai-standards contract. Prompts, validator entrypoints, and shared state are aligned; RR-002 remains blocked on real Windows validation.",
-  "next_action": "Run RR-002-T4 on a real Windows machine or VM using the updated state, artifacts, and handoff files as the canonical execution ledger.",
+  "last_updated": "2026-04-05T14:33:00.000Z",
+  "summary": "Canonical execution now uses a deterministic PR-driven controller, PR-only CI validation, and validator-enforced review remediation. RR-002 remains blocked on real Windows validation.",
+  "next_action": "Merge the PR-driven workflow normalization branch, then continue RR-002-T4 on a real Windows machine or VM using the updated controller and current-task files.",
   "discovered_issues": []
 }

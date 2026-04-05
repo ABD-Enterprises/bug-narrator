@@ -11,12 +11,12 @@ Files likely in scope:
 - `windows/scripts/invoke-windows-codex-handoff.ps1`
 - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
 - `state/current_task.md`
-- `state/validation_report.md`
 
 Done when:
 
 - the scripted Windows baseline has been run from a real Windows machine or VM
 - the live tray, recording, screenshot, and hotkey checks are recorded with concrete PASS or FAIL details
+- the pull request is ready for GitHub review
 
 Status: pending
 
@@ -34,7 +34,8 @@ Files likely in scope:
 
 Done when:
 
-- one concrete Windows runtime defect from `/state/validation_report.md` is fixed
-- the relevant validation commands are rerun and the result is recorded
+- one concrete Windows runtime defect from pull request review or CI is fixed
+- the relevant local preflight commands are rerun
+- the branch is ready for the next review pass
 
 Status: pending

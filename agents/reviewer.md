@@ -4,8 +4,9 @@
 - It is the authoritative entry point for AI-assisted work in this repo.
 - Review here means GitHub CI, pull request review, and Gemini Code Assist on GitHub if configured.
 - This file is the repo-specific supplement for the review stage.
-- Follow `/state/controller.md` for handoff status; if it is not the review stage, do nothing.
+- Follow `/state/controller.md`; if `current_state` is not `ready_for_review`, do nothing.
 - When review finds implementation issues, drive the controller to `review_failed_fix_required` instead of bypassing the Codex remediation pass.
+- Only planning_failure should return work to Claude.
 - Review against the canonical execution and roadmap state, not chat-only context.
 - Prioritize missing evidence, stale or missing state updates, silently dropped unresolved risks, and phase-completion claims without proof.
 - Treat `tools/validators/enforce-runtime-guardrails.js` as the enforcement source of truth for repo execution guardrails.

@@ -153,6 +153,71 @@ function buildFixtureRoot() {
     discovered_issues: []
   });
 
+  writeText(
+    path.join(fixtureRoot, "state", "controller.md"),
+    [
+      "# Controller State",
+      "",
+      "current_state: ready_for_codex",
+      "state_owner: Codex",
+      "",
+      "## allowed_transitions",
+      "",
+      "- ready_for_claude -> ready_for_codex",
+      "- ready_for_claude -> blocked",
+      "- ready_for_codex -> ready_for_review",
+      "- ready_for_codex -> blocked",
+      "- ready_for_review -> review_failed_fix_required",
+      "- ready_for_review -> ready_for_claude",
+      "- ready_for_review -> done",
+      "- ready_for_review -> blocked",
+      "- review_failed_fix_required -> ready_for_review",
+      "- review_failed_fix_required -> ready_for_claude",
+      "- review_failed_fix_required -> blocked",
+      "",
+      "## transition_rules",
+      "",
+      "- ready_for_claude -> ready_for_codex: planning complete",
+      "- ready_for_claude -> blocked: planning blocked",
+      "- ready_for_codex -> ready_for_review: implementation complete",
+      "- ready_for_codex -> blocked: implementation blocked",
+      "- ready_for_review -> review_failed_fix_required: review failed",
+      "- ready_for_review -> ready_for_claude: planning_failure found",
+      "- ready_for_review -> done: review passed",
+      "- ready_for_review -> blocked: review blocked",
+      "- review_failed_fix_required -> ready_for_review: fixes pushed",
+      "- review_failed_fix_required -> ready_for_claude: replanning required",
+      "- review_failed_fix_required -> blocked: remediation blocked",
+      "",
+      "## done_criteria",
+      "",
+      "- required GitHub checks are green",
+      "- no blocking review comments remain",
+      "",
+      "## blocked_criteria",
+      "",
+      "- external intervention is required"
+    ].join("\n")
+  );
+
+  writeText(
+    path.join(fixtureRoot, "state", "current_task.md"),
+    [
+      "# Current Task",
+      "",
+      "task_id: BUILD-001-T1",
+      "description: Validate the fixture task.",
+      "branch: main",
+      "pr_link: none",
+      "owner: Codex",
+      "current_state: ready_for_codex",
+      "failure_type: none",
+      "acceptance_criteria_reference: /ai/acceptance.md#t1",
+      "last_action: Created the fixture state.",
+      "next_action: Continue implementation."
+    ].join("\n")
+  );
+
   execFileSync("git", ["init", "-b", "main"], { cwd: fixtureRoot, stdio: "ignore" });
   execFileSync("git", ["config", "user.name", "Codex"], { cwd: fixtureRoot, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "codex@example.com"], { cwd: fixtureRoot, stdio: "ignore" });
@@ -291,4 +356,84 @@ test("validator passes when code changes include updated state and file-backed e
   const result = runValidator(fixtureRoot);
   assert.equal(result.status, 0);
   assert.match(result.output, /^PASS/m);
+});
+
+test("validator fails when review or CI failure is routed back to Claude", () => {
+  const fixtureRoot = buildFixtureRoot();
+
+  writeText(
+    path.join(fixtureRoot, "state", "controller.md"),
+    [
+      "# Controller State",
+      "",
+      "current_state: ready_for_claude",
+      "state_owner: Claude",
+      "",
+      "## allowed_transitions",
+      "",
+      "- ready_for_claude -> ready_for_codex",
+      "- ready_for_claude -> blocked",
+      "- ready_for_codex -> ready_for_review",
+      "- ready_for_codex -> blocked",
+      "- ready_for_review -> review_failed_fix_required",
+      "- ready_for_review -> ready_for_claude",
+      "- ready_for_review -> done",
+      "- ready_for_review -> blocked",
+      "- review_failed_fix_required -> ready_for_review",
+      "- review_failed_fix_required -> ready_for_claude",
+      "- review_failed_fix_required -> blocked",
+      "",
+      "## transition_rules",
+      "",
+      "- ready_for_claude -> ready_for_codex: planning complete",
+      "- ready_for_claude -> blocked: planning blocked",
+      "- ready_for_codex -> ready_for_review: implementation complete",
+      "- ready_for_codex -> blocked: implementation blocked",
+      "- ready_for_review -> review_failed_fix_required: review failed",
+      "- ready_for_review -> ready_for_claude: planning_failure found",
+      "- ready_for_review -> done: review passed",
+      "- ready_for_review -> blocked: review blocked",
+      "- review_failed_fix_required -> ready_for_review: fixes pushed",
+      "- review_failed_fix_required -> ready_for_claude: replanning required",
+      "- review_failed_fix_required -> blocked: remediation blocked",
+      "",
+      "## done_criteria",
+      "",
+      "- required GitHub checks are green",
+      "- no blocking review comments remain",
+      "",
+      "## blocked_criteria",
+      "",
+      "- external intervention is required"
+    ].join("\n")
+  );
+
+  writeText(
+    path.join(fixtureRoot, "state", "current_task.md"),
+    [
+      "# Current Task",
+      "",
+      "task_id: BUILD-001-T1",
+      "description: Validate the fixture task.",
+      "branch: main",
+      "pr_link: none",
+      "owner: Claude",
+      "current_state: ready_for_claude",
+      "failure_type: review_failure",
+      "acceptance_criteria_reference: /ai/acceptance.md#t1",
+      "last_action: Incorrectly routed review failure to planning.",
+      "next_action: Replan the task."
+    ].join("\n")
+  );
+
+  const result = runValidator(fixtureRoot);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.output,
+    /ci_failure and review_failure require current_state review_failed_fix_required/
+  );
+  assert.match(
+    result.output,
+    /ready_for_claude only allows failure_type none or planning_failure/
+  );
 });

@@ -29,3 +29,6 @@ infra/terraform/.terraform.lock.hcl
 site/node_modules/
 site/.docusaurus/
 site/build/
+
+state/implementation_notes.md
+state/validation_report.md

@@ -1,11 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - "phase/**"
-      - "codex/**"
   pull_request:
 
 env:

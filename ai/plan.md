@@ -2,7 +2,13 @@
 
 ## Goal
 
-Advance the current Windows runtime validation phase in small, verifiable slices without widening scope beyond the existing roadmap and product spec.
+Advance the active roadmap task through one pull-request-scoped slice at a time.
+
+## Execution model
+
+- Claude plans only.
+- Codex implements and fixes only.
+- GitHub PR review and CI accept or reject work.
 
 ## Constraints
 
@@ -10,10 +16,11 @@ Advance the current Windows runtime validation phase in small, verifiable slices
 - Prefer local changes
 - No unnecessary architecture work
 - Preserve existing behavior unless explicitly changing it
+- Do not reset the task when CI or review fails
 
 ## Approach
 
 1. Break work into small task slices.
-2. Each slice should be completable in one Codex run.
-3. Each slice must have acceptance criteria.
-4. Validation must be explicit.
+2. Encode the active slice in `/state/current_task.md`.
+3. Each slice should be completable in one Codex implementation pass plus zero or more fix passes.
+4. Validation is determined by GitHub PR review and CI.
