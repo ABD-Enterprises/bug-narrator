@@ -9,10 +9,11 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $reportDirectory = Join-Path $repoRoot "$OutputRoot\handoff"
 $reportPath = Join-Path $reportDirectory "windows-codex-handoff.json"
 $phaseStatePath = Join-Path $repoRoot "docs/roadmap/state.json"
-$sessionStatePath = Join-Path $repoRoot "state/session.json"
 $taskStatePath = Join-Path $repoRoot "state/tasks.json"
 $riskStatePath = Join-Path $repoRoot "state/risks.json"
 $decisionStatePath = Join-Path $repoRoot "state/decisions.json"
+$artifactsStatePath = Join-Path $repoRoot "state/artifacts.json"
+$handoffStatePath = Join-Path $repoRoot "state/handoff.json"
 
 function Read-JsonFile {
     param(
@@ -87,20 +88,47 @@ function Invoke-BaselineStep {
 }
 
 $phaseState = Read-JsonFile -Path $phaseStatePath
-$sessionState = Read-JsonFile -Path $sessionStatePath
 $taskState = Read-JsonFile -Path $taskStatePath
 $riskState = Read-JsonFile -Path $riskStatePath
 $decisionState = Read-JsonFile -Path $decisionStatePath
+$artifactsState = Read-JsonFile -Path $artifactsStatePath
+$handoffState = Read-JsonFile -Path $handoffStatePath
 
-$currentPhase = $phaseState.current_phase
-$currentPhaseId = $currentPhase.id
+$currentPhaseId = [string]$phaseState.current_phase
+$currentPhaseName = if ($phaseState.current_phase_name) {
+    [string]$phaseState.current_phase_name
+} elseif ($phaseState.current_phase_detail -and $phaseState.current_phase_detail.name) {
+    [string]$phaseState.current_phase_detail.name
+} else {
+    $currentPhaseId
+}
+$currentPhaseStatus = if ($phaseState.phase_status) {
+    [string]$phaseState.phase_status
+} elseif ($phaseState.current_phase_detail -and $phaseState.current_phase_detail.status) {
+    [string]$phaseState.current_phase_detail.status
+} else {
+    ""
+}
+$currentPhaseType = if ($phaseState.phase_type) {
+    [string]$phaseState.phase_type
+} else {
+    ""
+}
+$currentPhaseSummary = if ($phaseState.current_phase_detail -and $phaseState.current_phase_detail.summary) {
+    [string]$phaseState.current_phase_detail.summary
+} else {
+    ""
+}
 $currentBranch = Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD")
 $headCommit = Get-GitValue -Arguments @("rev-parse", "HEAD")
-$phaseTasks = @($taskState.active | Where-Object { $_.phase -eq $currentPhaseId })
-$phaseCompletedTasks = @($taskState.completed | Where-Object { $_.phase -eq $currentPhaseId })
-$phaseRisks = @($riskState.unresolved | Where-Object { $_.assigned_phase -eq $currentPhaseId })
-$allUnresolvedRisks = @($riskState.unresolved)
-$phaseDecisions = @($decisionState.entries | Where-Object { $_.phase -eq $currentPhaseId } | Select-Object -Last 5)
+$allTasks = if ($taskState.tasks) { @($taskState.tasks) } else { @() }
+$phaseTasks = @($allTasks | Where-Object { $_.phase -eq $currentPhaseId -and $_.status -ne "completed" })
+$phaseCompletedTasks = @($allTasks | Where-Object { $_.phase -eq $currentPhaseId -and $_.status -eq "completed" })
+$allRisks = if ($riskState.risks) { @($riskState.risks) } elseif ($riskState.unresolved) { @($riskState.unresolved) } else { @() }
+$phaseRisks = @($allRisks | Where-Object { $_.assigned_phase -eq $currentPhaseId -and $_.status -ne "resolved" -and $_.status -ne "closed" })
+$allUnresolvedRisks = @($allRisks | Where-Object { $_.status -ne "resolved" -and $_.status -ne "closed" })
+$allDecisions = if ($decisionState.decisions) { @($decisionState.decisions) } elseif ($decisionState.entries) { @($decisionState.entries) } else { @() }
+$phaseDecisions = @($allDecisions | Where-Object { $_.phase -eq $currentPhaseId } | Select-Object -Last 5)
 $windowsArtifacts = @(
     (Join-Path $repoRoot "windows/artifacts/packages/BugNarrator-windows-win-x64.zip")
     (Join-Path $repoRoot "windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json")
@@ -177,11 +205,13 @@ $report = [ordered]@{
         outputRoot = Get-RelativeRepoPath -Path (Join-Path $repoRoot $OutputRoot)
     }
     phase = [ordered]@{
-        id = $currentPhase.id
-        name = $currentPhase.name
-        status = $currentPhase.status
-        summary = $currentPhase.summary
-        sessionSummary = $sessionState.execution_summary
+        id = $currentPhaseId
+        name = $currentPhaseName
+        type = $currentPhaseType
+        status = $currentPhaseStatus
+        activeTaskId = [string]$phaseState.active_task_id
+        summary = $currentPhaseSummary
+        handoffSummary = $handoffState.summary
     }
     activeTasks = @($phaseTasks | ForEach-Object {
         [PSCustomObject]@{
@@ -203,9 +233,11 @@ $report = [ordered]@{
     sourceDocs = @(
         "docs/architecture/product-spec.md",
         "docs/roadmap/state.json",
-        "state/session.json",
         "state/tasks.json",
         "state/risks.json",
+        "state/decisions.json",
+        "state/artifacts.json",
+        "state/handoff.json",
         "windows/README.md",
         "windows/docs/WINDOWS_CODEX_HANDOFF.md",
         "windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md",
@@ -223,6 +255,7 @@ $report = [ordered]@{
         )
     }
     artifacts = @($artifactSnapshot)
+    executionEvidence = [PSCustomObject]$artifactsState.evidence
     baseline = [PSCustomObject]$baselineState
 }
 

@@ -22,6 +22,7 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 
 ## Help And Project Links
 
+- AI-assisted work starts at [ai/bootstrap.md](ai/bootstrap.md)
 - [Read the user manual](docs/user/user-manual.md)
 - [Canonical product spec](docs/architecture/product-spec.md)
 - [Getting started for maintainers and testers](docs/onboarding/getting-started.md)

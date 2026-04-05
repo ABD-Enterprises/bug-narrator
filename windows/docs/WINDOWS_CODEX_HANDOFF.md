@@ -6,16 +6,15 @@ Use it when a Codex instance is running on a real Windows machine or VM and need
 
 ## Current Takeover Target
 
-As of 2026-04-04:
+As of 2026-04-05:
 
 - active phase: `RR-002 Windows Runtime Validation And Hardening`
-- required branch: `phase/RR-002-windows-runtime-hardening`
+- phase type: `build`
+- required branch: `phase/bootstrap`
 - remaining phase blocker: `RR-002-T4 Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM`
 - unresolved phase risks:
   - `RISK-WIN-001`
   - `RISK-WIN-002`
-- related follow-up risk outside this phase:
-  - `RISK-CI-002 -> OPS-011`
 
 ## First Command On Windows
 
@@ -46,9 +45,11 @@ Load these before making Windows changes:
 
 - [Canonical Product Spec](../../docs/architecture/product-spec.md)
 - [Roadmap State](../../docs/roadmap/state.json)
-- [Session State](../../state/session.json)
 - [Task State](../../state/tasks.json)
 - [Risk State](../../state/risks.json)
+- [Decision State](../../state/decisions.json)
+- [Artifact State](../../state/artifacts.json)
+- [Handoff State](../../state/handoff.json)
 - [Windows README](../README.md)
 - [Windows Implementation Roadmap](WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [Windows Validation Checklist](WINDOWS_VALIDATION_CHECKLIST.md)
@@ -74,10 +75,11 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 4. When real Windows findings land, update:
    - `docs/roadmap/state.json`
-   - `state/session.json`
    - `state/tasks.json`
    - `state/risks.json`
    - `state/decisions.json`
+   - `state/artifacts.json`
+   - `state/handoff.json`
    - `windows/README.md`
    - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
 

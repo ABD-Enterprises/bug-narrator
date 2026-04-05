@@ -146,7 +146,7 @@ The session library is the durable archive for recorded sessions.
 
 It must support:
 
-- date filters: `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `All Sessions`, and `Custom Date Range`
+- date filters: `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `Retry Needed`, `All Sessions`, and `Custom Date Range`
 - search across session metadata and reviewable content
 - newest-first and oldest-first sorting
 - inline selection and review without opening a separate transcript popup

@@ -4,6 +4,7 @@ protocol SessionLibraryItem: Identifiable {
     var id: UUID { get }
     var createdAt: Date { get }
     var searchIndexText: String { get }
+    var isPendingTranscription: Bool { get }
 }
 
 struct SessionLibraryEntry: SessionLibraryItem, Equatable {
@@ -47,6 +48,7 @@ enum SessionLibraryDateFilter: String, CaseIterable, Identifiable {
     case yesterday = "Yesterday"
     case last7Days = "Last 7 Days"
     case last30Days = "Last 30 Days"
+    case retryNeeded = "Retry Needed"
     case allSessions = "All Sessions"
     case customRange = "Custom Date Range"
 
@@ -62,6 +64,8 @@ enum SessionLibraryDateFilter: String, CaseIterable, Identifiable {
             return "calendar"
         case .last30Days:
             return "calendar.badge.clock"
+        case .retryNeeded:
+            return "arrow.clockwise.circle"
         case .allSessions:
             return "square.stack.3d.up"
         case .customRange:
@@ -110,6 +114,9 @@ enum SessionLibraryEmptyState: Equatable {
         case .noSessionsYet:
             return "No Sessions Yet"
         case .noSessionsInFilter(let filter):
+            if filter == .retryNeeded {
+                return "No Retry Needed Sessions"
+            }
             return "No Sessions in \(filter.rawValue)"
         case .noSessionsInCustomRange:
             return "No Sessions in Date Range"
@@ -123,6 +130,9 @@ enum SessionLibraryEmptyState: Equatable {
         case .noSessionsYet:
             return "Start and stop a feedback session to begin building your BugNarrator session library."
         case .noSessionsInFilter(let filter):
+            if filter == .retryNeeded {
+                return "No saved sessions are currently waiting for transcription retry."
+            }
             return "No saved sessions match \(filter.rawValue.lowercased()) yet."
         case .noSessionsInCustomRange:
             return "Widen the selected date range to include more sessions."
@@ -135,7 +145,9 @@ enum SessionLibraryEmptyState: Equatable {
         switch self {
         case .noSessionsYet:
             return "text.quote"
-        case .noSessionsInFilter, .noSessionsInCustomRange:
+        case .noSessionsInFilter(let filter):
+            return filter == .retryNeeded ? "arrow.clockwise.circle" : "calendar.badge.exclamationmark"
+        case .noSessionsInCustomRange:
             return "calendar.badge.exclamationmark"
         case .noSearchResults:
             return "magnifyingglass"
@@ -178,8 +190,11 @@ enum SessionLibrary {
             if membership.customRange {
                 counts[.customRange, default: 0] += 1
             }
+            if item.isPendingTranscription {
+                counts[.retryNeeded, default: 0] += 1
+            }
 
-            guard membership.matches(query.filter) else {
+            guard membership.matches(query.filter, isPendingTranscription: item.isPendingTranscription) else {
                 continue
             }
 
@@ -334,7 +349,7 @@ private struct SessionLibraryDateMembership {
     let last30Days: Bool
     let customRange: Bool
 
-    func matches(_ filter: SessionLibraryDateFilter) -> Bool {
+    func matches(_ filter: SessionLibraryDateFilter, isPendingTranscription: Bool) -> Bool {
         switch filter {
         case .today:
             return today
@@ -344,6 +359,8 @@ private struct SessionLibraryDateMembership {
             return last7Days
         case .last30Days:
             return last30Days
+        case .retryNeeded:
+            return isPendingTranscription
         case .allSessions:
             return true
         case .customRange:

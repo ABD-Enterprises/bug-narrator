@@ -42,6 +42,9 @@ jobs:
           build/dmg-venv/bin/python -m pip install --upgrade pip
           build/dmg-venv/bin/python -m pip install dmgbuild
 
+      - name: Run runtime guardrails validator
+        run: ./scripts/validate.sh
+
       - name: Run release smoke test
         run: ./scripts/release_smoke_test.sh
 

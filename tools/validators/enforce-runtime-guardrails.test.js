@@ -20,14 +20,19 @@ function writeText(filePath, value) {
 
 function buildFixtureRoot() {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-guardrails-"));
-  const updatedOn = "2026-04-04";
-  const unresolvedRisk = {
-    id: "RISK-TEST-001",
-    severity: "medium",
-    status: "unresolved",
-    assigned_phase: "OPS-TEST",
-    note: "Fixture risk for validator testing."
-  };
+  const updatedAt = "2026-04-05T07:30:00Z";
+
+  writeJson(path.join(fixtureRoot, "ai.config.json"), {
+    run_profile: "standard",
+    requires_test_evidence: true,
+    requires_deploy_evidence: true,
+    allowed_phases_without_tests: ["planning", "docs"],
+    strict_mode: true,
+    evidence_directories: ["artifacts/"],
+    meta_directories: [],
+    allowed_metadata_only_evidence_types: ["build", "test", "run", "deploy"],
+    protected_environment_paths: ["brew/"]
+  });
 
   writeText(
     path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
@@ -35,16 +40,12 @@ function buildFixtureRoot() {
       "name: CI",
       "on:",
       "  pull_request:",
-      "",
-      "env:",
-      "  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: \"true\"",
-      "",
       "jobs:",
       "  runtime-guardrails:",
       "    runs-on: ubuntu-latest",
       "    steps:",
-      "      - name: Run runtime guardrails validator",
-      "        run: node tools/validators/enforce-runtime-guardrails.js"
+      "      - name: Validate",
+      "        run: ./scripts/validate.sh"
     ].join("\n")
   );
 
@@ -55,105 +56,101 @@ function buildFixtureRoot() {
   writeText(path.join(fixtureRoot, "prompts", "mega.md"), "mega\n");
   writeText(path.join(fixtureRoot, "prompts", "lean.md"), "lean\n");
   writeText(path.join(fixtureRoot, "prompts", "deploy.md"), "deploy\n");
-  writeText(path.join(fixtureRoot, "tools", "validators", "enforce-runtime-guardrails.js"), "// fixture copy marker\n");
+  writeText(path.join(fixtureRoot, "tools", "validators", "enforce-runtime-guardrails.js"), "// fixture marker\n");
+  writeText(path.join(fixtureRoot, "scripts", "validate.sh"), "#!/usr/bin/env bash\n");
   writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 1;\n");
 
   writeJson(path.join(fixtureRoot, "docs", "roadmap", "state.json"), {
-    current_phase: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    risk_remediation_phases: [
-      {
-        id: "OPS-TEST",
-        name: "Validator Fixture",
-        priority: "low",
-        grouped_risks: ["RISK-TEST-001"],
-        scope: "Fixture scope."
-      }
-    ],
-    upcoming_phases: [],
-    completed_phases: [],
-    opportunities: [],
-    incidents: [],
-    risks: [
-      {
-        id: "RISK-TEST-001",
-        description: "Fixture risk",
-        severity: "medium",
-        impact: "Fixture impact",
-        mitigation: "Fixture mitigation",
-        affected_components: ["tests"],
-        phase_association: "OPS-TEST",
-        status: "unresolved"
-      }
-    ],
-    tasks: {
-      active: ["OPS-TEST-T1"],
-      completed: []
-    },
-    decisions: [],
-    last_updated: updatedOn
+    current_phase: "BUILD-001",
+    phase_type: "build",
+    phase_status: "in_progress",
+    active_task_id: "BUILD-001-T1",
+    last_updated: updatedAt
   });
 
   writeJson(path.join(fixtureRoot, "state", "tasks.json"), {
-    updated_on: updatedOn,
-    active: [
+    last_updated: updatedAt,
+    tasks: [
       {
-        id: "OPS-TEST-T1",
-        phase: "OPS-TEST",
-        title: "Fixture task",
-        status: "pending",
-        blocking_for_phase_completion: true
+        id: "BUILD-001-T1",
+        title: "Validate the fixture",
+        status: "in_progress",
+        phase: "BUILD-001",
+        kind: "build",
+        updated_at: updatedAt
       }
-    ],
-    completed: []
+    ]
   });
 
   writeJson(path.join(fixtureRoot, "state", "risks.json"), {
-    updated_on: updatedOn,
-    resolved: [],
-    unresolved: [unresolvedRisk]
+    last_updated: updatedAt,
+    risks: [
+      {
+        id: "RISK-TEST-001",
+        severity: "medium",
+        status: "unresolved",
+        assigned_phase: "BUILD-001",
+        note: "Fixture risk for validator testing."
+      }
+    ]
   });
 
   writeJson(path.join(fixtureRoot, "state", "decisions.json"), {
-    updated_on: updatedOn,
-    entries: [
+    last_updated: updatedAt,
+    decisions: [
       {
-        date: updatedOn,
-        phase: "OPS-TEST",
+        date: updatedAt,
+        phase: "BUILD-001",
         summary: "Created fixture state."
       }
     ]
   });
 
-  writeJson(path.join(fixtureRoot, "state", "session.json"), {
-    updated_on: updatedOn,
-    phase: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
+  writeText(path.join(fixtureRoot, "artifacts", "build.log"), "build ok\n");
+  writeText(path.join(fixtureRoot, "artifacts", "run.log"), "run ok\n");
+
+  writeJson(path.join(fixtureRoot, "state", "artifacts.json"), {
+    last_updated: updatedAt,
+    code_changes_present: false,
+    claims: {
+      implementation: "in_progress",
+      validation: "in_progress",
+      deployment: "not_started"
     },
-    roadmap_phase_context: {
-      id: "OPS-TEST",
-      name: "Validator Fixture",
-      status: "in_progress"
-    },
-    branch: "main",
-    execution_summary: "Fixture summary.",
-    evidence: [
-      {
-        id: "OPS-TEST-E1",
-        date: updatedOn,
-        phase: "OPS-TEST",
-        scope: "fixture-validation",
-        type: "validation",
-        command: "node tools/validators/enforce-runtime-guardrails.js",
-        result: "PASS",
-        summary: "Fixture validation entry."
+    external_inputs: [],
+    evidence: {
+      build: {
+        status: "passed",
+        updated_at: updatedAt,
+        paths: ["artifacts/build.log"]
+      },
+      test: {
+        metadata_only: true,
+        status: "not_required",
+        reason: "No code changes in fixture baseline.",
+        updated_at: updatedAt,
+        paths: []
+      },
+      run: {
+        status: "passed",
+        updated_at: updatedAt,
+        paths: ["artifacts/run.log"]
+      },
+      deploy: {
+        metadata_only: true,
+        status: "not_required",
+        reason: "Build phase fixture.",
+        updated_at: updatedAt,
+        paths: []
       }
-    ]
+    }
+  });
+
+  writeJson(path.join(fixtureRoot, "state", "handoff.json"), {
+    last_updated: updatedAt,
+    summary: "Fixture handoff summary.",
+    next_action: "Continue validation.",
+    discovered_issues: []
   });
 
   execFileSync("git", ["init", "-b", "main"], { cwd: fixtureRoot, stdio: "ignore" });
@@ -165,37 +162,37 @@ function buildFixtureRoot() {
   return fixtureRoot;
 }
 
-function writeFixtureSession(fixtureRoot, evidence, phase = { id: "OPS-TEST", name: "Validator Fixture" }) {
-  writeJson(path.join(fixtureRoot, "state", "session.json"), {
-    updated_on: "2026-04-04",
-    phase: {
-      id: phase.id,
-      name: phase.name,
-      status: "in_progress"
-    },
-    roadmap_phase_context: {
-      id: phase.id,
-      name: phase.name,
-      status: "in_progress"
-    },
-    branch: "main",
-    execution_summary: "Fixture summary.",
-    evidence
-  });
+function writeArtifactsState(fixtureRoot, value) {
+  writeJson(path.join(fixtureRoot, "state", "artifacts.json"), value);
+}
+
+function writeTasksState(fixtureRoot, value) {
+  writeJson(path.join(fixtureRoot, "state", "tasks.json"), value);
+}
+
+function writeHandoffState(fixtureRoot, value) {
+  writeJson(path.join(fixtureRoot, "state", "handoff.json"), value);
 }
 
 function runValidator(fixtureRoot) {
   try {
-    const stdout = execFileSync("node", [validatorPath], {
-      cwd: repoRoot,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        RUNTIME_GUARDRAILS_REPO_ROOT: fixtureRoot,
-        RUNTIME_GUARDRAILS_BASE_REF: "main"
-      },
-      stdio: ["ignore", "pipe", "pipe"]
-    });
+    const stdout = execFileSync(
+      "node",
+      [
+        validatorPath,
+        "--repo",
+        fixtureRoot,
+        "--config",
+        path.join(fixtureRoot, "ai.config.json"),
+        "--base",
+        "main"
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
 
     return { status: 0, output: stdout };
   } catch (error) {
@@ -206,153 +203,92 @@ function runValidator(fixtureRoot) {
   }
 }
 
-test("validator fails when FAIL evidence omits risk_ids", () => {
+test("validator passes for a clean standard fixture", () => {
   const fixtureRoot = buildFixtureRoot();
-
-  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeFixtureSession(fixtureRoot, [
-    {
-      id: "OPS-TEST-E1",
-      date: "2026-04-04",
-      phase: "OPS-TEST",
-      scope: "fixture-validation",
-      type: "validation",
-      command: "node tools/validators/enforce-runtime-guardrails.js",
-      result: "FAIL",
-      summary: "Missing risk IDs should fail validation."
-    }
-  ]);
-
-  const result = runValidator(fixtureRoot);
-  assert.equal(result.status, 1);
-  assert.match(
-    result.output,
-    /Evidence entry OPS-TEST-E1 must reference risk_ids when result is FAIL\./
-  );
-});
-
-test("validator passes when FAIL evidence includes risk_ids", () => {
-  const fixtureRoot = buildFixtureRoot();
-
-  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeFixtureSession(fixtureRoot, [
-    {
-      id: "OPS-TEST-E1",
-      date: "2026-04-04",
-      phase: "OPS-TEST",
-      scope: "fixture-validation",
-      type: "validation",
-      command: "node tools/validators/enforce-runtime-guardrails.js",
-      result: "FAIL",
-      risk_ids: ["RISK-TEST-001"],
-      summary: "Known failure with mapped risk."
-    }
-  ]);
 
   const result = runValidator(fixtureRoot);
   assert.equal(result.status, 0);
   assert.match(result.output, /^PASS/m);
 });
 
-test("validator allows NOT RUN evidence without risk_ids in docs phases", () => {
+test("validator fails when code changes skip task artifact and handoff updates", () => {
   const fixtureRoot = buildFixtureRoot();
 
-  writeJson(path.join(fixtureRoot, "docs", "roadmap", "state.json"), {
-    current_phase: {
-      id: "DOC-TEST",
-      name: "Documentation Follow-up",
-      status: "in_progress"
-    },
-    risk_remediation_phases: [
+  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
+
+  const result = runValidator(fixtureRoot);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /state\/tasks\.json not updated after progress change/);
+  assert.match(result.output, /state\/artifacts\.json not updated after progress change/);
+  assert.match(result.output, /state\/handoff\.json not updated after progress change/);
+});
+
+test("validator passes when code changes include updated state and file-backed evidence", () => {
+  const fixtureRoot = buildFixtureRoot();
+  const updatedAt = "2026-04-05T08:00:00Z";
+
+  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
+  writeText(path.join(fixtureRoot, "artifacts", "build-updated.log"), "build updated\n");
+  writeText(path.join(fixtureRoot, "artifacts", "test-updated.log"), "test updated\n");
+  writeText(path.join(fixtureRoot, "artifacts", "run-updated.log"), "run updated\n");
+
+  writeTasksState(fixtureRoot, {
+    last_updated: updatedAt,
+    tasks: [
       {
-        id: "OPS-TEST",
-        name: "Validator Fixture",
-        priority: "low",
-        grouped_risks: ["RISK-TEST-001"],
-        scope: "Fixture scope."
+        id: "BUILD-001-T1",
+        title: "Validate the fixture",
+        status: "in_progress",
+        phase: "BUILD-001",
+        kind: "build",
+        updated_at: updatedAt
       }
-    ],
-    upcoming_phases: [],
-    completed_phases: [],
-    opportunities: [],
-    incidents: [],
-    risks: [
-      {
-        id: "RISK-TEST-001",
-        description: "Fixture risk",
-        severity: "medium",
-        impact: "Fixture impact",
-        mitigation: "Fixture mitigation",
-        affected_components: ["tests"],
-        phase_association: "OPS-TEST",
-        status: "unresolved"
-      }
-    ],
-    tasks: {
-      active: ["OPS-TEST-T1"],
-      completed: []
-    },
-    decisions: [],
-    last_updated: "2026-04-04"
+    ]
   });
 
-  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeFixtureSession(
-    fixtureRoot,
-    [
-      {
-        id: "DOC-TEST-E1",
-        date: "2026-04-04",
-        phase: "DOC-TEST",
-        scope: "docs-validation",
-        type: "validation",
-        command: "node tools/validators/enforce-runtime-guardrails.js",
-        result: "NOT RUN",
-        summary: "Docs-phase evidence can defer execution without a mapped risk."
+  writeArtifactsState(fixtureRoot, {
+    last_updated: updatedAt,
+    code_changes_present: true,
+    claims: {
+      implementation: "in_progress",
+      validation: "in_progress",
+      deployment: "not_started"
+    },
+    external_inputs: [],
+    evidence: {
+      build: {
+        status: "passed",
+        updated_at: updatedAt,
+        paths: ["artifacts/build-updated.log"]
+      },
+      test: {
+        status: "passed",
+        updated_at: updatedAt,
+        paths: ["artifacts/test-updated.log"]
+      },
+      run: {
+        status: "passed",
+        updated_at: updatedAt,
+        paths: ["artifacts/run-updated.log"]
+      },
+      deploy: {
+        metadata_only: true,
+        status: "not_required",
+        reason: "Build phase fixture.",
+        updated_at: updatedAt,
+        paths: []
       }
-    ],
-    { id: "DOC-TEST", name: "Documentation Follow-up" }
-  );
+    }
+  });
+
+  writeHandoffState(fixtureRoot, {
+    last_updated: updatedAt,
+    summary: "Code change executed with updated evidence.",
+    next_action: "Proceed to the next fixture step.",
+    discovered_issues: []
+  });
 
   const result = runValidator(fixtureRoot);
   assert.equal(result.status, 0);
   assert.match(result.output, /^PASS/m);
-});
-
-test("validator requires risk_ids for NOT RUN evidence outside docs phases", () => {
-  const fixtureRoot = buildFixtureRoot();
-
-  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-  writeFixtureSession(fixtureRoot, [
-    {
-      id: "OPS-TEST-E1",
-      date: "2026-04-04",
-      phase: "OPS-TEST",
-      scope: "fixture-validation",
-      type: "validation",
-      command: "node tools/validators/enforce-runtime-guardrails.js",
-      result: "NOT RUN",
-      summary: "Non-docs NOT RUN entries must carry risks."
-    }
-  ]);
-
-  const result = runValidator(fixtureRoot);
-  assert.equal(result.status, 1);
-  assert.match(
-    result.output,
-    /Evidence entry OPS-TEST-E1 must reference risk_ids when result is NOT RUN\./
-  );
-});
-
-test("validator fails when code changes skip canonical state updates", () => {
-  const fixtureRoot = buildFixtureRoot();
-
-  writeText(path.join(fixtureRoot, "src", "app.js"), "module.exports = 2;\n");
-
-  const result = runValidator(fixtureRoot);
-  assert.equal(result.status, 1);
-  assert.match(
-    result.output,
-    /Work progressed without updating the canonical state files\./
-  );
 });

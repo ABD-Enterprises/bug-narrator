@@ -5,14 +5,17 @@ This document is the human-readable roadmap companion to [state.json](state.json
 ## Current Status
 
 - current production app version: `1.0.22`
-- current in-progress phase: `RR-002 Windows Runtime Validation And Hardening`
-- phase outcome so far: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real hardware runtime validation, completed the hosted Node24 workflow validation slice, promoted the original OPS-012 remediation to `main`, and advanced the follow-up docs-site dependency work with a repo-local Node 22 wrapper, a branch-local `lodash` `4.18.1` patch, and direct runtime-guardrails regression tests while the remaining RR-002 blocker stays real Windows desktop runtime validation
+- current blocked phase: `RR-002 Windows Runtime Validation And Hardening`
+- recent completed work: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real Windows desktop validation, completed the hosted Node24 workflow validation slice, promoted both OPS-012 dependency remediation passes to `main`, covered the FAIL, NOT RUN, and missing-state-update guardrail rules with direct regression tests, closed the remaining Dependabot alerts, added a dedicated `Retry Needed` session-library filter for preserved-session recovery, and reconciled the repo to the latest `enterprise-ai-standards` validator and state contract
 
 ## Execution System
 
 - execution state lives in `/state/*.json` and is summarized in `docs/roadmap/state.json`
 - reusable execution roles live in `/agents/*.md`
 - reusable execution prompts live in `/prompts/*.md`
+- `state/tasks.json`, `state/risks.json`, `state/decisions.json`, `state/artifacts.json`, and `state/handoff.json` are the canonical execution ledger
+- `state/session.json` is retained only as a legacy mirror and is no longer canonical execution state
+- `ai.config.json` and `scripts/validate.sh` define the repo-local validator contract and entrypoint
 - `tools/validators/enforce-runtime-guardrails.js` is the repo-local gatekeeper for execution, evidence, risk persistence, and phase-aware validation
 - repo execution state stays local to this repository and does not depend on external environment-management systems
 
@@ -117,6 +120,28 @@ Scope completed:
 - wired the generated summary into the release workflow as a run summary and artifact
 - documented the summary as a maintainer aid rather than a public release-note replacement
 
+### OPS-012 Dependency Alert Remediation
+
+Completed on `2026-04-05`
+
+Scope completed:
+
+- remediated both default-branch Dependabot alert sets across the docs-site dependency graph
+- replaced the broken local docs-site npm 11 / Node 25 path with a repo-local Node 22 wrapper
+- added direct runtime-guardrails regression tests for the FAIL, NOT RUN, and missing-state-update rules
+- verified PR `#6` and PR `#8` merged to `main` and the default-branch Dependabot alert API returned no open alerts
+
+### OPS-010 Retry-Needed Session Filter
+
+Completed on `2026-04-05`
+
+Scope completed:
+
+- added a dedicated `Retry Needed` session-library filter alongside the existing date filters
+- routed the recovery banner action into the new filtered view so retryable sessions stay visible in larger histories
+- kept retry-needed counts visible in the session-library summary while the new filtered slice is active
+- added SessionLibrary regression coverage for retry-needed filtering, counts, and empty-state behavior
+
 ## Risk Remediation Phases
 
 ### RR-002 Windows Runtime Validation And Hardening
@@ -125,7 +150,7 @@ Priority: High
 
 Grouped risks:
 
-- WPF tray, recording, and screenshot milestones have not yet been validated on real Windows
+- WPF tray, recording, and screenshot milestones have not yet been validated on a real Windows machine or VM
 - CI and runtime confidence for Windows remain lower than macOS
 
 Current execution slice:
@@ -146,20 +171,6 @@ Priority: Low
 Grouped risks:
 
 - a real VoiceOver-driven runtime pass and docs-site accessibility validation still need to be run once the site is published and release-candidate UI is exercised live
-
-### OPS-012 Dependency Alert Remediation
-
-Priority: Medium
-
-Grouped risks:
-
-- GitHub still reports two open `lodash` Dependabot alerts on the default branch after the original four-alert remediation was promoted and verified on `main`
-
-Current execution slice:
-
-- patch the docs-site dependency tree with a `lodash` `4.18.1` override after the original `serialize-javascript`, `brace-expansion`, and Express `path-to-regexp` remediation cleared the first alert set on `main`
-- validate the patched dependency graph with `./scripts/site_npm.sh ls`, a production Docusaurus build, the passing hosted CI run `23989366196` on `phase/bootstrap`, and direct runtime-guardrails regression tests
-- keep the phase open until the follow-up `lodash` remediation is promoted to the default branch and GitHub clears the remaining alerts there
 
 ## Upcoming Feature / Opportunity Phases
 
@@ -183,17 +194,14 @@ Effort: Medium
 Expected value: Medium
 Effort: Low
 
-### OPS-010 Retry-Needed Session Filter
-
-Expected value: Medium
-Effort: Low
-
 ## Roadmap Rules
 
 - every unresolved risk must belong to a remediation phase
 - every opportunity must belong to a future phase
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
 - roadmap state in `state.json` is the source of truth for planning, risks, incidents, and phase status
-- `/state/session.json`, `/state/tasks.json`, `/state/risks.json`, and `/state/decisions.json` are the canonical execution ledger for evidence, task flow, unresolved-risk persistence, and execution decisions
+- `/state/tasks.json`, `/state/risks.json`, `/state/decisions.json`, `/state/artifacts.json`, and `/state/handoff.json` are the canonical execution ledger for task flow, unresolved-risk persistence, evidence, decisions, and run continuity
 - `tools/validators/enforce-runtime-guardrails.js` is the authoritative PR gatekeeper for runtime guardrails and phase-aware evidence enforcement
+- `ai.config.json` is the repo-local enterprise-ai standards config surface
+- `scripts/validate.sh` is the canonical local validator entrypoint
 - `CHANGELOG.md` is the source of truth for shipped change history

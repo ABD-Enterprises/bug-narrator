@@ -543,7 +543,9 @@ struct TranscriptView: View {
         }
 
         hasResolvedInitialFilter = true
-        if count(for: .today) == 0, !allSessionEntries.isEmpty {
+        if count(for: .today) == 0, count(for: .retryNeeded) > 0 {
+            selectedFilter = .retryNeeded
+        } else if count(for: .today) == 0, !allSessionEntries.isEmpty {
             selectedFilter = .allSessions
         }
     }
@@ -570,7 +572,7 @@ struct TranscriptView: View {
     }
 
     private func openLatestPendingTranscriptionSession() {
-        selectedFilter = .allSessions
+        selectedFilter = .retryNeeded
         searchText = ""
         appState.selectedTranscriptID = transcriptStore.latestPendingTranscriptionSession?.id
         syncSelection()

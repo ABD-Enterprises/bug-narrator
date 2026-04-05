@@ -1,9 +1,9 @@
 {
   "updated_on": "2026-04-05",
   "phase": {
-    "id": "OPS-012",
-    "name": "Dependency Alert Remediation",
-    "status": "in_progress"
+    "id": "bootstrap",
+    "name": "Enterprise-AI Standards Reconciliation",
+    "status": "completed"
   },
   "roadmap_phase_context": {
     "id": "RR-002",
@@ -11,7 +11,7 @@
     "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 remains blocked on real Windows runtime validation. OPS-012 has already promoted the original dependency remediation to main and cleared that first alert set there, and the current follow-up slice now carries a branch-local lodash 4.18.1 patch plus validator regression coverage for the guardrails that previously blocked this branch. The remaining work is promoting that follow-up remediation to the default branch so the two remaining lodash alerts can close there.",
+  "execution_summary": "Reconciled the repo to the latest enterprise-ai-standards contract by adopting ai.config.json plus scripts/validate.sh, aligning prompts and validator entrypoints, flattening canonical tasks, risks, and decisions ledgers, and adding file-backed artifacts and handoff state. RR-002 remains blocked on real Windows validation.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -332,6 +332,67 @@
       "command": "node tools/validators/enforce-runtime-guardrails.js --base-ref origin/main",
       "result": "PASS",
       "summary": "Validated the branch-local state sync and validator changes against origin/main before pushing the remaining lodash-remediation promotion work."
+    },
+    {
+      "id": "OPS-012-E16",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "github-hosted-ci",
+      "type": "validation",
+      "command": "GitHub Actions CI run 23995836693 on phase/bootstrap commit 68e3eb2",
+      "result": "PASS",
+      "summary": "Hosted CI passed on the final pre-promotion branch head, including runtime-guardrails, docs-site validation, macOS validation, and Windows workspace validation."
+    },
+    {
+      "id": "OPS-012-E17",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "default-branch-promotion",
+      "type": "validation",
+      "command": "gh pr view 8 --json state,mergedAt,mergeCommit",
+      "result": "PASS",
+      "summary": "Confirmed PR #8 merged phase/bootstrap into main at merge commit fa6f96798796f1d6cc42c4d7c05482abd4f6393c."
+    },
+    {
+      "id": "OPS-012-E18",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "default-branch-alert-audit",
+      "type": "validation",
+      "command": "gh api repos/deffenda/bug-narrator/dependabot/alerts --paginate --jq '[.[] | select(.state==\"open\") | {number:.number, dependency:.dependency.package.name, manifest:.dependency.manifest_path, severity:.security_advisory.severity}]'",
+      "result": "PASS",
+      "summary": "Confirmed the default-branch Dependabot alert API returned no open alerts after the PR #8 merge."
+    },
+    {
+      "id": "OPS-010-E1",
+      "date": "2026-04-05",
+      "phase": "OPS-010",
+      "scope": "session-library-tests",
+      "type": "test",
+      "command": "xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-ops010-tests test -only-testing:BugNarratorTests/SessionLibraryTests",
+      "result": "PASS",
+      "summary": "Validated SessionLibraryTests with the new retry-needed filter, count, and empty-state coverage."
+    },
+    {
+      "id": "OPS-010-E2",
+      "date": "2026-04-05",
+      "phase": "OPS-010",
+      "scope": "macos-debug-build",
+      "type": "build",
+      "command": "xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-ops010-build build",
+      "result": "PASS",
+      "summary": "Built the full BugNarrator macOS app successfully after wiring the Retry Needed filter into the session library view."
+    },
+    {
+      "id": "OPS-010-E3",
+      "date": "2026-04-05",
+      "phase": "OPS-010",
+      "scope": "runtime-guardrails",
+      "type": "validation",
+      "command": "node tools/validators/enforce-runtime-guardrails.js --base-ref origin/main",
+      "result": "PASS",
+      "summary": "Validated the canonical state sync for OPS-010 against the repo-local runtime guardrails."
     }
-  ]
+  ],
+  "legacy_notice": "state/session.json is kept only as a legacy mirror. Canonical execution now lives in state/tasks.json, state/risks.json, state/decisions.json, state/artifacts.json, and state/handoff.json."
 }

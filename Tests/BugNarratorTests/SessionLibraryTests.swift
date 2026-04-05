@@ -156,8 +156,64 @@ final class SessionLibraryTests: XCTestCase {
         XCTAssertEqual(SessionLibrary.count(for: .yesterday, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 1)
         XCTAssertEqual(SessionLibrary.count(for: .last7Days, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 3)
         XCTAssertEqual(SessionLibrary.count(for: .last30Days, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 4)
+        XCTAssertEqual(SessionLibrary.count(for: .retryNeeded, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 0)
         XCTAssertEqual(SessionLibrary.count(for: .allSessions, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 5)
         XCTAssertEqual(SessionLibrary.count(for: .customRange, in: sessions, customDateRange: customDateRange, calendar: calendar, referenceDate: referenceDate), 1)
+    }
+
+    func testRetryNeededFilterReturnsOnlyPendingTranscriptionSessions() {
+        let calendar = makeCalendar()
+        let retryNewest = makeSession(
+            transcript: "Saved while the API key was missing.",
+            createdAt: ISO8601DateFormatter().date(from: "2026-03-14T10:00:00Z")!,
+            summary: "",
+            pendingTranscription: PendingTranscription(
+                audioFileName: "retry-newest.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: referenceDate
+            )
+        )
+        let normalSession = makeSession(
+            transcript: "Normal completed transcript.",
+            createdAt: ISO8601DateFormatter().date(from: "2026-03-14T09:00:00Z")!,
+            summary: ""
+        )
+        let retryOlder = makeSession(
+            transcript: "Saved while the API key was revoked.",
+            createdAt: ISO8601DateFormatter().date(from: "2026-03-13T09:00:00Z")!,
+            summary: "",
+            pendingTranscription: PendingTranscription(
+                audioFileName: "retry-older.m4a",
+                failureReason: .revokedAPIKey,
+                preservedAt: referenceDate.addingTimeInterval(-3600)
+            )
+        )
+
+        let query = SessionLibraryQuery(
+            filter: .retryNeeded,
+            customDateRange: SessionLibraryDateRange(
+                startDate: referenceDate.addingTimeInterval(-30 * 24 * 60 * 60),
+                endDate: referenceDate
+            ),
+            sortOrder: .newestFirst
+        )
+
+        let filteredSessions = SessionLibrary.filteredSessions(
+            from: [retryOlder, normalSession, retryNewest],
+            query: query,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+        let filteredEntries = SessionLibrary.filteredEntries(
+            from: [retryOlder, normalSession, retryNewest].map(SessionLibraryEntry.init(session:)),
+            query: query,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(filteredSessions, [retryNewest, retryOlder])
+        XCTAssertEqual(filteredEntries.map(\.id), [retryNewest.id, retryOlder.id])
+        XCTAssertEqual(SessionLibrary.count(for: .retryNeeded, in: [retryOlder, normalSession, retryNewest], customDateRange: query.customDateRange, calendar: calendar, referenceDate: referenceDate), 2)
     }
 
     func testDateBucketFilteringHandlesMidnightBoundariesInLocalTimezone() {
@@ -261,6 +317,18 @@ final class SessionLibraryTests: XCTestCase {
             ),
             .noSearchResults
         )
+
+        XCTAssertEqual(
+            SessionLibrary.emptyState(
+                allSessions: sessions,
+                filteredSessions: [],
+                query: SessionLibraryQuery(
+                    filter: .retryNeeded,
+                    customDateRange: SessionLibraryDateRange(startDate: referenceDate, endDate: referenceDate)
+                )
+            ),
+            .noSessionsInFilter(.retryNeeded)
+        )
     }
 
     func testSnapshotSupportsIndexedEntriesForLargeHistory() {
@@ -345,7 +413,8 @@ final class SessionLibraryTests: XCTestCase {
     private func makeSession(
         transcript: String,
         createdAt: Date,
-        summary: String
+        summary: String,
+        pendingTranscription: PendingTranscription? = nil
     ) -> TranscriptSession {
         TranscriptSession(
             createdAt: createdAt,
@@ -355,6 +424,7 @@ final class SessionLibraryTests: XCTestCase {
             languageHint: nil,
             prompt: nil,
             issueExtraction: summary.isEmpty ? nil : IssueExtractionResult(summary: summary, issues: []),
+            pendingTranscription: pendingTranscription,
             updatedAt: createdAt
         )
     }

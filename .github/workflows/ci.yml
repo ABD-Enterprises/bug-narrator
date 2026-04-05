@@ -25,8 +25,18 @@ jobs:
         with:
           node-version: 22
 
+      - name: Resolve base ref
+        id: base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run runtime guardrails validator
-        run: node tools/validators/enforce-runtime-guardrails.js
+        run: ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
 
   macos-validation:
     needs: runtime-guardrails

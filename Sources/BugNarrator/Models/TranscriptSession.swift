@@ -187,6 +187,10 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         pendingTranscription != nil
     }
 
+    var isPendingTranscription: Bool {
+        requiresTranscriptionRetry
+    }
+
     var hasTranscriptContent: Bool {
         !Self.normalizedTranscriptBody(from: transcript).isEmpty
     }

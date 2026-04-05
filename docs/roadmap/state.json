@@ -53,6 +53,18 @@
       "name": "Release Summary Automation Seed",
       "completed_on": "2026-03-23",
       "summary": "Added an internal release-summary generator based on the changelog and roadmap state, surfaced it in the release workflow as a run artifact and step summary, and documented it as a maintainer aid rather than a public release-note replacement."
+    },
+    {
+      "id": "OPS-012",
+      "name": "Dependency Alert Remediation",
+      "completed_on": "2026-04-05",
+      "summary": "Remediated both default-branch Dependabot alert sets, replaced the broken local docs-site npm path with a pinned Node 22 wrapper, added runtime-guardrails regression coverage for the FAIL, NOT RUN, and missing-state-update rules, and verified that the default branch returned no open Dependabot alerts after PR #6 and PR #8 merged."
+    },
+    {
+      "id": "OPS-010",
+      "name": "Retry-Needed Session Filter",
+      "completed_on": "2026-04-05",
+      "summary": "Added a dedicated Retry Needed session-library filter, routed the recovery banner into that filtered view, and covered the new filter, count, and empty-state behavior with SessionLibrary regression tests."
     }
   ],
   "upcoming_phases": [
@@ -110,19 +122,6 @@
         "decide how much roadmap state belongs in public release notes",
         "attach release-summary generation to the release checklist"
       ]
-    },
-    {
-      "id": "OPS-010",
-      "name": "Retry-Needed Session Filter",
-      "priority": "low",
-      "depends_on": [
-        "OPS-003"
-      ],
-      "scope": [
-        "add a dedicated retry-needed session-library filter or saved view",
-        "keep recovery discovery visible in larger histories",
-        "consider explicit retry-needed counts in date-filter metadata"
-      ]
     }
   ],
   "risk_remediation_phases": [
@@ -134,7 +133,7 @@
         "RISK-WIN-001",
         "RISK-WIN-002"
       ],
-      "scope": "Validate Milestones 2-4 on real Windows hardware and fix tray, recording, and screenshot runtime issues discovered there."
+      "scope": "Validate Milestones 2-4 on a real Windows machine or VM and fix tray, recording, and screenshot runtime issues discovered there."
     },
     {
       "id": "RR-005",
@@ -144,15 +143,6 @@
         "RISK-ACC-002"
       ],
       "scope": "Run a real VoiceOver-driven validation pass on the release-candidate macOS UI and validate docs-site accessibility once the Docusaurus site is published."
-    },
-    {
-      "id": "OPS-012",
-      "name": "Dependency Alert Remediation",
-      "priority": "medium",
-      "grouped_risks": [
-        "RISK-SEC-002"
-      ],
-      "scope": "Review and remediate the open Dependabot alerts on the default branch, validate the patched dependency graph on the tracked branch, and promote the remediation so GitHub clears the default-branch alerts."
     }
   ],
   "opportunities": [
@@ -241,10 +231,10 @@
     },
     {
       "id": "RISK-WIN-001",
-      "description": "Windows tray shell, recording, and screenshot workflows have been scaffolded but not yet validated on real Windows hardware.",
+      "description": "Windows tray shell, recording, and screenshot workflows have been scaffolded but not yet validated on a real Windows machine or VM.",
       "severity": "high",
-      "impact": "The Windows workspace may compile conceptually while failing in real tray, permission, or capture behavior.",
-      "mitigation": "Track and fix in RR-002. This phase now improves CI and packaged artifact validation, but real Windows desktop validation is still required before the risk can be closed.",
+      "impact": "The Windows workspace may compile conceptually while failing in real tray-shell interaction, permission, or screen-capture behavior.",
+      "mitigation": "Track and fix in RR-002. This phase now improves CI and packaged artifact validation, but a real Windows machine or VM validation pass is still required before the risk can be closed.",
       "affected_components": [
         "windows",
         "BugNarrator.Windows",
@@ -255,10 +245,10 @@
     },
     {
       "id": "RISK-WIN-002",
-      "description": "CI does not yet prove full Windows runtime behavior or fully prove signed release automation.",
+      "description": "CI does not yet prove full interactive Windows runtime behavior or the signed release path.",
       "severity": "medium",
-      "impact": "Build confidence is improving, but key Windows and release-time behaviors can still regress outside local maintainer workflows.",
-      "mitigation": "Track and improve in RR-002 and OPS-002. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, packaged zip validation, packaged-app smoke execution, packaged-file hash parity checks, and uploaded validation evidence, but signed release proof and real runtime behavior are still unresolved.",
+      "impact": "Build confidence is improving, but key Windows and release behaviors can still regress outside maintainer-run workflows.",
+      "mitigation": "Track and improve in RR-002 and OPP-002. RR-002 now adds phase-branch CI coverage, explicit Windows test execution, packaged zip validation, packaged-app smoke execution, packaged-file hash parity checks, and uploaded validation artifacts, but signed release validation and interactive runtime behavior are still unresolved.",
       "affected_components": [
         "github-workflows",
         "windows",
@@ -401,14 +391,14 @@
       "description": "After the first default-branch remediation landed, GitHub still reported two open lodash Dependabot alerts on site/package-lock.json on 2026-04-04 (1 high, 1 moderate).",
       "severity": "medium",
       "impact": "The default branch remains exposed to the remaining lodash vulnerabilities until the follow-up dependency remediation is validated and promoted.",
-      "mitigation": "Track in OPS-012. phase/bootstrap now includes the lodash 4.18.1 override, synced state, validator regression tests for the guardrails that previously blocked the branch, and a passing hosted CI run 23989366196 on commit 40ddf31, but the default-branch promotion and alert-closure confirmation still remain.",
+      "mitigation": "Resolved in OPS-012 by validating the lodash 4.18.1 remediation locally and on hosted CI run 23995836693, merging PR #8 into main at fa6f96798796f1d6cc42c4d7c05482abd4f6393c, and confirming the default-branch Dependabot alert API returned no open alerts on 2026-04-05.",
       "affected_components": [
         "dependencies",
         "site",
         "default-branch"
       ],
       "phase_association": "OPS-012",
-      "status": "unresolved"
+      "status": "resolved"
     },
     {
       "id": "RISK-ENV-001",
@@ -499,23 +489,18 @@
       "remediation": "Executed OPS-007 Release Summary Automation Seed."
     }
   ],
-  "current_phase": {
-    "id": "RR-002",
-    "name": "Windows Runtime Validation And Hardening",
-    "status": "in_progress",
-    "started_on": "2026-03-24",
-    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 has now promoted the original dependency remediation to main, cleared the first Dependabot alert set there, and replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper. The active OPS-012 follow-up is the branch-local lodash 4.18.1 remediation, which now has passing local dependency-tree, docs-site build, runtime-guardrails regression-test, and hosted CI validation and only needs default-branch promotion plus alert-closure confirmation."
-  },
+  "current_phase": "RR-002",
   "current_phase_branch": "phase/bootstrap",
-  "last_updated": "2026-04-05",
+  "last_updated": "2026-04-05T11:52:00.230Z",
   "tasks": {
     "active": [
-      "RR-002-T4",
-      "OPS-012-T6"
+      "RR-002-T4"
     ],
     "completed": [
       "OPS-011-T1",
       "OPS-011-T3",
+      "BOOTSTRAP-T1",
+      "BOOTSTRAP-T2",
       "RR-002-T1",
       "RR-002-T2",
       "RR-002-T3",
@@ -524,15 +509,16 @@
       "RR-002-T7",
       "RR-002-T8",
       "RR-002-T9",
-      "BOOTSTRAP-T1",
-      "BOOTSTRAP-T2",
       "OPS-011-T4",
       "OPS-011-T2",
       "OPS-012-T1",
       "OPS-012-T2",
       "OPS-012-T3",
       "OPS-012-T4",
-      "OPS-012-T5"
+      "OPS-012-T5",
+      "OPS-012-T6",
+      "OPS-010-T1",
+      "BOOTSTRAP-T3"
     ]
   },
   "decisions": [
@@ -671,6 +657,18 @@
     {
       "date": "2026-04-05",
       "summary": "Added direct runtime-guardrails regression tests for the FAIL evidence, NOT RUN evidence, and missing-state-update rules before promoting the remaining lodash remediation, so the exact branch-blocking validator behavior is now covered by local test execution."
+    },
+    {
+      "date": "2026-04-05",
+      "summary": "Merged PR #8 after hosted CI run 23995836693 passed and then confirmed the default-branch Dependabot alert API returned no open alerts, closing OPS-012 and leaving RR-002 as the only active blocked phase."
+    },
+    {
+      "date": "2026-04-05",
+      "summary": "Because RR-002 is still blocked on real Windows validation, completed OPS-010 in the macOS workspace by adding a dedicated Retry Needed session-library filter, routing the recovery banner into that filtered view, and revalidating the library behavior with focused SessionLibraryTests plus a full app build."
+    },
+    {
+      "date": "2026-04-05",
+      "summary": "Adopted the latest enterprise-ai-standards contract by switching the repo to ai.config.json plus scripts/validate.sh, flattening the canonical tasks, risks, and decisions ledgers, and adding artifacts.json and handoff.json with file-backed evidence while keeping RR-002 blocked on real Windows validation."
     }
   ],
   "version": "1.0.22",
@@ -717,5 +715,16 @@
       "date": "2026-03-16",
       "notes": "Manual promotion through the signed/notarized GitHub release process."
     }
-  ]
+  ],
+  "current_phase_detail": {
+    "id": "RR-002",
+    "name": "Windows Runtime Validation And Hardening",
+    "status": "blocked",
+    "started_on": "2026-03-24",
+    "summary": "RR-002 is blocked on a real Windows validation pass. The latest repo-execution work reconciled prompts, validator entrypoints, and canonical state to the latest enterprise-ai-standards contract while preserving the existing roadmap history; the remaining execution blocker is RR-002-T4: run validation on a real Windows machine or VM."
+  },
+  "current_phase_name": "Windows Runtime Validation And Hardening",
+  "phase_type": "build",
+  "phase_status": "blocked",
+  "active_task_id": "RR-002-T4"
 }

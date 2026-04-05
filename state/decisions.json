@@ -105,6 +105,154 @@
       "date": "2026-04-05",
       "phase": "OPS-012",
       "summary": "Before promoting the remaining lodash remediation, added direct regression tests for the runtime-guardrails rules that had already blocked live branch pushes: FAIL evidence risk mapping, NOT RUN evidence handling, and mandatory canonical state updates after code changes."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Promoted the remaining lodash remediation plus validator regression coverage to main through PR #8 after hosted CI run 23995836693 passed, then closed RISK-SEC-002 when the default-branch Dependabot alert API returned no open alerts."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Moved OPS-012 out of the active risk-remediation list and into the completed-phase history so the roadmap now reflects that the dependency-alert phase is finished rather than still queued as future remediation."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-010",
+      "summary": "Because RR-002 remains blocked on a real Windows machine or VM, completed the next unblocked opportunity slice by adding a dedicated Retry Needed session-library filter, routing the retry banner into that filtered view, and validating the behavior with focused SessionLibraryTests plus a full app build."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "bootstrap",
+      "summary": "Adopted the latest enterprise-ai-standards contract by switching the repo to ai.config.json plus scripts/validate.sh, flattening the canonical tasks, risks, and decisions ledgers, and adding artifacts.json and handoff.json with file-backed evidence while keeping RR-002 blocked on real Windows validation."
+    }
+  ],
+  "last_updated": "2026-04-05T11:52:00.230Z",
+  "decisions": [
+    {
+      "date": "2026-03-24",
+      "phase": "RR-002",
+      "summary": "Executed the feasible RR-002 slice in the macOS workspace by hardening Windows CI and scripted validation instead of claiming real hardware validation that was not run."
+    },
+    {
+      "date": "2026-03-24",
+      "phase": "RR-002",
+      "summary": "Added a headless Windows smoke mode plus package-script validation so CI can exercise the packaged executable itself without pretending tray or capture UX was validated."
+    },
+    {
+      "date": "2026-03-24",
+      "phase": "RR-002",
+      "summary": "Treated the Windows-targeted compile failure as a real RR-002 defect and fixed it in scope instead of deferring it behind the broader runtime-validation risk."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Kept RR-002 on phase/RR-002-windows-runtime-hardening and cherry-picked only the targeted validation-fix commit so the phase record stays isolated from unrelated feature-branch work."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Treated the inherited diagnostics-redaction failure and packaged-smoke exit-code bug as RR-002 work because they blocked the package/runtime signal, then reran DiagnosticsLoggerTests and release_smoke_test.sh on the phase branch before updating state."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Extended RR-002 package validation by checking packaged-file hashes against the publish outputs and by uploading a machine-readable Windows validation manifest plus smoke report from the CI run."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Captured the Windows takeover path in-repo with a dedicated handoff doc, a handoff script, and a CI-produced handoff artifact so Codex on Windows can continue RR-002 from repo state instead of chat-only context."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Captured the GitHub Actions Node 20 deprecation warnings from the successful phase-branch run as a separate follow-up risk instead of expanding RR-002 into workflow-runtime maintenance."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "summary": "Kept RR-002 as the canonical product roadmap phase while using phase/bootstrap to add repo-local execution scaffolding, so roadmap delivery state and execution-system bootstrap work stay explicit instead of overwriting each other."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "bootstrap",
+      "summary": "Made tools/validators/enforce-runtime-guardrails.js the single CI gatekeeper and reused the existing roadmap and state ledgers instead of creating a second validator or external-state dependency."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Because RR-002 still needs real Windows hardware validation that cannot be completed honestly from this macOS workspace, advanced the next unblocked risk-remediation slice by upgrading core workflow actions to Node24-compatible majors and teaching the runtime guardrails validator to enforce those versions across both CI and release workflows."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Treated the stale dmgbuild shebang as a release-environment defect, switched scripts/build_dmg.sh to run dmgbuild through the virtualenv Python module, and revalidated release_smoke_test.sh plus unsigned DMG packaging before recording release readiness."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Hardened the local packaging entrypoint by making scripts/build_dmg.sh run scripts/release_smoke_test.sh by default, which carries the startup keychain smoke into DMG preflight; then reran workflow lint and unsigned DMG packaging through that exact path before recording release status."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-011",
+      "summary": "Closed OPS-011 after hosted CI run 23988211616 and hosted Release workflow run 23988213079 both succeeded on commit eca6ba9; upgraded actions/setup-python to v6 when the first hosted Release run still emitted a Node 20 deprecation annotation."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Because RR-002 is still blocked on real Windows hardware validation, started OPS-012 by patching the docs-site dependency graph locally with targeted overrides and direct tarball replacements, validated the patched versions with npm ls and a production Docusaurus build, and logged the local npm 11 / Node 25 EBADF fetch failure as a separate environment risk instead of treating it as successful package-manager remediation."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Validated hosted CI run 23988782016 on commit 5369212 after pushing the docs-site dependency remediation, then narrowed the remaining OPS-012 work to default-branch promotion for alert closure and the unresolved local npm 11 / Node 25 EBADF environment defect."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper pinned in site/.node-version, then validated a clean docs-site reinstall and production build through that path before closing the environment risk."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Promoted the original OPS-012 remediation to main via PR #6, verified the original four default-branch Dependabot alerts were gone, and closed RISK-SEC-001 instead of leaving the already-cleared alert set open."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Split the two newly surfaced default-branch lodash alerts into a new follow-up risk and task inside OPS-012, and pinned lodash to the non-deprecated patched release 4.18.1 after 4.18.0 reported a registry deprecation notice during the first branch-local test."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Kept the initial hosted CI failure on commit 64633e9 as evidence of the guardrail catching stale state, synced the canonical state files, and then reran hosted CI successfully on commit 40ddf31 before leaving only the default-branch promotion step open."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Before promoting the remaining lodash remediation, added direct regression tests for the runtime-guardrails rules that had already blocked live branch pushes: FAIL evidence risk mapping, NOT RUN evidence handling, and mandatory canonical state updates after code changes."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Promoted the remaining lodash remediation plus validator regression coverage to main through PR #8 after hosted CI run 23995836693 passed, then closed RISK-SEC-002 when the default-branch Dependabot alert API returned no open alerts."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Moved OPS-012 out of the active risk-remediation list and into the completed-phase history so the roadmap now reflects that the dependency-alert phase is finished rather than still queued as future remediation."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-010",
+      "summary": "Because RR-002 remains blocked on a real Windows machine or VM, completed the next unblocked opportunity slice by adding a dedicated Retry Needed session-library filter, routing the retry banner into that filtered view, and validating the behavior with focused SessionLibraryTests plus a full app build."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "bootstrap",
+      "summary": "Adopted the latest enterprise-ai-standards contract by switching the repo to ai.config.json plus scripts/validate.sh, flattening the canonical tasks, risks, and decisions ledgers, and adding artifacts.json and handoff.json with file-backed evidence while keeping RR-002 blocked on real Windows validation."
     }
   ]
 }
