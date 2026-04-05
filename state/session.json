@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-04-04",
+  "updated_on": "2026-04-05",
   "phase": {
     "id": "OPS-012",
     "name": "Dependency Alert Remediation",
@@ -11,7 +11,7 @@
     "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 remains blocked on real Windows runtime validation. OPS-012 has already promoted the original dependency remediation to main and cleared that first alert set there, and the current follow-up slice now carries a branch-local lodash 4.18.1 patch with passing local plus hosted branch validation. The remaining work is promoting that follow-up remediation to the default branch so the two remaining lodash alerts can close there.",
+  "execution_summary": "RR-002 remains blocked on real Windows runtime validation. OPS-012 has already promoted the original dependency remediation to main and cleared that first alert set there, and the current follow-up slice now carries a branch-local lodash 4.18.1 patch plus validator regression coverage for the guardrails that previously blocked this branch. The remaining work is promoting that follow-up remediation to the default branch so the two remaining lodash alerts can close there.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -312,6 +312,26 @@
       "command": "GitHub Actions CI run 23989366196 on phase/bootstrap commit 40ddf31",
       "result": "PASS",
       "summary": "Hosted CI passed after syncing the canonical state files, including runtime-guardrails, docs-site validation, macOS validation, and Windows workspace validation."
+    },
+    {
+      "id": "OPS-012-E14",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "runtime-guardrails-regression-tests",
+      "type": "test",
+      "command": "node --test tools/validators/enforce-runtime-guardrails.test.js",
+      "result": "PASS",
+      "summary": "Validated five runtime-guardrails regression tests covering FAIL evidence, NOT RUN evidence, and missing state-update enforcement."
+    },
+    {
+      "id": "OPS-012-E15",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "runtime-guardrails-validator",
+      "type": "validation",
+      "command": "node tools/validators/enforce-runtime-guardrails.js --base-ref origin/main",
+      "result": "PASS",
+      "summary": "Validated the branch-local state sync and validator changes against origin/main before pushing the remaining lodash-remediation promotion work."
     }
   ]
 }

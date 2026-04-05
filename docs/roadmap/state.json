@@ -401,7 +401,7 @@
       "description": "After the first default-branch remediation landed, GitHub still reported two open lodash Dependabot alerts on site/package-lock.json on 2026-04-04 (1 high, 1 moderate).",
       "severity": "medium",
       "impact": "The default branch remains exposed to the remaining lodash vulnerabilities until the follow-up dependency remediation is validated and promoted.",
-      "mitigation": "Track in OPS-012. phase/bootstrap now includes the lodash 4.18.1 override, synced state, and a passing hosted CI run 23989366196 on commit 40ddf31, but the default-branch promotion and alert-closure confirmation still remain.",
+      "mitigation": "Track in OPS-012. phase/bootstrap now includes the lodash 4.18.1 override, synced state, validator regression tests for the guardrails that previously blocked the branch, and a passing hosted CI run 23989366196 on commit 40ddf31, but the default-branch promotion and alert-closure confirmation still remain.",
       "affected_components": [
         "dependencies",
         "site",
@@ -504,10 +504,10 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 has now promoted the original dependency remediation to main, cleared the first Dependabot alert set there, and replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper. The active OPS-012 follow-up is the branch-local lodash 4.18.1 remediation, which now has passing local dependency-tree, docs-site build, and hosted CI validation and only needs default-branch promotion plus alert-closure confirmation."
+    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 has now promoted the original dependency remediation to main, cleared the first Dependabot alert set there, and replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper. The active OPS-012 follow-up is the branch-local lodash 4.18.1 remediation, which now has passing local dependency-tree, docs-site build, runtime-guardrails regression-test, and hosted CI validation and only needs default-branch promotion plus alert-closure confirmation."
   },
   "current_phase_branch": "phase/bootstrap",
-  "last_updated": "2026-04-04",
+  "last_updated": "2026-04-05",
   "tasks": {
     "active": [
       "RR-002-T4",
@@ -667,6 +667,10 @@
     {
       "date": "2026-04-04",
       "summary": "After syncing the canonical state files, reran hosted CI successfully on commit 40ddf31 and closed the tracked-branch validation step for the follow-up lodash remediation, leaving only the default-branch promotion and alert-closure confirmation open."
+    },
+    {
+      "date": "2026-04-05",
+      "summary": "Added direct runtime-guardrails regression tests for the FAIL evidence, NOT RUN evidence, and missing-state-update rules before promoting the remaining lodash remediation, so the exact branch-blocking validator behavior is now covered by local test execution."
     }
   ],
   "version": "1.0.22",
