@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-04-04",
+  "updated_on": "2026-04-05",
   "entries": [
     {
       "date": "2026-03-24",
@@ -85,6 +85,26 @@
       "date": "2026-04-04",
       "phase": "OPS-012",
       "summary": "Replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper pinned in site/.node-version, then validated a clean docs-site reinstall and production build through that path before closing the environment risk."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Promoted the original OPS-012 remediation to main via PR #6, verified the original four default-branch Dependabot alerts were gone, and closed RISK-SEC-001 instead of leaving the already-cleared alert set open."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Split the two newly surfaced default-branch lodash alerts into a new follow-up risk and task inside OPS-012, and pinned lodash to the non-deprecated patched release 4.18.1 after 4.18.0 reported a registry deprecation notice during the first branch-local test."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "summary": "Kept the initial hosted CI failure on commit 64633e9 as evidence of the guardrail catching stale state, synced the canonical state files, and then reran hosted CI successfully on commit 40ddf31 before leaving only the default-branch promotion step open."
+    },
+    {
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "summary": "Before promoting the remaining lodash remediation, added direct regression tests for the runtime-guardrails rules that had already blocked live branch pushes: FAIL evidence risk mapping, NOT RUN evidence handling, and mandatory canonical state updates after code changes."
     }
   ]
 }

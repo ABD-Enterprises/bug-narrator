@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-04-04",
+  "updated_on": "2026-04-05",
   "active": [
     {
       "id": "RR-002-T4",
@@ -9,9 +9,9 @@
       "blocking_for_phase_completion": true
     },
     {
-      "id": "OPS-012-T4",
+      "id": "OPS-012-T6",
       "phase": "OPS-012",
-      "title": "Promote the dependency remediation to the default branch and confirm the Dependabot alerts close there",
+      "title": "Promote the lodash remediation to the default branch and confirm the remaining Dependabot alerts close there",
       "status": "pending",
       "blocking_for_phase_completion": true
     }
@@ -117,6 +117,18 @@
       "id": "OPS-012-T3",
       "phase": "OPS-012",
       "title": "Stabilize or replace the local npm install path after the Node 25 / npm 11 EBADF registry-fetch failure",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T4",
+      "phase": "OPS-012",
+      "title": "Promote the dependency remediation to the default branch and confirm the Dependabot alerts close there",
+      "status": "completed"
+    },
+    {
+      "id": "OPS-012-T5",
+      "phase": "OPS-012",
+      "title": "Patch the newly surfaced lodash Dependabot alerts on the tracked branch and validate the updated dependency graph locally plus in hosted CI",
       "status": "completed"
     }
   ]

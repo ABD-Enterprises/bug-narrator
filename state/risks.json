@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-04-04",
+  "updated_on": "2026-04-05",
   "resolved": [
     {
       "id": "RISK-WIN-003",
@@ -42,6 +42,13 @@
       "status": "resolved",
       "assigned_phase": "OPS-012",
       "note": "Resolved by adding site/.node-version pinned to v22.22.2 and scripts/site_npm.sh, then validating ./scripts/site_npm.sh ci --ignore-scripts --no-audit --no-fund and ./scripts/site_npm.sh run build successfully on this machine."
+    },
+    {
+      "id": "RISK-SEC-001",
+      "severity": "medium",
+      "status": "resolved",
+      "assigned_phase": "OPS-012",
+      "note": "Resolved by merging PR #6 into main at merge commit dc7a66aa7b2fc42a0b05edddec6169c0f6a88135 and confirming the original four default-branch Dependabot alerts were no longer open in the GitHub alert API response on 2026-04-04."
     }
   ],
   "unresolved": [
@@ -67,11 +74,11 @@
       "note": "Live VoiceOver and hosted docs-site accessibility validation still remain for a later remediation phase."
     },
     {
-      "id": "RISK-SEC-001",
+      "id": "RISK-SEC-002",
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "OPS-012",
-      "note": "phase/bootstrap now contains the docs-site dependency remediation commit 5369212, the repo-local Node 22 wrapper for local docs-site installs, and a passing hosted CI run 23988782016 on the branch commit before the wrapper sync. The remaining work is to promote the dependency remediation to the default branch and confirm GitHub clears the four Dependabot alerts there."
+      "note": "After the original four alerts were cleared on main, GitHub still reported two open lodash alerts on the default branch (#6 high, #5 medium). phase/bootstrap now contains the lodash 4.18.1 override, synced phase state, validator regression coverage for the runtime guardrails rules, and a passing hosted CI run 23989366196 on commit 40ddf31; the remaining work is promoting that follow-up remediation to the default branch and confirming the alerts close there."
     }
   ]
 }

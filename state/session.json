@@ -1,5 +1,5 @@
 {
-  "updated_on": "2026-04-04",
+  "updated_on": "2026-04-05",
   "phase": {
     "id": "OPS-012",
     "name": "Dependency Alert Remediation",
@@ -11,7 +11,7 @@
     "status": "blocked"
   },
   "branch": "phase/bootstrap",
-  "execution_summary": "RR-002 remains blocked on real Windows runtime validation, so OPS-012 now includes a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The dependency remediation stays in progress only for default-branch promotion and Dependabot alert closure.",
+  "execution_summary": "RR-002 remains blocked on real Windows runtime validation. OPS-012 has already promoted the original dependency remediation to main and cleared that first alert set there, and the current follow-up slice now carries a branch-local lodash 4.18.1 patch plus validator regression coverage for the guardrails that previously blocked this branch. The remaining work is promoting that follow-up remediation to the default branch so the two remaining lodash alerts can close there.",
   "evidence": [
     {
       "id": "BOOTSTRAP-E1",
@@ -249,6 +249,89 @@
       "command": "./scripts/site_npm.sh run build",
       "result": "PASS",
       "summary": "Validated the production Docusaurus build through the repo-local Node 22 wrapper."
+    },
+    {
+      "id": "OPS-012-E8",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "default-branch-promotion",
+      "type": "validation",
+      "command": "gh pr view 6 --json state,mergedAt,mergeCommit",
+      "result": "PASS",
+      "summary": "Confirmed PR #6 merged phase/bootstrap into main at merge commit dc7a66aa7b2fc42a0b05edddec6169c0f6a88135, promoting the original dependency remediation and workflow hardening to the default branch."
+    },
+    {
+      "id": "OPS-012-E9",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "default-branch-alert-audit",
+      "type": "validation",
+      "command": "gh api repos/deffenda/bug-narrator/dependabot/alerts --paginate --jq '[.[] | select(.state==\"open\") | {number:.number, dependency:.dependency.package.name, manifest:.dependency.manifest_path, severity:.security_advisory.severity}]'",
+      "result": "PASS",
+      "summary": "Confirmed the original four Dependabot alerts no longer appeared on the default branch and identified only the two remaining lodash alerts (#6 high, #5 medium)."
+    },
+    {
+      "id": "OPS-012-E10",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "site-dependency-tree",
+      "type": "validation",
+      "command": "./scripts/site_npm.sh ls path-to-regexp serialize-javascript brace-expansion lodash",
+      "result": "PASS",
+      "summary": "Confirmed the docs-site dependency tree now resolves serialize-javascript 7.0.5, brace-expansion 1.1.13, express path-to-regexp 0.1.13, and lodash 4.18.1 on the branch."
+    },
+    {
+      "id": "OPS-012-E11",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "docs-site",
+      "type": "build",
+      "command": "./scripts/site_npm.sh run build",
+      "result": "PASS",
+      "summary": "Validated a production Docusaurus build after adding the lodash 4.18.1 override."
+    },
+    {
+      "id": "OPS-012-E12",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "github-hosted-ci",
+      "type": "validation",
+      "command": "GitHub Actions CI run 23989339794 on phase/bootstrap commit 64633e9",
+      "result": "FAIL",
+      "risk_ids": [
+        "RISK-SEC-002"
+      ],
+      "summary": "Hosted CI failed immediately in runtime-guardrails because the canonical state files had not yet been updated after the new lodash remediation work."
+    },
+    {
+      "id": "OPS-012-E13",
+      "date": "2026-04-04",
+      "phase": "OPS-012",
+      "scope": "github-hosted-ci",
+      "type": "validation",
+      "command": "GitHub Actions CI run 23989366196 on phase/bootstrap commit 40ddf31",
+      "result": "PASS",
+      "summary": "Hosted CI passed after syncing the canonical state files, including runtime-guardrails, docs-site validation, macOS validation, and Windows workspace validation."
+    },
+    {
+      "id": "OPS-012-E14",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "runtime-guardrails-regression-tests",
+      "type": "test",
+      "command": "node --test tools/validators/enforce-runtime-guardrails.test.js",
+      "result": "PASS",
+      "summary": "Validated five runtime-guardrails regression tests covering FAIL evidence, NOT RUN evidence, and missing state-update enforcement."
+    },
+    {
+      "id": "OPS-012-E15",
+      "date": "2026-04-05",
+      "phase": "OPS-012",
+      "scope": "runtime-guardrails-validator",
+      "type": "validation",
+      "command": "node tools/validators/enforce-runtime-guardrails.js --base-ref origin/main",
+      "result": "PASS",
+      "summary": "Validated the branch-local state sync and validator changes against origin/main before pushing the remaining lodash-remediation promotion work."
     }
   ]
 }

@@ -150,7 +150,7 @@
       "name": "Dependency Alert Remediation",
       "priority": "medium",
       "grouped_risks": [
-        "RISK-SEC-001"
+        "RISK-SEC-002"
       ],
       "scope": "Review and remediate the open Dependabot alerts on the default branch, validate the patched dependency graph on the tracked branch, and promote the remediation so GitHub clears the default-branch alerts."
     }
@@ -387,10 +387,24 @@
       "description": "GitHub reported four open Dependabot alerts on the default branch during push operations on 2026-04-04 (2 high, 2 moderate).",
       "severity": "medium",
       "impact": "Open dependency vulnerabilities can leave the repo and release workflows exposed until the affected packages or action pins are remediated and revalidated.",
-      "mitigation": "Track in OPS-012. The phase/bootstrap branch now patches the docs-site dependency graph locally with targeted overrides and verified build evidence, but the risk remains open until the remediation is merged to the default branch and the hosted CI/default-branch alert state is revalidated.",
+      "mitigation": "Resolved in OPS-012 by merging PR #6 into main at merge commit dc7a66aa7b2fc42a0b05edddec6169c0f6a88135 and rechecking the GitHub Dependabot alert API, which no longer showed the original four default-branch alerts on 2026-04-04.",
       "affected_components": [
         "github-workflows",
         "dependencies",
+        "default-branch"
+      ],
+      "phase_association": "OPS-012",
+      "status": "resolved"
+    },
+    {
+      "id": "RISK-SEC-002",
+      "description": "After the first default-branch remediation landed, GitHub still reported two open lodash Dependabot alerts on site/package-lock.json on 2026-04-04 (1 high, 1 moderate).",
+      "severity": "medium",
+      "impact": "The default branch remains exposed to the remaining lodash vulnerabilities until the follow-up dependency remediation is validated and promoted.",
+      "mitigation": "Track in OPS-012. phase/bootstrap now includes the lodash 4.18.1 override, synced state, validator regression tests for the guardrails that previously blocked the branch, and a passing hosted CI run 23989366196 on commit 40ddf31, but the default-branch promotion and alert-closure confirmation still remain.",
+      "affected_components": [
+        "dependencies",
+        "site",
         "default-branch"
       ],
       "phase_association": "OPS-012",
@@ -490,14 +504,14 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 now has a pushed dependency-remediation commit, a passing hosted CI run (23988782016), and a repo-local Node 22 wrapper that replaces the broken system npm 11 / Node 25 docs-site install path. The remaining OPS-012 follow-up is promoting the dependency patch to the default branch so the Dependabot alerts can close there."
+    "summary": "RR-002 remains blocked on real Windows desktop runtime validation while OPS-012 has now promoted the original dependency remediation to main, cleared the first Dependabot alert set there, and replaced the broken local npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper. The active OPS-012 follow-up is the branch-local lodash 4.18.1 remediation, which now has passing local dependency-tree, docs-site build, runtime-guardrails regression-test, and hosted CI validation and only needs default-branch promotion plus alert-closure confirmation."
   },
   "current_phase_branch": "phase/bootstrap",
-  "last_updated": "2026-04-04",
+  "last_updated": "2026-04-05",
   "tasks": {
     "active": [
       "RR-002-T4",
-      "OPS-012-T4"
+      "OPS-012-T6"
     ],
     "completed": [
       "OPS-011-T1",
@@ -516,7 +530,9 @@
       "OPS-011-T2",
       "OPS-012-T1",
       "OPS-012-T2",
-      "OPS-012-T3"
+      "OPS-012-T3",
+      "OPS-012-T4",
+      "OPS-012-T5"
     ]
   },
   "decisions": [
@@ -639,6 +655,22 @@
     {
       "date": "2026-04-04",
       "summary": "Closed OPS-012-T3 by replacing the broken system npm 11 / Node 25 docs-site install path with a repo-local Node 22 wrapper aligned to the docs-site CI runtime, then validated npm ci and the production site build through that pinned toolchain."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Promoted the original OPS-012 remediation to main via PR #6, verified the original four default-branch Dependabot alerts were gone, and closed that cleared alert set as RISK-SEC-001 instead of leaving it open after promotion."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Split the two newly surfaced lodash Dependabot alerts into a follow-up OPS-012 slice, pinned lodash to the non-deprecated patched release 4.18.1, and treated the initial hosted CI failure on commit 64633e9 as a guardrail-enforced state-sync miss rather than a code regression."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "After syncing the canonical state files, reran hosted CI successfully on commit 40ddf31 and closed the tracked-branch validation step for the follow-up lodash remediation, leaving only the default-branch promotion and alert-closure confirmation open."
+    },
+    {
+      "date": "2026-04-05",
+      "summary": "Added direct runtime-guardrails regression tests for the FAIL evidence, NOT RUN evidence, and missing-state-update rules before promoting the remaining lodash remediation, so the exact branch-blocking validator behavior is now covered by local test execution."
     }
   ],
   "version": "1.0.22",
