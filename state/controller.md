@@ -1,6 +1,6 @@
 # Controller State
 
-current_state: ready_for_claude
+current_state: blocked
 state_owner: Claude
 
 ## allowed_transitions
