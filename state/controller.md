@@ -1,7 +1,6 @@
 # Controller State
 
-state: blocked
-current_state: blocked
+current_state: ready_for_codex
 state_owner: Claude
 
 ## allowed_transitions
