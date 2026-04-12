@@ -101,7 +101,7 @@ final class MicrophonePermissionServiceTests: XCTestCase {
         let guidance = service.recoveryGuidance(
             for: .denied,
             runtimeEnvironment: AppRuntimeEnvironment(
-                bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
+                bundlePath: "/tmp/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
             )
         )
 

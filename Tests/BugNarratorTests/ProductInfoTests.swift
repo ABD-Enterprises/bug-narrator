@@ -65,7 +65,7 @@ final class ProductInfoTests: XCTestCase {
 
     func testRuntimeEnvironmentDetectsLocalTestingBuildsFromDerivedData() {
         let environment = AppRuntimeEnvironment(
-            bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
+            bundlePath: "/tmp/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
         )
 
         XCTAssertTrue(environment.isLocalTestingBuild)

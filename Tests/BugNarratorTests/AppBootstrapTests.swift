@@ -4,7 +4,7 @@ import XCTest
 final class AppBootstrapTests: XCTestCase {
     func testBootstrapUsesIsolatedStoresUnderXCTest() throws {
         let runtimeEnvironment = AppRuntimeEnvironment(
-            bundlePath: "/private/tmp/BugNarrator.app",
+            bundlePath: "/tmp/BugNarrator.app",
             environment: [
                 "XCTestConfigurationFilePath": "/tmp/test.xctestconfiguration",
                 "XCTestSessionIdentifier": "session:123"

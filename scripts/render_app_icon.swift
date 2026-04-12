@@ -2,8 +2,14 @@
 
 import AppKit
 
+let defaultOutputPath = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("Resources/AppIconSource.png")
+    .path
+
 let outputPath = CommandLine.arguments.dropFirst().first
-    ?? "/Users/deffenda/Code/FeedbackMic/Resources/AppIconSource.png"
+    ?? defaultOutputPath
 
 let size = CGSize(width: 1024, height: 1024)
 let image = NSImage(size: size)

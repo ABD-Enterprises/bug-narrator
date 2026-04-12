@@ -251,7 +251,7 @@ final class AppStateTests: XCTestCase {
     func testLocalTestingBuildAddsMicrophoneRecoveryGuidance() {
         let harness = AppStateHarness(
             runtimeEnvironment: AppRuntimeEnvironment(
-                bundlePath: "/Users/deffenda/Library/Developer/Xcode/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
+                bundlePath: "/tmp/DerivedData/BugNarrator/Build/Products/Debug/BugNarrator.app"
             )
         )
         defer { harness.cleanup() }

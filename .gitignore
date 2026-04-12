@@ -8,8 +8,6 @@ dist/
 *.moved-aside
 *.swp
 
-FeedbackMic.xcodeproj/xcuserdata/
-FeedbackMic.xcodeproj/project.xcworkspace/xcuserdata/
 BugNarrator.xcodeproj/xcuserdata/
 BugNarrator.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcworkspace/xcuserdata/
