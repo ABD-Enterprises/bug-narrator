@@ -30,3 +30,14 @@ site/build/
 
 state/implementation_notes.md
 state/validation_report.md
+!ai.config.json
+!state/tasks.json
+!state/risks.json
+!state/decisions.json
+!state/artifacts.json
+!state/handoff.json
+!ai/bootstrap.md
+!state/controller.md
+!state/current_task.md
+!state/implementation_notes.md
+!state/validation_report.md

@@ -20,6 +20,10 @@ GitHub pull requests, CI, and review are the source of truth for acceptance.
 7. Read `/state/implementation_notes.md` if it exists
 8. Read `/state/validation_report.md` if it exists
 
+## Standards reference
+
+This repo follows enterprise-ai-standards. The local validator runs via `scripts/validate.sh`. The authoritative standard is vendored at `project-manager/enterprise-ai-standards.md`.
+
 ## Role boundaries
 
 ### Claude

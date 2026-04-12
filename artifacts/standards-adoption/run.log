@@ -1,0 +1,11 @@
+VISIBLE ai.config.json
+VISIBLE state/tasks.json
+VISIBLE state/risks.json
+VISIBLE state/decisions.json
+VISIBLE state/artifacts.json
+VISIBLE state/handoff.json
+VISIBLE ai/bootstrap.md
+VISIBLE state/controller.md
+VISIBLE state/current_task.md
+VISIBLE state/implementation_notes.md
+VISIBLE state/validation_report.md
