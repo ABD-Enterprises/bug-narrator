@@ -2,7 +2,7 @@ import Foundation
 
 enum AppSupportLocation {
     private static let currentAppDirectoryName = "BugNarrator"
-    private static let legacyAppDirectoryNames = ["SessionMic", "FeedbackMic"]
+    private static let legacyAppDirectoryNames = ["SessionMic"]
 
     static func appDirectory(fileManager: FileManager = .default) -> URL {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

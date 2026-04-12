@@ -2,6 +2,10 @@ import Combine
 import Foundation
 
 final class SettingsStore: ObservableObject {
+    static let defaultLegacyDefaultsDomains = [
+        "com.abdenterprises.sessionmic"
+    ]
+
     private let logger = DiagnosticsLogger(category: .settings)
 
     @Published var apiKey: String = "" {
@@ -346,11 +350,7 @@ final class SettingsStore: ObservableObject {
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
         } else if defaults === UserDefaults.standard {
-            self.legacyDefaultsDomains = [
-                "com.abdenterprises.sessionmic",
-                "com.feedbackmic",
-                "com.deffenda.feedbackmic"
-            ]
+            self.legacyDefaultsDomains = Self.defaultLegacyDefaultsDomains
         } else {
             self.legacyDefaultsDomains = []
         }
@@ -908,13 +908,13 @@ private enum SecretSlot: Hashable, CaseIterable {
     var legacyServices: [String] {
         switch self {
         case .openAI:
-            return ["SessionMic.OpenAI", "FeedbackMic.OpenAI"]
+            return ["SessionMic.OpenAI"]
         case .github:
-            return ["SessionMic.GitHub", "FeedbackMic.GitHub"]
+            return ["SessionMic.GitHub"]
         case .jiraEmail:
-            return ["SessionMic.Jira", "FeedbackMic.Jira"]
+            return ["SessionMic.Jira"]
         case .jira:
-            return ["SessionMic.Jira", "FeedbackMic.Jira"]
+            return ["SessionMic.Jira"]
         }
     }
 

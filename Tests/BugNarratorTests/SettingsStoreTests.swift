@@ -3,6 +3,13 @@ import XCTest
 @testable import BugNarrator
 
 final class SettingsStoreTests: XCTestCase {
+    func testDefaultLegacyDefaultsDomainsOnlyIncludeSessionMic() {
+        XCTAssertEqual(
+            SettingsStore.defaultLegacyDefaultsDomains,
+            ["com.abdenterprises.sessionmic"]
+        )
+    }
+
     func testFirstLaunchStartsWithAllHotkeysDisabled() {
         let suiteName = "BugNarrator-SettingsNoHotkeyDefaultsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
