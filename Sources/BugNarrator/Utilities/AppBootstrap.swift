@@ -13,6 +13,8 @@ struct AppBootstrap {
     let isolatedStorageRootURL: URL?
 
     init(runtimeEnvironment: AppRuntimeEnvironment, fileManager: FileManager = .default) {
+        let launchAtLoginService: any LaunchAtLoginControlling
+
         if runtimeEnvironment.isRunningUnderTests {
             let scope = runtimeEnvironment.testIsolationScope
             let defaultsSuiteName = "BugNarrator.XCTestHost.\(scope)"
@@ -24,10 +26,12 @@ struct AppBootstrap {
             try? fileManager.removeItem(at: storageRootURL)
             try? fileManager.createDirectory(at: storageRootURL, withIntermediateDirectories: true)
 
+            launchAtLoginService = TestingLaunchAtLoginService()
             self.storageMode = .isolatedForTests
             self.settingsStore = SettingsStore(
                 defaults: defaults,
                 keychainService: InMemoryKeychainService(),
+                launchAtLoginService: launchAtLoginService,
                 legacyDefaultsDomains: []
             )
             self.transcriptStore = TranscriptStore(
@@ -39,8 +43,9 @@ struct AppBootstrap {
             return
         }
 
+        launchAtLoginService = SystemLaunchAtLoginService()
         self.storageMode = .production
-        self.settingsStore = SettingsStore()
+        self.settingsStore = SettingsStore(launchAtLoginService: launchAtLoginService)
         self.transcriptStore = TranscriptStore()
         self.isolatedDefaultsSuiteName = nil
         self.isolatedStorageRootURL = nil

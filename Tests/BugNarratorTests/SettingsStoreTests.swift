@@ -30,7 +30,12 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let launchAtLoginService = MockLaunchAtLoginService()
+        let firstStore = SettingsStore(
+            defaults: defaults,
+            keychainService: keychain,
+            launchAtLoginService: launchAtLoginService
+        )
         firstStore.apiKey = "persisted-api-key"
         firstStore.preferredModel = "whisper-1"
         firstStore.languageHint = "en"
@@ -39,6 +44,7 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.autoCopyTranscript = false
         firstStore.autoSaveTranscript = false
         firstStore.autoExtractIssues = true
+        firstStore.openAtStartup = true
         firstStore.debugMode = true
         firstStore.startRecordingHotkeyShortcut = HotkeyShortcut(
             keyCode: 1,
@@ -62,7 +68,11 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.jiraProjectKey = "FM"
         firstStore.jiraIssueType = "Task"
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = SettingsStore(
+            defaults: defaults,
+            keychainService: keychain,
+            launchAtLoginService: launchAtLoginService
+        )
 
         XCTAssertEqual(secondStore.apiKey, "persisted-api-key")
         XCTAssertEqual(secondStore.preferredModel, "whisper-1")
@@ -72,6 +82,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(secondStore.autoCopyTranscript)
         XCTAssertFalse(secondStore.autoSaveTranscript)
         XCTAssertTrue(secondStore.autoExtractIssues)
+        XCTAssertTrue(secondStore.openAtStartup)
         XCTAssertTrue(secondStore.debugMode)
         XCTAssertEqual(secondStore.startRecordingHotkeyShortcut.keyCode, 1)
         XCTAssertEqual(
@@ -474,5 +485,104 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.jiraAPIToken, "")
         XCTAssertEqual(store.githubTokenPersistenceState, .empty)
         XCTAssertEqual(store.jiraTokenPersistenceState, .empty)
+    }
+
+    func testLaunchAtLoginRequiresApprovalSurfacesWarningState() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginApprovalTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService(status: .requiresApproval)
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        XCTAssertTrue(store.openAtStartup)
+        XCTAssertEqual(store.openAtStartupStatusTone, .warning)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items."
+        )
+    }
+
+    func testLaunchAtLoginFailureRestoresActualStateAndShowsError() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginFailureTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService()
+        launchAtLoginService.setEnabledError = NSError(
+            domain: "LaunchAtLoginTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "The login item could not be registered."]
+        )
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        store.openAtStartup = true
+
+        XCTAssertFalse(store.openAtStartup)
+        XCTAssertEqual(store.openAtStartupStatusTone, .error)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "BugNarrator couldn't update the Open at Startup setting. The login item could not be registered."
+        )
+    }
+
+    func testLaunchAtLoginFailurePreservesStatusMessageWhenServiceProvidesOne() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginFailureStatusTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService(status: .requiresApproval)
+        launchAtLoginService.setEnabledError = NSError(
+            domain: "LaunchAtLoginTests",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "The login item could not be updated."]
+        )
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        store.openAtStartup = false
+
+        XCTAssertTrue(store.openAtStartup)
+        XCTAssertEqual(store.openAtStartupStatusTone, .error)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
+        )
+    }
+}
+
+private final class MockLaunchAtLoginService: LaunchAtLoginControlling {
+    var status: LaunchAtLoginStatus
+    var setEnabledError: Error?
+
+    init(status: LaunchAtLoginStatus = .disabled) {
+        self.status = status
+    }
+
+    func currentStatus() -> LaunchAtLoginStatus {
+        status
+    }
+
+    func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {
+        if let setEnabledError {
+            throw setEnabledError
+        }
+
+        status = enabled ? .enabled : .disabled
+        return status
     }
 }

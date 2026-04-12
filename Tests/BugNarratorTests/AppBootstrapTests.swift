@@ -19,6 +19,8 @@ final class AppBootstrapTests: XCTestCase {
         XCTAssertTrue(
             bootstrap.isolatedStorageRootURL?.lastPathComponent.contains("BugNarrator-XCTestHost-session-123") == true
         )
+        XCTAssertTrue(bootstrap.settingsStore.openAtStartupSupported)
+        XCTAssertNil(bootstrap.settingsStore.openAtStartupStatusMessage)
 
         bootstrap.settingsStore.preferredModel = "gpt-test-model"
 

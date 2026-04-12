@@ -66,6 +66,13 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var openAtStartup: Bool = false {
+        didSet {
+            guard hasLoaded, !isSynchronizingLaunchAtLogin else { return }
+            updateLaunchAtLoginPreference(enabled: openAtStartup)
+        }
+    }
+
     @Published var startRecordingHotkeyShortcut: HotkeyShortcut = .disabled {
         didSet {
             guard hasLoaded else { return }
@@ -169,6 +176,9 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var githubTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var jiraTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var hotkeyConflictMessage: String?
+    @Published private(set) var openAtStartupSupported = true
+    @Published private(set) var openAtStartupStatusMessage: String?
+    @Published private(set) var openAtStartupStatusTone: SettingsCalloutTone = .secondary
 
     var trimmedAPIKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -333,20 +343,24 @@ final class SettingsStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let keychainService: KeychainServicing
+    private let launchAtLoginService: any LaunchAtLoginControlling
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let legacyDefaultsDomains: [String]
     private var hasLoaded = false
     private var isSynchronizingHotkeys = false
+    private var isSynchronizingLaunchAtLogin = false
     private var sessionOnlySecrets: [SecretSlot: String] = [:]
 
     init(
         defaults: UserDefaults = .standard,
         keychainService: KeychainServicing = KeychainService(),
+        launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
         legacyDefaultsDomains: [String]? = nil
     ) {
         self.defaults = defaults
         self.keychainService = keychainService
+        self.launchAtLoginService = launchAtLoginService
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
         } else if defaults === UserDefaults.standard {
@@ -409,6 +423,7 @@ final class SettingsStore: ObservableObject {
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
+        syncLaunchAtLoginState(launchAtLoginService.currentStatus())
 
         startRecordingHotkeyShortcut = loadHotkey(
             key: Keys.startRecordingHotkeyShortcut,
@@ -444,7 +459,9 @@ final class SettingsStore: ObservableObject {
                 "debug_mode": debugMode ? "enabled" : "disabled",
                 "has_openai_key": hasAPIKey ? "yes" : "no",
                 "has_github_token": hasGitHubToken ? "yes" : "no",
-                "has_jira_token": hasJiraAPIToken ? "yes" : "no"
+                "has_jira_token": hasJiraAPIToken ? "yes" : "no",
+                "launch_at_login": openAtStartup ? "enabled" : "disabled",
+                "launch_at_login_supported": openAtStartupSupported ? "yes" : "no"
             ]
         )
     }
@@ -637,6 +654,63 @@ final class SettingsStore: ObservableObject {
             "removed_obsolete_marker_hotkey",
             "Removed the obsolete standalone marker hotkey assignment during settings load."
         )
+    }
+
+    private func updateLaunchAtLoginPreference(enabled: Bool) {
+        do {
+            let status = try launchAtLoginService.setEnabled(enabled)
+            syncLaunchAtLoginState(status)
+            logger.info(
+                "launch_at_login_updated",
+                enabled
+                    ? "BugNarrator will open automatically at login."
+                    : "BugNarrator will no longer open automatically at login.",
+                metadata: ["status": status.logValue]
+            )
+        } catch {
+            let status = launchAtLoginService.currentStatus()
+            syncLaunchAtLoginState(status)
+            openAtStartupStatusTone = .error
+            openAtStartupStatusMessage = launchAtLoginFailureMessage(status: status, error: error)
+            logger.error(
+                "launch_at_login_update_failed",
+                "Updating the launch-at-login setting failed.",
+                metadata: [
+                    "requested_state": enabled ? "enabled" : "disabled",
+                    "status": status.logValue
+                ]
+            )
+        }
+    }
+
+    private func launchAtLoginFailureMessage(status: LaunchAtLoginStatus, error: Error) -> String {
+        let errorDetails = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !errorDetails.isEmpty else {
+            return status.message ?? "BugNarrator couldn't update the Open at Startup setting."
+        }
+
+        if let statusMessage = status.message {
+            return "\(statusMessage) Details: \(errorDetails)"
+        }
+
+        return "BugNarrator couldn't update the Open at Startup setting. \(errorDetails)"
+    }
+
+    private func syncLaunchAtLoginState(_ status: LaunchAtLoginStatus) {
+        isSynchronizingLaunchAtLogin = true
+        openAtStartup = status.isEnabled
+        isSynchronizingLaunchAtLogin = false
+
+        openAtStartupSupported = status.isAvailable
+        openAtStartupStatusMessage = status.message
+
+        switch status {
+        case .disabled, .enabled:
+            openAtStartupStatusTone = .secondary
+        case .requiresApproval, .unavailable:
+            openAtStartupStatusTone = .warning
+        }
     }
 
     @discardableResult
@@ -976,4 +1050,10 @@ enum APIKeyPersistenceState: Equatable {
     case keychain
     case keychainLocked
     case sessionOnly
+}
+
+enum SettingsCalloutTone: Equatable {
+    case secondary
+    case warning
+    case error
 }
