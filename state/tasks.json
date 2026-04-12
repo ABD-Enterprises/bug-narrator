@@ -178,9 +178,16 @@
       "title": "Sanitize committed personal-machine path leakage in helper scripts, test fixtures, state metadata, and tracked artifacts",
       "status": "completed",
       "updated_at": "2026-04-12T16:36:38.000Z"
+    },
+    {
+      "id": "BOOTSTRAP-T6",
+      "phase": "bootstrap",
+      "title": "Adopt the latest vendored enterprise-ai-standards validator, guardrails workflow, and execution lease contract",
+      "status": "completed",
+      "updated_at": "2026-04-12T19:11:53.000Z"
     }
   ],
-  "last_updated": "2026-04-12T16:36:38.000Z",
+  "last_updated": "2026-04-12T19:11:53.000Z",
   "tasks": [
     {
       "id": "RR-002-T4",
@@ -357,6 +364,13 @@
       "title": "Sanitize committed personal-machine path leakage in helper scripts, test fixtures, state metadata, and tracked artifacts",
       "status": "completed",
       "updated_at": "2026-04-12T16:36:38.000Z"
+    },
+    {
+      "id": "BOOTSTRAP-T6",
+      "phase": "bootstrap",
+      "title": "Adopt the latest vendored enterprise-ai-standards validator, guardrails workflow, and execution lease contract",
+      "status": "completed",
+      "updated_at": "2026-04-12T19:11:53.000Z"
     }
   ]
 }

@@ -1,5 +1,6 @@
 # Controller State
 
+state: blocked
 current_state: blocked
 state_owner: Claude
 

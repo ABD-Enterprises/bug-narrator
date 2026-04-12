@@ -12,9 +12,19 @@ const REQUIRED_STATE_FILES = [
   "state/artifacts.json",
   "state/handoff.json"
 ];
-const REQUIRED_CONTROL_FILES = [
+const REQUIRED_WORKFLOW_FILES = [
+  "ai/bootstrap.md",
+  "ai/plan.md",
+  "ai/tasks.md",
+  "ai/acceptance.md",
   "state/controller.md",
-  "state/current_task.md"
+  "state/current_task.md",
+  "state/implementation_notes.md",
+  "state/validation_report.md"
+];
+const REQUIRED_REPO_FILES = [
+  ...REQUIRED_STATE_FILES,
+  ...REQUIRED_WORKFLOW_FILES
 ];
 
 const STATE_UPDATE_FILES = new Set([
@@ -81,6 +91,7 @@ const DOC_PATTERNS = [
 ];
 
 const STATE_OR_META_PATTERNS = [
+  /^ai\//,
   /^state\//,
   /^docs\/roadmap\/state\.json$/,
   /^docs\/roadmap\/roadmap\.md$/,
@@ -89,6 +100,20 @@ const STATE_OR_META_PATTERNS = [
   /^scripts\/validate\.sh$/,
   /^\.github\/workflows\//
 ];
+
+const FRONTEND_FILE_PATTERNS = [
+  /\.tsx$/,
+  /\.jsx$/,
+  /\.vue$/,
+  /\.svelte$/,
+  /\.css$/,
+  /\.scss$/,
+  /\.less$/
+];
+
+function isFrontendFile(relativePath) {
+  return FRONTEND_FILE_PATTERNS.some((pattern) => pattern.test(relativePath));
+}
 
 const EVIDENCE_KEYS = ["build", "test", "run", "deploy"];
 const ALLOWED_EVIDENCE_STATUSES = new Set([
@@ -116,6 +141,7 @@ const ALLOWED_PHASE_STATUSES = new Set([
   "blocked",
   "complete"
 ]);
+const ALLOWED_RUN_PROFILES = new Set(["standard", "night"]);
 const ALLOWED_CONTROLLER_STATES = new Set([
   "ready_for_claude",
   "ready_for_codex",
@@ -124,27 +150,6 @@ const ALLOWED_CONTROLLER_STATES = new Set([
   "blocked",
   "done"
 ]);
-const ALLOWED_CONTROLLER_OWNERS = new Set(["Claude", "Codex"]);
-const ALLOWED_FAILURE_TYPES = new Set([
-  "none",
-  "ci_failure",
-  "review_failure",
-  "planning_failure"
-]);
-const REQUIRED_CONTROLLER_TRANSITIONS = [
-  "ready_for_claude -> ready_for_codex",
-  "ready_for_claude -> blocked",
-  "ready_for_codex -> ready_for_review",
-  "ready_for_codex -> blocked",
-  "ready_for_review -> review_failed_fix_required",
-  "ready_for_review -> ready_for_claude",
-  "ready_for_review -> done",
-  "ready_for_review -> blocked",
-  "review_failed_fix_required -> ready_for_review",
-  "review_failed_fix_required -> ready_for_claude",
-  "review_failed_fix_required -> blocked"
-];
-const ALLOWED_RUN_PROFILES = new Set(["standard", "night"]);
 const RESOLVED_RISK_STATUSES = new Set(["resolved", "closed"]);
 
 function parseArgs(argv) {
@@ -185,10 +190,6 @@ function printUsage() {
 
 function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
-}
-
-function readTextFile(filePath) {
-  return fs.readFileSync(filePath, "utf8");
 }
 
 function exists(filePath) {
@@ -658,6 +659,16 @@ function addFailure(failures, message) {
   }
 }
 
+function readTextFile(filePath) {
+  return fs.readFileSync(filePath, "utf8");
+}
+
+function extractMarkdownField(content, fieldName) {
+  const pattern = new RegExp(`^${fieldName}:\\s*(.+)$`, "mi");
+  const match = content.match(pattern);
+  return match ? match[1].trim() : "";
+}
+
 function getRepoVisibleFiles(repoRoot) {
   const fromGit = runGit(repoRoot, [
     "ls-files",
@@ -682,241 +693,42 @@ function pathMatchesProtectedEnvironmentPath(relativePath, protectedPaths) {
 }
 
 function validateRequiredFiles(repoRoot, failures) {
-  for (const relativePath of REQUIRED_STATE_FILES) {
+  for (const relativePath of REQUIRED_REPO_FILES) {
     const absolutePath = path.join(repoRoot, relativePath);
     if (!exists(absolutePath)) {
+      const label = REQUIRED_WORKFLOW_FILES.includes(relativePath)
+        ? "workflow file"
+        : "state file";
       addFailure(
         failures,
-        `Missing required state file: ${relativePath}; validator does not infer missing state from BrewSync, machine state, or control layers`
+        `Missing required ${label}: ${relativePath}; validator does not infer missing execution contract inputs from chat memory, BrewSync, machine state, or control layers`
       );
     }
   }
+}
 
-  for (const relativePath of REQUIRED_CONTROL_FILES) {
+function validateWorkflowFiles(repoRoot, failures) {
+  for (const relativePath of REQUIRED_WORKFLOW_FILES) {
     const absolutePath = path.join(repoRoot, relativePath);
-    if (!exists(absolutePath)) {
-      addFailure(
-        failures,
-        `Missing required control file: ${relativePath}; execution state must be file-driven inside the repo`
-      );
-    }
-  }
-}
-
-function normalizeSectionKey(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function parseMarkdownStateFile(content) {
-  const parsed = {
-    content,
-    sections: {}
-  };
-  let currentSection = null;
-
-  for (const rawLine of String(content || "").split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line) {
+    if (!exists(absolutePath) || isDirectory(absolutePath)) {
       continue;
     }
 
-    const headingMatch = line.match(/^##\s+(.+)$/);
-    if (headingMatch) {
-      currentSection = normalizeSectionKey(headingMatch[1]);
-      parsed.sections[currentSection] = parsed.sections[currentSection] || [];
+    const content = readTextFile(absolutePath).trim();
+    if (!content) {
+      addFailure(failures, `Required workflow file is empty: ${relativePath}`);
       continue;
     }
 
-    const keyValueMatch = line.match(/^([a-z_]+):\s*(.+)$/);
-    if (keyValueMatch && !currentSection) {
-      parsed[keyValueMatch[1]] = keyValueMatch[2].trim();
-      continue;
+    if (relativePath === "state/controller.md") {
+      const state = extractMarkdownField(content, "state");
+      if (!ALLOWED_CONTROLLER_STATES.has(state)) {
+        addFailure(
+          failures,
+          `state/controller.md state must be one of ${[...ALLOWED_CONTROLLER_STATES].join(", ")}`
+        );
+      }
     }
-
-    const bulletMatch = line.match(/^- (.+)$/);
-    if (bulletMatch && currentSection) {
-      parsed.sections[currentSection].push(bulletMatch[1].trim());
-      continue;
-    }
-
-    if (currentSection) {
-      parsed.sections[currentSection].push(line);
-    }
-  }
-
-  return parsed;
-}
-
-function validateControllerAndTaskState(controller, currentTask, failures) {
-  const requiredControllerFields = ["current_state", "state_owner"];
-  const requiredControllerSections = [
-    "allowed_transitions",
-    "transition_rules",
-    "done_criteria",
-    "blocked_criteria"
-  ];
-
-  for (const field of requiredControllerFields) {
-    if (!String(controller[field] || "").trim()) {
-      addFailure(failures, `state/controller.md missing required field: ${field}`);
-    }
-  }
-
-  for (const section of requiredControllerSections) {
-    if (!Array.isArray(controller.sections[section]) || controller.sections[section].length === 0) {
-      addFailure(failures, `state/controller.md missing required section entries: ${section}`);
-    }
-  }
-
-  if (!ALLOWED_CONTROLLER_STATES.has(String(controller.current_state || ""))) {
-    addFailure(
-      failures,
-      `state/controller.md current_state must be one of ${[...ALLOWED_CONTROLLER_STATES].join(", ")}`
-    );
-  }
-
-  if (!ALLOWED_CONTROLLER_OWNERS.has(String(controller.state_owner || ""))) {
-    addFailure(
-      failures,
-      `state/controller.md state_owner must be one of ${[...ALLOWED_CONTROLLER_OWNERS].join(", ")}`
-    );
-  }
-
-  if (controller.content.includes("ready_for_gemini")) {
-    addFailure(failures, "state/controller.md must not reference ready_for_gemini");
-  }
-
-  const allowedTransitions = Array.isArray(controller.sections.allowed_transitions)
-    ? controller.sections.allowed_transitions
-    : [];
-
-  for (const requiredTransition of REQUIRED_CONTROLLER_TRANSITIONS) {
-    if (!allowedTransitions.includes(requiredTransition)) {
-      addFailure(
-        failures,
-        `state/controller.md missing required transition: ${requiredTransition}`
-      );
-    }
-  }
-
-  if (
-    controller.current_state === "ready_for_claude" &&
-    controller.state_owner !== "Claude"
-  ) {
-    addFailure(
-      failures,
-      "state/controller.md state_owner must be Claude when current_state is ready_for_claude"
-    );
-  }
-
-  if (
-    ["ready_for_codex", "ready_for_review", "review_failed_fix_required"].includes(
-      controller.current_state
-    ) &&
-    controller.state_owner !== "Codex"
-  ) {
-    addFailure(
-      failures,
-      `state/controller.md state_owner must be Codex when current_state is ${controller.current_state}`
-    );
-  }
-
-  const requiredTaskFields = [
-    "task_id",
-    "description",
-    "branch",
-    "pr_link",
-    "owner",
-    "current_state",
-    "failure_type",
-    "acceptance_criteria_reference",
-    "last_action",
-    "next_action"
-  ];
-
-  for (const field of requiredTaskFields) {
-    if (!String(currentTask[field] || "").trim()) {
-      addFailure(failures, `state/current_task.md missing required field: ${field}`);
-    }
-  }
-
-  if (!ALLOWED_CONTROLLER_OWNERS.has(String(currentTask.owner || ""))) {
-    addFailure(
-      failures,
-      `state/current_task.md owner must be one of ${[...ALLOWED_CONTROLLER_OWNERS].join(", ")}`
-    );
-  }
-
-  if (!ALLOWED_CONTROLLER_STATES.has(String(currentTask.current_state || ""))) {
-    addFailure(
-      failures,
-      `state/current_task.md current_state must be one of ${[...ALLOWED_CONTROLLER_STATES].join(", ")}`
-    );
-  }
-
-  if (!ALLOWED_FAILURE_TYPES.has(String(currentTask.failure_type || ""))) {
-    addFailure(
-      failures,
-      `state/current_task.md failure_type must be one of ${[...ALLOWED_FAILURE_TYPES].join(", ")}`
-    );
-  }
-
-  if (currentTask.current_state !== controller.current_state) {
-    addFailure(
-      failures,
-      "state/current_task.md current_state must match state/controller.md current_state"
-    );
-  }
-
-  if (currentTask.owner !== controller.state_owner) {
-    addFailure(
-      failures,
-      "state/current_task.md owner must match state/controller.md state_owner"
-    );
-  }
-
-  if (
-    currentTask.failure_type === "planning_failure" &&
-    currentTask.current_state !== "ready_for_claude"
-  ) {
-    addFailure(
-      failures,
-      "state/current_task.md planning_failure may only appear when current_state is ready_for_claude"
-    );
-  }
-
-  if (
-    ["ci_failure", "review_failure"].includes(String(currentTask.failure_type || "")) &&
-    currentTask.current_state !== "review_failed_fix_required"
-  ) {
-    addFailure(
-      failures,
-      "state/current_task.md ci_failure and review_failure require current_state review_failed_fix_required"
-    );
-  }
-
-  if (
-    currentTask.current_state === "review_failed_fix_required" &&
-    !["ci_failure", "review_failure"].includes(String(currentTask.failure_type || ""))
-  ) {
-    addFailure(
-      failures,
-      "state/current_task.md review_failed_fix_required requires failure_type ci_failure or review_failure"
-    );
-  }
-
-  if (
-    currentTask.current_state === "ready_for_claude" &&
-    !["none", "planning_failure"].includes(String(currentTask.failure_type || ""))
-  ) {
-    addFailure(
-      failures,
-      "state/current_task.md ready_for_claude only allows failure_type none or planning_failure"
-    );
   }
 }
 
@@ -1553,6 +1365,61 @@ function validatePhaseRules(
   }
 }
 
+function isGitIgnored(repoRoot, relativePath) {
+  try {
+    execFileSync("git", ["check-ignore", "-q", relativePath], {
+      cwd: repoRoot,
+      stdio: ["ignore", "ignore", "ignore"]
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateGitignoreSafety(repoRoot, failures) {
+  const pipelineFiles = [
+    ...REQUIRED_REPO_FILES,
+    "ai.config.json"
+  ];
+
+  for (const relativePath of pipelineFiles) {
+    if (isGitIgnored(repoRoot, relativePath)) {
+      addFailure(
+        failures,
+        `Pipeline file ${relativePath} is matched by .gitignore — the validator, Codex, and Claude will not see changes to this file`
+      );
+    }
+  }
+}
+
+function validateUICompliance(repoRoot, changedFiles, failures) {
+  const frontendChanges = changedFiles.filter((relativePath) =>
+    isFrontendFile(relativePath)
+  );
+
+  if (frontendChanges.length === 0) {
+    return;
+  }
+
+  const validationReportPath = path.join(repoRoot, "state/validation_report.md");
+  if (!exists(validationReportPath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(validationReportPath, "utf8").toLowerCase();
+  if (
+    !content.includes("ui compliance") &&
+    !content.includes("ui-business-software") &&
+    !content.includes("ui standard")
+  ) {
+    addFailure(
+      failures,
+      "Frontend files changed without UI compliance acknowledgment in state/validation_report.md (see developer/ui-business-software.md)"
+    );
+  }
+}
+
 function main() {
   let options;
   try {
@@ -1566,7 +1433,9 @@ function main() {
   const failures = [];
 
   try {
+    validateGitignoreSafety(repoRoot, failures);
     validateRequiredFiles(repoRoot, failures);
+    validateWorkflowFiles(repoRoot, failures);
     if (failures.length > 0) {
       throw new Error("missing-files");
     }
@@ -1580,12 +1449,6 @@ function main() {
     const decisions = readJsonFile(path.join(repoRoot, "state/decisions.json"));
     const artifacts = readJsonFile(path.join(repoRoot, "state/artifacts.json"));
     const handoff = readJsonFile(path.join(repoRoot, "state/handoff.json"));
-    const controller = parseMarkdownStateFile(
-      readTextFile(path.join(repoRoot, "state/controller.md"))
-    );
-    const currentTask = parseMarkdownStateFile(
-      readTextFile(path.join(repoRoot, "state/current_task.md"))
-    );
 
     const baseRoadmap = readJsonAtGitRef(repoRoot, baseRef, "docs/roadmap/state.json");
     const baseRisks = readJsonAtGitRef(repoRoot, baseRef, "state/risks.json");
@@ -1601,7 +1464,6 @@ function main() {
     );
 
     validateRoadmapState(roadmap, tasks, failures);
-    validateControllerAndTaskState(controller, currentTask, failures);
     validateEvidenceStructure(repoRoot, artifacts, config.value, failures);
     validateRiskAndHandoffState(risks, handoff, failures);
     validateDecisions(decisions, failures);
@@ -1616,6 +1478,7 @@ function main() {
       config.value,
       failures
     );
+    validateUICompliance(repoRoot, changedFiles, failures);
 
     if (failures.length > 0) {
       console.error("FAIL:");
