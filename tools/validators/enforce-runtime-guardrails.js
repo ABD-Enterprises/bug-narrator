@@ -63,7 +63,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "protected_environment_paths",
   "evidence_directories",
   "meta_directories",
-  "allowed_metadata_only_evidence_types"
+  "allowed_metadata_only_evidence_types",
+  "auto_merge"
 ]);
 const ALLOWED_EXTERNAL_INPUT_LAYERS = new Set([
   "environment",
@@ -721,7 +722,9 @@ function validateWorkflowFiles(repoRoot, failures) {
     }
 
     if (relativePath === "state/controller.md") {
-      const state = extractMarkdownField(content, "state");
+      const state = extractMarkdownField(content, "current_state")
+        || extractMarkdownField(content, "state")
+        || extractMarkdownField(content, "status");
       if (!ALLOWED_CONTROLLER_STATES.has(state)) {
         addFailure(
           failures,
