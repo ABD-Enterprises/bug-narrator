@@ -1,0 +1,15 @@
+2026-04-12 12:36:00.484 xcodebuild[94786:2776841] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, name:Any Mac }
+/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:39:30: warning: 'SecKeychainGetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
+                             ^
+/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:40:29: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let disableStatus = SecKeychainSetUserInteractionAllowed(false)
+                            ^
+/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:45:21: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+                _ = SecKeychainSetUserInteractionAllowed(restoreState)
+                    ^
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')

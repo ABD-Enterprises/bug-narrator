@@ -1,5 +1,5 @@
 Command line invocation:
-    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-standards-build build
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath <build-root> build
 
 Build settings from command line:
     CODE_SIGNING_ALLOWED = NO
@@ -32,640 +32,640 @@ ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeD
 ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
 
 Build description signature: bfb265e3113c0581c212d3205cfc33b1
-Build description path: /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/XCBuildData/bfb265e3113c0581c212d3205cfc33b1.xcbuilddata
-ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk /tmp/bugnarrator-standards-build/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o /tmp/bugnarrator-standards-build/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+Build description path: <build-root>/Build/Intermediates.noindex/XCBuildData/bfb265e3113c0581c212d3205cfc33b1.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk <build-root>/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+    cd <repo-root>/BugNarrator.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o <build-root>/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Products
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Products
+CreateBuildDirectory <build-root>/Build/Products
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Products
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex
+CreateBuildDirectory <build-root>/Build/Intermediates.noindex
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Intermediates.noindex
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+CreateBuildDirectory <build-root>/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/ExplicitPrecompiledModules
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/ExplicitPrecompiledModules
+CreateBuildDirectory <build-root>/Build/Intermediates.noindex/ExplicitPrecompiledModules
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Intermediates.noindex/ExplicitPrecompiledModules
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Products/Debug
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Products/Debug
+CreateBuildDirectory <build-root>/Build/Products/Debug
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Products/Debug
 
-CreateBuildDirectory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    builtin-create-build-directory /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug
+CreateBuildDirectory <build-root>/Build/Intermediates.noindex/EagerLinkingTBDs/Debug
+    cd <repo-root>/BugNarrator.xcodeproj
+    builtin-create-build-directory <build-root>/Build/Intermediates.noindex/EagerLinkingTBDs/Debug
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator-7105f1fe8228e05a67bfb42a14e25a9c-VFS/all-product-headers.yaml
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator-7105f1fe8228e05a67bfb42a14e25a9c-VFS/all-product-headers.yaml
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator-7105f1fe8228e05a67bfb42a14e25a9c-VFS/all-product-headers.yaml
+    cd <repo-root>/BugNarrator.xcodeproj
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator-7105f1fe8228e05a67bfb42a14e25a9c-VFS/all-product-headers.yaml
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList
 
-MkDir /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app
+MkDir <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Products/Debug/BugNarrator.app
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.hmap
 
-MkDir /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents
+MkDir <build-root>/Build/Products/Debug/BugNarrator.app/Contents (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Products/Debug/BugNarrator.app/Contents
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt
 
-MkDir /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS
+MkDir <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-non-framework-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-non-framework-target-headers.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-non-framework-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-non-framework-target-headers.hmap
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList
 
-MkDir /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources
+MkDir <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json
 
-WriteAuxiliaryFile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    write-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList
+WriteAuxiliaryFile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    write-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList
 
-CpResource /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources/CHANGELOG.md /Users/deffenda/Code/bug-narrator/CHANGELOG.md (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/deffenda/Code/bug-narrator/CHANGELOG.md /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources
+CpResource <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources/CHANGELOG.md <repo-root>/CHANGELOG.md (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks <repo-root>/CHANGELOG.md <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources
 
-Ld /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/__preview.dylib normal (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L/tmp/bugnarrator-standards-build/Build/Products/Debug -F/tmp/bugnarrator-standards-build/Build/Products/Debug -install_name @rpath/BugNarrator.debug.dylib -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat -o /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/__preview.dylib
+Ld <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/__preview.dylib normal (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L<build-root>/Build/Products/Debug -F<build-root>/Build/Products/Debug -install_name @rpath/BugNarrator.debug.dylib -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat -o <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/__preview.dylib
 
-MkDir /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned
+MkDir <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned
 
-MkDir /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /bin/mkdir -p /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned
+MkDir <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /bin/mkdir -p <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned
 
-GenerateAssetSymbols /Users/deffenda/Code/bug-narrator/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/usr/bin/actool /Users/deffenda/Code/bug-narrator/Resources/Assets.xcassets --compile /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources --output-format human-readable-text --notices --warnings --export-dependency-info /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies --output-partial-info-plist /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist --app-icon AppIcon --enable-on-demand-resources NO --development-region en --target-device mac --minimum-deployment-target 14.0 --platform macosx --bundle-identifier com.abdenterprises.bugnarrator --generate-swift-asset-symbol-extensions NO --generate-swift-asset-symbols /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift --generate-objc-asset-symbols /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.h --generate-asset-symbol-index /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+GenerateAssetSymbols <repo-root>/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/usr/bin/actool <repo-root>/Resources/Assets.xcassets --compile <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources --output-format human-readable-text --notices --warnings --export-dependency-info <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies --output-partial-info-plist <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist --app-icon AppIcon --enable-on-demand-resources NO --development-region en --target-device mac --minimum-deployment-target 14.0 --platform macosx --bundle-identifier com.abdenterprises.bugnarrator --generate-swift-asset-symbol-extensions NO --generate-swift-asset-symbols <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift --generate-objc-asset-symbols <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.h --generate-asset-symbol-index <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols-Index.plist
 /* com.apple.actool.compilation-results */
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols-Index.plist
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.h
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.h
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift
 
 
-CompileAssetCatalogVariant thinned /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources /Users/deffenda/Code/bug-narrator/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/usr/bin/actool /Users/deffenda/Code/bug-narrator/Resources/Assets.xcassets --compile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_thinned --output-partial-info-plist /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --enable-on-demand-resources NO --development-region en --target-device mac --minimum-deployment-target 14.0 --platform macosx
+CompileAssetCatalogVariant thinned <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources <repo-root>/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/usr/bin/actool <repo-root>/Resources/Assets.xcassets --compile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_thinned --output-partial-info-plist <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --enable-on-demand-resources NO --development-region en --target-device mac --minimum-deployment-target 14.0 --platform macosx
 /* com.apple.actool.compilation-results */
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned/AppIcon.icns
-/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned/Assets.car
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned/AppIcon.icns
+<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned/Assets.car
 
 
-LinkAssetCatalog /Users/deffenda/Code/bug-narrator/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-linkAssetCatalog --thinned /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned --thinned-dependencies /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned --unthinned /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned --unthinned-dependencies /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_unthinned --output /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources --plist-output /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist
-note: Emplaced /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources/Assets.car (in target 'BugNarrator' from project 'BugNarrator')
-note: Emplaced /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources/AppIcon.icns (in target 'BugNarrator' from project 'BugNarrator')
+LinkAssetCatalog <repo-root>/Resources/Assets.xcassets (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-linkAssetCatalog --thinned <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/thinned --thinned-dependencies <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_thinned --thinned-info-plist-content <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_thinned --unthinned <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_output/unthinned --unthinned-dependencies <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist_unthinned --output <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources --plist-output <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist
+note: Emplaced <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources/Assets.car (in target 'BugNarrator' from project 'BugNarrator')
+note: Emplaced <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources/AppIcon.icns (in target 'BugNarrator' from project 'BugNarrator')
 
-ProcessInfoPlistFile /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Info.plist /Users/deffenda/Code/bug-narrator/Resources/Info.plist (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-infoPlistUtility /Users/deffenda/Code/bug-narrator/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist -o /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Info.plist
+ProcessInfoPlistFile <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Info.plist <repo-root>/Resources/Info.plist (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-infoPlistUtility <repo-root>/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo <build-root>/Build/Products/Debug/BugNarrator.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist -o <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Info.plist
 
 SwiftDriver BugNarrator normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /tmp/bugnarrator-standards-build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /tmp/bugnarrator-standards-build/Build/Products/Debug -F /tmp/bugnarrator-standards-build/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /tmp/bugnarrator-standards-build/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -sdk-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file /tmp/bugnarrator-standards-build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Products/Debug/include -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory /Users/deffenda/Code/bug-narrator -experimental-emit-module-separately -disable-cmo
+    cd <repo-root>
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path <build-root>/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path <build-root>/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I <build-root>/Build/Products/Debug -F <build-root>/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc <build-root>/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path <build-root>/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path <build-root>/ModuleCache.noindex -sdk-module-cache-path <build-root>/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file <build-root>/ModuleCache.noindex/Session.modulevalidation -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I<build-root>/Build/Products/Debug/include -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory <repo-root> -experimental-emit-module-separately -disable-cmo
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ptrcheck-C9F44S9VWJYVCCGSHQXQWUT80.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ptrcheck-C9F44S9VWJYVCCGSHQXQWUT80.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_stdbool-DD31JQERML711CZS7N9U6TNM4.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_stdbool-DD31JQERML711CZS7N9U6TNM4.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_AvailabilityInternal-EGKGSZT9ELQ26430L54AD3C32.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_AvailabilityInternal-EGKGSZT9ELQ26430L54AD3C32.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ptrauth-6NNIS10NL8Y9FTSJ1P6KWKY3X.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ptrauth-6NNIS10NL8Y9FTSJ1P6KWKY3X.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/SwiftShims-34MUUGJ6DJWGOK98UR1FW15FU.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/SwiftShims-34MUUGJ6DJWGOK98UR1FW15FU.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_stdarg-APJCPQNT5MHZM2IDCTJK1L8S7.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_stdarg-APJCPQNT5MHZM2IDCTJK1L8S7.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_stddef-VA9H66Y8EP7O0G4DVQP6J60C.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_stddef-VA9H66Y8EP7O0G4DVQP6J60C.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_SwiftConcurrencyShims-COP5K3TK2R0DH5W4WKMTZELB6.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_SwiftConcurrencyShims-COP5K3TK2R0DH5W4WKMTZELB6.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/DeveloperToolsSupport-9WR1X09GHGRXQIRZJP90E18JF.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/DeveloperToolsSupport-9WR1X09GHGRXQIRZJP90E18JF.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_float-8SPOT9EMIYSVJPEUTZGMD20I7.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_float-8SPOT9EMIYSVJPEUTZGMD20I7.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_DarwinFoundation1-2MLN8JNT0DZJNF8HYG20MSAT9.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_DarwinFoundation1-2MLN8JNT0DZJNF8HYG20MSAT9.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_DarwinFoundation2-4ZTESVZECN0T94VFI1MLGUNPK.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_DarwinFoundation2-4ZTESVZECN0T94VFI1MLGUNPK.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_limits-4YCNA08THJ13XAAKI9CBTKOXP.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_limits-4YCNA08THJ13XAAKI9CBTKOXP.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/sys_types-6NH0EZJ4VFP9A1WITOHF685GU.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/sys_types-6NH0EZJ4VFP9A1WITOHF685GU.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_tgmath-9QJIQN3JQ1PKKQW4RDKEOB4CP.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_tgmath-9QJIQN3JQ1PKKQW4RDKEOB4CP.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_stdint-BVRAXWMZSF9Q0BICTNF4L864Y.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_stdint-BVRAXWMZSF9Q0BICTNF4L864Y.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_DarwinFoundation3-DZBDMQOF040LL47TTEWG4FD9H.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_DarwinFoundation3-DZBDMQOF040LL47TTEWG4FD9H.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_stdatomic-DFZR13DCE6YEBB4SYYNXRCATF.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_stdatomic-DFZR13DCE6YEBB4SYYNXRCATF.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/libDER-AN1DA3ELZ0RIPTGUWQPYB0DT.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/libDER-AN1DA3ELZ0RIPTGUWQPYB0DT.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/OpenGL-DBEC4CIXCQBPPRHWR4AAFD56R.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/OpenGL-DBEC4CIXCQBPPRHWR4AAFD56R.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_intrinsics-3IR3F8UV2CUEG85VC2AOEDH3T.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_intrinsics-3IR3F8UV2CUEG85VC2AOEDH3T.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/_Builtin_inttypes-8N8M7RGKI60MA9A5WIPDELOGZ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/_Builtin_inttypes-8N8M7RGKI60MA9A5WIPDELOGZ.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Darwin-1LW3YC6IM4W7VLBLCCEL8E9T1.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Darwin-1LW3YC6IM4W7VLBLCCEL8E9T1.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/simd-28O6W22HFHI8MG6S7J8N1CU3X.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/simd-28O6W22HFHI8MG6S7J8N1CU3X.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/libkern-DDR74OW56KABBN0TDYH23WS67.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/libkern-DDR74OW56KABBN0TDYH23WS67.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CUPS-8QPRO7GBKRYOGNKSOUIAQYOXJ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CUPS-8QPRO7GBKRYOGNKSOUIAQYOXJ.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/MachO-6RGPJS4TAKI8EYIA5C8NBQGTL.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/MachO-6RGPJS4TAKI8EYIA5C8NBQGTL.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/launch-79MBQ6JAA9HI21FRNHT1HFMU3.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/launch-79MBQ6JAA9HI21FRNHT1HFMU3.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Spatial-5TYBWMYFENVS974KKFZVLC6S4.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Spatial-5TYBWMYFENVS974KKFZVLC6S4.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ObjectiveC-CVM5U1ENW7WK33QHJ6EBLA9A3.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ObjectiveC-CVM5U1ENW7WK33QHJ6EBLA9A3.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/os_object-7T2656WHNUW85R0ASB2I3P1MB.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/os_object-7T2656WHNUW85R0ASB2I3P1MB.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/os_workgroup-BWAZQUAGJS7TRK3YLB7KURYMJ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/os_workgroup-BWAZQUAGJS7TRK3YLB7KURYMJ.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Dispatch-AKRWQ9ZEIC5DP3RDF89U2EHCE.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Dispatch-AKRWQ9ZEIC5DP3RDF89U2EHCE.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/XPC-OEBGFEO8M3CGEP4HGVA6R3LJ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/XPC-OEBGFEO8M3CGEP4HGVA6R3LJ.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreFoundation-U7UZMIQFOX1UP2J8QV0U5D0P.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreFoundation-U7UZMIQFOX1UP2J8QV0U5D0P.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/os-7GMZKZ4S1NUHRKMH2O9XWOEE.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/os-7GMZKZ4S1NUHRKMH2O9XWOEE.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ColorSync-EHH2WY9OEI4VMVOOEUNKPY8RO.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ColorSync-EHH2WY9OEI4VMVOOEUNKPY8RO.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreAudioTypes-67N18OPKPTJ9PXEEFW41Y9V1F.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreAudioTypes-67N18OPKPTJ9PXEEFW41Y9V1F.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/IOKit-CI619WZD83HKK18J4NICDUN6D.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/IOKit-CI619WZD83HKK18J4NICDUN6D.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Security-3BB9DFPNBTQ2D1UNB2CKTVBAK.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Security-3BB9DFPNBTQ2D1UNB2CKTVBAK.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CFNetwork-BMSXGDWZ9OL4DS7E6MYLRNRSB.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CFNetwork-BMSXGDWZ9OL4DS7E6MYLRNRSB.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/DiskArbitration-CQ9HRKF7MGUBQI16IL470J6JK.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/DiskArbitration-CQ9HRKF7MGUBQI16IL470J6JK.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreGraphics-EZYTRE5WX4D3WESJ6GBGBBN40.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreGraphics-EZYTRE5WX4D3WESJ6GBGBBN40.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreServices-EZ2J94AOC0W0U9YFSFFL1U0JO.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreServices-EZ2J94AOC0W0U9YFSFFL1U0JO.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ImageIO-35F8EA8K03YA2DO73KHHKSYPG.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ImageIO-35F8EA8K03YA2DO73KHHKSYPG.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreText-54W1IAXK4PYTFJ6CRBE4J8UWK.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreText-54W1IAXK4PYTFJ6CRBE4J8UWK.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Foundation-4EQJZKOJFU72753O9DDYS7I0O.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Foundation-4EQJZKOJFU72753O9DDYS7I0O.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/LocalAuthentication-1589AIQ0Y2RYSC1AY5L834LY0.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/LocalAuthentication-1589AIQ0Y2RYSC1AY5L834LY0.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/DataDetection-4DUXXK12FM49U4U0LIRU2RY6W.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/DataDetection-4DUXXK12FM49U4U0LIRU2RY6W.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreData-AY016NI261RQXALCQB7562AWD.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreData-AY016NI261RQXALCQB7562AWD.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/UniformTypeIdentifiers-8F2JRZTP14399WPCURUXKZBUU.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/UniformTypeIdentifiers-8F2JRZTP14399WPCURUXKZBUU.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreAudio-5HL70DMSOT98XLYKN1SV13E0K.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreAudio-5HL70DMSOT98XLYKN1SV13E0K.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/OSLog-1ZFKCN7TLFG4RTY84Q0X7HQIP.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/OSLog-1ZFKCN7TLFG4RTY84Q0X7HQIP.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/IOSurface-BKH1GABCQ6EB9QNEPA5KIWR70.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/IOSurface-BKH1GABCQ6EB9QNEPA5KIWR70.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ApplicationServices-8JCSXDI1GZI6N5HC8M3ZBPWN9.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ApplicationServices-8JCSXDI1GZI6N5HC8M3ZBPWN9.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreTransferable-CNJP8ZCBZ0ZOF172JMY1HLR0I.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreTransferable-CNJP8ZCBZ0ZOF172JMY1HLR0I.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreMIDI-5NQYRM8OFTEQMJMUO7LGKIOO.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreMIDI-5NQYRM8OFTEQMJMUO7LGKIOO.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Symbols-111FS422CZ0JU3MLXPQLL81TC.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Symbols-111FS422CZ0JU3MLXPQLL81TC.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Accessibility-2QZ7SLPBG2396H4YE4XL253Q6.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Accessibility-2QZ7SLPBG2396H4YE4XL253Q6.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Metal-9VMR0ZFW40H1ODRCT5B5FZEG3.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Metal-9VMR0ZFW40H1ODRCT5B5FZEG3.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/Carbon-2Z1HP02CXLS7JAJDMMLLZBTV6.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/Carbon-2Z1HP02CXLS7JAJDMMLLZBTV6.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreVideo-9CBRDX2XC4W9FNDHYRMD8W600.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreVideo-9CBRDX2XC4W9FNDHYRMD8W600.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/AudioToolbox-5U1KXBSYJD0HYVU7Y8W2IT9L6.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/AudioToolbox-5U1KXBSYJD0HYVU7Y8W2IT9L6.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreMedia-76JG3UTOTJFLNHQLVYY0B2BWY.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreMedia-76JG3UTOTJFLNHQLVYY0B2BWY.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/CoreImage-2FGG1D3UAW5CT8JMYERUEHUVW.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/CoreImage-2FGG1D3UAW5CT8JMYERUEHUVW.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/QuartzCore-9ZYVSRKSUWQCOMMMA4TH0HS0J.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/QuartzCore-9ZYVSRKSUWQCOMMMA4TH0HS0J.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/SwiftUICore-408IAU1AQMDTL0IJNWASWLN1T.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/SwiftUICore-408IAU1AQMDTL0IJNWASWLN1T.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/MediaToolbox-B8B0W9AK22PSBOMAJ7XL8EQWB.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/MediaToolbox-B8B0W9AK22PSBOMAJ7XL8EQWB.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/AVFAudio-EKPCBVB5IY05GX7B39YT2DDJ1.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/AVFAudio-EKPCBVB5IY05GX7B39YT2DDJ1.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/AppKit-5UJ0GLNKIZECCWZTSMS80OSXX.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/AppKit-5UJ0GLNKIZECCWZTSMS80OSXX.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/AVFoundation-EQEKMHX0Z56OIXUQXVFEP0I3T.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/AVFoundation-EQEKMHX0Z56OIXUQXVFEP0I3T.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/SwiftUI-6HFJTPWF4UGI51T1VIZHIZ3DR.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/SwiftUI-6HFJTPWF4UGI51T1VIZHIZ3DR.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /tmp/bugnarrator-standards-build/ModuleCache.noindex/ScreenCaptureKit-33ZPOQM0689RCXQVGRTV1P5R2.pcm
+SwiftExplicitDependencyGeneratePcm arm64 <build-root>/ModuleCache.noindex/ScreenCaptureKit-33ZPOQM0689RCXQVGRTV1P5R2.pcm
 
-SwiftCompile normal arm64 Compiling\ URLHandler.swift,\ WindowCoordinator.swift,\ GeneratedAssetSymbols.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/URLHandler.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/WindowCoordinator.swift /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ URLHandler.swift,\ WindowCoordinator.swift,\ GeneratedAssetSymbols.swift <repo-root>/Sources/BugNarrator/Services/URLHandler.swift <repo-root>/Sources/BugNarrator/WindowCoordinator.swift <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/URLHandler.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/URLHandler.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/WindowCoordinator.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/WindowCoordinator.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
 SwiftEmitModule normal arm64 Emitting\ module\ for\ BugNarrator (in target 'BugNarrator' from project 'BugNarrator')
 
 EmitSwiftModule normal arm64 (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ TranscriptSectionBuilder.swift,\ TranscriptSession.swift,\ TranscriptStore.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptSectionBuilder.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TranscriptSession.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptStore.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ TranscriptSectionBuilder.swift,\ TranscriptSession.swift,\ TranscriptStore.swift <repo-root>/Sources/BugNarrator/Services/TranscriptSectionBuilder.swift <repo-root>/Sources/BugNarrator/Models/TranscriptSession.swift <repo-root>/Sources/BugNarrator/Services/TranscriptStore.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptSectionBuilder.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/TranscriptSectionBuilder.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TranscriptSession.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/TranscriptSession.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptStore.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/TranscriptStore.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ SupportView.swift,\ TranscriptExporter.swift,\ TranscriptSection.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/SupportView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptExporter.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TranscriptSection.swift (in target 'BugNarrator' from project 'BugNarrator')
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/SupportView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 Compiling\ SupportView.swift,\ TranscriptExporter.swift,\ TranscriptSection.swift <repo-root>/Sources/BugNarrator/Views/SupportView.swift <repo-root>/Sources/BugNarrator/Services/TranscriptExporter.swift <repo-root>/Sources/BugNarrator/Models/TranscriptSection.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/SupportView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptExporter.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/TranscriptExporter.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TranscriptSection.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/TranscriptSection.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ TranscriptView.swift,\ TranscriptionClient.swift,\ TransientToast.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/TranscriptView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptionClient.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TransientToast.swift (in target 'BugNarrator' from project 'BugNarrator')
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/TranscriptView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 Compiling\ TranscriptView.swift,\ TranscriptionClient.swift,\ TransientToast.swift <repo-root>/Sources/BugNarrator/Views/TranscriptView.swift <repo-root>/Sources/BugNarrator/Services/TranscriptionClient.swift <repo-root>/Sources/BugNarrator/Models/TransientToast.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/TranscriptView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/TranscriptionClient.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/TranscriptionClient.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/TransientToast.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/TransientToast.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ SettingsStore.swift,\ SettingsView.swift,\ SingleInstanceController.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/SettingsStore.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/SettingsView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/SingleInstanceController.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ SettingsStore.swift,\ SettingsView.swift,\ SingleInstanceController.swift <repo-root>/Sources/BugNarrator/Services/SettingsStore.swift <repo-root>/Sources/BugNarrator/Views/SettingsView.swift <repo-root>/Sources/BugNarrator/Utilities/SingleInstanceController.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/SettingsStore.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/SettingsStore.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/SettingsView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/SettingsView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/SingleInstanceController.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/SingleInstanceController.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ SessionLibrary.swift,\ SessionMarker.swift,\ SessionScreenshot.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/SessionLibrary.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/SessionMarker.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/SessionScreenshot.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ SessionLibrary.swift,\ SessionMarker.swift,\ SessionScreenshot.swift <repo-root>/Sources/BugNarrator/Utilities/SessionLibrary.swift <repo-root>/Sources/BugNarrator/Models/SessionMarker.swift <repo-root>/Sources/BugNarrator/Models/SessionScreenshot.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/SessionLibrary.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/SessionLibrary.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/SessionMarker.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/SessionMarker.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/SessionScreenshot.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/SessionScreenshot.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ ScreenshotSelectionService.swift,\ ServiceProtocols.swift,\ SessionArtifactsService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenshotSelectionService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ServiceProtocols.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/SessionArtifactsService.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ ScreenshotSelectionService.swift,\ ServiceProtocols.swift,\ SessionArtifactsService.swift <repo-root>/Sources/BugNarrator/Services/ScreenshotSelectionService.swift <repo-root>/Sources/BugNarrator/Services/ServiceProtocols.swift <repo-root>/Sources/BugNarrator/Services/SessionArtifactsService.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenshotSelectionService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ScreenshotSelectionService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ServiceProtocols.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ServiceProtocols.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/SessionArtifactsService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/SessionArtifactsService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ ScreenCapturePermissionService.swift,\ ScreenshotCaptureService.swift,\ ScreenshotPreviewCache.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenCapturePermissionService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenshotCaptureService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ScreenshotPreviewCache.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ ScreenCapturePermissionService.swift,\ ScreenshotCaptureService.swift,\ ScreenshotPreviewCache.swift <repo-root>/Sources/BugNarrator/Services/ScreenCapturePermissionService.swift <repo-root>/Sources/BugNarrator/Services/ScreenshotCaptureService.swift <repo-root>/Sources/BugNarrator/Utilities/ScreenshotPreviewCache.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenCapturePermissionService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ScreenCapturePermissionService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ScreenshotCaptureService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ScreenshotCaptureService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ScreenshotPreviewCache.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/ScreenshotPreviewCache.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ RecordingControlPanelView.swift,\ RecordingSessionDraft.swift,\ ReviewWorkspace.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/RecordingControlPanelView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/RecordingSessionDraft.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ReviewWorkspace.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ RecordingControlPanelView.swift,\ RecordingSessionDraft.swift,\ ReviewWorkspace.swift <repo-root>/Sources/BugNarrator/Views/RecordingControlPanelView.swift <repo-root>/Sources/BugNarrator/Models/RecordingSessionDraft.swift <repo-root>/Sources/BugNarrator/Utilities/ReviewWorkspace.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/RecordingControlPanelView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/RecordingControlPanelView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/RecordingSessionDraft.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/RecordingSessionDraft.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ReviewWorkspace.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/ReviewWorkspace.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ MicrophonePermissionResolver.swift,\ MicrophonePermissionService.swift,\ OpenAIErrorMapper.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/MicrophonePermissionResolver.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/MicrophonePermissionService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/OpenAIErrorMapper.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ MicrophonePermissionResolver.swift,\ MicrophonePermissionService.swift,\ OpenAIErrorMapper.swift <repo-root>/Sources/BugNarrator/Utilities/MicrophonePermissionResolver.swift <repo-root>/Sources/BugNarrator/Services/MicrophonePermissionService.swift <repo-root>/Sources/BugNarrator/Services/OpenAIErrorMapper.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/MicrophonePermissionResolver.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/MicrophonePermissionResolver.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/MicrophonePermissionService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/MicrophonePermissionService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/OpenAIErrorMapper.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/OpenAIErrorMapper.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ HotkeyManager.swift,\ HotkeyRecorderView.swift,\ HotkeyShortcut.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/HotkeyManager.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/HotkeyRecorderView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/HotkeyShortcut.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ HotkeyManager.swift,\ HotkeyRecorderView.swift,\ HotkeyShortcut.swift <repo-root>/Sources/BugNarrator/Services/HotkeyManager.swift <repo-root>/Sources/BugNarrator/Views/HotkeyRecorderView.swift <repo-root>/Sources/BugNarrator/Models/HotkeyShortcut.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/HotkeyManager.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/HotkeyManager.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/HotkeyRecorderView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/HotkeyRecorderView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/HotkeyShortcut.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/HotkeyShortcut.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ ExtractedIssue.swift,\ GitHubExportProvider.swift,\ HotkeyAction.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/ExtractedIssue.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/GitHubExportProvider.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/HotkeyAction.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ ExtractedIssue.swift,\ GitHubExportProvider.swift,\ HotkeyAction.swift <repo-root>/Sources/BugNarrator/Models/ExtractedIssue.swift <repo-root>/Sources/BugNarrator/Services/GitHubExportProvider.swift <repo-root>/Sources/BugNarrator/Models/HotkeyAction.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/ExtractedIssue.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/ExtractedIssue.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/GitHubExportProvider.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/GitHubExportProvider.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/HotkeyAction.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/HotkeyAction.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ DebugBundleExporter.swift,\ ElapsedTimeFormatter.swift,\ ExportService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/DebugBundleExporter.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ElapsedTimeFormatter.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ExportService.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ DebugBundleExporter.swift,\ ElapsedTimeFormatter.swift,\ ExportService.swift <repo-root>/Sources/BugNarrator/Services/DebugBundleExporter.swift <repo-root>/Sources/BugNarrator/Utilities/ElapsedTimeFormatter.swift <repo-root>/Sources/BugNarrator/Services/ExportService.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/DebugBundleExporter.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/DebugBundleExporter.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ElapsedTimeFormatter.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/ElapsedTimeFormatter.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ExportService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ExportService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ BugNarratorDiagnostics.swift,\ BugNarratorLinks.swift,\ BugNarratorMetadata.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorDiagnostics.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorLinks.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorMetadata.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ BugNarratorDiagnostics.swift,\ BugNarratorLinks.swift,\ BugNarratorMetadata.swift <repo-root>/Sources/BugNarrator/Utilities/BugNarratorDiagnostics.swift <repo-root>/Sources/BugNarrator/Utilities/BugNarratorLinks.swift <repo-root>/Sources/BugNarrator/Utilities/BugNarratorMetadata.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorDiagnostics.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/BugNarratorDiagnostics.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorLinks.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/BugNarratorLinks.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/BugNarratorMetadata.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/BugNarratorMetadata.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ ChangelogDocument.swift,\ ChangelogView.swift,\ ClipboardService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ChangelogDocument.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/ChangelogView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ClipboardService.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ ChangelogDocument.swift,\ ChangelogView.swift,\ ClipboardService.swift <repo-root>/Sources/BugNarrator/Utilities/ChangelogDocument.swift <repo-root>/Sources/BugNarrator/Views/ChangelogView.swift <repo-root>/Sources/BugNarrator/Services/ClipboardService.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/ChangelogDocument.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/ChangelogDocument.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/ChangelogView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/ChangelogView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/ClipboardService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/ClipboardService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ IssueExtractionService.swift,\ JiraExportProvider.swift,\ KeychainService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/IssueExtractionService.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/JiraExportProvider.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ IssueExtractionService.swift,\ JiraExportProvider.swift,\ KeychainService.swift <repo-root>/Sources/BugNarrator/Services/IssueExtractionService.swift <repo-root>/Sources/BugNarrator/Services/JiraExportProvider.swift <repo-root>/Sources/BugNarrator/Services/KeychainService.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/IssueExtractionService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/IssueExtractionService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/JiraExportProvider.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/JiraExportProvider.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/KeychainService.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
-/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:39:30: warning: 'SecKeychainGetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+<repo-root>/Sources/BugNarrator/Services/KeychainService.swift:39:30: warning: 'SecKeychainGetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
         let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
                              ^
-/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:40:29: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+<repo-root>/Sources/BugNarrator/Services/KeychainService.swift:40:29: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
         let disableStatus = SecKeychainSetUserInteractionAllowed(false)
                             ^
-/Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/KeychainService.swift:45:21: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+<repo-root>/Sources/BugNarrator/Services/KeychainService.swift:45:21: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
                 _ = SecKeychainSetUserInteractionAllowed(restoreState)
                     ^
 
-SwiftCompile normal arm64 Compiling\ AppRuntimeEnvironment.swift,\ AppState.swift,\ AppStatus.swift,\ AppSupportLocation.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppRuntimeEnvironment.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/AppState.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/AppStatus.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppSupportLocation.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ AppRuntimeEnvironment.swift,\ AppState.swift,\ AppStatus.swift,\ AppSupportLocation.swift <repo-root>/Sources/BugNarrator/Utilities/AppRuntimeEnvironment.swift <repo-root>/Sources/BugNarrator/AppState.swift <repo-root>/Sources/BugNarrator/Models/AppStatus.swift <repo-root>/Sources/BugNarrator/Utilities/AppSupportLocation.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppRuntimeEnvironment.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/AppRuntimeEnvironment.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/AppState.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/AppState.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/AppStatus.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/AppStatus.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppSupportLocation.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/AppSupportLocation.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ AtomicBundleDirectoryWriter.swift,\ AudioRecorder.swift,\ BugNarratorApp.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AtomicBundleDirectoryWriter.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/AudioRecorder.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/BugNarratorApp.swift (in target 'BugNarrator' from project 'BugNarrator')
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AtomicBundleDirectoryWriter.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 Compiling\ AtomicBundleDirectoryWriter.swift,\ AudioRecorder.swift,\ BugNarratorApp.swift <repo-root>/Sources/BugNarrator/Utilities/AtomicBundleDirectoryWriter.swift <repo-root>/Sources/BugNarrator/Services/AudioRecorder.swift <repo-root>/Sources/BugNarrator/BugNarratorApp.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/AtomicBundleDirectoryWriter.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Services/AudioRecorder.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Services/AudioRecorder.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/BugNarratorApp.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/BugNarratorApp.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ MenuBarLabelView.swift,\ MenuBarStatusPresentation.swift,\ MenuBarView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/MenuBarLabelView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/MenuBarStatusPresentation.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/MenuBarView.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ MenuBarLabelView.swift,\ MenuBarStatusPresentation.swift,\ MenuBarView.swift <repo-root>/Sources/BugNarrator/Views/MenuBarLabelView.swift <repo-root>/Sources/BugNarrator/Utilities/MenuBarStatusPresentation.swift <repo-root>/Sources/BugNarrator/Views/MenuBarView.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/MenuBarLabelView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/MenuBarLabelView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/MenuBarStatusPresentation.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/MenuBarStatusPresentation.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/MenuBarView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/MenuBarView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 Compiling\ APIKeyValidationState.swift,\ AboutBugNarratorView.swift,\ AppBootstrap.swift,\ AppError.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/APIKeyValidationState.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/AboutBugNarratorView.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppBootstrap.swift /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/AppError.swift (in target 'BugNarrator' from project 'BugNarrator')
+SwiftCompile normal arm64 Compiling\ APIKeyValidationState.swift,\ AboutBugNarratorView.swift,\ AppBootstrap.swift,\ AppError.swift <repo-root>/Sources/BugNarrator/Models/APIKeyValidationState.swift <repo-root>/Sources/BugNarrator/Views/AboutBugNarratorView.swift <repo-root>/Sources/BugNarrator/Utilities/AppBootstrap.swift <repo-root>/Sources/BugNarrator/Models/AppError.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/APIKeyValidationState.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/APIKeyValidationState.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Views/AboutBugNarratorView.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Views/AboutBugNarratorView.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Utilities/AppBootstrap.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Utilities/AppBootstrap.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
-SwiftCompile normal arm64 /Users/deffenda/Code/bug-narrator/Sources/BugNarrator/Models/AppError.swift (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+SwiftCompile normal arm64 <repo-root>/Sources/BugNarrator/Models/AppError.swift (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
     
 
 SwiftDriverJobDiscovery normal arm64 Emitting module for BugNarrator (in target 'BugNarrator' from project 'BugNarrator')
 
 SwiftDriver\ Compilation\ Requirements BugNarrator normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /tmp/bugnarrator-standards-build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /tmp/bugnarrator-standards-build/Build/Products/Debug -F /tmp/bugnarrator-standards-build/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /tmp/bugnarrator-standards-build/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -sdk-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file /tmp/bugnarrator-standards-build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Products/Debug/include -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory /Users/deffenda/Code/bug-narrator -experimental-emit-module-separately -disable-cmo
+    cd <repo-root>
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path <build-root>/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path <build-root>/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I <build-root>/Build/Products/Debug -F <build-root>/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc <build-root>/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path <build-root>/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path <build-root>/ModuleCache.noindex -sdk-module-cache-path <build-root>/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file <build-root>/ModuleCache.noindex/Session.modulevalidation -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I<build-root>/Build/Products/Debug/include -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory <repo-root> -experimental-emit-module-separately -disable-cmo
 
 SwiftDriverJobDiscovery normal arm64 Compiling SessionLibrary.swift, SessionMarker.swift, SessionScreenshot.swift (in target 'BugNarrator' from project 'BugNarrator')
 
 SwiftDriverJobDiscovery normal arm64 Compiling TranscriptSectionBuilder.swift, TranscriptSession.swift, TranscriptStore.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-SwiftMergeGeneratedHeaders /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/BugNarrator-Swift.h /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-swiftHeaderTool -arch arm64 /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -o /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/BugNarrator-Swift.h
+SwiftMergeGeneratedHeaders <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/BugNarrator-Swift.h <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-swiftHeaderTool -arch arm64 <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -o <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/BugNarrator-Swift.h
 
-Copy /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftmodule /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftmodule
+Copy <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftmodule <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftmodule
 
-Copy /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftdoc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftdoc (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftdoc /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftdoc
+Copy <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftdoc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftdoc (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftdoc <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.swiftdoc
 
-Copy /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.abi.json /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.abi.json (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.abi.json /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.abi.json
+Copy <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.abi.json <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.abi.json (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.abi.json <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/arm64-apple-macos.abi.json
 
 SwiftDriverJobDiscovery normal arm64 Compiling BugNarratorDiagnostics.swift, BugNarratorLinks.swift, BugNarratorMetadata.swift (in target 'BugNarrator' from project 'BugNarrator')
 
-Copy /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftsourceinfo (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftsourceinfo /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+Copy <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftsourceinfo (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftsourceinfo <build-root>/Build/Products/Debug/BugNarrator.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
 
 SwiftDriverJobDiscovery normal arm64 Compiling IssueExtractionService.swift, JiraExportProvider.swift, KeychainService.swift (in target 'BugNarrator' from project 'BugNarrator')
 
@@ -702,48 +702,48 @@ SwiftDriverJobDiscovery normal arm64 Compiling TranscriptView.swift, Transcripti
 SwiftDriverJobDiscovery normal arm64 Compiling AtomicBundleDirectoryWriter.swift, AudioRecorder.swift, BugNarratorApp.swift (in target 'BugNarrator' from project 'BugNarrator')
 
 SwiftDriver\ Compilation BugNarrator normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /tmp/bugnarrator-standards-build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /tmp/bugnarrator-standards-build/Build/Products/Debug -F /tmp/bugnarrator-standards-build/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /tmp/bugnarrator-standards-build/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -sdk-module-cache-path /tmp/bugnarrator-standards-build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file /tmp/bugnarrator-standards-build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I/tmp/bugnarrator-standards-build/Build/Products/Debug/include -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory /Users/deffenda/Code/bug-narrator -experimental-emit-module-separately -disable-cmo
+    cd <repo-root>
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BugNarrator -Onone @<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList -DDEBUG -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -target arm64-apple-macos14.0 -g -module-cache-path <build-root>/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path <build-root>/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I <build-root>/Build/Products/Debug -F <build-root>/Build/Products/Debug -c -j20 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc <build-root>/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache -output-file-map <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path <build-root>/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path <build-root>/ModuleCache.noindex -sdk-module-cache-path <build-root>/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule -validate-clang-modules-once -clang-build-session-file <build-root>/ModuleCache.noindex/Session.modulevalidation -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_const_extract_protocols.json -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-generated-files.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-own-target-headers.hmap -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-all-target-headers.hmap -Xcc -iquote -Xcc <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-project-headers.hmap -Xcc -I<build-root>/Build/Products/Debug/include -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources-normal/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources/arm64 -Xcc -I<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-Swift.h -working-directory <repo-root> -experimental-emit-module-separately -disable-cmo
 
-Ld /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib normal (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/tmp/bugnarrator-standards-build/Build/Products/Debug -F/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/tmp/bugnarrator-standards-build/Build/Products/Debug -filelist /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList -install_name @rpath/BugNarrator.debug.dylib -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -object_path_lto -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat -fobjc-link-runtime -fprofile-instr-generate -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule @/tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-linker-args.resp -Xlinker -alias -Xlinker _main -Xlinker ___debug_main_executable_dylib_entry_point -o /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib
+Ld <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib normal (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L<build-root>/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L<build-root>/Build/Products/Debug -F<build-root>/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F<build-root>/Build/Products/Debug -filelist <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.LinkFileList -install_name @rpath/BugNarrator.debug.dylib -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -object_path_lto -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat -fobjc-link-runtime -fprofile-instr-generate -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.swiftmodule @<build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator-linker-args.resp -Xlinker -alias -Xlinker _main -Xlinker ___debug_main_executable_dylib_entry_point -o <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib
 
-ConstructStubExecutorLinkFileList /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    construct-stub-executor-link-file-list /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor_no_swift_entry_point.a /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor.a --output /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt
+ConstructStubExecutorLinkFileList <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    construct-stub-executor-link-file-list <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor_no_swift_entry_point.a /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor.a --output <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt
 note: Using stub executor library with Swift entry point. (in target 'BugNarrator' from project 'BugNarrator')
 
-Ld /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator normal (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L/tmp/bugnarrator-standards-build/Build/Products/Debug -F/tmp/bugnarrator-standards-build/Build/Products/Debug -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker @executable_path/../Frameworks -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib -o /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator
+Ld <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator normal (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -O0 -L<build-root>/Build/Products/Debug -F<build-root>/Build/Products/Debug -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker @executable_path/../Frameworks -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator-ExecutorLinkFileList-normal-arm64.txt <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib -o <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator
 
-CopySwiftLibs /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-swiftStdLibTool --copy --verbose --scan-executable /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib --scan-folder /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --scan-folder /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/PlugIns --scan-folder /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Library/SystemExtensions --scan-folder /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+CopySwiftLibs <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-swiftStdLibTool --copy --verbose --scan-executable <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib --scan-folder <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --scan-folder <build-root>/Build/Products/Debug/BugNarrator.app/Contents/PlugIns --scan-folder <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Library/SystemExtensions --scan-folder <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
 Ignoring --strip-bitcode because --sign was not passed
 
 ExtractAppIntentsMetadata (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name BugNarrator --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk --xcode-version 17E192 --platform-family macOS --deployment-target 14.0 --bundle-identifier com.abdenterprises.bugnarrator --output /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/Resources --target-triple arm64-apple-macos14.0 --binary-file /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator --dependency-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat --stringsdata-file /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList --metadata-file-list /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList --static-metadata-file-list /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList --swift-const-vals-list /tmp/bugnarrator-standards-build/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+    cd <repo-root>
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name BugNarrator --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk --xcode-version 17E192 --platform-family macOS --deployment-target 14.0 --bundle-identifier com.abdenterprises.bugnarrator --output <build-root>/Build/Products/Debug/BugNarrator.app/Contents/Resources --target-triple arm64-apple-macos14.0 --binary-file <build-root>/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator --dependency-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator_dependency_info.dat --stringsdata-file <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftFileList --metadata-file-list <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyMetadataFileList --static-metadata-file-list <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/BugNarrator.DependencyStaticMetadataFileList --swift-const-vals-list <build-root>/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/Objects-normal/arm64/BugNarrator.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
 2026-04-05 07:50:16.977 appintentsmetadataprocessor[53282:1260557] Starting appintentsmetadataprocessor export
 2026-04-05 07:50:16.979 appintentsmetadataprocessor[53282:1260557] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
 
-RegisterExecutionPolicyException /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-RegisterExecutionPolicyException /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app
+RegisterExecutionPolicyException <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-RegisterExecutionPolicyException <build-root>/Build/Products/Debug/BugNarrator.app
 
-Validate /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-validationUtility /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+Validate <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    builtin-validationUtility <build-root>/Build/Products/Debug/BugNarrator.app -no-validate-extension -infoplist-subpath Contents/Info.plist
 
-Touch /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /usr/bin/touch -c /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app
+Touch <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /usr/bin/touch -c <build-root>/Build/Products/Debug/BugNarrator.app
 
-RegisterWithLaunchServices /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /tmp/bugnarrator-standards-build/Build/Products/Debug/BugNarrator.app
+RegisterWithLaunchServices <build-root>/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd <repo-root>
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted <build-root>/Build/Products/Debug/BugNarrator.app
 
 note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')
 ** BUILD SUCCEEDED **
