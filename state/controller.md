@@ -1,4 +1,4 @@
 # Controller State
 
-current_state: done
-current_task: N3-H1
+current_state: ready_for_codex
+current_task: N4

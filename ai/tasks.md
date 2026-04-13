@@ -33,7 +33,7 @@ Done when: Issues have severity, component, and dedup hint. Severity inferred fr
 
 ### N3-H1
 Title: Deduplication hash locale stability and extraction inference optimization
-Status: pending
+Status: done
 Phase: 1
 Depends on: N3
 Description: Address two post-review hardening items from N3: (1) Fix string folding in deduplication hint generation to use a fixed locale (e.g., `.current` pinned or explicit `.en_US_POSIX`) so that hashes are stable across machines and user locales — a locale-dependent hash breaks duplicate detection when sessions are shared across team members. (2) Move severity-heuristic signal arrays in `IssueExtractionService` to static constants so they are allocated once rather than on every inference call. Both changes are non-functional from a feature standpoint but are correctness and performance prerequisites for N5 (duplicate detection).

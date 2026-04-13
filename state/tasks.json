@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T09:49:22Z",
+  "last_updated": "2026-04-13T10:00:00Z",
   "tasks": [
     {
       "id": "N1",
@@ -24,6 +24,11 @@
       "status": "done",
       "title": "Deduplication hash locale stability and extraction inference optimization",
       "completed_at": "2026-04-13T09:07:09Z"
+    },
+    {
+      "id": "N4",
+      "status": "pending",
+      "title": "Smart screenshot annotation — auto-highlight relevant UI elements"
     }
   ]
 }
