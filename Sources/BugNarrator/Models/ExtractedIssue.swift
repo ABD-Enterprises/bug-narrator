@@ -52,6 +52,8 @@ struct IssueReproductionStep: Identifiable, Codable, Equatable {
 }
 
 struct ExtractedIssue: Identifiable, Codable, Equatable {
+    private static let deduplicationNormalizationLocale = Locale(identifier: "en_US_POSIX")
+
     let id: UUID
     var title: String
     var category: ExtractedIssueCategory
@@ -197,8 +199,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
             evidenceExcerpt
         ]
         .joined(separator: "\n")
-        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-        .lowercased()
+        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: deduplicationNormalizationLocale)
+        .lowercased(with: deduplicationNormalizationLocale)
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
 

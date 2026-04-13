@@ -167,6 +167,34 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertTrue(result.issues.first?.deduplicationHint.hasPrefix("issue-") == true)
     }
 
+    func testDeduplicationHintUsesFixedLocaleNormalization() {
+        let title = "ISTANBUL ISSUE"
+        let summary = "I expected the icon to stay visible."
+        let evidenceExcerpt = "The icon disappears immediately."
+
+        let hint = ExtractedIssue.makeDeduplicationHint(
+            title: title,
+            summary: summary,
+            evidenceExcerpt: evidenceExcerpt
+        )
+
+        let posixHash = makeExpectedDeduplicationHint(
+            title: title,
+            summary: summary,
+            evidenceExcerpt: evidenceExcerpt,
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+        let turkishHash = makeExpectedDeduplicationHint(
+            title: title,
+            summary: summary,
+            evidenceExcerpt: evidenceExcerpt,
+            locale: Locale(identifier: "tr_TR")
+        )
+
+        XCTAssertEqual(hint, posixHash)
+        XCTAssertNotEqual(posixHash, turkishHash)
+    }
+
     func testExtractIssuesReturnsClearErrorForMalformedStructuredPayload() async throws {
         let session = makeReviewSession()
         let malformedContent = """
@@ -262,5 +290,33 @@ final class IssueExtractionServiceTests: XCTestCase {
                 ]
             ]
         )
+    }
+
+    private func makeExpectedDeduplicationHint(
+        title: String,
+        summary: String,
+        evidenceExcerpt: String,
+        locale: Locale
+    ) -> String {
+        let normalized = [
+            title,
+            summary,
+            evidenceExcerpt
+        ]
+        .joined(separator: "\n")
+        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
+        .lowercased(with: locale)
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let prime: UInt64 = 1_099_511_628_211
+
+        for byte in normalized.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= prime
+        }
+
+        return String(format: "issue-%016llx", hash)
     }
 }
