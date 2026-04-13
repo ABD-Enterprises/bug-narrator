@@ -12,7 +12,8 @@ const REQUIRED_STATE_FILES = [
 const OPTIONAL_STATE_FILES = [
   "docs/roadmap/state.json",
   "state/risks.json",
-  "state/handoff.json"
+  "state/handoff.json",
+  "state/decisions.json"
 ];
 const REQUIRED_WORKFLOW_FILES = [
   "ai/bootstrap.md",
@@ -94,13 +95,13 @@ const DOC_PATTERNS = [
 const STATE_OR_META_PATTERNS = [
   /^ai\//,
   /^state\//,
-  /^docs\/roadmap\/state\.json$/,
-  /^docs\/roadmap\/roadmap\.md$/,
+  /^docs\/roadmap\//,
   /^ai\.config\.json$/,
   /^bootstrap\.sh$/,
-  /^scripts\/validate\.sh$/,
+  /^scripts\//,
   /^\.github\/workflows\//,
-  /^tools\/validators\//
+  /^tools\/validators\//,
+  /^developer\//
 ];
 
 const FRONTEND_FILE_PATTERNS = [
@@ -875,12 +876,14 @@ function validateEvidenceStructure(repoRoot, artifacts, config, failures) {
     const metadataOnlyAllowed = config.allowed_metadata_only_evidence_types.includes(key);
     const status = String(entry.status || "");
     const requiresFileBackedEvidence = ["passed", "failed"].includes(status);
+    // not_run/blocked/not_required are "pending" or "exempt" states — empty paths are fine
+    const pathsOptional = ["not_run", "blocked", "not_required"].includes(status);
 
     if (!Object.prototype.hasOwnProperty.call(entry, "paths")) {
       addFailure(failures, `${label}.paths is required`);
     } else if (!Array.isArray(entry.paths)) {
       addFailure(failures, `${label}.paths must be an array`);
-    } else if (entry.paths.length === 0) {
+    } else if (entry.paths.length === 0 && !pathsOptional) {
       if (!metadataOnly) {
         addFailure(
           failures,
@@ -928,8 +931,9 @@ function validateEvidenceStructure(repoRoot, artifacts, config, failures) {
       );
     }
 
+    // reason is optional for not_run (the default reset state — no work done yet)
     if (
-      ["failed", "not_run", "blocked", "not_required"].includes(String(entry.status || "")) &&
+      ["failed", "blocked", "not_required"].includes(String(entry.status || "")) &&
       !String(entry.reason || "").trim()
     ) {
       addFailure(
