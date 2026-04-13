@@ -1,15 +1,13 @@
 # Validation Report
 
-task_id: N1
+task_id: N2
 result: passed
-summary: Runtime guardrails and the full BugNarrator macOS test suite passed for the N1 recording-flow hardening slice.
+summary: Runtime guardrails and the targeted BugNarrator extraction/export macOS tests passed for the N2 reproduction-step slice.
 
 artifacts:
-- artifacts/n1-recording-flow-hardening/validate.log
-- artifacts/n1-recording-flow-hardening/xcodebuild-test.log
+- artifacts/n2-reproduction-steps/validate.log
+- artifacts/n2-reproduction-steps/xcodebuild-test.log
 
-## 2026-04-13 Review Remediation Validation
-
-- ./scripts/accessibility_regression_check.sh -> PASS
+commands:
 - ./scripts/validate.sh -> PASS
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/AppStateTests test -> PASS
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n2-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -> PASS

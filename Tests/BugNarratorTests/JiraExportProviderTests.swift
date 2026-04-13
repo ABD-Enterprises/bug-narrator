@@ -16,7 +16,15 @@ final class JiraExportProviderTests: XCTestCase {
             summary: "The modal has no visible close affordance.",
             evidenceExcerpt: "I cannot tell how to dismiss the modal.",
             timestamp: 22,
-            requiresReview: true
+            requiresReview: true,
+            reproductionSteps: [
+                IssueReproductionStep(
+                    instruction: "Open the modal from settings.",
+                    expectedResult: "A close affordance is visible immediately.",
+                    actualResult: "No close affordance appears in the modal chrome.",
+                    timestamp: 22
+                )
+            ]
         )
         let session = TranscriptSession(
             createdAt: Date(),
@@ -44,15 +52,20 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Basic ") == true)
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "BugNarrator")
 
-        let body = try XCTUnwrap(request.httpBody)
-        let payload = try JSONSerialization.jsonObject(with: body) as? [String: Any]
-        let fields = try XCTUnwrap(payload?["fields"] as? [String: Any])
+        let body: Data = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
         let project = try XCTUnwrap(fields["project"] as? [String: Any])
         let issueType = try XCTUnwrap(fields["issuetype"] as? [String: Any])
 
         XCTAssertEqual(project["key"] as? String, "FM")
         XCTAssertEqual(issueType["name"] as? String, "Task")
         XCTAssertEqual(fields["summary"] as? String, "Modal lacks close affordance")
+        let payloadData = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        let payloadString = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        XCTAssertTrue(payloadString.contains("Reproduction steps"))
+        XCTAssertTrue(payloadString.contains("Expected: A close affordance is visible immediately."))
+        XCTAssertTrue(payloadString.contains("Actual: No close affordance appears in the modal chrome."))
     }
 
     func testExportMapsValidationFailure() async throws {

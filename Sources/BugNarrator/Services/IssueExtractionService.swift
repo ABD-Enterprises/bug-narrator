@@ -185,7 +185,9 @@ actor IssueExtractionService: IssueExtracting {
                         You convert spoken software review notes into structured, reviewable draft issues.
                         Use only information explicitly present in the transcript, markers, and screenshot references.
                         Return strict JSON with keys summary, guidanceNote, issues.
-                        Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview.
+                        Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps.
+                        Each reproduction step must contain instruction, expectedResult, actualResult, timestamp, relatedScreenshotFileName.
+                        Generate numbered reproduction steps that follow the narration timeline and tie each step to the most relevant screenshot reference when one exists.
                         Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
                         Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
                         """
@@ -433,7 +435,7 @@ private struct IssueExtractionPayload {
         return String(content[startIndex...endIndex])
     }
 
-    private static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
+    fileprivate static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
         for key in keys {
             if let value = dictionary[key] as? String {
                 return value
@@ -464,6 +466,7 @@ private struct IssuePayload {
     let relatedScreenshotFileNames: [String]?
     let confidence: Double?
     let requiresReview: Bool?
+    let reproductionSteps: [IssueReproductionStepPayload]
 
     init?(dictionary: [String: Any]) {
         let title = Self.firstString(in: dictionary, keys: ["title", "issueTitle", "name"])?.trimmedForExtraction
@@ -490,28 +493,47 @@ private struct IssuePayload {
         )
         self.confidence = Self.firstDouble(in: dictionary, keys: ["confidence", "score"])
         self.requiresReview = Self.firstBool(in: dictionary, keys: ["requiresReview", "requires_review", "needsReview"])
+        self.reproductionSteps = Self.firstArray(
+            in: dictionary,
+            keys: ["reproductionSteps", "stepsToReproduce", "steps_to_reproduce", "reproSteps", "steps"]
+        )?.compactMap { stepObject in
+            guard let stepDictionary = stepObject as? [String: Any] else {
+                return nil
+            }
+
+            return IssueReproductionStepPayload(dictionary: stepDictionary)
+        } ?? []
     }
 
     func makeExtractedIssue(screenshotIndex: [String: UUID]) -> ExtractedIssue {
         let screenshotIDs = (relatedScreenshotFileNames ?? []).compactMap { fileName in
             screenshotIndex[fileName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
         }
+        let parsedTimestamp = Self.parseTimestamp(timestamp)
+        let reproductionSteps = reproductionSteps.map {
+            $0.makeIssueReproductionStep(
+                screenshotIndex: screenshotIndex,
+                fallbackTimestamp: parsedTimestamp,
+                fallbackScreenshotID: screenshotIDs.first
+            )
+        }
 
         return ExtractedIssue(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            category: parseCategory(category),
+            category: Self.parseCategory(category),
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
             evidenceExcerpt: evidenceExcerpt.trimmingCharacters(in: .whitespacesAndNewlines),
-            timestamp: parseTimestamp(timestamp),
+            timestamp: parsedTimestamp,
             relatedScreenshotIDs: screenshotIDs,
             confidence: confidence,
             requiresReview: requiresReview ?? true,
             isSelectedForExport: true,
-            sectionTitle: sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            sectionTitle: sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+            reproductionSteps: reproductionSteps
         )
     }
 
-    private static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
+    fileprivate static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
         for key in keys {
             if let value = dictionary[key] as? String {
                 return value
@@ -521,7 +543,17 @@ private struct IssuePayload {
         return nil
     }
 
-    private static func firstStringArray(in dictionary: [String: Any], keys: [String]) -> [String]? {
+    fileprivate static func firstArray(in dictionary: [String: Any], keys: [String]) -> [Any]? {
+        for key in keys {
+            if let value = dictionary[key] as? [Any] {
+                return value
+            }
+        }
+
+        return nil
+    }
+
+    fileprivate static func firstStringArray(in dictionary: [String: Any], keys: [String]) -> [String]? {
         for key in keys {
             if let values = dictionary[key] as? [String] {
                 return values
@@ -566,7 +598,7 @@ private struct IssuePayload {
         return nil
     }
 
-    private func parseCategory(_ value: String) -> ExtractedIssueCategory {
+    fileprivate static func parseCategory(_ value: String) -> ExtractedIssueCategory {
         let normalizedValue = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         switch normalizedValue {
@@ -581,7 +613,7 @@ private struct IssuePayload {
         }
     }
 
-    private func parseTimestamp(_ value: String?) -> TimeInterval? {
+    fileprivate static func parseTimestamp(_ value: String?) -> TimeInterval? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !value.isEmpty else {
             return nil
@@ -600,6 +632,66 @@ private struct IssuePayload {
     }
 }
 
+private struct IssueReproductionStepPayload {
+    let instruction: String
+    let expectedResult: String?
+    let actualResult: String?
+    let timestamp: String?
+    let relatedScreenshotFileName: String?
+
+    init?(dictionary: [String: Any]) {
+        let instruction = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["instruction", "step", "action", "description"]
+        )?.trimmedForExtraction
+
+        guard let instruction, !instruction.isEmpty else {
+            return nil
+        }
+
+        self.instruction = instruction
+        self.expectedResult = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["expectedResult", "expected", "expected_result"]
+        )?.trimmedForExtraction.nilIfEmpty
+        self.actualResult = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["actualResult", "actual", "actual_result"]
+        )?.trimmedForExtraction.nilIfEmpty
+        self.timestamp = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["timestamp", "time", "timecode"]
+        )?.trimmedForExtraction
+        self.relatedScreenshotFileName =
+            IssuePayload.firstString(
+                in: dictionary,
+                keys: ["relatedScreenshotFileName", "screenshotFileName", "screenshot", "related_screenshot_file_name"]
+            )?.trimmedForExtraction ??
+            IssuePayload.firstStringArray(
+                in: dictionary,
+                keys: ["relatedScreenshotFileNames", "screenshotFileNames", "screenshots"]
+            )?.first?.trimmedForExtraction
+    }
+
+    func makeIssueReproductionStep(
+        screenshotIndex: [String: UUID],
+        fallbackTimestamp: TimeInterval?,
+        fallbackScreenshotID: UUID?
+    ) -> IssueReproductionStep {
+        let screenshotID = relatedScreenshotFileName.flatMap {
+            screenshotIndex[$0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
+        } ?? fallbackScreenshotID
+
+        return IssueReproductionStep(
+            instruction: instruction,
+            expectedResult: expectedResult,
+            actualResult: actualResult,
+            timestamp: IssuePayload.parseTimestamp(timestamp) ?? fallbackTimestamp,
+            screenshotID: screenshotID
+        )
+    }
+}
+
 private enum IssueExtractionParseError: Error {
     case invalidPayload(String)
 }
@@ -607,5 +699,9 @@ private enum IssueExtractionParseError: Error {
 private extension String {
     var trimmedForExtraction: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T00:07:30Z",
+  "last_updated": "2026-04-13T01:34:16Z",
   "code_changes_present": true,
   "claims": {
     "implementation": "complete",
@@ -10,32 +10,32 @@
   "evidence": {
     "build": {
       "status": "passed",
-      "updated_at": "2026-04-13T00:07:30Z",
+      "updated_at": "2026-04-13T01:34:16Z",
       "reason": "",
       "paths": [
-        "artifacts/n1-recording-flow-hardening/xcodebuild-test.log"
+        "artifacts/n2-reproduction-steps/xcodebuild-test.log"
       ]
     },
     "test": {
       "status": "passed",
-      "updated_at": "2026-04-13T00:07:30Z",
+      "updated_at": "2026-04-13T01:34:16Z",
       "reason": "",
       "paths": [
-        "artifacts/n1-recording-flow-hardening/xcodebuild-test.log"
+        "artifacts/n2-reproduction-steps/xcodebuild-test.log"
       ]
     },
     "run": {
       "metadata_only": true,
       "status": "not_run",
-      "reason": "No interactive app run was performed in this Codex slice; local coverage came from runtime guardrails plus the full macOS test suite.",
-      "updated_at": "2026-04-13T00:07:30Z",
+      "reason": "No interactive app run was performed in this N2 Codex slice; local coverage came from runtime guardrails plus targeted macOS tests.",
+      "updated_at": "2026-04-13T01:34:16Z",
       "paths": []
     },
     "deploy": {
       "metadata_only": true,
       "status": "not_required",
-      "reason": "Current roadmap phase remains build-scoped and no deployment was executed in the N1 review slice.",
-      "updated_at": "2026-04-13T00:07:30Z",
+      "reason": "Current roadmap phase remains build-scoped and no deployment was executed in the N2 review slice.",
+      "updated_at": "2026-04-13T01:34:16Z",
       "paths": []
     }
   }

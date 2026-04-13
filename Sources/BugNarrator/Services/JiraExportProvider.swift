@@ -147,6 +147,14 @@ actor JiraExportProvider {
             content.append(.bulletList(items: metadataLines))
         }
 
+        if !issue.reproductionSteps.isEmpty {
+            let stepLines = issue.reproductionSteps.enumerated().map { index, step in
+                formattedReproductionStep(step, index: index, session: session)
+            }
+            content.append(.paragraph(text: "Reproduction steps"))
+            content.append(.bulletList(items: stepLines))
+        }
+
         let screenshots = session.screenshots(for: issue)
         if !screenshots.isEmpty {
             let screenshotLines = screenshots.map {
@@ -158,6 +166,39 @@ actor JiraExportProvider {
 
         content.append(.paragraph(text: "Exported from BugNarrator. Review against the raw transcript before triage."))
         return JiraDocument(content: content)
+    }
+
+    private func formattedReproductionStep(
+        _ step: IssueReproductionStep,
+        index: Int,
+        session: TranscriptSession
+    ) -> String {
+        var parts = ["\(index + 1). \(step.instruction)"]
+
+        if let expectedResult = step.expectedResult?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !expectedResult.isEmpty {
+            parts.append("Expected: \(expectedResult)")
+        }
+
+        if let actualResult = step.actualResult?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !actualResult.isEmpty {
+            parts.append("Actual: \(actualResult)")
+        }
+
+        var references: [String] = []
+        if let timestampLabel = step.timestampLabel {
+            references.append("Transcript \(timestampLabel)")
+        }
+        if let screenshotID = step.screenshotID,
+           let screenshot = session.screenshot(with: screenshotID) {
+            references.append("Screenshot \(screenshot.fileName) (\(screenshot.timeLabel))")
+        }
+
+        if !references.isEmpty {
+            parts.append("Reference: \(references.joined(separator: " • "))")
+        }
+
+        return parts.joined(separator: " | ")
     }
 
     private func mapJiraError(
