@@ -1,4 +1,4 @@
 # Controller State
 
-current_state: ready_for_review
-current_task: N2
+current_state: ready_for_codex
+current_task: N3

@@ -1,9 +1,9 @@
 # Current Task
 
-task_id: N2
-description: AI-generated reproduction steps from narration + screenshots
+task_id: N3
+description: Enhanced issue classification — severity, component, deduplication hint
 scope: Sources/BugNarrator/
-status: ready_for_review
+status: pending
 execution_status: idle
 execution_branch:
 execution_started_at:
@@ -12,5 +12,5 @@ execution_lease_expires_at:
 execution_host_id:
 execution_worker_id:
 review_failure_count: 0
-depends_on: N1 (done, merged to main)
-acceptance_criteria_reference: /ai/acceptance.md#N2
+depends_on: N2 (done, merged to main)
+acceptance_criteria_reference: /ai/acceptance.md#N3
