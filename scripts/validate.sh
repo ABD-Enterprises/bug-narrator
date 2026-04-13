@@ -7,7 +7,7 @@ cd "$ROOT"
 BASE_REF="${AI_VALIDATOR_BASE_REF:-${1:-}}"
 
 if [[ -n "$BASE_REF" ]]; then
-  node tools/validators/enforce-runtime-guardrails.js --repo . --config ai.config.json --base "$BASE_REF"
+  node tools/validators/enforce-runtime-guardrails.mjs --repo . --config ai.config.json --base "$BASE_REF"
 else
-  node tools/validators/enforce-runtime-guardrails.js --repo . --config ai.config.json
+  node tools/validators/enforce-runtime-guardrails.mjs --repo . --config ai.config.json
 fi
