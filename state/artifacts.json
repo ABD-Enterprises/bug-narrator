@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T10:15:44Z",
+  "last_updated": "2026-04-13T12:18:48Z",
   "code_changes_present": true,
   "claims": {
     "implementation": "complete",
@@ -10,30 +10,30 @@
   "evidence": {
     "build": {
       "status": "passed",
-      "updated_at": "2026-04-13T10:15:44Z",
-      "reason": "Targeted macOS test build passed for the N4 annotation slice.",
+      "updated_at": "2026-04-13T12:18:48Z",
+      "reason": "Targeted macOS test build passed for the N5 similar-issue review slice.",
       "paths": [
-        "artifacts/n4-smart-screenshot-annotation/xcodebuild-test.log"
+        "artifacts/n5-similar-bug-detection/xcodebuild-test.log"
       ]
     },
     "test": {
       "status": "passed",
-      "updated_at": "2026-04-13T10:15:44Z",
-      "reason": "Targeted screenshot annotation and export provider tests passed.",
+      "updated_at": "2026-04-13T12:18:48Z",
+      "reason": "Targeted duplicate detection, tracker search, and export review tests passed.",
       "paths": [
-        "artifacts/n4-smart-screenshot-annotation/xcodebuild-test.log"
+        "artifacts/n5-similar-bug-detection/xcodebuild-test.log"
       ]
     },
     "run": {
       "status": "not_run",
       "reason": "",
-      "updated_at": "2026-04-13T10:15:44Z",
+      "updated_at": "2026-04-13T12:18:48Z",
       "paths": []
     },
     "deploy": {
       "status": "not_run",
       "reason": "",
-      "updated_at": "2026-04-13T10:15:44Z",
+      "updated_at": "2026-04-13T12:18:48Z",
       "paths": []
     }
   }

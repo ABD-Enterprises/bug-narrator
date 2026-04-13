@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-04-13T10:15:44Z",
-  "summary": "N4 is ready for review on codex/N4-smart-screenshot-annotation-auto-highlight-relevant-ui-elements with multimodal screenshot annotation extraction, draggable review overlays, and export-side annotation support.",
-  "next_action": "Review the N4 PR, focusing on annotation payload parsing, overlay edit behavior, and exported screenshot annotation context.",
+  "last_updated": "2026-04-13T12:18:48Z",
+  "summary": "N5 is ready for review on codex/N5-similar-bug-detection-before-export with pre-export tracker duplicate checks, OpenAI confidence scoring, and duplicate-vs-related export decisions.",
+  "next_action": "Review the N5 PR, focusing on the similarity review sheet, GitHub/Jira search payloads, and how duplicate selections avoid filing new tickets.",
   "discovered_issues": []
 }

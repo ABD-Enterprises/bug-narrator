@@ -3,13 +3,13 @@
 task_id: N5
 description: Similar bug detection before export
 scope: Sources/BugNarrator/Services/, Sources/BugNarrator/Views/
-status: pending
-current_state: ready_for_codex
+status: done
+current_state: ready_for_review
 execution_status: idle
-execution_branch: codex/N5-similar-bug-detection-before-export
-execution_started_at: 2026-04-13T12:04:35Z
-execution_heartbeat_at: 2026-04-13T12:04:35Z
-execution_lease_expires_at: 2026-04-13T13:34:35Z
+execution_branch:
+execution_started_at:
+execution_heartbeat_at:
+execution_lease_expires_at:
 execution_host_id:
 execution_worker_id:
 review_failure_count: 0

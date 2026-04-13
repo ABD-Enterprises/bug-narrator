@@ -1,13 +1,13 @@
 # Validation Report
 
-task_id: N4
+task_id: N5
 result: passed
-summary: Runtime guardrails plus the targeted screenshot annotation and export provider macOS tests passed for the N4 smart screenshot annotation slice.
+summary: Runtime guardrails plus the targeted duplicate-detection, export provider, and similarity-review macOS tests passed for the N5 similar bug detection slice.
 
 artifacts:
-- artifacts/n4-smart-screenshot-annotation/validate.log
-- artifacts/n4-smart-screenshot-annotation/xcodebuild-test.log
+- artifacts/n5-similar-bug-detection/validate.log
+- artifacts/n5-similar-bug-detection/xcodebuild-test.log
 
 commands:
 - ./scripts/validate.sh -> PASS
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n4-tests test -only-testing:BugNarratorTests/ScreenshotAnnotationTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -> PASS
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n5-tests test -parallel-testing-enabled NO -only-testing:BugNarratorTests/AppStateTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -only-testing:BugNarratorTests/IssueExtractionServiceTests -> PASS
