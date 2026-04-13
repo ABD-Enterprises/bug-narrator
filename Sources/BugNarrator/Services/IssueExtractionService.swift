@@ -460,6 +460,45 @@ private struct IssueExtractionPayload {
 }
 
 private struct IssuePayload {
+    private static let criticalSeveritySignals = [
+        "crash",
+        "crashes",
+        "data loss",
+        "completely broken",
+        "blocked",
+        "blocker",
+        "cannot continue",
+        "can't continue",
+        "unable to continue",
+        "won't open",
+        "blank screen"
+    ]
+
+    private static let lowSeveritySignals = [
+        "minor",
+        "small",
+        "cosmetic",
+        "visual glitch",
+        "visual issue",
+        "spacing",
+        "alignment",
+        "typo",
+        "copy issue"
+    ]
+
+    private static let highSeveritySignals = [
+        "broken",
+        "doesn't work",
+        "does not work",
+        "not respond",
+        "fails",
+        "failure",
+        "unable to",
+        "cannot",
+        "can't",
+        "stuck"
+    ]
+
     let title: String
     let category: String
     let severity: String?
@@ -680,51 +719,15 @@ private struct IssuePayload {
         .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         .lowercased()
 
-        let criticalSignals = [
-            "crash",
-            "crashes",
-            "data loss",
-            "completely broken",
-            "blocked",
-            "blocker",
-            "cannot continue",
-            "can't continue",
-            "unable to continue",
-            "won't open",
-            "blank screen"
-        ]
-        if criticalSignals.contains(where: combinedText.contains) {
+        if Self.criticalSeveritySignals.contains(where: combinedText.contains) {
             return .critical
         }
 
-        let lowSignals = [
-            "minor",
-            "small",
-            "cosmetic",
-            "visual glitch",
-            "visual issue",
-            "spacing",
-            "alignment",
-            "typo",
-            "copy issue"
-        ]
-        if lowSignals.contains(where: combinedText.contains) {
+        if Self.lowSeveritySignals.contains(where: combinedText.contains) {
             return .low
         }
 
-        let highSignals = [
-            "broken",
-            "doesn't work",
-            "does not work",
-            "not respond",
-            "fails",
-            "failure",
-            "unable to",
-            "cannot",
-            "can't",
-            "stuck"
-        ]
-        if highSignals.contains(where: combinedText.contains) {
+        if Self.highSeveritySignals.contains(where: combinedText.contains) {
             return .high
         }
 
