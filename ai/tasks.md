@@ -45,7 +45,7 @@ Done when: Deduplication hints generate identical hashes for identical input acr
 
 ### N4
 Title: Smart screenshot annotation — auto-highlight relevant UI elements
-Status: pending
+Status: done
 Phase: 2
 Depends on: N2
 Description: When the tester narrates about a specific UI element ("this button doesn't respond"), AI analyzes the screenshot to identify and annotate the element being discussed. Draw a subtle highlight box or arrow pointing to the relevant UI area. Annotation appears in the review screen overlay on the screenshot. Tester can adjust or remove annotations. Annotated screenshots export with the issue. Uses vision model (GPT-4o or similar) to locate UI elements from narration context.

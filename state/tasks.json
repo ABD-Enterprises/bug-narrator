@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T10:14:11Z",
+  "last_updated": "2026-04-13T10:25:00Z",
   "tasks": [
     {
       "id": "N1",
@@ -30,6 +30,11 @@
       "status": "done",
       "title": "Smart screenshot annotation — auto-highlight relevant UI elements",
       "completed_at": "2026-04-13T10:14:11Z"
+    },
+    {
+      "id": "N5",
+      "status": "pending",
+      "title": "Similar bug detection before export"
     }
   ]
 }
