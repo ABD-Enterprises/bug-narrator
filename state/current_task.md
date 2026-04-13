@@ -3,12 +3,13 @@
 task_id: N3
 description: Enhanced issue classification — severity, component, deduplication hint
 scope: Sources/BugNarrator/
-status: pending
+current_state: ready_for_review
+status: done
 execution_status: idle
-execution_branch: codex/N3-enhanced-issue-classification
-execution_started_at: 2026-04-13T08:02:53Z
-execution_heartbeat_at: 2026-04-13T08:02:53Z
-execution_lease_expires_at: 2026-04-13T09:32:53Z
+execution_branch:
+execution_started_at:
+execution_heartbeat_at:
+execution_lease_expires_at:
 execution_host_id:
 execution_worker_id:
 review_failure_count: 0

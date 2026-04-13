@@ -1,10 +1,11 @@
 # Implementation Notes
 
-task_id: N2
+task_id: N3
 status: ready_for_review
 
 CHANGED:
 - Sources/BugNarrator/Models/ExtractedIssue.swift
+- Sources/BugNarrator/Models/TranscriptSession.swift
 - Sources/BugNarrator/Services/GitHubExportProvider.swift
 - Sources/BugNarrator/Services/IssueExtractionService.swift
 - Sources/BugNarrator/Services/JiraExportProvider.swift
@@ -14,16 +15,15 @@ CHANGED:
 - Tests/BugNarratorTests/JiraExportProviderTests.swift
 
 DID:
-- Added structured reproduction-step data to extracted issues, with per-step instruction, expected result, actual result, timestamp, and screenshot reference persistence.
-- Extended the issue-extraction prompt/parser so OpenAI returns reproduction steps tied to narration timecodes and screenshot file names, with issue-level reference fallback when a step omits one.
-- Rendered reproduction steps in the review workspace with editable action, expected, and actual fields plus visible timestamp and screenshot references.
-- Included reproduction steps and step references in both GitHub and Jira export payloads so the generated issue tracker tickets carry the same reviewable repro details.
-- Normalized optional reproduction-step edits so expected and actual text is trimmed before persistence, preventing accidental whitespace from leaking into exports.
+- Added severity, suggested component, and stable deduplication-hint fields to extracted issues, with persistence defaults for older saved sessions.
+- Extended issue extraction so OpenAI can return severity/component metadata, while local fallbacks infer severity from narration content, reuse section titles as component context, and generate deduplication hashes when hints are missing.
+- Rendered editable severity, component, and deduplication fields in the review workspace alongside the existing issue editor.
+- Included the new classification metadata in review markdown plus GitHub and Jira export payloads.
+- Added targeted tests that cover structured parsing, fallback inference, and export formatting for the new classification metadata.
 
 VALIDATED:
 - ./scripts/validate.sh
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n2-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -only-testing:BugNarratorTests/ReviewWorkspaceTests test
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n3-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -only-testing:BugNarratorTests/TranscriptExporterTests -only-testing:BugNarratorTests/ReviewWorkspaceTests
 
 NEXT:
-- Confirm the PR review thread about reproduction-step whitespace is resolved by the pushed branch update.
+- Ready for PR review on the N3 issue-classification slice.
