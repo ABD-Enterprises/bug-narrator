@@ -426,6 +426,10 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
             lines.append("- **\(item.title)**: \(item.summary)")
 
             var contextParts: [String] = []
+            contextParts.append("severity \(item.severity.rawValue)")
+            if let component = item.component, !component.isEmpty {
+                contextParts.append(component)
+            }
             if let sectionTitle = item.sectionTitle, !sectionTitle.isEmpty {
                 contextParts.append(sectionTitle)
             }
@@ -443,6 +447,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
                 lines.append("  Context: \(contextParts.joined(separator: "  •  "))")
             }
             lines.append("  Evidence: \(item.evidenceExcerpt)")
+            lines.append("  Dedup hint: \(item.deduplicationHint)")
 
             let relatedScreenshots = screenshots(for: item)
             if !relatedScreenshots.isEmpty {

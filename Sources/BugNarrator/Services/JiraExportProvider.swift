@@ -133,6 +133,12 @@ actor JiraExportProvider {
         if let timestampLabel = issue.timestampLabel {
             metadataLines.append("Transcript time: \(timestampLabel)")
         }
+        metadataLines.append("Severity: \(issue.severity.rawValue)")
+        if let component = issue.component?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !component.isEmpty {
+            metadataLines.append("Component: \(component)")
+        }
+        metadataLines.append("Deduplication hint: \(issue.deduplicationHint)")
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
             metadataLines.append("Transcript section: \(sectionTitle)")
         }

@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T08:00:00Z",
+  "last_updated": "2026-04-13T08:08:10Z",
   "tasks": [
     {
       "id": "N1",
@@ -15,8 +15,9 @@
     },
     {
       "id": "N3",
-      "status": "pending",
-      "title": "Enhanced issue classification — severity, component, deduplication hint"
+      "status": "done",
+      "title": "Enhanced issue classification — severity, component, deduplication hint",
+      "completed_at": "2026-04-13T08:08:10Z"
     }
   ]
 }

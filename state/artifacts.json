@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-04-13T08:00:00Z",
-  "code_changes_present": false,
+  "last_updated": "2026-04-13T08:08:10Z",
+  "code_changes_present": true,
   "claims": {
     "implementation": "complete",
     "validation": "complete",
@@ -9,16 +9,21 @@
   "external_inputs": [],
   "evidence": {
     "build": {
-      "status": "not_run",
-      "updated_at": "2026-04-13T08:00:00Z",
-      "reason": "",
-      "paths": []
+      "status": "passed",
+      "updated_at": "2026-04-13T08:08:10Z",
+      "reason": "Targeted macOS xcodebuild test run compiled the N3 classification slice successfully.",
+      "paths": [
+        "artifacts/n3-issue-classification/xcodebuild-test.log"
+      ]
     },
     "test": {
-      "status": "not_run",
-      "updated_at": "2026-04-13T08:00:00Z",
-      "reason": "",
-      "paths": []
+      "status": "passed",
+      "updated_at": "2026-04-13T08:08:10Z",
+      "reason": "Runtime guardrails and targeted extraction/export/review tests passed for N3.",
+      "paths": [
+        "artifacts/n3-issue-classification/validate.log",
+        "artifacts/n3-issue-classification/xcodebuild-test.log"
+      ]
     },
     "run": {
       "status": "not_run",

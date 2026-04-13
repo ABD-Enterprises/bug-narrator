@@ -13,8 +13,11 @@ final class GitHubExportProviderTests: XCTestCase {
         let issue = ExtractedIssue(
             title: "Login button is disabled",
             category: .bug,
+            severity: .high,
+            component: "Login Page",
             summary: "The login button stays disabled after valid input.",
             evidenceExcerpt: "The login button never re-enabled after typing a valid email.",
+            deduplicationHint: "issue-login-disabled",
             timestamp: 14,
             relatedScreenshotIDs: [],
             requiresReview: true,
@@ -57,6 +60,9 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(payload.title, "Login button is disabled")
         XCTAssertEqual(payload.labels, ["bug", "triage"])
         XCTAssertTrue(payload.body.contains("Transcript time"))
+        XCTAssertTrue(payload.body.contains("Severity: High"))
+        XCTAssertTrue(payload.body.contains("Component: Login Page"))
+        XCTAssertTrue(payload.body.contains("Deduplication hint: `issue-login-disabled`"))
         XCTAssertTrue(payload.body.contains("Review needed: Yes"))
         XCTAssertTrue(payload.body.contains("## Reproduction Steps"))
         XCTAssertTrue(payload.body.contains("Expected: The login button enables."))

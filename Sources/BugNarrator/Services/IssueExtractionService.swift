@@ -185,10 +185,13 @@ actor IssueExtractionService: IssueExtracting {
                         You convert spoken software review notes into structured, reviewable draft issues.
                         Use only information explicitly present in the transcript, markers, and screenshot references.
                         Return strict JSON with keys summary, guidanceNote, issues.
-                        Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps.
+                        Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps.
                         Each reproduction step must contain instruction, expectedResult, actualResult, timestamp, relatedScreenshotFileName.
                         Generate numbered reproduction steps that follow the narration timeline and tie each step to the most relevant screenshot reference when one exists.
                         Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
+                        Valid severities are exactly: Critical, High, Medium, Low.
+                        Infer severity from the narration tone and impact. Infer component from the most specific app area available in the transcript or screenshot context.
+                        DeduplicationHint should be a short stable hash-like string derived from the issue description.
                         Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
                         """
                     ),
@@ -459,8 +462,11 @@ private struct IssueExtractionPayload {
 private struct IssuePayload {
     let title: String
     let category: String
+    let severity: String?
+    let component: String?
     let summary: String
     let evidenceExcerpt: String
+    let deduplicationHint: String?
     let timestamp: String?
     let sectionTitle: String?
     let relatedScreenshotFileNames: [String]?
@@ -483,8 +489,20 @@ private struct IssuePayload {
 
         self.title = title
         self.category = category
+        self.severity = Self.firstString(
+            in: dictionary,
+            keys: ["severity", "priority", "impact"]
+        )?.trimmedForExtraction
+        self.component = Self.firstString(
+            in: dictionary,
+            keys: ["component", "area", "affectedComponent", "affected_component", "surface", "scope"]
+        )?.trimmedForExtraction
         self.summary = summary
         self.evidenceExcerpt = evidenceExcerpt
+        self.deduplicationHint = Self.firstString(
+            in: dictionary,
+            keys: ["deduplicationHint", "dedupHint", "dedup_hint", "duplicateHint", "duplicate_hint"]
+        )?.trimmedForExtraction
         self.timestamp = Self.firstString(in: dictionary, keys: ["timestamp", "time", "timecode"])?.trimmedForExtraction
         self.sectionTitle = Self.firstString(in: dictionary, keys: ["sectionTitle", "section", "sectionName"])?.trimmedForExtraction
         self.relatedScreenshotFileNames = Self.firstStringArray(
@@ -521,8 +539,11 @@ private struct IssuePayload {
         return ExtractedIssue(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             category: Self.parseCategory(category),
+            severity: Self.parseSeverity(severity, title: title, summary: summary, evidenceExcerpt: evidenceExcerpt),
+            component: normalizedComponent,
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
             evidenceExcerpt: evidenceExcerpt.trimmingCharacters(in: .whitespacesAndNewlines),
+            deduplicationHint: deduplicationHint?.trimmingCharacters(in: .whitespacesAndNewlines),
             timestamp: parsedTimestamp,
             relatedScreenshotIDs: screenshotIDs,
             confidence: confidence,
@@ -531,6 +552,20 @@ private struct IssuePayload {
             sectionTitle: sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
             reproductionSteps: reproductionSteps
         )
+    }
+
+    private var normalizedComponent: String? {
+        if let component = component?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !component.isEmpty {
+            return component
+        }
+
+        if let sectionTitle = sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !sectionTitle.isEmpty {
+            return sectionTitle
+        }
+
+        return nil
     }
 
     fileprivate static func firstString(in dictionary: [String: Any], keys: [String]) -> String? {
@@ -611,6 +646,89 @@ private struct IssuePayload {
         default:
             return .followUp
         }
+    }
+
+    fileprivate static func parseSeverity(
+        _ value: String?,
+        title: String,
+        summary: String,
+        evidenceExcerpt: String
+    ) -> ExtractedIssueSeverity {
+        if let value {
+            let normalizedValue = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+            switch normalizedValue {
+            case "critical", "blocker", "sev1", "p0":
+                return .critical
+            case "high", "major", "sev2", "p1":
+                return .high
+            case "medium", "moderate", "normal", "sev3", "p2":
+                return .medium
+            case "low", "minor", "cosmetic", "sev4", "p3":
+                return .low
+            default:
+                break
+            }
+        }
+
+        let combinedText = [
+            title,
+            summary,
+            evidenceExcerpt
+        ]
+        .joined(separator: " ")
+        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        .lowercased()
+
+        let criticalSignals = [
+            "crash",
+            "crashes",
+            "data loss",
+            "completely broken",
+            "blocked",
+            "blocker",
+            "cannot continue",
+            "can't continue",
+            "unable to continue",
+            "won't open",
+            "blank screen"
+        ]
+        if criticalSignals.contains(where: combinedText.contains) {
+            return .critical
+        }
+
+        let lowSignals = [
+            "minor",
+            "small",
+            "cosmetic",
+            "visual glitch",
+            "visual issue",
+            "spacing",
+            "alignment",
+            "typo",
+            "copy issue"
+        ]
+        if lowSignals.contains(where: combinedText.contains) {
+            return .low
+        }
+
+        let highSignals = [
+            "broken",
+            "doesn't work",
+            "does not work",
+            "not respond",
+            "fails",
+            "failure",
+            "unable to",
+            "cannot",
+            "can't",
+            "stuck"
+        ]
+        if highSignals.contains(where: combinedText.contains) {
+            return .high
+        }
+
+        return .medium
     }
 
     fileprivate static func parseTimestamp(_ value: String?) -> TimeInterval? {

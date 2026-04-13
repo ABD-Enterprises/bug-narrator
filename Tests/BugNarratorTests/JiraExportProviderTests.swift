@@ -13,8 +13,11 @@ final class JiraExportProviderTests: XCTestCase {
         let issue = ExtractedIssue(
             title: "Modal lacks close affordance",
             category: .uxIssue,
+            severity: .medium,
+            component: "Settings Modal",
             summary: "The modal has no visible close affordance.",
             evidenceExcerpt: "I cannot tell how to dismiss the modal.",
+            deduplicationHint: "issue-modal-close-affordance",
             timestamp: 22,
             requiresReview: true,
             reproductionSteps: [
@@ -63,6 +66,9 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(fields["summary"] as? String, "Modal lacks close affordance")
         let payloadData = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
         let payloadString = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        XCTAssertTrue(payloadString.contains("Severity: Medium"))
+        XCTAssertTrue(payloadString.contains("Component: Settings Modal"))
+        XCTAssertTrue(payloadString.contains("Deduplication hint: issue-modal-close-affordance"))
         XCTAssertTrue(payloadString.contains("Reproduction steps"))
         XCTAssertTrue(payloadString.contains("Expected: A close affordance is visible immediately."))
         XCTAssertTrue(payloadString.contains("Actual: No close affordance appears in the modal chrome."))

@@ -134,6 +134,15 @@ actor GitHubExportProvider {
             lines.append("- Transcript time: `\(timestampLabel)`")
         }
 
+        lines.append("- Severity: \(issue.severity.rawValue)")
+
+        if let component = issue.component?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !component.isEmpty {
+            lines.append("- Component: \(component)")
+        }
+
+        lines.append("- Deduplication hint: `\(issue.deduplicationHint)`")
+
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
             lines.append("- Transcript section: \(sectionTitle)")
         }

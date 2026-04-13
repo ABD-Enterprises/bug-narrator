@@ -1,0 +1,166 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n3-tests test "-only-testing:BugNarratorTests/IssueExtractionServiceTests" "-only-testing:BugNarratorTests/GitHubExportProviderTests" "-only-testing:BugNarratorTests/JiraExportProviderTests" "-only-testing:BugNarratorTests/TranscriptExporterTests" "-only-testing:BugNarratorTests/ReviewWorkspaceTests"
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+2026-04-13 04:09:00.862 xcodebuild[57025:2183900] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, name:Any Mac }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (2 targets)
+    Target 'BugNarratorTests' in project 'BugNarrator'
+        ➜ Explicit dependency on target 'BugNarrator' in project 'BugNarrator'
+    Target 'BugNarrator' in project 'BugNarrator' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: 7f5e936c9a66d6a108c8f87d33cc4ca3
+Build description path: /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/XCBuildData/7f5e936c9a66d6a108c8f87d33cc4ca3.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk /tmp/bugnarrator-n3-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o /tmp/bugnarrator-n3-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')
+CopySwiftLibs /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
+    cd /Users/deffenda/Code/bug-narrator
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Library/SystemExtensions --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+Ignoring --strip-bitcode because --sign was not passed
+
+ProcessInfoPlistFile /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist /Users/deffenda/Code/bug-narrator/Resources/Info.plist (in target 'BugNarrator' from project 'BugNarrator')
+    cd /Users/deffenda/Code/bug-narrator
+    builtin-infoPlistUtility /Users/deffenda/Code/bug-narrator/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist -o /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist
+
+CopySwiftLibs /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest (in target 'BugNarratorTests' from project 'BugNarrator')
+    cd /Users/deffenda/Code/bug-narrator
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/MacOS/BugNarratorTests --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Frameworks --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/PlugIns --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Library/SystemExtensions --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+Ignoring --strip-bitcode because --sign was not passed
+
+ProcessInfoPlistFile /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Info.plist /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/empty-BugNarratorTests.plist (in target 'BugNarratorTests' from project 'BugNarrator')
+    cd /Users/deffenda/Code/bug-narrator
+    builtin-infoPlistUtility /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/empty-BugNarratorTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -o /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Info.plist
+
+2026-04-13 04:09:07.698211-0400 BugNarrator[57197:2184594] [settings] 2026-04-13T08:09:07.696Z [INFO] [settings] settings_loaded - Settings finished loading. debug_mode=disabled has_github_token=<redacted> has_jira_token=<redacted> has_openai_key=no launch_at_login=disabled launch_at_login_supported=yes
+2026-04-13 04:09:07.698880-0400 BugNarrator[57197:2184594] [session-library] 2026-04-13T08:09:07.699Z [INFO] [session-library] session_store_empty - No existing session history was found on disk.
+2026-04-13 04:09:07.704006-0400 BugNarrator[57197:2184594] [settings] 2026-04-13T08:09:07.704Z [INFO] [settings] app_state_initialized - BugNarrator finished initializing application state. debug_mode=disabled has_openai_key=no
+2026-04-13 04:09:07.716440-0400 BugNarrator[57197:2184594] [permissions] 2026-04-13T08:09:07.716Z [INFO] [permissions] launch_permission_snapshot - Captured the initial permission state snapshot for this BugNarrator app copy. bundle_path=/private/tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app is_local_testing_build=no microphone_status=notDetermined screen_capture_status=notDetermined
+2026-04-13 04:09:07.716715-0400 BugNarrator[57197:2184594] [session-library] 2026-04-13T08:09:07.717Z [INFO] [session-library] launch_session_store_snapshot - Captured the initial session library state at launch. selected_transcript_id=<redacted> stored_session_count=0
+Test Suite 'Selected tests' started at 2026-04-13 04:09:07.955.
+Test Suite 'BugNarratorTests.xctest' started at 2026-04-13 04:09:07.956.
+Test Suite 'GitHubExportProviderTests' started at 2026-04-13 04:09:07.956.
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportMapsRepositoryNotFound]' started.
+2026-04-13 04:09:07.958096-0400 BugNarrator[57197:2184687] [export] 2026-04-13T08:09:07.958Z [INFO] [export] github_export_requested - Exporting selected issues to GitHub. issue_count=1 repository=acme/bugnarrator session_id=<redacted>
+2026-04-13 04:09:07.964811-0400 BugNarrator[57197:2184673] [export] 2026-04-13T08:09:07.965Z [ERROR] [export] github_export_failed - Export failed: GitHub could not find acme/bugnarrator. Check the owner, repository name, and token permissions. source_issue_id=5530F4A5-0E14-4203-A1C3-E1523E9586FB successful_count=0
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportMapsRepositoryNotFound]' passed (0.009 seconds).
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' started.
+2026-04-13 04:09:07.966919-0400 BugNarrator[57197:2184710] [export] 2026-04-13T08:09:07.967Z [INFO] [export] github_export_requested - Exporting selected issues to GitHub. issue_count=2 repository=acme/bugnarrator session_id=<redacted>
+2026-04-13 04:09:07.967886-0400 BugNarrator[57197:2184673] [export] 2026-04-13T08:09:07.968Z [INFO] [export] github_issue_exported - Exported one issue to GitHub. remote_identifier=#101 source_issue_id=E2344E49-637E-4ACE-AD0B-628578663917
+2026-04-13 04:09:07.968460-0400 BugNarrator[57197:2184673] [export] 2026-04-13T08:09:07.968Z [ERROR] [export] github_export_failed - Export failed: GitHub rejected the issue payload: Validation Failed source_issue_id=D3ABAAA0-D7A9-469A-A2FD-741D93C8F744 successful_count=1
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' passed (0.008 seconds).
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testMakeURLRequestIncludesAuthorizationAndIssueBody]' started.
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testMakeURLRequestIncludesAuthorizationAndIssueBody]' passed (0.009 seconds).
+Test Suite 'GitHubExportProviderTests' passed at 2026-04-13 04:09:07.983.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.026 (0.027) seconds
+Test Suite 'IssueExtractionServiceTests' started at 2026-04-13 04:09:07.983.
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesInfersSeverityAndDeduplicationHintWhenMissing]' started.
+2026-04-13 04:09:07.984605-0400 BugNarrator[57197:2184664] [transcription] 2026-04-13T08:09:07.984Z [INFO] [transcription] issue_extraction_request_started - Sending the transcript to OpenAI for issue extraction. marker_count=1 model=gpt-4.1-mini screenshot_count=1 session_id=<redacted>
+2026-04-13 04:09:07.987444-0400 BugNarrator[57197:2184710] [transcription] 2026-04-13T08:09:07.987Z [INFO] [transcription] issue_extraction_request_succeeded - OpenAI returned extracted review issues. issue_count=1 session_id=<redacted>
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesInfersSeverityAndDeduplicationHintWhenMissing]' passed (0.004 seconds).
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesParsesArrayBasedContentWithMarkdownFenceAndAliasKeys]' started.
+2026-04-13 04:09:07.989322-0400 BugNarrator[57197:2184710] [transcription] 2026-04-13T08:09:07.989Z [INFO] [transcription] issue_extraction_request_started - Sending the transcript to OpenAI for issue extraction. marker_count=1 model=gpt-4.1-mini screenshot_count=1 session_id=<redacted>
+2026-04-13 04:09:07.990822-0400 BugNarrator[57197:2184710] [transcription] 2026-04-13T08:09:07.991Z [INFO] [transcription] issue_extraction_request_succeeded - OpenAI returned extracted review issues. issue_count=1 session_id=<redacted>
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesParsesArrayBasedContentWithMarkdownFenceAndAliasKeys]' passed (0.003 seconds).
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesReturnsClearErrorForMalformedStructuredPayload]' started.
+2026-04-13 04:09:07.992601-0400 BugNarrator[57197:2184710] [transcription] 2026-04-13T08:09:07.992Z [INFO] [transcription] issue_extraction_request_started - Sending the transcript to OpenAI for issue extraction. marker_count=1 model=gpt-4.1-mini screenshot_count=1 session_id=<redacted>
+2026-04-13 04:09:07.993691-0400 BugNarrator[57197:2184713] [transcription] 2026-04-13T08:09:07.993Z [ERROR] [transcription] issue_extraction_request_failed - Issue extraction failed: OpenAI returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings. session_id=<redacted>
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesReturnsClearErrorForMalformedStructuredPayload]' passed (0.003 seconds).
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesReturnsStructuredDraftIssues]' started.
+2026-04-13 04:09:07.995409-0400 BugNarrator[57197:2184664] [transcription] 2026-04-13T08:09:07.995Z [INFO] [transcription] issue_extraction_request_started - Sending the transcript to OpenAI for issue extraction. marker_count=1 model=gpt-4.1-mini screenshot_count=1 session_id=<redacted>
+2026-04-13 04:09:07.996555-0400 BugNarrator[57197:2184664] [transcription] 2026-04-13T08:09:07.996Z [INFO] [transcription] issue_extraction_request_succeeded - OpenAI returned extracted review issues. issue_count=1 session_id=<redacted>
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesReturnsStructuredDraftIssues]' passed (0.003 seconds).
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesTimesOutAfterConfiguredBudget]' started.
+2026-04-13 04:09:07.998315-0400 BugNarrator[57197:2184713] [transcription] 2026-04-13T08:09:07.998Z [INFO] [transcription] issue_extraction_request_started - Sending the transcript to OpenAI for issue extraction. marker_count=1 model=gpt-4.1-mini screenshot_count=1 session_id=<redacted>
+2026-04-13 04:09:08.275930-0400 BugNarrator[57197:2184713] [transcription] 2026-04-13T08:09:08.276Z [ERROR] [transcription] issue_extraction_request_failed - Issue extraction failed: Issue extraction took longer than 0.3 seconds. Retry the extraction or choose a faster model in Settings. session_id=<redacted>
+Test Case '-[BugNarratorTests.IssueExtractionServiceTests testExtractIssuesTimesOutAfterConfiguredBudget]' passed (0.283 seconds).
+Test Suite 'IssueExtractionServiceTests' passed at 2026-04-13 04:09:08.280.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.295 (0.297) seconds
+Test Suite 'JiraExportProviderTests' started at 2026-04-13 04:09:08.280.
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportMapsValidationFailure]' started.
+2026-04-13 04:09:08.281845-0400 BugNarrator[57197:2184664] [export] 2026-04-13T08:09:08.282Z [INFO] [export] jira_export_requested - Exporting selected issues to Jira. issue_count=1 project_key=FM session_id=<redacted>
+2026-04-13 04:09:08.311923-0400 BugNarrator[57197:2184687] [export] 2026-04-13T08:09:08.311Z [ERROR] [export] jira_export_failed - Export failed: Jira rejected the issue payload: Issue type is invalid source_issue_id=D85F6B7C-1062-4B46-8834-B01CD4B7BFD7 successful_count=0
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportMapsValidationFailure]' passed (0.033 seconds).
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' started.
+2026-04-13 04:09:08.318296-0400 BugNarrator[57197:2184664] [export] 2026-04-13T08:09:08.318Z [INFO] [export] jira_export_requested - Exporting selected issues to Jira. issue_count=2 project_key=FM session_id=<redacted>
+2026-04-13 04:09:08.320729-0400 BugNarrator[57197:2184687] [export] 2026-04-13T08:09:08.320Z [INFO] [export] jira_issue_exported - Exported one issue to Jira. remote_identifier=FM-101 source_issue_id=077F37B2-A202-4ACD-BF52-2DF9FC85E43D
+2026-04-13 04:09:08.322972-0400 BugNarrator[57197:2184710] [export] 2026-04-13T08:09:08.322Z [ERROR] [export] jira_export_failed - Export failed: Jira rejected the issue payload: Issue type is invalid source_issue_id=0B9C6ABD-86A2-4B34-B20A-5FDEBF854E69 successful_count=1
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' passed (0.009 seconds).
+Test Case '-[BugNarratorTests.JiraExportProviderTests testMakeURLRequestIncludesBasicAuthAndProjectFields]' started.
+Test Case '-[BugNarratorTests.JiraExportProviderTests testMakeURLRequestIncludesBasicAuthAndProjectFields]' passed (0.002 seconds).
+Test Suite 'JiraExportProviderTests' passed at 2026-04-13 04:09:08.327.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.045 (0.047) seconds
+Test Suite 'ReviewWorkspaceTests' started at 2026-04-13 04:09:08.328.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testAvailableTabsIncludeSummaryOnlyWhenSessionHasSummaryContent]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testAvailableTabsIncludeSummaryOnlyWhenSessionHasSummaryContent]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testClampedTabFallsBackToSummaryWhenReviewSummaryIsAvailable]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testClampedTabFallsBackToSummaryWhenReviewSummaryIsAvailable]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testNormalizedOptionalReproductionStepTextTrimsPaddingAndDropsBlankValues]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testNormalizedOptionalReproductionStepTextTrimsPaddingAndDropsBlankValues]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testPendingTranscriptionSessionUsesRecoveryTimelineEntry]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testPendingTranscriptionSessionUsesRecoveryTimelineEntry]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testSelectedIssueSummaryCountsOnlySelectedIssues]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testSelectedIssueSummaryCountsOnlySelectedIssues]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testTimelineEntriesCombineScreenshotAndLinkedMarkerAtSameTimestamp]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testTimelineEntriesCombineScreenshotAndLinkedMarkerAtSameTimestamp]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testTimelineEntriesKeepLegacyMarkerWithoutScreenshot]' started.
+Test Case '-[BugNarratorTests.ReviewWorkspaceTests testTimelineEntriesKeepLegacyMarkerWithoutScreenshot]' passed (0.001 seconds).
+Test Suite 'ReviewWorkspaceTests' passed at 2026-04-13 04:09:08.334.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.005 (0.007) seconds
+Test Suite 'TranscriptExporterTests' started at 2026-04-13 04:09:08.334.
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleCreatesExpectedFilesAndCopiesScreenshots]' started.
+2026-04-13 04:09:08.337304-0400 BugNarrator[57197:2184594] [export] 2026-04-13T08:09:08.337Z [INFO] [export] session_bundle_exported - Exported a local session bundle. copied_screenshot_count=1 missing_screenshot_count=0 screenshot_count=1 session_id=<redacted>
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleCreatesExpectedFilesAndCopiesScreenshots]' passed (0.004 seconds).
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames]' started.
+2026-04-13 04:09:08.342193-0400 BugNarrator[57197:2184594] [export] 2026-04-13T08:09:08.342Z [INFO] [export] session_bundle_exported - Exported a local session bundle. copied_screenshot_count=2 missing_screenshot_count=0 screenshot_count=2 session_id=<redacted>
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames]' passed (0.005 seconds).
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleSkipsMissingScreenshotFilesButStillCreatesScreenshotsDirectory]' started.
+2026-04-13 04:09:08.345851-0400 BugNarrator[57197:2184594] [export] 2026-04-13T08:09:08.346Z [INFO] [export] session_bundle_exported - Exported a local session bundle. copied_screenshot_count=0 missing_screenshot_count=1 screenshot_count=1 session_id=<redacted>
+Test Case '-[BugNarratorTests.TranscriptExporterTests testWriteBundleSkipsMissingScreenshotFilesButStillCreatesScreenshotsDirectory]' passed (0.003 seconds).
+Test Suite 'TranscriptExporterTests' passed at 2026-04-13 04:09:08.347.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.012 (0.013) seconds
+Test Suite 'BugNarratorTests.xctest' passed at 2026-04-13 04:09:08.347.
+	 Executed 21 tests, with 0 failures (0 unexpected) in 0.383 (0.392) seconds
+Test Suite 'Selected tests' passed at 2026-04-13 04:09:08.348.
+	 Executed 21 tests, with 0 failures (0 unexpected) in 0.383 (0.392) seconds
+2026-04-13 04:09:08.627 xcodebuild[57025:2183900] [MT] IDETestOperationsObserverDebug: 2.782 elapsed -- Testing started completed.
+2026-04-13 04:09:08.627 xcodebuild[57025:2183900] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-04-13 04:09:08.627 xcodebuild[57025:2183900] [MT] IDETestOperationsObserverDebug: 2.782 sec, +2.782 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bugnarrator-n3-tests/Logs/Test/Test-BugNarrator-2026.04.13_04-09-00--0400.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

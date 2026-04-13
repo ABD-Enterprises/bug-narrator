@@ -19,8 +19,11 @@ final class IssueExtractionServiceTests: XCTestCase {
             {
               "title": "Save button clips in the modal",
               "category": "Bug",
+              "severity": "High",
+              "component": "Settings > Save Modal",
               "summary": "The save button appears clipped in the modal layout.",
               "evidenceExcerpt": "The save button is clipped",
+              "deduplicationHint": "issue-save-modal-clipped",
               "timestamp": "00:08",
               "sectionTitle": "Save flow",
               "relatedScreenshotFileNames": ["review-shot.png"],
@@ -54,7 +57,10 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.guidanceNote, "Review these before export.")
         XCTAssertEqual(result.issues.count, 1)
         XCTAssertEqual(result.issues.first?.category, .bug)
+        XCTAssertEqual(result.issues.first?.severity, .high)
+        XCTAssertEqual(result.issues.first?.component, "Settings > Save Modal")
         XCTAssertEqual(result.issues.first?.relatedScreenshotIDs, [try XCTUnwrap(session.screenshots.first?.id)])
+        XCTAssertEqual(result.issues.first?.deduplicationHint, "issue-save-modal-clipped")
         XCTAssertEqual(result.issues.first?.timestamp, 8)
         XCTAssertEqual(result.issues.first?.reproductionSteps.count, 1)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.instruction, "Open the save modal.")
@@ -123,11 +129,42 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.count, 1)
         XCTAssertEqual(result.issues.first?.title, "Save button clips in the modal")
         XCTAssertEqual(result.issues.first?.category, .bug)
+        XCTAssertEqual(result.issues.first?.severity, .medium)
+        XCTAssertEqual(result.issues.first?.component, "Save flow")
         XCTAssertEqual(result.issues.first?.relatedScreenshotIDs, [session.screenshots.first?.id].compactMap { $0 })
+        XCTAssertTrue(result.issues.first?.deduplicationHint.hasPrefix("issue-") == true)
         XCTAssertEqual(result.issues.first?.timestamp, 8)
         XCTAssertEqual(result.issues.first?.reproductionSteps.count, 1)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.timestamp, 8)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.screenshotID, session.screenshots.first?.id)
+    }
+
+    func testExtractIssuesInfersSeverityAndDeduplicationHintWhenMissing() async throws {
+        let session = makeReviewSession()
+        let content = """
+        {
+          "summary": "One draft issue was extracted.",
+          "issues": [
+            {
+              "title": "Submit button does not respond",
+              "category": "Bug",
+              "summary": "The submit button does not respond after entering valid input.",
+              "evidenceExcerpt": "This is completely broken because the submit button never responds.",
+              "timestamp": "00:08"
+            }
+          ]
+        }
+        """
+
+        MockURLProtocol.requestHandler = { request in
+            (self.successResponse(for: request), self.makeChatCompletionData(content: content))
+        }
+
+        let service = IssueExtractionService(session: makeMockURLSession())
+        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+
+        XCTAssertEqual(result.issues.first?.severity, .critical)
+        XCTAssertTrue(result.issues.first?.deduplicationHint.hasPrefix("issue-") == true)
     }
 
     func testExtractIssuesReturnsClearErrorForMalformedStructuredPayload() async throws {
