@@ -41,7 +41,8 @@ final class JiraExportProviderTests: XCTestCase {
                     width: 0.14,
                     height: 0.16
                 )
-            ]
+            ],
+            note: "Related to FM-142 (78% match): Existing modal close affordance issue."
         )
         let session = TranscriptSession(
             createdAt: Date(),
@@ -71,7 +72,7 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Basic ") == true)
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "BugNarrator")
 
-        let body: Data = try XCTUnwrap(request.httpBody)
+        let body = try requestBodyData(from: request)
         let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
         let project = try XCTUnwrap(fields["project"] as? [String: Any])
@@ -85,12 +86,54 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(payloadString.contains("Severity: Medium"))
         XCTAssertTrue(payloadString.contains("Component: Settings Modal"))
         XCTAssertTrue(payloadString.contains("Deduplication hint: issue-modal-close-affordance"))
+        XCTAssertTrue(payloadString.contains("Tracker context: Related to FM-142"))
         XCTAssertTrue(payloadString.contains("Reproduction steps"))
         XCTAssertTrue(payloadString.contains("Expected: A close affordance is visible immediately."))
         XCTAssertTrue(payloadString.contains("Actual: No close affordance appears in the modal chrome."))
         XCTAssertTrue(payloadString.contains("Annotated screenshots"))
         XCTAssertTrue(payloadString.contains("Modal close affordance"))
         XCTAssertTrue(payloadString.contains("modal-shot-annotated"))
+    }
+
+    func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Modal lacks close affordance",
+            category: .uxIssue,
+            summary: "The modal has no visible close affordance.",
+            evidenceExcerpt: "I cannot tell how to dismiss the modal.",
+            timestamp: nil
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/search/jql")
+            let body = try requestBodyData(from: request)
+            let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertTrue((payload["jql"] as? String)?.contains("project = FM") == true)
+            XCTAssertEqual(payload["maxResults"] as? Int, 5)
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"issues":[{"key":"FM-142","fields":{"summary":"Existing modal close affordance issue","description":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"The modal cannot be dismissed quickly."}]}]}}}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let matches = try await provider.findOpenIssues(
+            matching: issue,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        XCTAssertEqual(matches.count, 1)
+        XCTAssertEqual(matches.first?.remoteIdentifier, "FM-142")
+        XCTAssertEqual(matches.first?.title, "Existing modal close affordance issue")
     }
 
     func testExportMapsValidationFailure() async throws {

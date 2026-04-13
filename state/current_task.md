@@ -3,8 +3,8 @@
 task_id: N5
 description: Similar bug detection before export
 scope: Sources/BugNarrator/Services/, Sources/BugNarrator/Views/
-status: pending
-current_state: ready_for_codex
+status: done
+current_state: ready_for_review
 execution_status: idle
 execution_branch:
 execution_started_at:

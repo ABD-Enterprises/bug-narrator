@@ -23,7 +23,7 @@ final class TranscriptionClientTests: XCTestCase {
             )
         )
 
-        let body = try XCTUnwrap(request.httpBody)
+        let body = try requestBodyData(from: request)
         let bodyString = try XCTUnwrap(String(data: body, encoding: .utf8))
 
         XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/audio/transcriptions")

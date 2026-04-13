@@ -94,6 +94,38 @@ actor JiraExportProvider {
         return results
     }
 
+    func findOpenIssues(
+        matching issue: ExtractedIssue,
+        configuration: JiraExportConfiguration
+    ) async throws -> [TrackerIssueCandidate] {
+        guard configuration.isComplete else {
+            throw AppError.exportConfigurationMissing(
+                "Jira export requires a base URL, email, API token, project key, and issue type."
+            )
+        }
+
+        let request = try makeSearchRequest(issue: issue, configuration: configuration)
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.exportFailure("Jira returned an invalid response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw mapJiraError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+        }
+
+        let payload = try JSONDecoder().decode(JiraSearchResponse.self, from: data)
+        return payload.issues.map { issue in
+            TrackerIssueCandidate(
+                remoteIdentifier: issue.key,
+                title: issue.fields.summary,
+                summary: issue.fields.description?.plainText ?? "",
+                remoteURL: configuration.baseURL.appending(path: "browse/\(issue.key)")
+            )
+        }
+    }
+
     func makeURLRequest(
         issue: ExtractedIssue,
         session reviewSession: TranscriptSession,
@@ -114,6 +146,30 @@ actor JiraExportProvider {
                     issueType: .init(name: configuration.issueType),
                     description: try makeDescription(issue: issue, session: reviewSession)
                 )
+            )
+        )
+        return request
+    }
+
+    private func makeSearchRequest(
+        issue: ExtractedIssue,
+        configuration: JiraExportConfiguration
+    ) throws -> URLRequest {
+        let endpoint = configuration.baseURL.appending(path: "rest/api/3/search/jql")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue(
+            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
+            forHTTPHeaderField: "Authorization"
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        request.httpBody = try JSONEncoder().encode(
+            JiraSearchRequest(
+                jql: searchJQL(for: issue, projectKey: configuration.projectKey),
+                maxResults: 5,
+                fields: ["summary", "description"]
             )
         )
         return request
@@ -152,6 +208,11 @@ actor JiraExportProvider {
 
         if !metadataLines.isEmpty {
             content.append(.bulletList(items: metadataLines))
+        }
+
+        if let note = issue.note?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !note.isEmpty {
+            content.append(.paragraph(text: "Tracker context: \(note)"))
         }
 
         if !issue.reproductionSteps.isEmpty {
@@ -291,6 +352,28 @@ actor JiraExportProvider {
             "Jira exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
         )
     }
+
+    private func searchJQL(for issue: ExtractedIssue, projectKey: String) -> String {
+        let phrase = searchPhrase(for: issue)
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        return """
+        project = \(projectKey) AND statusCategory != Done AND (summary ~ "\\"\(phrase)\\"" OR description ~ "\\"\(phrase)\\"") ORDER BY updated DESC
+        """
+    }
+
+    private func searchPhrase(for issue: ExtractedIssue) -> String {
+        let source = [issue.title, issue.component, issue.summary]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let significantTerms = source
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 3 }
+
+        return significantTerms.prefix(6).joined(separator: " ")
+    }
 }
 
 private struct JiraIssueRequest: Encodable {
@@ -362,6 +445,51 @@ private struct JiraInline: Encodable {
 private struct JiraIssueResponse: Decodable {
     let id: String
     let key: String
+}
+
+private struct JiraSearchRequest: Encodable {
+    let jql: String
+    let maxResults: Int
+    let fields: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case jql
+        case maxResults = "maxResults"
+        case fields
+    }
+}
+
+private struct JiraSearchResponse: Decodable {
+    let issues: [JiraSearchIssue]
+}
+
+private struct JiraSearchIssue: Decodable {
+    let key: String
+    let fields: JiraSearchIssueFields
+}
+
+private struct JiraSearchIssueFields: Decodable {
+    let summary: String
+    let description: JiraADFNode?
+}
+
+private struct JiraADFNode: Decodable {
+    let type: String?
+    let text: String?
+    let content: [JiraADFNode]?
+
+    var plainText: String {
+        let childText = content?.map(\.plainText).filter { !$0.isEmpty }.joined(separator: " ") ?? ""
+        if let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            if childText.isEmpty {
+                return text
+            }
+
+            return [text, childText].joined(separator: " ")
+        }
+
+        return childText
+    }
 }
 
 private struct JiraErrorResponse: Decodable {
