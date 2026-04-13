@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T09:00:00Z",
+  "last_updated": "2026-04-13T09:07:09Z",
   "tasks": [
     {
       "id": "N1",
@@ -21,8 +21,9 @@
     },
     {
       "id": "N3-H1",
-      "status": "pending",
-      "title": "Deduplication hash locale stability and extraction inference optimization"
+      "status": "done",
+      "title": "Deduplication hash locale stability and extraction inference optimization",
+      "completed_at": "2026-04-13T09:07:09Z"
     }
   ]
 }
