@@ -44,7 +44,7 @@ final class MenuBarStatusPresentationTests: XCTestCase {
 
     func testTranscribingStateExpandsWidthForLongRunningStatus() {
         let presentation = MenuBarStatusPresentation(
-            status: .transcribing("Uploading audio to OpenAI and waiting for transcription..."),
+            status: .transcribing("Step 1 of 3: Uploading audio to OpenAI for transcription..."),
             currentError: nil
         )
 

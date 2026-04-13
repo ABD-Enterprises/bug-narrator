@@ -1,11 +1,14 @@
 import Foundation
 
 actor IssueExtractionService: IssueExtracting {
+    static let defaultTimeoutDuration: Duration = .seconds(10)
+
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let session: URLSession
+    private let timeoutDuration: Duration
     private let logger = DiagnosticsLogger(category: .transcription)
 
-    init(session: URLSession? = nil) {
+    init(session: URLSession? = nil, timeoutDuration: Duration = IssueExtractionService.defaultTimeoutDuration) {
         if let session {
             self.session = session
         } else {
@@ -14,6 +17,7 @@ actor IssueExtractionService: IssueExtracting {
             configuration.timeoutIntervalForResource = 180
             self.session = URLSession(configuration: configuration)
         }
+        self.timeoutDuration = timeoutDuration
     }
 
     func extractIssues(
@@ -31,101 +35,44 @@ actor IssueExtractionService: IssueExtracting {
                 "screenshot_count": "\(reviewSession.screenshotCount)"
             ]
         )
-        let body = try JSONEncoder().encode(
-            ChatCompletionRequest(
-                model: model,
-                temperature: 0.1,
-                responseFormat: .jsonObject,
-                messages: [
-                    .init(
-                        role: "system",
-                        content: """
-                        You convert spoken software review notes into structured, reviewable draft issues.
-                        Use only information explicitly present in the transcript, markers, and screenshot references.
-                        Return strict JSON with keys summary, guidanceNote, issues.
-                        Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview.
-                        Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
-                        Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
-                        """
-                    ),
-                    .init(role: "user", content: makePrompt(for: reviewSession))
-                ]
-            )
-        )
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = body
-
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AppError.issueExtractionFailure("The server response was invalid.")
+            let request = try Self.makeRequest(
+                endpoint: endpoint,
+                reviewSession: reviewSession,
+                apiKey: apiKey,
+                model: model
+            )
+
+            let result = try await withThrowingTaskGroup(of: IssueExtractionResult.self) { group in
+                let session = self.session
+                let timeoutDuration = self.timeoutDuration
+
+                group.addTask {
+                    try await Self.performRequest(request, using: session, reviewSession: reviewSession)
+                }
+
+                group.addTask {
+                    try await Task.sleep(for: timeoutDuration)
+                    throw AppError.issueExtractionFailure(Self.timeoutFailureMessage(for: timeoutDuration))
+                }
+
+                guard let firstResult = try await group.next() else {
+                    throw AppError.issueExtractionFailure("The extraction response was empty.")
+                }
+
+                group.cancelAll()
+                return firstResult
             }
 
-            guard (200...299).contains(httpResponse.statusCode) else {
-                logger.warning(
-                    "issue_extraction_request_rejected",
-                    "OpenAI rejected the issue extraction request.",
-                    metadata: ["status_code": "\(httpResponse.statusCode)"]
-                )
-                throw OpenAIErrorMapper.mapResponse(
-                    statusCode: httpResponse.statusCode,
-                    data: data,
-                    fallback: AppError.issueExtractionFailure
-                )
-            }
-
-            let completion = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-            guard let message = completion.choices.first?.message else {
-                logger.warning("issue_extraction_empty", "OpenAI returned an empty issue extraction response.")
-                throw AppError.issueExtractionFailure("The extraction response was empty.")
-            }
-
-            if let refusal = message.refusal?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !refusal.isEmpty {
-                logger.warning(
-                    "issue_extraction_refused",
-                    "OpenAI refused the issue extraction request.",
-                    metadata: ["session_id": reviewSession.id.uuidString]
-                )
-                throw AppError.issueExtractionFailure(refusal)
-            }
-
-            guard let content = message.content?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !content.isEmpty else {
-                logger.warning("issue_extraction_empty", "OpenAI returned an empty issue extraction response.")
-                throw AppError.issueExtractionFailure("The extraction response was empty.")
-            }
-
-            let payload: IssueExtractionPayload
-            do {
-                payload = try IssueExtractionPayload.parse(from: content)
-            } catch {
-                logger.error(
-                    "issue_extraction_response_parse_failed",
-                    "OpenAI returned issue data that BugNarrator could not parse.",
-                    metadata: [
-                        "session_id": reviewSession.id.uuidString,
-                        "content_length": "\(content.count)",
-                        "parse_error": String(describing: error)
-                    ]
-                )
-                throw AppError.issueExtractionFailure(
-                    "OpenAI returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings."
-                )
-            }
             logger.info(
                 "issue_extraction_request_succeeded",
                 "OpenAI returned extracted review issues.",
                 metadata: [
                     "session_id": reviewSession.id.uuidString,
-                    "issue_count": "\(payload.issues.count)"
+                    "issue_count": "\(result.issues.count)"
                 ]
             )
-            return payload.makeIssueExtractionResult(using: reviewSession)
+            return result
         } catch {
             logger.error(
                 "issue_extraction_request_failed",
@@ -136,7 +83,27 @@ actor IssueExtractionService: IssueExtracting {
         }
     }
 
-    private func makePrompt(for session: TranscriptSession) -> String {
+    private static func timeoutFailureMessage(for duration: Duration) -> String {
+        "Issue extraction took longer than \(timeoutDisplayText(for: duration)). Retry the extraction or choose a faster model in Settings."
+    }
+
+    private static func timeoutDisplayText(for duration: Duration) -> String {
+        let components = duration.components
+        let rawSeconds = max(
+            0,
+            Double(components.seconds) + (Double(components.attoseconds) / 1_000_000_000_000_000_000)
+        )
+
+        if rawSeconds.rounded() == rawSeconds {
+            let wholeSeconds = Int(rawSeconds)
+            return "\(wholeSeconds) second\(wholeSeconds == 1 ? "" : "s")"
+        }
+
+        let roundedTenths = ceil(rawSeconds * 10) / 10
+        return "\(String(format: "%.1f", roundedTenths)) seconds"
+    }
+
+    private static func makePrompt(for session: TranscriptSession) -> String {
         var lines: [String] = [
             "Session metadata:",
             "- Recorded: \(session.createdAt.formatted(date: .abbreviated, time: .standard))",
@@ -198,6 +165,85 @@ actor IssueExtractionService: IssueExtracting {
 
         lines.append("Return a concise summary plus reviewable draft issues for product and engineering triage.")
         return lines.joined(separator: "\n")
+    }
+
+    private static func makeRequest(
+        endpoint: URL,
+        reviewSession: TranscriptSession,
+        apiKey: String,
+        model: String
+    ) throws -> URLRequest {
+        let body = try JSONEncoder().encode(
+            ChatCompletionRequest(
+                model: model,
+                temperature: 0.1,
+                responseFormat: .jsonObject,
+                messages: [
+                    .init(
+                        role: "system",
+                        content: """
+                        You convert spoken software review notes into structured, reviewable draft issues.
+                        Use only information explicitly present in the transcript, markers, and screenshot references.
+                        Return strict JSON with keys summary, guidanceNote, issues.
+                        Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview.
+                        Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
+                        Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
+                        """
+                    ),
+                    .init(role: "user", content: makePrompt(for: reviewSession))
+                ]
+            )
+        )
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return request
+    }
+
+    private static func performRequest(
+        _ request: URLRequest,
+        using session: URLSession,
+        reviewSession: TranscriptSession
+    ) async throws -> IssueExtractionResult {
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.issueExtractionFailure("The server response was invalid.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw OpenAIErrorMapper.mapResponse(
+                statusCode: httpResponse.statusCode,
+                data: data,
+                fallback: AppError.issueExtractionFailure
+            )
+        }
+
+        let completion = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+        guard let message = completion.choices.first?.message else {
+            throw AppError.issueExtractionFailure("The extraction response was empty.")
+        }
+
+        if let refusal = message.refusal?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !refusal.isEmpty {
+            throw AppError.issueExtractionFailure(refusal)
+        }
+
+        guard let content = message.content?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !content.isEmpty else {
+            throw AppError.issueExtractionFailure("The extraction response was empty.")
+        }
+
+        do {
+            let payload = try IssueExtractionPayload.parse(from: content)
+            return payload.makeIssueExtractionResult(using: reviewSession)
+        } catch {
+            throw AppError.issueExtractionFailure(
+                "OpenAI returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings."
+            )
+        }
     }
 }
 

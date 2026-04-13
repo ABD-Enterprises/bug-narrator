@@ -1,5 +1,34 @@
 # Implementation Notes
 
-task_id: T1
-status: idle
-summary: Standards adoption bootstrap has not started an implementation slice in this workflow file yet.
+task_id: N1
+status: ready_for_review
+
+CHANGED:
+- Sources/BugNarrator/AppState.swift
+- Sources/BugNarrator/Services/IssueExtractionService.swift
+- Sources/BugNarrator/Views/SettingsView.swift
+- Sources/BugNarrator/Views/TranscriptView.swift
+- Tests/BugNarratorTests/AppStateTests.swift
+- Tests/BugNarratorTests/IssueExtractionServiceTests.swift
+- Tests/BugNarratorTests/MenuBarStatusPresentationTests.swift
+
+DID:
+- Forced completed recording sessions to persist locally on stop, even if the legacy auto-save preference is disabled.
+- Added staged progress text for stop and retry flows so transcription, local save, and extraction progress are visible as text.
+- Enforced a 10-second issue-extraction timeout with a clear retry/faster-model error.
+- Reworked the review pane into one stacked workspace so summary, extracted issues, screenshots, and transcript are visible in a single view.
+- Updated workflow settings copy to reflect required local session persistence.
+
+VALIDATED:
+- ./scripts/validate.sh 314d332a132e94f9076d7da5c512d031f598a7ff
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test
+
+NEXT:
+- Review the unified transcript workspace and the forced auto-save behavior in PR review.
+
+## 2026-04-13 Review Remediation
+
+- Synced the issue-extraction timeout failure copy to the configured timeout budget and rounded subsecond values up to a stable tenths display.
+- Computed transcription progress step totals from `autoExtractIssues` so non-extraction runs no longer claim a missing third step.
+- Marked the stacked review workspace section titles as accessibility headers and updated the regression script for the no-tabs layout.
+- Returned `state/current_task.md` to `ready_for_review` after fixing the CI and review findings on PR #14.

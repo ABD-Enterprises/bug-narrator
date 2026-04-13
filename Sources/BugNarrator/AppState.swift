@@ -392,7 +392,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing("Uploading audio to OpenAI and waiting for transcription..."))
+            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
             swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcriptionClient.transcribe(
@@ -432,6 +432,8 @@ final class AppState: ObservableObject {
                 ]
             )
 
+            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the finished session locally...")))
+
             do {
                 try persistCompletedTranscript(session)
             } catch {
@@ -460,7 +462,7 @@ final class AppState: ObservableObject {
 
             if settingsStore.autoExtractIssues {
                 issueExtractionSessionID = session.id
-                setStatus(.transcribing("Extracting reviewable issues..."))
+                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
                 swapActivity(reason: "Extracting review issues")
 
                 do {
@@ -494,10 +496,10 @@ final class AppState: ObservableObject {
             endActivity()
             setStatus(.success(
                 settingsStore.autoExtractIssues
-                    ? "Transcript and extracted issues are ready."
+                    ? "Session saved. Transcript and extracted issues are ready."
                     : (settingsStore.autoCopyTranscript
-                        ? "Transcript copied to the clipboard."
-                        : "Transcript ready.")
+                        ? "Session saved. Transcript copied to the clipboard."
+                        : "Session saved locally and ready for review.")
             ))
         } catch {
             if let failureReason = recoverablePendingTranscriptionReason(for: error),
@@ -755,7 +757,7 @@ final class AppState: ObservableObject {
         let request = makeTranscriptionRequest()
         selectedTranscriptID = session.id
         currentTranscript = session
-        setStatus(.transcribing("Retrying transcription from the preserved recording..."))
+        setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
         transcriptionLogger.info(
             "transcription_retry_requested",
@@ -797,6 +799,7 @@ final class AppState: ObservableObject {
                 artifactsDirectoryPath: session.artifactsDirectoryPath
             )
 
+            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the recovered session locally...")))
             try persistUpdatedSession(updatedSession)
 
             if settingsStore.autoCopyTranscript {
@@ -805,7 +808,7 @@ final class AppState: ObservableObject {
 
             if settingsStore.autoExtractIssues {
                 issueExtractionSessionID = updatedSession.id
-                setStatus(.transcribing("Extracting reviewable issues..."))
+                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
                 swapActivity(reason: "Extracting review issues")
 
                 do {
@@ -832,10 +835,10 @@ final class AppState: ObservableObject {
             endActivity()
             setStatus(.success(
                 settingsStore.autoExtractIssues
-                    ? "Transcript and extracted issues are ready."
+                    ? "Session saved. Transcript and extracted issues are ready."
                     : (settingsStore.autoCopyTranscript
-                        ? "Transcript copied to the clipboard."
-                        : "Transcript ready.")
+                        ? "Session saved. Transcript copied to the clipboard."
+                        : "Session saved locally and ready for review.")
             ))
         } catch {
             if let failureReason = recoverablePendingTranscriptionReason(for: error) {
@@ -1017,6 +1020,11 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func transcriptionProgressMessage(step: Int, action: String) -> String {
+        let totalSteps = settingsStore.autoExtractIssues ? 3 : 2
+        return "Step \(step) of \(totalSteps): \(action)"
+    }
+
     func extractIssuesForDisplayedTranscript() async {
         guard let transcriptSession = displayedTranscript else {
             return
@@ -1026,7 +1034,7 @@ final class AppState: ObservableObject {
 
         guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
             issueExtractionSessionID = transcriptSession.id
-            setStatus(.transcribing("Extracting reviewable issues..."))
+            setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
             beginActivity(reason: "Extracting review issues")
             transcriptionLogger.info(
                 "issue_extraction_requested",
@@ -1560,12 +1568,8 @@ final class AppState: ObservableObject {
     }
 
     private func persistCompletedTranscript(_ session: TranscriptSession) throws {
-        if settingsStore.autoSaveTranscript {
-            try transcriptStore.add(session)
-            selectedTranscriptID = session.id
-        } else {
-            selectedTranscriptID = session.id
-        }
+        try transcriptStore.add(session)
+        selectedTranscriptID = session.id
 
         if settingsStore.autoCopyTranscript {
             clipboardService.copy(session.transcript)
@@ -1576,7 +1580,7 @@ final class AppState: ObservableObject {
             "Persisted a completed transcript session.",
             metadata: [
                 "session_id": session.id.uuidString,
-                "auto_saved": settingsStore.autoSaveTranscript ? "yes" : "no",
+                "auto_saved": "required",
                 "auto_copied": settingsStore.autoCopyTranscript ? "yes" : "no"
             ]
         )

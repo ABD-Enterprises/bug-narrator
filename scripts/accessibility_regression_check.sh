@@ -49,8 +49,8 @@ check_literal \
   'session-library filter selected-state announcement'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
-  '.accessibilityValue(selectedDetailTab == tab ? "Selected" : "Not selected")' \
-  'review tab selected-state announcement'
+  '.accessibilityAddTraits(.isHeader)' \
+  'review workspace section heading announcement'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
   'Select issue ' \
