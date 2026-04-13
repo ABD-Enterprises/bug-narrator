@@ -27,6 +27,18 @@ final class IssueExtractionServiceTests: XCTestCase {
               "timestamp": "00:08",
               "sectionTitle": "Save flow",
               "relatedScreenshotFileNames": ["review-shot.png"],
+              "screenshotAnnotations": [
+                {
+                  "relatedScreenshotFileName": "review-shot.png",
+                  "label": "Save button",
+                  "x": 0.48,
+                  "y": 0.62,
+                  "width": 0.22,
+                  "height": 0.14,
+                  "confidence": 0.81,
+                  "style": "highlight"
+                }
+              ],
               "reproductionSteps": [
                 {
                   "instruction": "Open the save modal.",
@@ -46,6 +58,12 @@ final class IssueExtractionServiceTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
+
+            let body = try XCTUnwrap(request.httpBody)
+            let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
+            let userContent = try XCTUnwrap(messages.last?["content"] as? [[String: Any]])
+            XCTAssertTrue(userContent.contains(where: { ($0["type"] as? String) == "image_url" }))
 
             return (self.successResponse(for: request), self.makeChatCompletionData(content: content))
         }
@@ -68,6 +86,9 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.actualResult, "The save button is clipped on the right edge.")
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.timestamp, 8)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.screenshotID, session.screenshots.first?.id)
+        XCTAssertEqual(result.issues.first?.screenshotAnnotations.count, 1)
+        XCTAssertEqual(result.issues.first?.screenshotAnnotations.first?.label, "Save button")
+        XCTAssertEqual(result.issues.first?.screenshotAnnotations.first?.screenshotID, session.screenshots.first?.id)
     }
 
     func testExtractIssuesParsesArrayBasedContentWithMarkdownFenceAndAliasKeys() async throws {
@@ -87,6 +108,16 @@ final class IssueExtractionServiceTests: XCTestCase {
               "timecode": "00:08",
               "section": "Save flow",
               "screenshotFileNames": ["review-shot.png"],
+              "annotations": [
+                {
+                  "screenshot": "review-shot.png",
+                  "target": "Save button",
+                  "left": 0.45,
+                  "top": 0.60,
+                  "w": 0.24,
+                  "h": 0.15
+                }
+              ],
               "stepsToReproduce": [
                 {
                   "step": "Open the save modal.",
@@ -137,6 +168,8 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.first?.reproductionSteps.count, 1)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.timestamp, 8)
         XCTAssertEqual(result.issues.first?.reproductionSteps.first?.screenshotID, session.screenshots.first?.id)
+        XCTAssertEqual(result.issues.first?.screenshotAnnotations.count, 1)
+        XCTAssertEqual(result.issues.first?.screenshotAnnotations.first?.label, "Save button")
     }
 
     func testExtractIssuesInfersSeverityAndDeduplicationHintWhenMissing() async throws {
@@ -251,7 +284,12 @@ final class IssueExtractionServiceTests: XCTestCase {
     }
 
     private func makeReviewSession() -> TranscriptSession {
-        let screenshot = SessionScreenshot(elapsedTime: 8, filePath: "/tmp/review-shot.png")
+        let screenshotURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("review-shot.png")
+        let pngData = Data(
+            base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="
+        )!
+        try? pngData.write(to: screenshotURL)
+        let screenshot = SessionScreenshot(elapsedTime: 8, filePath: screenshotURL.path)
         return TranscriptSession(
             createdAt: Date(timeIntervalSince1970: 10),
             transcript: "The save button is clipped and the modal is confusing.",

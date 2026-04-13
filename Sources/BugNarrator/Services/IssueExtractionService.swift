@@ -181,21 +181,26 @@ actor IssueExtractionService: IssueExtracting {
                 messages: [
                     .init(
                         role: "system",
-                        content: """
+                        content: .text("""
                         You convert spoken software review notes into structured, reviewable draft issues.
                         Use only information explicitly present in the transcript, markers, and screenshot references.
                         Return strict JSON with keys summary, guidanceNote, issues.
-                        Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps.
+                        Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps, screenshotAnnotations.
                         Each reproduction step must contain instruction, expectedResult, actualResult, timestamp, relatedScreenshotFileName.
+                        Each screenshot annotation must contain relatedScreenshotFileName, label, x, y, width, height, confidence, style.
                         Generate numbered reproduction steps that follow the narration timeline and tie each step to the most relevant screenshot reference when one exists.
+                        When the narration clearly points to a specific UI control or region, return one or more screenshotAnnotations that use normalized 0-1 coordinates relative to the screenshot image.
+                        Use a top-left origin for x and y.
+                        Only include screenshotAnnotations when the narration or evidence clearly references a specific UI element. Otherwise return an empty array.
+                        Valid annotation styles are exactly: highlight.
                         Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
                         Valid severities are exactly: Critical, High, Medium, Low.
                         Infer severity from the narration tone and impact. Infer component from the most specific app area available in the transcript or screenshot context.
                         DeduplicationHint should be a short stable hash-like string derived from the issue description.
                         Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
-                        """
+                        """)
                     ),
-                    .init(role: "user", content: makePrompt(for: reviewSession))
+                    .init(role: "user", content: .parts(makeUserMessageParts(for: reviewSession)))
                 ]
             )
         )
@@ -206,6 +211,47 @@ actor IssueExtractionService: IssueExtracting {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         return request
+    }
+
+    private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {
+        var parts: [ChatMessageInputPart] = [.text(makePrompt(for: session))]
+
+        for screenshot in session.screenshots {
+            parts.append(.text("Screenshot reference: \(screenshot.fileName) at \(screenshot.timeLabel)."))
+
+            guard let imagePart = makeScreenshotContentPart(for: screenshot) else {
+                continue
+            }
+
+            parts.append(imagePart)
+        }
+
+        return parts
+    }
+
+    private static func makeScreenshotContentPart(for screenshot: SessionScreenshot) -> ChatMessageInputPart? {
+        guard let imageData = try? Data(contentsOf: screenshot.fileURL),
+              let mimeType = mimeType(for: screenshot.fileURL) else {
+            return nil
+        }
+
+        let dataURL = "data:\(mimeType);base64,\(imageData.base64EncodedString())"
+        return .imageURL(dataURL)
+    }
+
+    private static func mimeType(for fileURL: URL) -> String? {
+        switch fileURL.pathExtension.lowercased() {
+        case "png":
+            return "image/png"
+        case "jpg", "jpeg":
+            return "image/jpeg"
+        case "heic":
+            return "image/heic"
+        case "webp":
+            return "image/webp"
+        default:
+            return nil
+        }
     }
 
     private static func performRequest(
@@ -274,7 +320,51 @@ private struct ResponseFormat: Encodable {
 
 private struct ChatMessage: Encodable {
     let role: String
-    let content: String
+    let content: ChatMessageContent
+}
+
+private enum ChatMessageContent: Encodable {
+    case text(String)
+    case parts([ChatMessageInputPart])
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+
+        switch self {
+        case .text(let value):
+            try container.encode(value)
+        case .parts(let parts):
+            try container.encode(parts)
+        }
+    }
+}
+
+private enum ChatMessageInputPart: Encodable {
+    case text(String)
+    case imageURL(String)
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .text(let value):
+            try container.encode("text", forKey: .type)
+            try container.encode(value, forKey: .text)
+        case .imageURL(let value):
+            try container.encode("image_url", forKey: .type)
+            try container.encode(ImageURLPayload(url: value), forKey: .imageURL)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case imageURL = "image_url"
+    }
+}
+
+private struct ImageURLPayload: Encodable {
+    let url: String
 }
 
 private struct ChatCompletionResponse: Decodable {
@@ -512,6 +602,7 @@ private struct IssuePayload {
     let confidence: Double?
     let requiresReview: Bool?
     let reproductionSteps: [IssueReproductionStepPayload]
+    let screenshotAnnotations: [IssueScreenshotAnnotationPayload]
 
     init?(dictionary: [String: Any]) {
         let title = Self.firstString(in: dictionary, keys: ["title", "issueTitle", "name"])?.trimmedForExtraction
@@ -560,6 +651,16 @@ private struct IssuePayload {
 
             return IssueReproductionStepPayload(dictionary: stepDictionary)
         } ?? []
+        self.screenshotAnnotations = Self.firstArray(
+            in: dictionary,
+            keys: ["screenshotAnnotations", "annotations", "screenshot_annotations", "uiAnnotations"]
+        )?.compactMap { annotationObject in
+            guard let annotationDictionary = annotationObject as? [String: Any] else {
+                return nil
+            }
+
+            return IssueScreenshotAnnotationPayload(dictionary: annotationDictionary)
+        } ?? []
     }
 
     func makeExtractedIssue(screenshotIndex: [String: UUID]) -> ExtractedIssue {
@@ -571,6 +672,12 @@ private struct IssuePayload {
             $0.makeIssueReproductionStep(
                 screenshotIndex: screenshotIndex,
                 fallbackTimestamp: parsedTimestamp,
+                fallbackScreenshotID: screenshotIDs.first
+            )
+        }
+        let annotations = screenshotAnnotations.compactMap {
+            $0.makeIssueScreenshotAnnotation(
+                screenshotIndex: screenshotIndex,
                 fallbackScreenshotID: screenshotIDs.first
             )
         }
@@ -589,7 +696,8 @@ private struct IssuePayload {
             requiresReview: requiresReview ?? true,
             isSelectedForExport: true,
             sectionTitle: sectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-            reproductionSteps: reproductionSteps
+            reproductionSteps: reproductionSteps,
+            screenshotAnnotations: annotations
         )
     }
 
@@ -810,6 +918,96 @@ private struct IssueReproductionStepPayload {
             timestamp: IssuePayload.parseTimestamp(timestamp) ?? fallbackTimestamp,
             screenshotID: screenshotID
         )
+    }
+}
+
+private struct IssueScreenshotAnnotationPayload {
+    private static let xKeys = ["x", "left", "originX", "origin_x", "minX"]
+    private static let yKeys = ["y", "top", "originY", "origin_y", "minY"]
+    private static let widthKeys = ["width", "w"]
+    private static let heightKeys = ["height", "h"]
+
+    let relatedScreenshotFileName: String?
+    let label: String?
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    let confidence: Double?
+    let style: String?
+
+    init?(dictionary: [String: Any]) {
+        guard let x = Self.firstDouble(in: dictionary, keys: Self.xKeys),
+              let y = Self.firstDouble(in: dictionary, keys: Self.yKeys),
+              let width = Self.firstDouble(in: dictionary, keys: Self.widthKeys),
+              let height = Self.firstDouble(in: dictionary, keys: Self.heightKeys) else {
+            return nil
+        }
+
+        self.relatedScreenshotFileName = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["relatedScreenshotFileName", "screenshot", "screenshotFileName", "fileName", "related_screenshot_file_name"]
+        )?.trimmedForExtraction
+        self.label = IssuePayload.firstString(
+            in: dictionary,
+            keys: ["label", "title", "target", "description"]
+        )?.trimmedForExtraction.nilIfEmpty
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.confidence = Self.firstDouble(in: dictionary, keys: ["confidence", "score"])
+        self.style = IssuePayload.firstString(in: dictionary, keys: ["style", "kind"])?.trimmedForExtraction
+    }
+
+    func makeIssueScreenshotAnnotation(
+        screenshotIndex: [String: UUID],
+        fallbackScreenshotID: UUID?
+    ) -> IssueScreenshotAnnotation? {
+        let screenshotID = relatedScreenshotFileName.flatMap {
+            screenshotIndex[$0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
+        } ?? fallbackScreenshotID
+
+        guard let screenshotID else {
+            return nil
+        }
+
+        let annotationStyle: IssueScreenshotAnnotation.Style
+        switch style?.lowercased() {
+        case nil, "", "highlight", "box", "outline":
+            annotationStyle = .highlight
+        default:
+            annotationStyle = .highlight
+        }
+
+        return IssueScreenshotAnnotation(
+            screenshotID: screenshotID,
+            label: label,
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            confidence: confidence,
+            style: annotationStyle
+        )
+    }
+
+    private static func firstDouble(in dictionary: [String: Any], keys: [String]) -> Double? {
+        for key in keys {
+            if let value = dictionary[key] as? Double {
+                return value
+            }
+
+            if let value = dictionary[key] as? NSNumber {
+                return value.doubleValue
+            }
+
+            if let value = dictionary[key] as? String, let doubleValue = Double(value) {
+                return doubleValue
+            }
+        }
+
+        return nil
     }
 }
 

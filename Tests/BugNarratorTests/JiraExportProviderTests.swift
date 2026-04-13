@@ -10,6 +10,9 @@ final class JiraExportProviderTests: XCTestCase {
 
     func testMakeURLRequestIncludesBasicAuthAndProjectFields() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
+        let screenshotURL = makeScreenshotFileURL(named: "modal-shot.png")
+        let screenshot = SessionScreenshot(elapsedTime: 22, filePath: screenshotURL.path)
+        let artifactsDirectory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)
         let issue = ExtractedIssue(
             title: "Modal lacks close affordance",
             category: .uxIssue,
@@ -19,6 +22,7 @@ final class JiraExportProviderTests: XCTestCase {
             evidenceExcerpt: "I cannot tell how to dismiss the modal.",
             deduplicationHint: "issue-modal-close-affordance",
             timestamp: 22,
+            relatedScreenshotIDs: [screenshot.id],
             requiresReview: true,
             reproductionSteps: [
                 IssueReproductionStep(
@@ -26,6 +30,16 @@ final class JiraExportProviderTests: XCTestCase {
                     expectedResult: "A close affordance is visible immediately.",
                     actualResult: "No close affordance appears in the modal chrome.",
                     timestamp: 22
+                )
+            ],
+            screenshotAnnotations: [
+                IssueScreenshotAnnotation(
+                    screenshotID: screenshot.id,
+                    label: "Modal close affordance",
+                    x: 0.78,
+                    y: 0.12,
+                    width: 0.14,
+                    height: 0.16
                 )
             ]
         )
@@ -36,7 +50,9 @@ final class JiraExportProviderTests: XCTestCase {
             model: "whisper-1",
             languageHint: nil,
             prompt: nil,
-            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+            screenshots: [screenshot],
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue]),
+            artifactsDirectoryPath: artifactsDirectory.path
         )
         let request = try await provider.makeURLRequest(
             issue: issue,
@@ -72,6 +88,9 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(payloadString.contains("Reproduction steps"))
         XCTAssertTrue(payloadString.contains("Expected: A close affordance is visible immediately."))
         XCTAssertTrue(payloadString.contains("Actual: No close affordance appears in the modal chrome."))
+        XCTAssertTrue(payloadString.contains("Annotated screenshots"))
+        XCTAssertTrue(payloadString.contains("Modal close affordance"))
+        XCTAssertTrue(payloadString.contains("modal-shot-annotated"))
     }
 
     func testExportMapsValidationFailure() async throws {
@@ -184,4 +203,13 @@ final class JiraExportProviderTests: XCTestCase {
             XCTAssertTrue(message.contains("Issue type is invalid"))
         }
     }
+}
+
+private func makeScreenshotFileURL(named fileName: String) -> URL {
+    let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString)-\(fileName)")
+    let pngData = Data(
+        base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="
+    )!
+    try? pngData.write(to: url)
+    return url
 }
