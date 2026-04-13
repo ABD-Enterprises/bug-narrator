@@ -13,7 +13,7 @@ Done when: Full record → transcribe → extract → export flow works without 
 
 ### N2
 Title: AI-generated reproduction steps from narration + screenshots
-Status: pending
+Status: done
 Phase: 1
 Depends on: N1
 Description: After issue extraction, generate step-by-step reproduction instructions for each extracted issue. AI analyzes the narration timeline (what was said when) + screenshot timestamps (what was visible) to produce numbered steps: "1. Navigate to X. 2. Click Y. 3. Enter Z. Expected: A. Actual: B." Reproduction steps appear on each extracted issue in the review screen. Editable before export. Include the relevant screenshot reference per step. This is the killer differentiator — no tool generates repro steps from narration.
@@ -23,11 +23,21 @@ Done when: Each extracted issue has AI-generated reproduction steps. Steps refer
 
 ### N3
 Title: Enhanced issue classification — severity, component, deduplication hint
-Status: pending
+Status: done
 Phase: 1
 Depends on: N1
 Description: Enhance AI issue extraction to include: severity assessment (critical/high/medium/low based on narration tone and content — "this is completely broken" → critical, "minor visual glitch" → low), suggested component/area (based on screenshots and narration context — "Settings > Accounts" or "Login Page"), and a deduplication hint (hash of the issue description for later duplicate detection). Show severity and component on each issue in the review screen. Editable before export.
 Done when: Issues have severity, component, and dedup hint. Severity inferred from narration. Component inferred from screenshots/context. All editable.
+
+---
+
+### N3-H1
+Title: Deduplication hash locale stability and extraction inference optimization
+Status: pending
+Phase: 1
+Depends on: N3
+Description: Address two post-review hardening items from N3: (1) Fix string folding in deduplication hint generation to use a fixed locale (e.g., `.current` pinned or explicit `.en_US_POSIX`) so that hashes are stable across machines and user locales — a locale-dependent hash breaks duplicate detection when sessions are shared across team members. (2) Move severity-heuristic signal arrays in `IssueExtractionService` to static constants so they are allocated once rather than on every inference call. Both changes are non-functional from a feature standpoint but are correctness and performance prerequisites for N5 (duplicate detection).
+Done when: Deduplication hints generate identical hashes for identical input across all locales. Severity signal arrays are static constants in `IssueExtractionService`. Existing tests pass.
 
 ---
 

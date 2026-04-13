@@ -44,3 +44,30 @@ Validation commands:
 
 - `./scripts/validate.sh 9a0048fc6397f1be3086b3753b2afa4a912399d2`
 - `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-settings-tests test -only-testing:BugNarratorTests/SettingsStoreTests`
+
+### N3-H1
+
+- Deduplication hint for identical issue text produces the same hash when the device locale is changed (e.g., en_US vs fr_FR)
+- `IssueExtractionService` severity signal arrays are declared `static let` (visible in the Swift file, no instance allocation)
+- All existing extraction, export, and review tests pass
+- Runtime guardrails passes
+
+Validation commands:
+
+- `./scripts/validate.sh`
+- `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n3h1-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests`
+
+### N4
+
+- Each extracted issue in the review screen displays an annotated screenshot with a visible highlight or arrow pointing to the UI element discussed in the narration
+- Annotations are editable (moveable/removeable) by the tester before export
+- Annotated screenshots are exported alongside issues to both GitHub Issues and Jira
+- Vision model (GPT-4o or equivalent) is used to locate UI elements from narration context
+- No annotation appears when narration does not reference a specific UI element
+- All existing extraction/export tests continue to pass
+- Runtime guardrails passes
+
+Validation commands:
+
+- `./scripts/validate.sh`
+- `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n4-tests test -only-testing:BugNarratorTests/ScreenshotAnnotationTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests`
