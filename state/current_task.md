@@ -3,13 +3,13 @@
 task_id: N4
 description: Smart screenshot annotation — auto-highlight relevant UI elements
 scope: Sources/BugNarrator/Services/, Sources/BugNarrator/Views/
-status: pending
-current_state: ready_for_codex
-execution_status: in_progress
-execution_branch: codex/N4-smart-screenshot-annotation-auto-highlight-relevant-ui-elements
-execution_started_at: 2026-04-13T10:03:53Z
-execution_heartbeat_at: 2026-04-13T10:03:53Z
-execution_lease_expires_at: 2026-04-13T11:33:53Z
+status: done
+current_state: ready_for_review
+execution_status: idle
+execution_branch:
+execution_started_at:
+execution_heartbeat_at:
+execution_lease_expires_at:
 execution_host_id:
 execution_worker_id:
 review_failure_count: 0
