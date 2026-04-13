@@ -125,7 +125,7 @@ Single-tool rule:
 
 Budget rules:
 
-- Codex: implement at most 1 task per repo per run; after opening a PR, stop
+- Codex: implement up to 3 sequential tasks per run (batch mode); opens one PR per batch
 - review gate: CI checks (free) + Copilot review (primary) are the merge gate; Gemini is optional
 - auto-merge: PRs that pass all required CI checks with no blocking review comments are merged automatically
 
@@ -135,7 +135,7 @@ The following cron automations run on your local machine (no GitHub Actions cost
 
 | Time (every hour) | Automation | What it does |
 |---|---|---|
-| :00 | `codex-{repo}` | Implements next task if `ready_for_codex` |
+| :00 | `codex-{repo}` | Implements up to 3 tasks (batch) if `ready_for_codex` |
 | :30 | `post-push-reviewer` | Reviews newly-opened PRs (advisory checks) |
 | :45 | `watch-open-prs` | Merges green PRs, advances state to `ready_for_codex` |
 | :55 | `fix-stuck-repos` | Fixes repos with `review_failure_count >= 2` |
