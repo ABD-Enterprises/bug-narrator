@@ -1,6 +1,23 @@
 {
-  "last_updated": "2026-04-13T00:07:30Z",
+  "last_updated": "2026-04-13T05:11:00Z",
   "summary": "N1 is implemented on codex/N1-end-to-end-recording-flow-hardening with forced session persistence, staged progress text, a 10-second extraction timeout, and a unified review workspace.",
   "next_action": "Open or review the PR for N1 and collect GitHub CI plus code review feedback.",
-  "discovered_issues": []
+  "discovered_issues": [
+    {
+      "issue": "Roadmap active_task_id (N1) does not match current_task.md (N2). The advance-task workflow did not update docs/roadmap/state.json.",
+      "severity": "medium",
+      "action": "Update docs/roadmap/state.json active_task_id to N2 and last_updated.",
+      "owner": "scheduled-audit",
+      "source": "repo-health-audit",
+      "detected_at": "2026-04-13T05:11:00Z"
+    },
+    {
+      "issue": "Handoff next_action still references opening or reviewing the N1 PR, but N1 is already done and merged. Current task is N2.",
+      "severity": "low",
+      "action": "Update handoff summary and next_action to reflect current N2 task state.",
+      "owner": "scheduled-audit",
+      "source": "repo-health-audit",
+      "detected_at": "2026-04-13T05:11:00Z"
+    }
+  ]
 }
