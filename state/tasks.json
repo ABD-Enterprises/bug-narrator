@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-13T12:18:48Z",
+  "last_updated": "2026-04-13T12:30:00Z",
   "tasks": [
     {
       "id": "N1",
@@ -36,6 +36,11 @@
       "status": "done",
       "title": "Similar bug detection before export",
       "completed_at": "2026-04-13T12:18:48Z"
+    },
+    {
+      "id": "N6",
+      "status": "pending",
+      "title": "Session intelligence — testing coverage summary"
     }
   ]
 }

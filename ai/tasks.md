@@ -55,7 +55,7 @@ Done when: Screenshots auto-annotated with highlights matching narration. Annota
 
 ### N5
 Title: Similar bug detection before export
-Status: pending
+Status: done
 Phase: 2
 Depends on: N3
 Description: Before exporting an issue to Jira or GitHub, check existing open issues for potential duplicates or related bugs. Query the issue tracker API for open issues with similar titles/descriptions. AI compares the new issue against top matches and shows: "This may be related to PROJ-142 (85% match): Login form validation broken." User can link as related, mark as duplicate, or export as new. Reduces duplicate tickets filed. Works with both Jira and GitHub Issues.
