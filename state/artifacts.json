@@ -1,40 +1,35 @@
 {
-  "last_updated": "2026-04-13T09:07:09Z",
-  "code_changes_present": true,
+  "last_updated": "2026-04-13T09:49:22Z",
+  "code_changes_present": false,
   "claims": {
-    "implementation": "complete",
-    "validation": "complete",
+    "implementation": "not_started",
+    "validation": "not_started",
     "deployment": "not_started"
   },
   "external_inputs": [],
   "evidence": {
     "build": {
-      "status": "passed",
-      "updated_at": "2026-04-13T09:07:09Z",
-      "reason": "Targeted xcodebuild validation completed for N3-H1.",
-      "paths": [
-        "artifacts/n3-h1-hardening/xcodebuild-test.log"
-      ]
+      "status": "not_run",
+      "updated_at": "2026-04-13T09:49:22Z",
+      "reason": "",
+      "paths": []
     },
     "test": {
-      "status": "passed",
-      "updated_at": "2026-04-13T09:07:09Z",
-      "reason": "Runtime guardrails and targeted extraction/export tests passed for N3-H1.",
-      "paths": [
-        "artifacts/n3-h1-hardening/validate.log",
-        "artifacts/n3-h1-hardening/xcodebuild-test.log"
-      ]
+      "status": "not_run",
+      "updated_at": "2026-04-13T09:49:22Z",
+      "reason": "",
+      "paths": []
     },
     "run": {
       "status": "not_run",
       "reason": "",
-      "updated_at": "2026-04-13T09:00:00Z",
+      "updated_at": "2026-04-13T09:49:22Z",
       "paths": []
     },
     "deploy": {
       "status": "not_run",
       "reason": "",
-      "updated_at": "2026-04-13T09:00:00Z",
+      "updated_at": "2026-04-13T09:49:22Z",
       "paths": []
     }
   }

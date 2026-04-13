@@ -4,7 +4,7 @@ task_id: N3-H1
 description: Deduplication hash locale stability and extraction inference optimization
 scope: Sources/BugNarrator/Services/IssueExtractionService.swift, Sources/BugNarrator/Models/ExtractedIssue.swift
 status: done
-current_state: ready_for_review
+current_state: done
 execution_status: idle
 execution_branch:
 execution_started_at:
