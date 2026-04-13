@@ -5,7 +5,7 @@ description: End-to-end recording flow hardening — bulletproof record → tran
 scope: Sources/BugNarrator/
 status: pending
 execution_status: idle
-execution_branch:
+execution_branch: codex/N1-end-to-end-recording-flow-hardening
 execution_started_at:
 execution_heartbeat_at:
 execution_lease_expires_at:

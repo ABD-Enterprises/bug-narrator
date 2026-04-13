@@ -134,6 +134,31 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
     }
 
+    func testExtractIssuesTimesOutAfterConfiguredBudget() async throws {
+        let session = makeReviewSession()
+
+        MockURLProtocol.requestHandler = { request in
+            (self.successResponse(for: request), self.makeChatCompletionData(content: #"{"summary":"","guidanceNote":"","issues":[]}"#))
+        }
+
+        let service = IssueExtractionService(
+            session: makeMockURLSession(),
+            timeoutDuration: .zero
+        )
+
+        do {
+            _ = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+            XCTFail("Expected issue extraction to time out.")
+        } catch {
+            XCTAssertEqual(
+                error as? AppError,
+                .issueExtractionFailure(
+                    "Issue extraction took longer than 10 seconds. Retry the extraction or choose a faster model in Settings."
+                )
+            )
+        }
+    }
+
     private func makeReviewSession() -> TranscriptSession {
         let screenshot = SessionScreenshot(elapsedTime: 8, filePath: "/tmp/review-shot.png")
         return TranscriptSession(

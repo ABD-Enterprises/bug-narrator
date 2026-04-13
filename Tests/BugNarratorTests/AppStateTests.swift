@@ -364,6 +364,24 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(harness.appState.activeRecordingSession)
     }
 
+    func testCompletedSessionStillSavesWhenAutoSavePreferenceIsDisabled() async throws {
+        let harness = AppStateHarness(autoSaveTranscript: false)
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "forced-auto-save")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Forced save transcript.", segments: []))
+        )
+
+        await harness.appState.startSession()
+        await harness.appState.stopSession()
+
+        XCTAssertEqual(harness.transcriptStore.sessions.count, 1)
+        XCTAssertEqual(harness.transcriptStore.sessions.first?.transcript, "Forced save transcript.")
+        XCTAssertEqual(harness.appState.status.detail, "Session saved. Transcript copied to the clipboard.")
+    }
+
     func testTranscriptionFailureTransitionsToErrorAndDeletesTemporaryAudioFile() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -598,7 +616,7 @@ final class AppStateTests: XCTestCase {
 
         let completedSession = try XCTUnwrap(harness.transcriptStore.session(with: preservedSession.id))
         XCTAssertEqual(completedSession.issueExtraction?.summary, "Recovered summary")
-        XCTAssertEqual(harness.appState.status.detail, "Transcript and extracted issues are ready.")
+        XCTAssertEqual(harness.appState.status.detail, "Session saved. Transcript and extracted issues are ready.")
     }
 
     func testValidateAPIKeyUpdatesValidationStateOnSuccess() async {

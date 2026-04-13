@@ -145,7 +145,6 @@ struct SettingsView: View {
                         sectionIntro("Control what BugNarrator does automatically after recording, transcription, and support workflows.")
 
                         Toggle("Auto-copy transcript to clipboard", isOn: $settingsStore.autoCopyTranscript)
-                        Toggle("Auto-save transcript to local history", isOn: $settingsStore.autoSaveTranscript)
                         Toggle("Open BugNarrator at startup", isOn: $settingsStore.openAtStartup)
                             .disabled(!settingsStore.openAtStartupSupported)
                         Toggle("Debug mode enables verbose local diagnostics", isOn: $settingsStore.debugMode)
@@ -157,6 +156,10 @@ struct SettingsView: View {
                         }
 
                         Text("Screenshot capture prompts for Screen Recording permission the first time you use it if macOS requires access.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Text("Completed recordings are always saved to the local session library as soon as you stop. BugNarrator keeps the session even if the app quits before you review it.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 

@@ -187,12 +187,13 @@
       "updated_at": "2026-04-12T19:11:53.000Z"
     }
   ],
-  "last_updated": "2026-04-12T23:58:43Z",
+  "last_updated": "2026-04-13T00:07:30Z",
   "tasks": [
     {
       "id": "N1",
-      "status": "pending",
-      "title": "End-to-end recording flow hardening"
+      "status": "ready_for_review",
+      "title": "End-to-end recording flow hardening",
+      "updated_at": "2026-04-13T00:07:30Z"
     }
   ]
 }
