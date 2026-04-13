@@ -4,7 +4,7 @@
 
 ### N1
 Title: End-to-end recording flow hardening
-Status: pending
+Status: done
 Phase: 1
 Description: Ensure the core flow is bulletproof: start recording → narrate → capture screenshots → stop → transcribe → extract issues → review → export. Fix any rough edges in the current flow. Recording must handle microphone permission gracefully (prompt, not crash). Transcription must show progress as text. Issue extraction must complete within 10 seconds of transcription finishing. Session must auto-save on stop (no data loss if app quits). Review screen must show transcript + screenshots + extracted issues in one view without scrolling between tabs.
 Done when: Full record → transcribe → extract → export flow works without errors. Mic permission handled. Progress shown. Auto-save works. Review shows everything in one view.

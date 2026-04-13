@@ -1,199 +1,27 @@
 {
   "updated_on": "2026-04-12",
-  "active": [
-    {
-      "id": "RR-002-T4",
-      "phase": "RR-002",
-      "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
-      "status": "pending",
-      "blocking_for_phase_completion": true,
-      "updated_at": "2026-04-05T11:52:00.230Z"
-    }
-  ],
+  "active": [],
   "completed": [
     {
-      "id": "OPS-011-T1",
-      "phase": "OPS-011",
-      "title": "Upgrade CI and release workflows plus runtime guardrails enforcement to Node24-compatible action majors",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-011-T3",
-      "phase": "OPS-011",
-      "title": "Harden local DMG packaging against stale virtualenv entrypoints and revalidate unsigned release artifact generation",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "BOOTSTRAP-T1",
-      "phase": "bootstrap",
-      "title": "Normalize roadmap and execution state, and add reusable agent and prompt contracts",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "BOOTSTRAP-T2",
-      "phase": "bootstrap",
-      "title": "Add the authoritative runtime guardrails validator and make it the pull-request gatekeeper",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T1",
-      "phase": "RR-002",
-      "title": "Expand CI trigger coverage to include phase branches",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T2",
-      "phase": "RR-002",
-      "title": "Run both Windows test projects through the scripted validation baseline",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T3",
-      "phase": "RR-002",
-      "title": "Package and validate the Windows zip artifact in CI",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T5",
-      "phase": "RR-002",
-      "title": "Run the packaged Windows executable in a headless smoke mode and validate the emitted report",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T6",
-      "phase": "RR-002",
-      "title": "Fix Windows-targeted service compile blockers discovered while running the Windows test project",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T7",
-      "phase": "RR-002",
-      "title": "Fix inherited CI validation blockers in diagnostics redaction and Windows packaged-smoke exit handling",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T8",
-      "phase": "RR-002",
-      "title": "Emit machine-readable Windows validation evidence from CI and verify the artifact-producing workflow run",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "RR-002-T9",
-      "phase": "RR-002",
-      "title": "Add a Windows Codex handoff script, handoff doc, and CI artifact so takeover work can continue on a real Windows machine",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-011-T4",
-      "phase": "OPS-011",
-      "title": "Enforce release-smoke preflight in scripts/build_dmg.sh and revalidate unsigned DMG packaging through that hardened path",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-011-T2",
-      "phase": "OPS-011",
-      "title": "Run GitHub-hosted CI on the upgraded workflows and clear the remaining Node24 compatibility risk with hosted evidence",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T1",
-      "phase": "OPS-012",
-      "title": "Patch the docs-site dependency tree to remediate the four recorded Dependabot alerts and validate the updated versions locally",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T2",
-      "phase": "OPS-012",
-      "title": "Push the dependency remediation to the tracked branch and validate hosted CI before default-branch promotion",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T3",
-      "phase": "OPS-012",
-      "title": "Stabilize or replace the local npm install path after the Node 25 / npm 11 EBADF registry-fetch failure",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T4",
-      "phase": "OPS-012",
-      "title": "Promote the dependency remediation to the default branch and confirm the Dependabot alerts close there",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T5",
-      "phase": "OPS-012",
-      "title": "Patch the newly surfaced lodash Dependabot alerts on the tracked branch and validate the updated dependency graph locally plus in hosted CI",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-012-T6",
-      "phase": "OPS-012",
-      "title": "Promote the lodash remediation to the default branch and confirm the remaining Dependabot alerts close there",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "OPS-010-T1",
-      "phase": "OPS-010",
-      "title": "Add a dedicated Retry Needed session-library filter and route recovery actions into it",
-      "status": "completed",
-      "updated_at": "2026-04-05T00:00:00Z"
-    },
-    {
-      "id": "BOOTSTRAP-T3",
-      "phase": "bootstrap",
-      "title": "Reconcile prompts, validator entrypoints, and canonical state to the latest enterprise-ai-standards contract",
-      "status": "completed",
-      "updated_at": "2026-04-05T11:52:00.230Z"
-    },
-    {
-      "id": "BOOTSTRAP-T4",
-      "phase": "bootstrap",
-      "title": "Normalize the repo onto the canonical autonomous PR-driven workflow and enforce it in the validator",
-      "status": "completed",
-      "updated_at": "2026-04-05T14:33:00.000Z"
-    },
-    {
-      "id": "BOOTSTRAP-T5",
-      "phase": "bootstrap",
-      "title": "Sanitize committed personal-machine path leakage in helper scripts, test fixtures, state metadata, and tracked artifacts",
-      "status": "completed",
-      "updated_at": "2026-04-12T16:36:38.000Z"
-    },
-    {
-      "id": "BOOTSTRAP-T6",
-      "phase": "bootstrap",
-      "title": "Adopt the latest vendored enterprise-ai-standards validator, guardrails workflow, and execution lease contract",
-      "status": "completed",
-      "updated_at": "2026-04-12T19:11:53.000Z"
+      "id": "N1",
+      "status": "done",
+      "title": "End-to-end recording flow hardening",
+      "updated_at": "2026-04-12T07:00:00Z"
     }
   ],
-  "last_updated": "2026-04-13T00:07:30Z",
+  "last_updated": "2026-04-12T07:00:00Z",
   "tasks": [
     {
       "id": "N1",
-      "status": "ready_for_review",
+      "status": "done",
       "title": "End-to-end recording flow hardening",
-      "updated_at": "2026-04-13T00:07:30Z"
+      "updated_at": "2026-04-12T07:00:00Z"
+    },
+    {
+      "id": "N2",
+      "status": "pending",
+      "title": "AI-generated reproduction steps from narration + screenshots",
+      "updated_at": "2026-04-12T07:00:00Z"
     }
   ]
 }
