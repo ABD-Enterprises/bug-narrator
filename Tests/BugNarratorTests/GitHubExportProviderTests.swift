@@ -10,6 +10,9 @@ final class GitHubExportProviderTests: XCTestCase {
 
     func testMakeURLRequestIncludesAuthorizationAndIssueBody() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
+        let screenshotURL = makeScreenshotFileURL(named: "review-shot.png")
+        let screenshot = SessionScreenshot(elapsedTime: 14, filePath: screenshotURL.path)
+        let artifactsDirectory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)
         let issue = ExtractedIssue(
             title: "Login button is disabled",
             category: .bug,
@@ -19,7 +22,7 @@ final class GitHubExportProviderTests: XCTestCase {
             evidenceExcerpt: "The login button never re-enabled after typing a valid email.",
             deduplicationHint: "issue-login-disabled",
             timestamp: 14,
-            relatedScreenshotIDs: [],
+            relatedScreenshotIDs: [screenshot.id],
             requiresReview: true,
             reproductionSteps: [
                 IssueReproductionStep(
@@ -27,6 +30,17 @@ final class GitHubExportProviderTests: XCTestCase {
                     expectedResult: "The login button enables.",
                     actualResult: "The login button stays disabled.",
                     timestamp: 14
+                )
+            ],
+            screenshotAnnotations: [
+                IssueScreenshotAnnotation(
+                    screenshotID: screenshot.id,
+                    label: "Login button",
+                    x: 0.44,
+                    y: 0.52,
+                    width: 0.24,
+                    height: 0.16,
+                    confidence: 0.82
                 )
             ]
         )
@@ -37,7 +51,9 @@ final class GitHubExportProviderTests: XCTestCase {
             model: "whisper-1",
             languageHint: nil,
             prompt: nil,
-            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+            screenshots: [screenshot],
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue]),
+            artifactsDirectoryPath: artifactsDirectory.path
         )
         let request = try await provider.makeURLRequest(
             issue: issue,
@@ -67,6 +83,9 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.contains("## Reproduction Steps"))
         XCTAssertTrue(payload.body.contains("Expected: The login button enables."))
         XCTAssertTrue(payload.body.contains("Actual: The login button stays disabled."))
+        XCTAssertTrue(payload.body.contains("## Annotated Screenshots"))
+        XCTAssertTrue(payload.body.contains("Login button"))
+        XCTAssertTrue(payload.body.contains("review-shot-annotated"))
     }
 
     func testExportMapsRepositoryNotFound() async throws {
@@ -183,4 +202,13 @@ private struct GitHubIssueRequestPayload: Decodable {
     let title: String
     let body: String
     let labels: [String]?
+}
+
+private func makeScreenshotFileURL(named fileName: String) -> URL {
+    let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString)-\(fileName)")
+    let pngData = Data(
+        base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="
+    )!
+    try? pngData.write(to: url)
+    return url
 }

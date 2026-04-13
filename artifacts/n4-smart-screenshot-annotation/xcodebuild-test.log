@@ -1,0 +1,108 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n4-tests test "-only-testing:BugNarratorTests/ScreenshotAnnotationTests" "-only-testing:BugNarratorTests/GitHubExportProviderTests" "-only-testing:BugNarratorTests/JiraExportProviderTests"
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+2026-04-13 06:15:04.511 xcodebuild[62549:2540421] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006002-001470622E03401E, name:My Mac }
+{ platform:macOS, name:Any Mac }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (2 targets)
+    Target 'BugNarratorTests' in project 'BugNarrator'
+        ➜ Explicit dependency on target 'BugNarrator' in project 'BugNarrator'
+    Target 'BugNarrator' in project 'BugNarrator' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk /tmp/bugnarrator-n4-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o /tmp/bugnarrator-n4-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
+
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')
+2026-04-13 06:15:05.850660-0400 BugNarrator[62691:2540828] [settings] 2026-04-13T10:15:05.849Z [INFO] [settings] settings_loaded - Settings finished loading. debug_mode=disabled has_github_token=<redacted> has_jira_token=<redacted> has_openai_key=no launch_at_login=disabled launch_at_login_supported=yes
+2026-04-13 06:15:05.851287-0400 BugNarrator[62691:2540828] [session-library] 2026-04-13T10:15:05.851Z [INFO] [session-library] session_store_empty - No existing session history was found on disk.
+2026-04-13 06:15:05.856478-0400 BugNarrator[62691:2540828] [settings] 2026-04-13T10:15:05.856Z [INFO] [settings] app_state_initialized - BugNarrator finished initializing application state. debug_mode=disabled has_openai_key=no
+2026-04-13 06:15:05.867879-0400 BugNarrator[62691:2540828] [permissions] 2026-04-13T10:15:05.868Z [INFO] [permissions] launch_permission_snapshot - Captured the initial permission state snapshot for this BugNarrator app copy. bundle_path=/private/tmp/bugnarrator-n4-tests/Build/Products/Debug/BugNarrator.app is_local_testing_build=no microphone_status=notDetermined screen_capture_status=notDetermined
+2026-04-13 06:15:05.868144-0400 BugNarrator[62691:2540828] [session-library] 2026-04-13T10:15:05.868Z [INFO] [session-library] launch_session_store_snapshot - Captured the initial session library state at launch. selected_transcript_id=<redacted> stored_session_count=0
+Test Suite 'Selected tests' started at 2026-04-13 06:15:06.330.
+Test Suite 'BugNarratorTests.xctest' started at 2026-04-13 06:15:06.331.
+Test Suite 'GitHubExportProviderTests' started at 2026-04-13 06:15:06.331.
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportMapsRepositoryNotFound]' started.
+2026-04-13 06:15:06.332937-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.333Z [INFO] [export] github_export_requested - Exporting selected issues to GitHub. issue_count=1 repository=acme/bugnarrator session_id=<redacted>
+2026-04-13 06:15:06.336018-0400 BugNarrator[62691:2540837] [export] 2026-04-13T10:15:06.336Z [ERROR] [export] github_export_failed - Export failed: GitHub could not find acme/bugnarrator. Check the owner, repository name, and token permissions. source_issue_id=7AA601CF-1805-4859-B202-1E4D7CB830D7 successful_count=0
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportMapsRepositoryNotFound]' passed (0.007 seconds).
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' started.
+2026-04-13 06:15:06.339413-0400 BugNarrator[62691:2540844] [export] 2026-04-13T10:15:06.339Z [INFO] [export] github_export_requested - Exporting selected issues to GitHub. issue_count=2 repository=acme/bugnarrator session_id=<redacted>
+2026-04-13 06:15:06.340279-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.340Z [INFO] [export] github_issue_exported - Exported one issue to GitHub. remote_identifier=#101 source_issue_id=5DD4591F-220E-470F-AD84-53A7BDC644B9
+2026-04-13 06:15:06.340911-0400 BugNarrator[62691:2540844] [export] 2026-04-13T10:15:06.341Z [ERROR] [export] github_export_failed - Export failed: GitHub rejected the issue payload: Validation Failed source_issue_id=F6CB8EC8-3D70-45BE-9D07-ADE3437A38D1 successful_count=1
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' passed (0.006 seconds).
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testMakeURLRequestIncludesAuthorizationAndIssueBody]' started.
+2026-04-13 06:15:06.347338-0400 BugNarrator[62691:2540862] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.347375-0400 BugNarrator[62691:2540862] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.347403-0400 BugNarrator[62691:2540862] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.347417-0400 BugNarrator[62691:2540862] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.347440-0400 BugNarrator[62691:2540862] [com.abdenterprises.bugnarrator] img_image: Bad image source
+Test Case '-[BugNarratorTests.GitHubExportProviderTests testMakeURLRequestIncludesAuthorizationAndIssueBody]' passed (0.011 seconds).
+Test Suite 'GitHubExportProviderTests' passed at 2026-04-13 06:15:06.356.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.023 (0.025) seconds
+Test Suite 'JiraExportProviderTests' started at 2026-04-13 06:15:06.356.
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportMapsValidationFailure]' started.
+2026-04-13 06:15:06.357231-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.357Z [INFO] [export] jira_export_requested - Exporting selected issues to Jira. issue_count=1 project_key=FM session_id=<redacted>
+2026-04-13 06:15:06.358464-0400 BugNarrator[62691:2540844] [export] 2026-04-13T10:15:06.358Z [ERROR] [export] jira_export_failed - Export failed: Jira rejected the issue payload: Issue type is invalid source_issue_id=F41739C2-4373-4950-8040-AF09F8916855 successful_count=0
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportMapsValidationFailure]' passed (0.003 seconds).
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' started.
+2026-04-13 06:15:06.360519-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.360Z [INFO] [export] jira_export_requested - Exporting selected issues to Jira. issue_count=2 project_key=FM session_id=<redacted>
+2026-04-13 06:15:06.361295-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.361Z [INFO] [export] jira_issue_exported - Exported one issue to Jira. remote_identifier=FM-101 source_issue_id=58F79A79-BBBB-422C-81A2-8C74258E088B
+2026-04-13 06:15:06.362133-0400 BugNarrator[62691:2540833] [export] 2026-04-13T10:15:06.362Z [ERROR] [export] jira_export_failed - Export failed: Jira rejected the issue payload: Issue type is invalid source_issue_id=585A2472-F613-4642-8690-64B6C57F47D1 successful_count=1
+Test Case '-[BugNarratorTests.JiraExportProviderTests testExportReportsPartialSuccessWhenLaterIssueFails]' passed (0.003 seconds).
+Test Case '-[BugNarratorTests.JiraExportProviderTests testMakeURLRequestIncludesBasicAuthAndProjectFields]' started.
+2026-04-13 06:15:06.364625-0400 BugNarrator[62691:2540844] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.364675-0400 BugNarrator[62691:2540844] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.364712-0400 BugNarrator[62691:2540844] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.364728-0400 BugNarrator[62691:2540844] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.364744-0400 BugNarrator[62691:2540844] [com.abdenterprises.bugnarrator] img_image: Bad image source
+Test Case '-[BugNarratorTests.JiraExportProviderTests testMakeURLRequestIncludesBasicAuthAndProjectFields]' passed (0.004 seconds).
+Test Suite 'JiraExportProviderTests' passed at 2026-04-13 06:15:06.367.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.010 (0.011) seconds
+Test Suite 'ScreenshotAnnotationTests' started at 2026-04-13 06:15:06.367.
+Test Case '-[BugNarratorTests.ScreenshotAnnotationTests testIssueScreenshotAnnotationMoveClampsIntoImageBounds]' started.
+Test Case '-[BugNarratorTests.ScreenshotAnnotationTests testIssueScreenshotAnnotationMoveClampsIntoImageBounds]' passed (0.001 seconds).
+Test Case '-[BugNarratorTests.ScreenshotAnnotationTests testRendererWritesAnnotatedScreenshotAsset]' started.
+2026-04-13 06:15:06.369522-0400 BugNarrator[62691:2540828] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.369556-0400 BugNarrator[62691:2540828] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.369582-0400 BugNarrator[62691:2540828] [BugNarrator] handle_error:268: IDAT: CRC error
+2026-04-13 06:15:06.369596-0400 BugNarrator[62691:2540828] [BugNarrator] imagePNG_error_break:384: *** ERROR: imagePNG_error_break
+2026-04-13 06:15:06.369608-0400 BugNarrator[62691:2540828] [com.abdenterprises.bugnarrator] img_image: Bad image source
+Test Case '-[BugNarratorTests.ScreenshotAnnotationTests testRendererWritesAnnotatedScreenshotAsset]' passed (0.002 seconds).
+Test Suite 'ScreenshotAnnotationTests' passed at 2026-04-13 06:15:06.371.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.003 (0.004) seconds
+Test Suite 'BugNarratorTests.xctest' passed at 2026-04-13 06:15:06.371.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.036 (0.040) seconds
+Test Suite 'Selected tests' passed at 2026-04-13 06:15:06.371.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.036 (0.041) seconds
+2026-04-13 06:15:06.638 xcodebuild[62549:2540421] [MT] IDETestOperationsObserverDebug: 1.315 elapsed -- Testing started completed.
+2026-04-13 06:15:06.638 xcodebuild[62549:2540421] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-04-13 06:15:06.638 xcodebuild[62549:2540421] [MT] IDETestOperationsObserverDebug: 1.315 sec, +1.315 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bugnarrator-n4-tests/Logs/Test/Test-BugNarrator-2026.04.13_06-15-04--0400.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

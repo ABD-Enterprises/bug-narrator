@@ -1329,6 +1329,16 @@ struct TranscriptView: View {
 
             let relatedScreenshots = (extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue).relatedScreenshotIDs
                 .compactMap(session.screenshot(with:))
+            let annotatedScreenshots = relatedScreenshots.filter {
+                !liveIssue.screenshotAnnotations(for: $0.id).isEmpty
+            }
+            if !annotatedScreenshots.isEmpty {
+                issueScreenshotAnnotationSection(
+                    issue: liveIssue,
+                    screenshots: annotatedScreenshots,
+                    sessionID: session.id
+                )
+            }
             if !relatedScreenshots.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Screenshots:")
@@ -1343,6 +1353,40 @@ struct TranscriptView: View {
                         .accessibilityLabel("Open related screenshot \(screenshot.fileName)")
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func issueScreenshotAnnotationSection(
+        issue: ExtractedIssue,
+        screenshots: [SessionScreenshot],
+        sessionID: UUID
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Annotated Screenshots")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(screenshots) { screenshot in
+                IssueScreenshotAnnotationPreview(
+                    screenshot: screenshot,
+                    annotations: issue.screenshotAnnotations(for: screenshot.id),
+                    onUpdate: { updatedAnnotation in
+                        updateScreenshotAnnotation(
+                            updatedAnnotation,
+                            issueID: issue.id,
+                            sessionID: sessionID
+                        )
+                    },
+                    onRemove: { annotation in
+                        removeScreenshotAnnotation(
+                            annotationID: annotation.id,
+                            issueID: issue.id,
+                            sessionID: sessionID
+                        )
+                    }
+                )
             }
         }
     }
@@ -1650,6 +1694,33 @@ struct TranscriptView: View {
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )
+    }
+
+    private func updateScreenshotAnnotation(
+        _ updatedAnnotation: IssueScreenshotAnnotation,
+        issueID: UUID,
+        sessionID: UUID
+    ) {
+        guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID),
+              let annotationIndex = updatedIssue.screenshotAnnotations.firstIndex(where: { $0.id == updatedAnnotation.id }) else {
+            return
+        }
+
+        updatedIssue.screenshotAnnotations[annotationIndex] = updatedAnnotation
+        appState.updateExtractedIssue(updatedIssue, in: sessionID)
+    }
+
+    private func removeScreenshotAnnotation(
+        annotationID: UUID,
+        issueID: UUID,
+        sessionID: UUID
+    ) {
+        guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID) else {
+            return
+        }
+
+        updatedIssue.screenshotAnnotations.removeAll { $0.id == annotationID }
+        appState.updateExtractedIssue(updatedIssue, in: sessionID)
     }
 
     private func sessionRowAccessibilitySummary(for entry: SessionLibraryEntry) -> String {

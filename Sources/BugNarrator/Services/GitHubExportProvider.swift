@@ -3,6 +3,7 @@ import Foundation
 actor GitHubExportProvider {
     private let session: URLSession
     private let logger = DiagnosticsLogger(category: .export)
+    private let annotationRenderer = IssueScreenshotAnnotationRenderer()
 
     init(session: URLSession? = nil) {
         if let session {
@@ -113,14 +114,14 @@ actor GitHubExportProvider {
         request.httpBody = try JSONEncoder().encode(
             GitHubIssueRequest(
                 title: issue.title,
-                body: makeIssueBody(issue: issue, session: reviewSession),
+                body: try makeIssueBody(issue: issue, session: reviewSession),
                 labels: configuration.labels.isEmpty ? nil : configuration.labels
             )
         )
         return request
     }
 
-    private func makeIssueBody(issue: ExtractedIssue, session: TranscriptSession) -> String {
+    private func makeIssueBody(issue: ExtractedIssue, session: TranscriptSession) throws -> String {
         var lines: [String] = [
             "## Summary",
             issue.summary,
@@ -178,6 +179,13 @@ actor GitHubExportProvider {
             }
         }
 
+        let annotationLines = try annotatedScreenshotLines(issue: issue, session: session)
+        if !annotationLines.isEmpty {
+            lines.append("")
+            lines.append("## Annotated Screenshots")
+            lines.append(contentsOf: annotationLines)
+        }
+
         let screenshots = session.screenshots(for: issue)
         if !screenshots.isEmpty {
             lines.append("")
@@ -207,6 +215,38 @@ actor GitHubExportProvider {
         }
 
         return parts.isEmpty ? nil : parts.joined(separator: "  •  ")
+    }
+
+    private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
+        let screenshots = session.screenshots(for: issue).filter {
+            !issue.screenshotAnnotations(for: $0.id).isEmpty
+        }
+
+        guard !screenshots.isEmpty else {
+            return []
+        }
+
+        let annotationDirectoryURL = session.artifactsDirectoryURL?.appendingPathComponent(
+            "annotated-exports",
+            isDirectory: true
+        )
+
+        return try screenshots.map { screenshot in
+            let renderedAsset = try annotationDirectoryURL.flatMap {
+                try annotationRenderer.writeAnnotatedScreenshot(
+                    for: issue,
+                    screenshot: screenshot,
+                    to: $0
+                )
+            }
+            let summaries = issue.screenshotAnnotations(for: screenshot.id).map(\.exportDescription).joined(separator: "; ")
+
+            if let renderedAsset {
+                return "- \(renderedAsset.fileName) from `\(screenshot.fileName)` (`\(screenshot.timeLabel)`) — \(summaries)"
+            }
+
+            return "- \(screenshot.fileName) (`\(screenshot.timeLabel)`) — \(summaries)"
+        }
     }
 
     private func mapGitHubError(

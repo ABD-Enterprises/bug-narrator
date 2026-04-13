@@ -1,13 +1,13 @@
 # Validation Report
 
-task_id: N3-H1
+task_id: N4
 result: passed
-summary: Runtime guardrails plus the targeted BugNarrator extraction/export macOS tests passed for the N3-H1 locale-stability and inference-optimization slice.
+summary: Runtime guardrails plus the targeted screenshot annotation and export provider macOS tests passed for the N4 smart screenshot annotation slice.
 
 artifacts:
-- artifacts/n3-h1-hardening/validate.log
-- artifacts/n3-h1-hardening/xcodebuild-test.log
+- artifacts/n4-smart-screenshot-annotation/validate.log
+- artifacts/n4-smart-screenshot-annotation/xcodebuild-test.log
 
 commands:
 - ./scripts/validate.sh -> PASS
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n3h1-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -> PASS
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n4-tests test -only-testing:BugNarratorTests/ScreenshotAnnotationTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -> PASS

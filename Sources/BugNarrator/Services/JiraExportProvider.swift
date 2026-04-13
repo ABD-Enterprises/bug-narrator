@@ -3,6 +3,7 @@ import Foundation
 actor JiraExportProvider {
     private let session: URLSession
     private let logger = DiagnosticsLogger(category: .export)
+    private let annotationRenderer = IssueScreenshotAnnotationRenderer()
 
     init(session: URLSession? = nil) {
         if let session {
@@ -111,7 +112,7 @@ actor JiraExportProvider {
                     project: .init(key: configuration.projectKey),
                     summary: issue.title,
                     issueType: .init(name: configuration.issueType),
-                    description: makeDescription(issue: issue, session: reviewSession)
+                    description: try makeDescription(issue: issue, session: reviewSession)
                 )
             )
         )
@@ -123,7 +124,7 @@ actor JiraExportProvider {
         return Data(rawValue.utf8).base64EncodedString()
     }
 
-    private func makeDescription(issue: ExtractedIssue, session: TranscriptSession) -> JiraDocument {
+    private func makeDescription(issue: ExtractedIssue, session: TranscriptSession) throws -> JiraDocument {
         var content: [JiraBlock] = [
             .paragraph(text: "Summary: \(issue.summary)"),
             .paragraph(text: "Evidence: \(issue.evidenceExcerpt)")
@@ -159,6 +160,12 @@ actor JiraExportProvider {
             }
             content.append(.paragraph(text: "Reproduction steps"))
             content.append(.bulletList(items: stepLines))
+        }
+
+        let annotationLines = try annotatedScreenshotLines(issue: issue, session: session)
+        if !annotationLines.isEmpty {
+            content.append(.paragraph(text: "Annotated screenshots"))
+            content.append(.bulletList(items: annotationLines))
         }
 
         let screenshots = session.screenshots(for: issue)
@@ -205,6 +212,38 @@ actor JiraExportProvider {
         }
 
         return parts.joined(separator: " | ")
+    }
+
+    private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
+        let screenshots = session.screenshots(for: issue).filter {
+            !issue.screenshotAnnotations(for: $0.id).isEmpty
+        }
+
+        guard !screenshots.isEmpty else {
+            return []
+        }
+
+        let annotationDirectoryURL = session.artifactsDirectoryURL?.appendingPathComponent(
+            "annotated-exports",
+            isDirectory: true
+        )
+
+        return try screenshots.map { screenshot in
+            let renderedAsset = try annotationDirectoryURL.flatMap {
+                try annotationRenderer.writeAnnotatedScreenshot(
+                    for: issue,
+                    screenshot: screenshot,
+                    to: $0
+                )
+            }
+            let summaries = issue.screenshotAnnotations(for: screenshot.id).map(\.exportDescription).joined(separator: "; ")
+
+            if let renderedAsset {
+                return "\(renderedAsset.fileName) from \(screenshot.fileName) (\(screenshot.timeLabel)) - \(summaries)"
+            }
+
+            return "\(screenshot.fileName) (\(screenshot.timeLabel)) - \(summaries)"
+        }
     }
 
     private func mapJiraError(

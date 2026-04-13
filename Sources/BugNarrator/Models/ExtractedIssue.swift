@@ -51,6 +51,101 @@ struct IssueReproductionStep: Identifiable, Codable, Equatable {
     }
 }
 
+struct IssueScreenshotAnnotation: Identifiable, Codable, Equatable {
+    enum Style: String, Codable {
+        case highlight
+    }
+
+    let id: UUID
+    var screenshotID: UUID
+    var label: String?
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
+    var confidence: Double?
+    var style: Style
+
+    init(
+        id: UUID = UUID(),
+        screenshotID: UUID,
+        label: String? = nil,
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double,
+        confidence: Double? = nil,
+        style: Style = .highlight
+    ) {
+        self.id = id
+        self.screenshotID = screenshotID
+        self.label = label?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.x = min(max(x, 0), 1)
+        self.y = min(max(y, 0), 1)
+        self.width = min(max(width, 0.05), 1)
+        self.height = min(max(height, 0.05), 1)
+        self.confidence = confidence
+        self.style = style
+
+        clampRectIntoBounds()
+    }
+
+    var normalizedRect: CGRect {
+        CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    var confidenceLabel: String? {
+        guard let confidence else {
+            return nil
+        }
+
+        return "\(Int((confidence * 100).rounded()))%"
+    }
+
+    var exportDescription: String {
+        let normalized = normalizedRect
+        let xPercent = Int((normalized.minX * 100).rounded())
+        let yPercent = Int((normalized.minY * 100).rounded())
+        let widthPercent = Int((normalized.width * 100).rounded())
+        let heightPercent = Int((normalized.height * 100).rounded())
+
+        var parts = [
+            label ?? "UI highlight",
+            "x \(xPercent)%",
+            "y \(yPercent)%",
+            "w \(widthPercent)%",
+            "h \(heightPercent)%"
+        ]
+
+        if let confidenceLabel {
+            parts.append("confidence \(confidenceLabel)")
+        }
+
+        return parts.joined(separator: " • ")
+    }
+
+    mutating func move(x deltaX: Double, y deltaY: Double) {
+        x += deltaX
+        y += deltaY
+        clampRectIntoBounds()
+    }
+
+    mutating func updateRect(_ rect: CGRect) {
+        x = min(max(rect.origin.x, 0), 1)
+        y = min(max(rect.origin.y, 0), 1)
+        width = min(max(rect.width, 0.05), 1)
+        height = min(max(rect.height, 0.05), 1)
+        clampRectIntoBounds()
+    }
+
+    private mutating func clampRectIntoBounds() {
+        width = min(max(width, 0.05), 1)
+        height = min(max(height, 0.05), 1)
+        x = min(max(x, 0), max(0, 1 - width))
+        y = min(max(y, 0), max(0, 1 - height))
+    }
+}
+
 struct ExtractedIssue: Identifiable, Codable, Equatable {
     private static let deduplicationNormalizationLocale = Locale(identifier: "en_US_POSIX")
 
@@ -69,6 +164,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
     var isSelectedForExport: Bool
     var sectionTitle: String?
     var reproductionSteps: [IssueReproductionStep]
+    var screenshotAnnotations: [IssueScreenshotAnnotation]
     var note: String?
 
     init(
@@ -87,6 +183,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         isSelectedForExport: Bool = true,
         sectionTitle: String? = nil,
         reproductionSteps: [IssueReproductionStep] = [],
+        screenshotAnnotations: [IssueScreenshotAnnotation] = [],
         note: String? = nil
     ) {
         self.id = id
@@ -109,6 +206,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         self.isSelectedForExport = isSelectedForExport
         self.sectionTitle = sectionTitle
         self.reproductionSteps = reproductionSteps
+        self.screenshotAnnotations = screenshotAnnotations
         self.note = note
     }
 
@@ -134,6 +232,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         isSelectedForExport = try container.decodeIfPresent(Bool.self, forKey: .isSelectedForExport) ?? true
         sectionTitle = try container.decodeIfPresent(String.self, forKey: .sectionTitle)
         reproductionSteps = try container.decodeIfPresent([IssueReproductionStep].self, forKey: .reproductionSteps) ?? []
+        screenshotAnnotations = try container.decodeIfPresent([IssueScreenshotAnnotation].self, forKey: .screenshotAnnotations) ?? []
         note = try container.decodeIfPresent(String.self, forKey: .note)
     }
 
@@ -154,6 +253,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         try container.encode(isSelectedForExport, forKey: .isSelectedForExport)
         try container.encodeIfPresent(sectionTitle, forKey: .sectionTitle)
         try container.encode(reproductionSteps, forKey: .reproductionSteps)
+        try container.encode(screenshotAnnotations, forKey: .screenshotAnnotations)
         try container.encodeIfPresent(note, forKey: .note)
     }
 
@@ -173,6 +273,7 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         case isSelectedForExport
         case sectionTitle
         case reproductionSteps
+        case screenshotAnnotations
         case note
     }
 
@@ -190,6 +291,10 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         }
 
         return "\(Int((confidence * 100).rounded()))%"
+    }
+
+    func screenshotAnnotations(for screenshotID: UUID) -> [IssueScreenshotAnnotation] {
+        screenshotAnnotations.filter { $0.screenshotID == screenshotID }
     }
 
     static func makeDeduplicationHint(title: String, summary: String, evidenceExcerpt: String) -> String {
