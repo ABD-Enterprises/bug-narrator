@@ -51,6 +51,20 @@ Codex acquires a 90-minute lease before starting work:
 3. `state/artifacts.json` must reflect actual evidence (real file paths, correct statuses)
 4. Lease must be cleared (`execution_status: idle`)
 
+
+## Batch mode (Codex)
+
+Codex implements **up to 3 sequential tasks per run** on one branch and one PR:
+
+- Lease is acquired **once** at the start and covers the entire batch.
+- After each task: commit the work, mark the task `done` in `state/tasks.json`, check elapsed time.
+- Branch is named after the **first** task in the batch. PR title lists all completed task IDs.
+- If validation fails mid-batch: commit partial work, open PR with what was done, stop (do not attempt the next task).
+- `state/current_task.md` `task_id` updates to each task as the batch progresses — this is expected and correct.
+- watch-open-prs is batch-aware: it finds the first `pending` task in tasks.json after all batch-completed tasks.
+
+**Do not stop after the first task** — continue the batch loop until: 3 tasks done, 75 min elapsed, or no more pending tasks.
+
 ## Scope rules
 
 - Work on the current task only — do not change files outside the declared scope in `ai/tasks.md`
