@@ -6,6 +6,11 @@ func normalizedOptionalReproductionStepText(_ value: String) -> String? {
     return trimmedValue.isEmpty ? nil : trimmedValue
 }
 
+func normalizedOptionalIssueText(_ value: String) -> String? {
+    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedValue.isEmpty ? nil : trimmedValue
+}
+
 struct TranscriptView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
@@ -1221,7 +1226,10 @@ struct TranscriptView: View {
         VStack(alignment: .leading, spacing: 10) {
             if availableWidth < 520 {
                 VStack(alignment: .leading, spacing: 8) {
-                    issueCategoryPicker(issue: issue, session: session)
+                    HStack(spacing: 8) {
+                        issueCategoryPicker(issue: issue, session: session)
+                        issueSeverityPicker(issue: issue, session: session)
+                    }
 
                     TextField(
                         "Issue title",
@@ -1235,6 +1243,7 @@ struct TranscriptView: View {
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     issueCategoryPicker(issue: issue, session: session)
+                    issueSeverityPicker(issue: issue, session: session)
 
                     Text("—")
                         .foregroundStyle(.secondary)
@@ -1250,6 +1259,24 @@ struct TranscriptView: View {
 
                     issueReviewBadge(issue: issue, session: session)
                 }
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                Text("Component")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                TextField(
+                    "Settings > Accounts",
+                    text: issueOptionalTextBinding(
+                        sessionID: session.id,
+                        issueID: issue.id,
+                        keyPath: \.component,
+                        fallback: issue.component
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Suggested component for \(issue.title)")
             }
 
             if let timestampLabel = extractedIssue(sessionID: session.id, issueID: issue.id)?.timestampLabel ?? issue.timestampLabel {
@@ -1275,6 +1302,24 @@ struct TranscriptView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                Text("Dedup Hint")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                TextField(
+                    "Stable duplicate hint",
+                    text: issueDeduplicationHintBinding(
+                        sessionID: session.id,
+                        issueID: issue.id,
+                        fallback: issue.deduplicationHint
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+                .accessibilityLabel("Deduplication hint for \(issue.title)")
             }
 
             let liveIssue = extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue
@@ -1405,6 +1450,21 @@ struct TranscriptView: View {
         .pickerStyle(.menu)
         .accessibilityLabel("Issue category for \(issue.title)")
         .accessibilityValue((extractedIssue(sessionID: session.id, issueID: issue.id)?.category ?? issue.category).rawValue)
+    }
+
+    private func issueSeverityPicker(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+        Picker(
+            "",
+            selection: issueBinding(sessionID: session.id, issueID: issue.id, keyPath: \.severity, fallback: issue.severity)
+        ) {
+            ForEach(ExtractedIssueSeverity.allCases) { severity in
+                Text(severity.rawValue).tag(severity)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .accessibilityLabel("Issue severity for \(issue.title)")
+        .accessibilityValue((extractedIssue(sessionID: session.id, issueID: issue.id)?.severity ?? issue.severity).rawValue)
     }
 
     @ViewBuilder
@@ -1540,6 +1600,53 @@ struct TranscriptView: View {
                 }
 
                 updatedIssue.reproductionSteps[stepIndex][keyPath: keyPath] = normalizedOptionalReproductionStepText(newValue)
+                appState.updateExtractedIssue(updatedIssue, in: sessionID)
+            }
+        )
+    }
+
+    private func issueOptionalTextBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        keyPath: WritableKeyPath<ExtractedIssue, String?>,
+        fallback: String?
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                extractedIssue(sessionID: sessionID, issueID: issueID)?[keyPath: keyPath] ?? fallback ?? ""
+            },
+            set: { newValue in
+                guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID) else {
+                    return
+                }
+
+                updatedIssue[keyPath: keyPath] = normalizedOptionalIssueText(newValue)
+                appState.updateExtractedIssue(updatedIssue, in: sessionID)
+            }
+        )
+    }
+
+    private func issueDeduplicationHintBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        fallback: String
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                extractedIssue(sessionID: sessionID, issueID: issueID)?.deduplicationHint ?? fallback
+            },
+            set: { newValue in
+                guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID) else {
+                    return
+                }
+
+                updatedIssue.deduplicationHint =
+                    normalizedOptionalIssueText(newValue) ??
+                    ExtractedIssue.makeDeduplicationHint(
+                        title: updatedIssue.title,
+                        summary: updatedIssue.summary,
+                        evidenceExcerpt: updatedIssue.evidenceExcerpt
+                    )
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )

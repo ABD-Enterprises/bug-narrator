@@ -9,6 +9,15 @@ enum ExtractedIssueCategory: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum ExtractedIssueSeverity: String, Codable, CaseIterable, Identifiable {
+    case critical = "Critical"
+    case high = "High"
+    case medium = "Medium"
+    case low = "Low"
+
+    var id: String { rawValue }
+}
+
 struct IssueReproductionStep: Identifiable, Codable, Equatable {
     let id: UUID
     var instruction: String
@@ -46,8 +55,11 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
     var category: ExtractedIssueCategory
+    var severity: ExtractedIssueSeverity
+    var component: String?
     var summary: String
     var evidenceExcerpt: String
+    var deduplicationHint: String
     var timestamp: TimeInterval?
     var relatedScreenshotIDs: [UUID]
     var confidence: Double?
@@ -61,8 +73,11 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         title: String,
         category: ExtractedIssueCategory,
+        severity: ExtractedIssueSeverity = .medium,
+        component: String? = nil,
         summary: String,
         evidenceExcerpt: String,
+        deduplicationHint: String? = nil,
         timestamp: TimeInterval?,
         relatedScreenshotIDs: [UUID] = [],
         confidence: Double? = nil,
@@ -75,8 +90,16 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         self.id = id
         self.title = title
         self.category = category
+        self.severity = severity
+        self.component = component?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.summary = summary
         self.evidenceExcerpt = evidenceExcerpt
+        self.deduplicationHint = Self.normalizedDeduplicationHint(
+            deduplicationHint,
+            title: title,
+            summary: summary,
+            evidenceExcerpt: evidenceExcerpt
+        )
         self.timestamp = timestamp
         self.relatedScreenshotIDs = relatedScreenshotIDs
         self.confidence = confidence
@@ -92,8 +115,16 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
         category = try container.decode(ExtractedIssueCategory.self, forKey: .category)
+        severity = try container.decodeIfPresent(ExtractedIssueSeverity.self, forKey: .severity) ?? .medium
+        component = try container.decodeIfPresent(String.self, forKey: .component)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         summary = try container.decode(String.self, forKey: .summary)
         evidenceExcerpt = try container.decode(String.self, forKey: .evidenceExcerpt)
+        deduplicationHint = Self.normalizedDeduplicationHint(
+            try container.decodeIfPresent(String.self, forKey: .deduplicationHint),
+            title: title,
+            summary: summary,
+            evidenceExcerpt: evidenceExcerpt
+        )
         timestamp = try container.decodeIfPresent(TimeInterval.self, forKey: .timestamp)
         relatedScreenshotIDs = try container.decodeIfPresent([UUID].self, forKey: .relatedScreenshotIDs) ?? []
         confidence = try container.decodeIfPresent(Double.self, forKey: .confidence)
@@ -109,8 +140,11 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         try container.encode(id, forKey: .id)
         try container.encode(title, forKey: .title)
         try container.encode(category, forKey: .category)
+        try container.encode(severity, forKey: .severity)
+        try container.encodeIfPresent(component, forKey: .component)
         try container.encode(summary, forKey: .summary)
         try container.encode(evidenceExcerpt, forKey: .evidenceExcerpt)
+        try container.encode(deduplicationHint, forKey: .deduplicationHint)
         try container.encodeIfPresent(timestamp, forKey: .timestamp)
         try container.encode(relatedScreenshotIDs, forKey: .relatedScreenshotIDs)
         try container.encodeIfPresent(confidence, forKey: .confidence)
@@ -125,8 +159,11 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         case id
         case title
         case category
+        case severity
+        case component
         case summary
         case evidenceExcerpt
+        case deduplicationHint
         case timestamp
         case relatedScreenshotIDs
         case confidence
@@ -151,6 +188,47 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         }
 
         return "\(Int((confidence * 100).rounded()))%"
+    }
+
+    static func makeDeduplicationHint(title: String, summary: String, evidenceExcerpt: String) -> String {
+        let normalized = [
+            title,
+            summary,
+            evidenceExcerpt
+        ]
+        .joined(separator: "\n")
+        .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        .lowercased()
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalized.isEmpty else {
+            return "issue-0000000000000000"
+        }
+
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let prime: UInt64 = 1_099_511_628_211
+
+        for byte in normalized.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= prime
+        }
+
+        return String(format: "issue-%016llx", hash)
+    }
+
+    private static func normalizedDeduplicationHint(
+        _ value: String?,
+        title: String,
+        summary: String,
+        evidenceExcerpt: String
+    ) -> String {
+        if let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !trimmedValue.isEmpty {
+            return trimmedValue
+        }
+
+        return makeDeduplicationHint(title: title, summary: summary, evidenceExcerpt: evidenceExcerpt)
     }
 }
 
@@ -233,5 +311,11 @@ struct JiraExportConfiguration: Equatable {
 
     var isComplete: Bool {
         !email.isEmpty && !apiToken.isEmpty && !projectKey.isEmpty && !issueType.isEmpty
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
