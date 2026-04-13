@@ -3,7 +3,7 @@
 task_id: N2
 description: AI-generated reproduction steps from narration + screenshots
 scope: Sources/BugNarrator/
-status: pending
+status: ready_for_review
 execution_status: idle
 execution_branch:
 execution_started_at:

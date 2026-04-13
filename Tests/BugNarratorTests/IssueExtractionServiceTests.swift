@@ -24,6 +24,15 @@ final class IssueExtractionServiceTests: XCTestCase {
               "timestamp": "00:08",
               "sectionTitle": "Save flow",
               "relatedScreenshotFileNames": ["review-shot.png"],
+              "reproductionSteps": [
+                {
+                  "instruction": "Open the save modal.",
+                  "expectedResult": "The primary action fits within the modal bounds.",
+                  "actualResult": "The save button is clipped on the right edge.",
+                  "timestamp": "00:08",
+                  "relatedScreenshotFileName": "review-shot.png"
+                }
+              ],
               "confidence": 0.74,
               "requiresReview": true
             }
@@ -47,6 +56,12 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.first?.category, .bug)
         XCTAssertEqual(result.issues.first?.relatedScreenshotIDs, [try XCTUnwrap(session.screenshots.first?.id)])
         XCTAssertEqual(result.issues.first?.timestamp, 8)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.count, 1)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.instruction, "Open the save modal.")
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.expectedResult, "The primary action fits within the modal bounds.")
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.actualResult, "The save button is clipped on the right edge.")
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.timestamp, 8)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.screenshotID, session.screenshots.first?.id)
     }
 
     func testExtractIssuesParsesArrayBasedContentWithMarkdownFenceAndAliasKeys() async throws {
@@ -66,6 +81,13 @@ final class IssueExtractionServiceTests: XCTestCase {
               "timecode": "00:08",
               "section": "Save flow",
               "screenshotFileNames": ["review-shot.png"],
+              "stepsToReproduce": [
+                {
+                  "step": "Open the save modal.",
+                  "expected": "The save button is fully visible.",
+                  "actual": "The save button clips against the modal frame."
+                }
+              ],
               "score": 0.74,
               "needsReview": true
             }
@@ -103,6 +125,9 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.first?.category, .bug)
         XCTAssertEqual(result.issues.first?.relatedScreenshotIDs, [session.screenshots.first?.id].compactMap { $0 })
         XCTAssertEqual(result.issues.first?.timestamp, 8)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.count, 1)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.timestamp, 8)
+        XCTAssertEqual(result.issues.first?.reproductionSteps.first?.screenshotID, session.screenshots.first?.id)
     }
 
     func testExtractIssuesReturnsClearErrorForMalformedStructuredPayload() async throws {

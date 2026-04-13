@@ -146,6 +146,29 @@ actor GitHubExportProvider {
             lines.append("- Review needed: Yes")
         }
 
+        if !issue.reproductionSteps.isEmpty {
+            lines.append("")
+            lines.append("## Reproduction Steps")
+
+            for (index, step) in issue.reproductionSteps.enumerated() {
+                lines.append("\(index + 1). \(step.instruction)")
+
+                if let expectedResult = step.expectedResult?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !expectedResult.isEmpty {
+                    lines.append("   - Expected: \(expectedResult)")
+                }
+
+                if let actualResult = step.actualResult?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !actualResult.isEmpty {
+                    lines.append("   - Actual: \(actualResult)")
+                }
+
+                if let reference = reproductionStepReference(step, session: session) {
+                    lines.append("   - Reference: \(reference)")
+                }
+            }
+        }
+
         let screenshots = session.screenshots(for: issue)
         if !screenshots.isEmpty {
             lines.append("")
@@ -160,6 +183,21 @@ actor GitHubExportProvider {
         lines.append("Exported from BugNarrator. Review against the raw transcript before triage.")
 
         return lines.joined(separator: "\n")
+    }
+
+    private func reproductionStepReference(_ step: IssueReproductionStep, session: TranscriptSession) -> String? {
+        var parts: [String] = []
+
+        if let timestampLabel = step.timestampLabel {
+            parts.append("Transcript `\(timestampLabel)`")
+        }
+
+        if let screenshotID = step.screenshotID,
+           let screenshot = session.screenshot(with: screenshotID) {
+            parts.append("Screenshot `\(screenshot.fileName)` (`\(screenshot.timeLabel)`)")
+        }
+
+        return parts.isEmpty ? nil : parts.joined(separator: "  •  ")
     }
 
     private func mapGitHubError(

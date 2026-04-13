@@ -17,7 +17,15 @@ final class GitHubExportProviderTests: XCTestCase {
             evidenceExcerpt: "The login button never re-enabled after typing a valid email.",
             timestamp: 14,
             relatedScreenshotIDs: [],
-            requiresReview: true
+            requiresReview: true,
+            reproductionSteps: [
+                IssueReproductionStep(
+                    instruction: "Enter a valid email and password.",
+                    expectedResult: "The login button enables.",
+                    actualResult: "The login button stays disabled.",
+                    timestamp: 14
+                )
+            ]
         )
         let session = TranscriptSession(
             createdAt: Date(),
@@ -44,12 +52,15 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-github-token")
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "BugNarrator")
 
-        let body = try XCTUnwrap(request.httpBody)
+        let body: Data = try XCTUnwrap(request.httpBody)
         let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: body)
         XCTAssertEqual(payload.title, "Login button is disabled")
         XCTAssertEqual(payload.labels, ["bug", "triage"])
         XCTAssertTrue(payload.body.contains("Transcript time"))
         XCTAssertTrue(payload.body.contains("Review needed: Yes"))
+        XCTAssertTrue(payload.body.contains("## Reproduction Steps"))
+        XCTAssertTrue(payload.body.contains("Expected: The login button enables."))
+        XCTAssertTrue(payload.body.contains("Actual: The login button stays disabled."))
     }
 
     func testExportMapsRepositoryNotFound() async throws {

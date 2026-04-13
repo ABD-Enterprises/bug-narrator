@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+func normalizedOptionalReproductionStepText(_ value: String) -> String? {
+    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedValue.isEmpty ? nil : trimmedValue
+}
+
 struct TranscriptView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
@@ -1272,6 +1277,11 @@ struct TranscriptView: View {
                     .textSelection(.enabled)
             }
 
+            let liveIssue = extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue
+            if !liveIssue.reproductionSteps.isEmpty {
+                reproductionStepsSection(issue: liveIssue, session: session)
+            }
+
             let relatedScreenshots = (extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue).relatedScreenshotIDs
                 .compactMap(session.screenshot(with:))
             if !relatedScreenshots.isEmpty {
@@ -1290,6 +1300,96 @@ struct TranscriptView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func reproductionStepsSection(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Reproduction Steps")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(Array(issue.reproductionSteps.enumerated()), id: \.element.id) { index, step in
+                reproductionStepEditor(
+                    step: step,
+                    stepIndex: index,
+                    issueID: issue.id,
+                    session: session
+                )
+            }
+        }
+    }
+
+    private func reproductionStepEditor(
+        step: IssueReproductionStep,
+        stepIndex: Int,
+        issueID: UUID,
+        session: TranscriptSession
+    ) -> some View {
+        let liveStep = reproductionStep(sessionID: session.id, issueID: issueID, stepID: step.id) ?? step
+        let referencedScreenshot = liveStep.screenshotID.flatMap(session.screenshot(with:))
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
+                Text("Step \(stepIndex + 1)")
+                    .font(.body.weight(.semibold))
+
+                if let timestampLabel = liveStep.timestampLabel {
+                    metadataChip(label: timestampLabel, systemImage: "clock")
+                }
+
+                if let referencedScreenshot {
+                    metadataChip(label: referencedScreenshot.fileName, systemImage: "photo")
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            fieldEditor(
+                title: "Action",
+                text: reproductionStepInstructionBinding(
+                    sessionID: session.id,
+                    issueID: issueID,
+                    stepID: step.id,
+                    fallback: liveStep.instruction
+                ),
+                minHeight: 56
+            )
+
+            fieldEditor(
+                title: "Expected",
+                text: reproductionStepOptionalTextBinding(
+                    sessionID: session.id,
+                    issueID: issueID,
+                    stepID: step.id,
+                    keyPath: \.expectedResult,
+                    fallback: liveStep.expectedResult
+                ),
+                minHeight: 44
+            )
+
+            fieldEditor(
+                title: "Actual",
+                text: reproductionStepOptionalTextBinding(
+                    sessionID: session.id,
+                    issueID: issueID,
+                    stepID: step.id,
+                    keyPath: \.actualResult,
+                    fallback: liveStep.actualResult
+                ),
+                minHeight: 44
+            )
+
+            if let referencedScreenshot {
+                Button("Open Referenced Screenshot") {
+                    appState.openScreenshot(referencedScreenshot)
+                }
+                .buttonStyle(.link)
+                .accessibilityLabel("Open referenced screenshot \(referencedScreenshot.fileName) for step \(stepIndex + 1)")
+            }
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func issueCategoryPicker(issue: ExtractedIssue, session: TranscriptSession) -> some View {
@@ -1365,6 +1465,12 @@ struct TranscriptView: View {
         return sourceSession?.issueExtraction?.issues.first(where: { $0.id == issueID })
     }
 
+    private func reproductionStep(sessionID: UUID, issueID: UUID, stepID: UUID) -> IssueReproductionStep? {
+        extractedIssue(sessionID: sessionID, issueID: issueID)?
+            .reproductionSteps
+            .first(where: { $0.id == stepID })
+    }
+
     private func liveSession(with sessionID: UUID) -> TranscriptSession? {
         if appState.currentTranscript?.id == sessionID {
             return appState.currentTranscript
@@ -1389,6 +1495,51 @@ struct TranscriptView: View {
                 }
 
                 updatedIssue[keyPath: keyPath] = newValue
+                appState.updateExtractedIssue(updatedIssue, in: sessionID)
+            }
+        )
+    }
+
+    private func reproductionStepInstructionBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        stepID: UUID,
+        fallback: String
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                reproductionStep(sessionID: sessionID, issueID: issueID, stepID: stepID)?.instruction ?? fallback
+            },
+            set: { newValue in
+                guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID),
+                      let stepIndex = updatedIssue.reproductionSteps.firstIndex(where: { $0.id == stepID }) else {
+                    return
+                }
+
+                updatedIssue.reproductionSteps[stepIndex].instruction = newValue
+                appState.updateExtractedIssue(updatedIssue, in: sessionID)
+            }
+        )
+    }
+
+    private func reproductionStepOptionalTextBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        stepID: UUID,
+        keyPath: WritableKeyPath<IssueReproductionStep, String?>,
+        fallback: String?
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                reproductionStep(sessionID: sessionID, issueID: issueID, stepID: stepID)?[keyPath: keyPath] ?? fallback ?? ""
+            },
+            set: { newValue in
+                guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID),
+                      let stepIndex = updatedIssue.reproductionSteps.firstIndex(where: { $0.id == stepID }) else {
+                    return
+                }
+
+                updatedIssue.reproductionSteps[stepIndex][keyPath: keyPath] = normalizedOptionalReproductionStepText(newValue)
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )
