@@ -16,6 +16,7 @@ const OPTIONAL_STATE_FILES = [
   "state/decisions.json"
 ];
 const REQUIRED_WORKFLOW_FILES = [
+  "AGENTS.md",
   "ai/bootstrap.md",
   "ai/plan.md",
   "ai/tasks.md",
@@ -93,6 +94,7 @@ const DOC_PATTERNS = [
 ];
 
 const STATE_OR_META_PATTERNS = [
+  /^AGENTS\.md$/,
   /^ai\//,
   /^state\//,
   /^docs\/roadmap\//,
