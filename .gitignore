@@ -28,8 +28,6 @@ site/node_modules/
 site/.docusaurus/
 site/build/
 
-state/implementation_notes.md
-state/validation_report.md
 !ai.config.json
 !state/tasks.json
 !state/risks.json
@@ -39,5 +37,7 @@ state/validation_report.md
 !ai/bootstrap.md
 !state/controller.md
 !state/current_task.md
+# Do NOT add state/implementation_notes.md or state/validation_report.md here
+# These are required pipeline files that must be tracked by git
 !state/implementation_notes.md
 !state/validation_report.md
