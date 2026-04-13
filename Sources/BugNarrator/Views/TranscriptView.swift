@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+func normalizedOptionalReproductionStepText(_ value: String) -> String? {
+    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedValue.isEmpty ? nil : trimmedValue
+}
+
 struct TranscriptView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var transcriptStore: TranscriptStore
@@ -1534,8 +1539,7 @@ struct TranscriptView: View {
                     return
                 }
 
-                let trimmedValue = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                updatedIssue.reproductionSteps[stepIndex][keyPath: keyPath] = trimmedValue.isEmpty ? nil : newValue
+                updatedIssue.reproductionSteps[stepIndex][keyPath: keyPath] = normalizedOptionalReproductionStepText(newValue)
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )

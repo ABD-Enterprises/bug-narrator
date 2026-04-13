@@ -18,10 +18,12 @@ DID:
 - Extended the issue-extraction prompt/parser so OpenAI returns reproduction steps tied to narration timecodes and screenshot file names, with issue-level reference fallback when a step omits one.
 - Rendered reproduction steps in the review workspace with editable action, expected, and actual fields plus visible timestamp and screenshot references.
 - Included reproduction steps and step references in both GitHub and Jira export payloads so the generated issue tracker tickets carry the same reviewable repro details.
+- Normalized optional reproduction-step edits so expected and actual text is trimmed before persistence, preventing accidental whitespace from leaking into exports.
 
 VALIDATED:
 - ./scripts/validate.sh
 - xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n2-tests test -only-testing:BugNarratorTests/IssueExtractionServiceTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests
+- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -only-testing:BugNarratorTests/ReviewWorkspaceTests test
 
 NEXT:
-- Review the generated reproduction steps in the stacked review workspace and confirm the exported GitHub/Jira issue formatting in PR review.
+- Confirm the PR review thread about reproduction-step whitespace is resolved by the pushed branch update.

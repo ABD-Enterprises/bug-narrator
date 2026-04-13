@@ -3,6 +3,14 @@ import XCTest
 @testable import BugNarrator
 
 final class ReviewWorkspaceTests: XCTestCase {
+    func testNormalizedOptionalReproductionStepTextTrimsPaddingAndDropsBlankValues() {
+        XCTAssertEqual(
+            normalizedOptionalReproductionStepText("  Click Save  \n"),
+            "Click Save"
+        )
+        XCTAssertNil(normalizedOptionalReproductionStepText("  \n  "))
+    }
+
     func testAvailableTabsIncludeSummaryOnlyWhenSessionHasSummaryContent() {
         let baseSession = makeSession(summary: "", extraction: nil)
         let summarySession = makeSession(summary: "One summary line.", extraction: nil)
