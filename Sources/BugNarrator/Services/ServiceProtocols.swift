@@ -158,6 +158,22 @@ protocol IssueExtracting: Sendable {
 }
 
 protocol IssueExporting: Sendable {
+    func prepareGitHubExportReview(
+        issues: [ExtractedIssue],
+        session: TranscriptSession,
+        configuration: GitHubExportConfiguration,
+        apiKey: String,
+        model: String
+    ) async throws -> IssueExportReview
+
+    func prepareJiraExportReview(
+        issues: [ExtractedIssue],
+        session: TranscriptSession,
+        configuration: JiraExportConfiguration,
+        apiKey: String,
+        model: String
+    ) async throws -> IssueExportReview
+
     func exportToGitHub(
         issues: [ExtractedIssue],
         session: TranscriptSession,

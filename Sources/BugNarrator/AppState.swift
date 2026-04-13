@@ -14,6 +14,7 @@ final class AppState: ObservableObject {
     @Published private(set) var activeRecordingSession: RecordingSessionDraft?
     @Published private(set) var issueExtractionSessionID: UUID?
     @Published private(set) var exportDestinationInProgress: ExportDestination?
+    @Published private(set) var pendingExportReview: IssueExportReview?
     @Published private(set) var apiKeyValidationState: APIKeyValidationState = .idle
 
     let settingsStore: SettingsStore
@@ -270,6 +271,7 @@ final class AppState: ObservableObject {
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
         guard status.phase != .recording,
               status.phase != .transcribing,
+              pendingExportReview == nil,
               let session = sessionSnapshot(with: session.id),
               let extraction = session.issueExtraction,
               !extraction.selectedIssues.isEmpty else {
@@ -1169,12 +1171,17 @@ final class AppState: ObservableObject {
             return
         }
 
+        guard settingsStore.hasAPIKey else {
+            presentError(AppError.missingAPIKey)
+            return
+        }
+
         exportDestinationInProgress = destination
-        setStatus(.transcribing("Exporting \(selectedIssues.count) issues to \(destination.rawValue)..."))
-        beginActivity(reason: "Exporting extracted issues")
+        setStatus(.transcribing("Checking \(destination.rawValue) for similar open issues..."))
+        beginActivity(reason: "Reviewing similar issues before export")
         exportLogger.info(
-            "issue_export_requested",
-            "Exporting selected issues.",
+            "issue_export_review_requested",
+            "Preparing similar issue review before export.",
             metadata: [
                 "destination": destination.rawValue,
                 "session_id": currentSession.id.uuidString,
@@ -1183,7 +1190,7 @@ final class AppState: ObservableObject {
         )
 
         do {
-            let results: [ExportResult]
+            let review: IssueExportReview
 
             switch destination {
             case .github:
@@ -1192,10 +1199,12 @@ final class AppState: ObservableObject {
                         "GitHub export requires a token, repository owner, and repository name."
                     )
                 }
-                results = try await exportService.exportToGitHub(
+                review = try await exportService.prepareGitHubExportReview(
                     issues: selectedIssues,
                     session: currentSession,
-                    configuration: configuration
+                    configuration: configuration,
+                    apiKey: settingsStore.trimmedAPIKey,
+                    model: settingsStore.issueExtractionModelValue
                 )
             case .jira:
                 guard let configuration = settingsStore.jiraExportConfiguration else {
@@ -1203,29 +1212,205 @@ final class AppState: ObservableObject {
                         "Jira export requires a base URL, email, API token, project key, and issue type."
                     )
                 }
-                results = try await exportService.exportToJira(
+                review = try await exportService.prepareJiraExportReview(
                     issues: selectedIssues,
                     session: currentSession,
-                    configuration: configuration
+                    configuration: configuration,
+                    apiKey: settingsStore.trimmedAPIKey,
+                    model: settingsStore.issueExtractionModelValue
                 )
             }
 
             exportDestinationInProgress = nil
             endActivity()
+
+            if review.hasMatches {
+                pendingExportReview = review
+                exportLogger.info(
+                    "issue_export_review_ready",
+                    "Similar issue review is ready for user confirmation.",
+                    metadata: [
+                        "destination": destination.rawValue,
+                        "session_id": currentSession.id.uuidString
+                    ]
+                )
+                setStatus(.success("Review the similar \(destination.rawValue) issues before export."))
+            } else {
+                await finalizeIssueExport(using: review)
+            }
+        } catch {
+            exportDestinationInProgress = nil
+            endActivity()
+            presentError(error)
+        }
+    }
+
+    func cancelPendingExportReview() {
+        pendingExportReview = nil
+    }
+
+    func setExportReviewResolution(_ resolution: SimilarIssueResolution, for issueID: UUID) {
+        guard var review = pendingExportReview,
+              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
+            return
+        }
+
+        review.items[itemIndex].setResolution(resolution)
+        pendingExportReview = review
+    }
+
+    func selectExportReviewMatch(_ matchID: String, for issueID: UUID) {
+        guard var review = pendingExportReview,
+              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
+            return
+        }
+
+        review.items[itemIndex].selectMatch(id: matchID)
+        pendingExportReview = review
+    }
+
+    func confirmPendingExportReview() async {
+        guard let pendingExportReview else {
+            return
+        }
+
+        await finalizeIssueExport(using: pendingExportReview)
+    }
+
+    private func finalizeIssueExport(using review: IssueExportReview) async {
+        guard let currentSession = sessionSnapshot(with: review.sessionID) else {
+            presentError(AppError.exportFailure("This session is no longer available in the library."))
+            pendingExportReview = nil
+            return
+        }
+
+        do {
+            let preparedIssues = try preparedIssuesForExport(from: review)
+            let duplicateMatches = try duplicateMatchResults(from: review)
+
+            pendingExportReview = nil
+            let combinedResults: [ExportResult]
+
+            if preparedIssues.isEmpty {
+                combinedResults = duplicateMatches
+            } else {
+                exportDestinationInProgress = review.destination
+                setStatus(.transcribing("Exporting reviewed issues to \(review.destination.rawValue)..."))
+                beginActivity(reason: "Exporting extracted issues")
+
+                let exportedResults: [ExportResult]
+                switch review.destination {
+                case .github:
+                    guard let configuration = settingsStore.githubExportConfiguration else {
+                        throw AppError.exportConfigurationMissing(
+                            "GitHub export requires a token, repository owner, and repository name."
+                        )
+                    }
+                    exportedResults = try await exportService.exportToGitHub(
+                        issues: preparedIssues,
+                        session: currentSession,
+                        configuration: configuration
+                    )
+                case .jira:
+                    guard let configuration = settingsStore.jiraExportConfiguration else {
+                        throw AppError.exportConfigurationMissing(
+                            "Jira export requires a base URL, email, API token, project key, and issue type."
+                        )
+                    }
+                    exportedResults = try await exportService.exportToJira(
+                        issues: preparedIssues,
+                        session: currentSession,
+                        configuration: configuration
+                    )
+                }
+
+                combinedResults = exportedResults + duplicateMatches
+                exportDestinationInProgress = nil
+                endActivity()
+            }
+
             exportLogger.info(
                 "issue_export_completed",
                 "Finished exporting selected issues.",
                 metadata: [
-                    "destination": destination.rawValue,
+                    "destination": review.destination.rawValue,
                     "session_id": currentSession.id.uuidString,
-                    "issue_count": "\(results.count)"
+                    "issue_count": "\(combinedResults.count)"
                 ]
             )
-            setStatus(.success("Exported \(results.count) issues to \(destination.rawValue)."))
+            setStatus(.success(exportSummary(for: combinedResults, duplicateCount: duplicateMatches.count, destination: review.destination)))
         } catch {
             exportDestinationInProgress = nil
+            endActivity()
             presentError(error)
         }
+    }
+
+    private func preparedIssuesForExport(from review: IssueExportReview) throws -> [ExtractedIssue] {
+        try review.items.compactMap { item in
+            switch item.resolution {
+            case .exportNew:
+                return item.issue
+            case .linkAsRelated:
+                guard let match = item.selectedMatch else {
+                    throw AppError.exportFailure("Choose a related \(review.destination.rawValue) issue before linking.")
+                }
+
+                var issue = item.issue
+                issue.note = trackerContextNote(for: .linkAsRelated, match: match)
+                return issue
+            case .markDuplicate:
+                return nil
+            }
+        }
+    }
+
+    private func duplicateMatchResults(from review: IssueExportReview) throws -> [ExportResult] {
+        try review.items.compactMap { item in
+            guard item.resolution == .markDuplicate else {
+                return nil
+            }
+
+            guard let match = item.selectedMatch else {
+                throw AppError.exportFailure("Choose an existing \(review.destination.rawValue) issue to mark as duplicate.")
+            }
+
+            return ExportResult(
+                sourceIssueID: item.issue.id,
+                destination: review.destination,
+                remoteIdentifier: match.remoteIdentifier,
+                remoteURL: match.remoteURL
+            )
+        }
+    }
+
+    private func trackerContextNote(for resolution: SimilarIssueResolution, match: SimilarIssueMatch) -> String {
+        switch resolution {
+        case .exportNew:
+            return ""
+        case .linkAsRelated:
+            return "Related to \(match.remoteIdentifier) (\(match.confidenceLabel) match): \(match.title). \(match.reasoning)"
+        case .markDuplicate:
+            return "Marked as duplicate of \(match.remoteIdentifier) (\(match.confidenceLabel) match): \(match.title). \(match.reasoning)"
+        }
+    }
+
+    private func exportSummary(
+        for results: [ExportResult],
+        duplicateCount: Int,
+        destination: ExportDestination
+    ) -> String {
+        let createdCount = max(0, results.count - duplicateCount)
+
+        if duplicateCount > 0, createdCount > 0 {
+            return "Exported \(createdCount) new issue\(createdCount == 1 ? "" : "s") to \(destination.rawValue) and linked \(duplicateCount) to existing tracker items."
+        }
+
+        if duplicateCount > 0 {
+            return "Linked \(duplicateCount) issue\(duplicateCount == 1 ? "" : "s") to existing \(destination.rawValue) items without creating duplicates."
+        }
+
+        return "Exported \(createdCount) issues to \(destination.rawValue)."
     }
 
     func openScreenshot(_ screenshot: SessionScreenshot) {

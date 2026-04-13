@@ -94,6 +94,38 @@ actor GitHubExportProvider {
         return results
     }
 
+    func findOpenIssues(
+        matching issue: ExtractedIssue,
+        configuration: GitHubExportConfiguration
+    ) async throws -> [TrackerIssueCandidate] {
+        guard configuration.isComplete else {
+            throw AppError.exportConfigurationMissing(
+                "GitHub export requires a personal access token, repository owner, and repository name."
+            )
+        }
+
+        let request = try makeSearchRequest(issue: issue, configuration: configuration)
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.exportFailure("GitHub returned an invalid response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw mapGitHubError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+        }
+
+        let payload = try JSONDecoder().decode(GitHubSearchResponse.self, from: data)
+        return payload.items.map { item in
+            TrackerIssueCandidate(
+                remoteIdentifier: "#\(item.number)",
+                title: item.title,
+                summary: item.body?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+                remoteURL: item.htmlURL
+            )
+        }
+    }
+
     func makeURLRequest(
         issue: ExtractedIssue,
         session reviewSession: TranscriptSession,
@@ -118,6 +150,26 @@ actor GitHubExportProvider {
                 labels: configuration.labels.isEmpty ? nil : configuration.labels
             )
         )
+        return request
+    }
+
+    private func makeSearchRequest(
+        issue: ExtractedIssue,
+        configuration: GitHubExportConfiguration
+    ) throws -> URLRequest {
+        var components = URLComponents(string: "https://api.github.com/search/issues")!
+        let searchTerms = searchTerms(for: issue)
+        let query = "repo:\(configuration.owner)/\(configuration.repository) is:issue is:open \(searchTerms)"
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "per_page", value: "5")
+        ]
+
+        var request = URLRequest(url: try url(from: components))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         return request
     }
 
@@ -154,6 +206,13 @@ actor GitHubExportProvider {
 
         if issue.requiresReview {
             lines.append("- Review needed: Yes")
+        }
+
+        if let note = issue.note?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !note.isEmpty {
+            lines.append("")
+            lines.append("## Tracker Context")
+            lines.append(note)
         }
 
         if !issue.reproductionSteps.isEmpty {
@@ -289,6 +348,26 @@ actor GitHubExportProvider {
             "GitHub exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
         )
     }
+
+    private func searchTerms(for issue: ExtractedIssue) -> String {
+        let source = [issue.title, issue.component, issue.summary]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let significantTerms = source
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 3 }
+
+        return significantTerms.prefix(6).joined(separator: " ")
+    }
+
+    private func url(from components: URLComponents) throws -> URL {
+        guard let url = components.url else {
+            throw AppError.exportFailure("GitHub search query could not be constructed.")
+        }
+
+        return url
+    }
 }
 
 private struct GitHubIssueRequest: Encodable {
@@ -303,6 +382,24 @@ private struct GitHubIssueResponse: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case number
+        case htmlURL = "html_url"
+    }
+}
+
+private struct GitHubSearchResponse: Decodable {
+    let items: [GitHubSearchItem]
+}
+
+private struct GitHubSearchItem: Decodable {
+    let number: Int
+    let title: String
+    let body: String?
+    let htmlURL: URL?
+
+    enum CodingKeys: String, CodingKey {
+        case number
+        case title
+        case body
         case htmlURL = "html_url"
     }
 }

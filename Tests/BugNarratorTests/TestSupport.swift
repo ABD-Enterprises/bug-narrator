@@ -233,11 +233,17 @@ actor MockIssueExtractionService: IssueExtracting {
 actor MockExportService: IssueExporting {
     var gitHubResults: [ExportResult] = []
     var jiraResults: [ExportResult] = []
+    var gitHubReview: IssueExportReview?
+    var jiraReview: IssueExportReview?
     var gitHubError: Error?
     var jiraError: Error?
 
     private(set) var gitHubCallCount = 0
     private(set) var jiraCallCount = 0
+    private(set) var gitHubReviewCallCount = 0
+    private(set) var jiraReviewCallCount = 0
+    private(set) var lastGitHubIssues: [ExtractedIssue] = []
+    private(set) var lastJiraIssues: [ExtractedIssue] = []
 
     func setGitHubResults(_ results: [ExportResult]) {
         gitHubResults = results
@@ -255,12 +261,61 @@ actor MockExportService: IssueExporting {
         jiraError = error
     }
 
+    func setGitHubReview(_ review: IssueExportReview) {
+        gitHubReview = review
+    }
+
+    func setJiraReview(_ review: IssueExportReview) {
+        jiraReview = review
+    }
+
+    func prepareGitHubExportReview(
+        issues: [ExtractedIssue],
+        session: TranscriptSession,
+        configuration: GitHubExportConfiguration,
+        apiKey: String,
+        model: String
+    ) async throws -> IssueExportReview {
+        gitHubReviewCallCount += 1
+
+        if let gitHubError {
+            throw gitHubError
+        }
+
+        return gitHubReview ?? IssueExportReview(
+            destination: .github,
+            sessionID: session.id,
+            items: issues.map { IssueExportReviewItem(issue: $0, matches: []) }
+        )
+    }
+
+    func prepareJiraExportReview(
+        issues: [ExtractedIssue],
+        session: TranscriptSession,
+        configuration: JiraExportConfiguration,
+        apiKey: String,
+        model: String
+    ) async throws -> IssueExportReview {
+        jiraReviewCallCount += 1
+
+        if let jiraError {
+            throw jiraError
+        }
+
+        return jiraReview ?? IssueExportReview(
+            destination: .jira,
+            sessionID: session.id,
+            items: issues.map { IssueExportReviewItem(issue: $0, matches: []) }
+        )
+    }
+
     func exportToGitHub(
         issues: [ExtractedIssue],
         session: TranscriptSession,
         configuration: GitHubExportConfiguration
     ) async throws -> [ExportResult] {
         gitHubCallCount += 1
+        lastGitHubIssues = issues
 
         if let gitHubError {
             throw gitHubError
@@ -275,6 +330,7 @@ actor MockExportService: IssueExporting {
         configuration: JiraExportConfiguration
     ) async throws -> [ExportResult] {
         jiraCallCount += 1
+        lastJiraIssues = issues
 
         if let jiraError {
             throw jiraError
@@ -581,4 +637,41 @@ func makeMockURLSession() -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]
     return URLSession(configuration: configuration)
+}
+
+func requestBodyData(from request: URLRequest) throws -> Data {
+    if let httpBody = request.httpBody {
+        return httpBody
+    }
+
+    guard let stream = request.httpBodyStream else {
+        throw NSError(domain: "BugNarratorTests", code: 1, userInfo: [NSLocalizedDescriptionKey: "Request body was missing."])
+    }
+
+    stream.open()
+    defer { stream.close() }
+
+    var data = Data()
+    let bufferSize = 4096
+    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+    defer { buffer.deallocate() }
+
+    while stream.hasBytesAvailable {
+        let readCount = stream.read(buffer, maxLength: bufferSize)
+        if readCount < 0 {
+            throw stream.streamError ?? NSError(
+                domain: "BugNarratorTests",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Request body stream could not be read."]
+            )
+        }
+
+        if readCount == 0 {
+            break
+        }
+
+        data.append(buffer, count: readCount)
+    }
+
+    return data
 }

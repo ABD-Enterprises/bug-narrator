@@ -1125,6 +1125,195 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .success)
     }
 
+    func testExportSelectedIssuesPresentsSimilarIssueReviewWhenMatchesExist() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+
+        let sourceIssue = ExtractedIssue(
+            title: "Login button is disabled",
+            category: .bug,
+            summary: "The login button never enables after valid input.",
+            evidenceExcerpt: "The login button stayed disabled after I entered a valid email.",
+            timestamp: 2,
+            requiresReview: true,
+            isSelectedForExport: true
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [sourceIssue])
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+        await harness.exportService.setGitHubReview(
+            IssueExportReview(
+                destination: .github,
+                sessionID: session.id,
+                items: [
+                    IssueExportReviewItem(
+                        issue: sourceIssue,
+                        matches: [
+                            SimilarIssueMatch(
+                                remoteIdentifier: "#142",
+                                title: "Login form validation broken",
+                                summary: "The login form never re-enables its submit button.",
+                                remoteURL: URL(string: "https://github.com/acme/bugnarrator/issues/142"),
+                                confidence: 0.85,
+                                reasoning: "Both reports describe the same blocked login action after valid input."
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        await harness.appState.exportSelectedIssues(from: session, to: .github)
+
+        let reviewCallCount = await harness.exportService.gitHubReviewCallCount
+        let exportCallCount = await harness.exportService.gitHubCallCount
+        XCTAssertEqual(reviewCallCount, 1)
+        XCTAssertEqual(exportCallCount, 0)
+        XCTAssertEqual(harness.appState.pendingExportReview?.items.first?.matches.first?.remoteIdentifier, "#142")
+        XCTAssertEqual(harness.appState.status.phase, .success)
+    }
+
+    func testConfirmPendingExportReviewSkipsCreatingDuplicateIssue() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+
+        let sourceIssue = ExtractedIssue(
+            title: "Login button is disabled",
+            category: .bug,
+            summary: "The login button never enables after valid input.",
+            evidenceExcerpt: "The login button stayed disabled after I entered a valid email.",
+            timestamp: 2,
+            requiresReview: true,
+            isSelectedForExport: true
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [sourceIssue])
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+        await harness.exportService.setGitHubReview(
+            IssueExportReview(
+                destination: .github,
+                sessionID: session.id,
+                items: [
+                    IssueExportReviewItem(
+                        issue: sourceIssue,
+                        matches: [
+                            SimilarIssueMatch(
+                                remoteIdentifier: "#142",
+                                title: "Login form validation broken",
+                                summary: "The login form never re-enables its submit button.",
+                                remoteURL: URL(string: "https://github.com/acme/bugnarrator/issues/142"),
+                                confidence: 0.85,
+                                reasoning: "Both reports describe the same blocked login action after valid input."
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        await harness.appState.exportSelectedIssues(from: session, to: .github)
+        harness.appState.setExportReviewResolution(.markDuplicate, for: sourceIssue.id)
+        await harness.appState.confirmPendingExportReview()
+
+        let exportCallCount = await harness.exportService.gitHubCallCount
+        XCTAssertEqual(exportCallCount, 0)
+        XCTAssertNil(harness.appState.pendingExportReview)
+        XCTAssertEqual(harness.appState.status.phase, .success)
+    }
+
+    func testConfirmPendingExportReviewAddsTrackerContextForRelatedLink() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+        await harness.exportService.setGitHubResults([
+            ExportResult(
+                sourceIssueID: UUID(),
+                destination: .github,
+                remoteIdentifier: "#200",
+                remoteURL: URL(string: "https://github.com/acme/bugnarrator/issues/200")
+            )
+        ])
+
+        let sourceIssue = ExtractedIssue(
+            title: "Login button is disabled",
+            category: .bug,
+            summary: "The login button never enables after valid input.",
+            evidenceExcerpt: "The login button stayed disabled after I entered a valid email.",
+            timestamp: 2,
+            requiresReview: true,
+            isSelectedForExport: true
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [sourceIssue])
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+        await harness.exportService.setGitHubReview(
+            IssueExportReview(
+                destination: .github,
+                sessionID: session.id,
+                items: [
+                    IssueExportReviewItem(
+                        issue: sourceIssue,
+                        matches: [
+                            SimilarIssueMatch(
+                                remoteIdentifier: "#142",
+                                title: "Login form validation broken",
+                                summary: "The login form never re-enables its submit button.",
+                                remoteURL: URL(string: "https://github.com/acme/bugnarrator/issues/142"),
+                                confidence: 0.85,
+                                reasoning: "Both reports describe the same blocked login action after valid input."
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        await harness.appState.exportSelectedIssues(from: session, to: .github)
+        harness.appState.setExportReviewResolution(.linkAsRelated, for: sourceIssue.id)
+        await harness.appState.confirmPendingExportReview()
+
+        let exportCallCount = await harness.exportService.gitHubCallCount
+        let exportedIssues = await harness.exportService.lastGitHubIssues
+        XCTAssertEqual(exportCallCount, 1)
+        XCTAssertEqual(exportedIssues.count, 1)
+        XCTAssertTrue(exportedIssues.first?.note?.contains("Related to #142") == true)
+    }
+
     func testPersistUpdatedSessionFailureKeepsEditedIssueVisibleAsUnsavedOverlay() throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

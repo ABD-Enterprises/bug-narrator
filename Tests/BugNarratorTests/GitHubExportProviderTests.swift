@@ -42,7 +42,8 @@ final class GitHubExportProviderTests: XCTestCase {
                     height: 0.16,
                     confidence: 0.82
                 )
-            ]
+            ],
+            note: "Related to #142 (85% match): Login form validation broken."
         )
         let session = TranscriptSession(
             createdAt: Date(),
@@ -71,7 +72,7 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-github-token")
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "BugNarrator")
 
-        let body: Data = try XCTUnwrap(request.httpBody)
+        let body = try requestBodyData(from: request)
         let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: body)
         XCTAssertEqual(payload.title, "Login button is disabled")
         XCTAssertEqual(payload.labels, ["bug", "triage"])
@@ -80,12 +81,52 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.contains("Component: Login Page"))
         XCTAssertTrue(payload.body.contains("Deduplication hint: `issue-login-disabled`"))
         XCTAssertTrue(payload.body.contains("Review needed: Yes"))
+        XCTAssertTrue(payload.body.contains("## Tracker Context"))
+        XCTAssertTrue(payload.body.contains("Related to #142"))
         XCTAssertTrue(payload.body.contains("## Reproduction Steps"))
         XCTAssertTrue(payload.body.contains("Expected: The login button enables."))
         XCTAssertTrue(payload.body.contains("Actual: The login button stays disabled."))
         XCTAssertTrue(payload.body.contains("## Annotated Screenshots"))
         XCTAssertTrue(payload.body.contains("Login button"))
         XCTAssertTrue(payload.body.contains("review-shot-annotated"))
+    }
+
+    func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Login button is disabled",
+            category: .bug,
+            summary: "The login button never enables after valid input.",
+            evidenceExcerpt: "The login button stayed disabled after I entered a valid email.",
+            timestamp: nil
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertTrue(request.url?.absoluteString.contains("/search/issues?") == true)
+            XCTAssertTrue(request.url?.absoluteString.contains("repo:acme/bugnarrator") == true)
+            XCTAssertTrue(request.url?.absoluteString.contains("is:open") == true)
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"items":[{"number":142,"title":"Login form validation broken","body":"The login form never re-enables its submit button.","html_url":"https://github.com/acme/bugnarrator/issues/142"}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let matches = try await provider.findOpenIssues(
+            matching: issue,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            )
+        )
+
+        XCTAssertEqual(matches.count, 1)
+        XCTAssertEqual(matches.first?.remoteIdentifier, "#142")
+        XCTAssertEqual(matches.first?.title, "Login form validation broken")
     }
 
     func testExportMapsRepositoryNotFound() async throws {

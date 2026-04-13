@@ -59,7 +59,7 @@ final class IssueExtractionServiceTests: XCTestCase {
             XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
 
-            let body = try XCTUnwrap(request.httpBody)
+            let body = try requestBodyData(from: request)
             let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
             let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
             let userContent = try XCTUnwrap(messages.last?["content"] as? [[String: Any]])
@@ -281,6 +281,61 @@ final class IssueExtractionServiceTests: XCTestCase {
                 )
             )
         }
+    }
+
+    func testSimilarIssueReviewReturnsConfidenceRankedMatches() async throws {
+        let session = makeReviewSession()
+        let issue = ExtractedIssue(
+            title: "Save button clips in the modal",
+            category: .bug,
+            summary: "The save button appears clipped in the modal layout.",
+            evidenceExcerpt: "The save button is clipped",
+            timestamp: 8,
+            requiresReview: true,
+            isSelectedForExport: true
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
+            let content = """
+            {
+              "matches": [
+                {
+                  "remoteIdentifier": "#142",
+                  "confidence": 0.85,
+                  "reasoning": "Both reports describe the same clipped primary action inside the save modal."
+                }
+              ]
+            }
+            """
+            return (self.successResponse(for: request), self.makeChatCompletionData(content: content))
+        }
+
+        let service = SimilarIssueReviewService(session: makeMockURLSession())
+        let review = try await service.prepareReview(
+            issues: [issue],
+            session: session,
+            destination: .github,
+            apiKey: "fixture-openai-key",
+            model: "gpt-4.1-mini"
+        ) { _ in
+            [
+                TrackerIssueCandidate(
+                    remoteIdentifier: "#142",
+                    title: "Save modal primary action is clipped",
+                    summary: "The primary button clips against the modal edge.",
+                    remoteURL: URL(string: "https://github.com/acme/bugnarrator/issues/142")
+                )
+            ]
+        }
+
+        XCTAssertEqual(review.items.count, 1)
+        XCTAssertEqual(review.items.first?.matches.first?.remoteIdentifier, "#142")
+        XCTAssertEqual(review.items.first?.matches.first?.confidenceLabel, "85%")
+        XCTAssertEqual(
+            review.items.first?.matches.first?.reasoning,
+            "Both reports describe the same clipped primary action inside the save modal."
+        )
     }
 
     private func makeReviewSession() -> TranscriptSession {
