@@ -1,12 +1,14 @@
 import Foundation
 
 actor IssueExtractionService: IssueExtracting {
+    static let defaultTimeoutDuration: Duration = .seconds(10)
+
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let session: URLSession
     private let timeoutDuration: Duration
     private let logger = DiagnosticsLogger(category: .transcription)
 
-    init(session: URLSession? = nil, timeoutDuration: Duration = .seconds(10)) {
+    init(session: URLSession? = nil, timeoutDuration: Duration = IssueExtractionService.defaultTimeoutDuration) {
         if let session {
             self.session = session
         } else {
@@ -51,9 +53,7 @@ actor IssueExtractionService: IssueExtracting {
 
                 group.addTask {
                     try await Task.sleep(for: timeoutDuration)
-                    throw AppError.issueExtractionFailure(
-                        "Issue extraction took longer than 10 seconds. Retry the extraction or choose a faster model in Settings."
-                    )
+                    throw AppError.issueExtractionFailure(Self.timeoutFailureMessage(for: timeoutDuration))
                 }
 
                 guard let firstResult = try await group.next() else {
@@ -81,6 +81,26 @@ actor IssueExtractionService: IssueExtracting {
             )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.issueExtractionFailure)
         }
+    }
+
+    private static func timeoutFailureMessage(for duration: Duration) -> String {
+        "Issue extraction took longer than \(timeoutDisplayText(for: duration)). Retry the extraction or choose a faster model in Settings."
+    }
+
+    private static func timeoutDisplayText(for duration: Duration) -> String {
+        let components = duration.components
+        let rawSeconds = max(
+            0,
+            Double(components.seconds) + (Double(components.attoseconds) / 1_000_000_000_000_000_000)
+        )
+
+        if rawSeconds.rounded() == rawSeconds {
+            let wholeSeconds = Int(rawSeconds)
+            return "\(wholeSeconds) second\(wholeSeconds == 1 ? "" : "s")"
+        }
+
+        let roundedTenths = ceil(rawSeconds * 10) / 10
+        return "\(String(format: "%.1f", roundedTenths)) seconds"
     }
 
     private static func makePrompt(for session: TranscriptSession) -> String {

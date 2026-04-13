@@ -392,7 +392,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing("Step 1 of 3: Uploading audio to OpenAI for transcription..."))
+            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
             swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcriptionClient.transcribe(
@@ -432,7 +432,7 @@ final class AppState: ObservableObject {
                 ]
             )
 
-            setStatus(.transcribing("Step 2 of 3: Saving the finished session locally..."))
+            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the finished session locally...")))
 
             do {
                 try persistCompletedTranscript(session)
@@ -462,7 +462,7 @@ final class AppState: ObservableObject {
 
             if settingsStore.autoExtractIssues {
                 issueExtractionSessionID = session.id
-                setStatus(.transcribing("Step 3 of 3: Extracting reviewable issues..."))
+                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
                 swapActivity(reason: "Extracting review issues")
 
                 do {
@@ -757,7 +757,7 @@ final class AppState: ObservableObject {
         let request = makeTranscriptionRequest()
         selectedTranscriptID = session.id
         currentTranscript = session
-        setStatus(.transcribing("Step 1 of 3: Retrying transcription from the preserved recording..."))
+        setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
         transcriptionLogger.info(
             "transcription_retry_requested",
@@ -799,7 +799,7 @@ final class AppState: ObservableObject {
                 artifactsDirectoryPath: session.artifactsDirectoryPath
             )
 
-            setStatus(.transcribing("Step 2 of 3: Saving the recovered session locally..."))
+            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the recovered session locally...")))
             try persistUpdatedSession(updatedSession)
 
             if settingsStore.autoCopyTranscript {
@@ -808,7 +808,7 @@ final class AppState: ObservableObject {
 
             if settingsStore.autoExtractIssues {
                 issueExtractionSessionID = updatedSession.id
-                setStatus(.transcribing("Step 3 of 3: Extracting reviewable issues..."))
+                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
                 swapActivity(reason: "Extracting review issues")
 
                 do {
@@ -1018,6 +1018,11 @@ final class AppState: ObservableObject {
             )
             setStatus(.recording(appError.userMessage), error: appError)
         }
+    }
+
+    private func transcriptionProgressMessage(step: Int, action: String) -> String {
+        let totalSteps = settingsStore.autoExtractIssues ? 3 : 2
+        return "Step \(step) of \(totalSteps): \(action)"
     }
 
     func extractIssuesForDisplayedTranscript() async {

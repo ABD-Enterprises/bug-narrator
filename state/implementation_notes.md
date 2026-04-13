@@ -25,3 +25,10 @@ VALIDATED:
 
 NEXT:
 - Review the unified transcript workspace and the forced auto-save behavior in PR review.
+
+## 2026-04-13 Review Remediation
+
+- Synced the issue-extraction timeout failure copy to the configured timeout budget and rounded subsecond values up to a stable tenths display.
+- Computed transcription progress step totals from `autoExtractIssues` so non-extraction runs no longer claim a missing third step.
+- Marked the stacked review workspace section titles as accessibility headers and updated the regression script for the no-tabs layout.
+- Returned `state/current_task.md` to `ready_for_review` after fixing the CI and review findings on PR #14.

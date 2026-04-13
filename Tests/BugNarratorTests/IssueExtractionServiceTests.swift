@@ -138,12 +138,13 @@ final class IssueExtractionServiceTests: XCTestCase {
         let session = makeReviewSession()
 
         MockURLProtocol.requestHandler = { request in
-            (self.successResponse(for: request), self.makeChatCompletionData(content: #"{"summary":"","guidanceNote":"","issues":[]}"#))
+            Thread.sleep(forTimeInterval: 0.3)
+            return (self.successResponse(for: request), self.makeChatCompletionData(content: #"{"summary":"","guidanceNote":"","issues":[]}"#))
         }
 
         let service = IssueExtractionService(
             session: makeMockURLSession(),
-            timeoutDuration: .zero
+            timeoutDuration: .milliseconds(250)
         )
 
         do {
@@ -153,7 +154,7 @@ final class IssueExtractionServiceTests: XCTestCase {
             XCTAssertEqual(
                 error as? AppError,
                 .issueExtractionFailure(
-                    "Issue extraction took longer than 10 seconds. Retry the extraction or choose a faster model in Settings."
+                    "Issue extraction took longer than 0.3 seconds. Retry the extraction or choose a faster model in Settings."
                 )
             )
         }

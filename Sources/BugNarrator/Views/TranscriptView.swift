@@ -811,6 +811,7 @@ struct TranscriptView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
 
             content()
         }
