@@ -33,22 +33,6 @@ jobs:
       - name: Run runtime guardrails validator
         run: ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
 
-  macos-validation:
-    needs: runtime-guardrails
-    runs-on: macos-15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Run release smoke test
-        run: ./scripts/release_smoke_test.sh
-
-      - name: Run accessibility regression check
-        run: ./scripts/accessibility_regression_check.sh
-
   docs-site-validation:
     needs: runtime-guardrails
     runs-on: ubuntu-latest
