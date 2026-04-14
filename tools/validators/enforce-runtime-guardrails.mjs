@@ -369,6 +369,23 @@ function isDependencyManifestOrLockFile(relativePath) {
   return DEPENDENCY_FILE_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
+function readGithubEventPayload() {
+  const eventPath = String(process.env.GITHUB_EVENT_PATH || "").trim();
+  if (!eventPath) {
+    return null;
+  }
+
+  try {
+    return readJsonFile(eventPath);
+  } catch {
+    return null;
+  }
+}
+
+function isDependencyBotLogin(login) {
+  return DEPENDENCY_BOT_ACTORS.has(String(login || "").trim().toLowerCase());
+}
+
 function isDependencyBotActor() {
   const actor = String(
     process.env.GITHUB_ACTOR || process.env.GITHUB_TRIGGERING_ACTOR || ""
@@ -376,7 +393,18 @@ function isDependencyBotActor() {
     .trim()
     .toLowerCase();
 
-  return DEPENDENCY_BOT_ACTORS.has(actor);
+  if (isDependencyBotLogin(actor)) {
+    return true;
+  }
+
+  const eventPayload = readGithubEventPayload();
+  const prAuthorLogin =
+    eventPayload &&
+    eventPayload.pull_request &&
+    eventPayload.pull_request.user &&
+    eventPayload.pull_request.user.login;
+
+  return isDependencyBotLogin(prAuthorLogin);
 }
 
 function isDependencyOnlyBotPr(changedFiles) {
