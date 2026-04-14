@@ -1,14 +1,15 @@
 name: AI Guardrails
 
-# Runs on every PR targeting main.
-# Do NOT add macos-latest jobs — macOS runners consume significantly
-# more runner credits. Native builds should use separate workflow_dispatch
-# or release-only triggers.
+# This workflow runs on ubuntu-latest for every PR only.
+# Do NOT add a push-to-main trigger — the validator is called during the
+# state-advance commit and fails on merge commits (no diff base available).
+# Do NOT add macos-latest jobs here — macOS runners consume significantly
+# more runner credits. Native app builds (Swift, Xcode, etc.) should use
+# a separate workflow with workflow_dispatch or release-only triggers.
 # See developer/coding-standards.md "CI Design Rules" for the full policy.
 
 on:
   pull_request:
-    branches: [main]
 
 jobs:
   enforce:
