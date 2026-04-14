@@ -13,7 +13,12 @@ mkdir -p "$VALIDATION_ARTIFACT_DIR"
 rm -f "$SEMGREP_STATUS_FILE" "$SEMGREP_OUTPUT_FILE"
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  if docker run --rm -v "${ROOT}":/src -w /src -e SEMGREP_APP_TOKEN semgrep/semgrep semgrep --config=auto --error . >"$SEMGREP_OUTPUT_FILE" 2>&1; then
+  SEMGREP_ENVS=(-e SEMGREP_APP_TOKEN)
+  if [[ -n "$BASE_REF" ]]; then
+    SEMGREP_ENVS+=(-e "SEMGREP_BASELINE_REF=$BASE_REF")
+  fi
+
+  if docker run --rm -v "${ROOT}":/src -w /src "${SEMGREP_ENVS[@]}" semgrep/semgrep semgrep ci --config=auto >"$SEMGREP_OUTPUT_FILE" 2>&1; then
     printf 'PASS: semgrep completed successfully
 ' >"$SEMGREP_STATUS_FILE"
   else
