@@ -407,7 +407,7 @@ function isDependencyBotActor() {
   return isDependencyBotLogin(prAuthorLogin);
 }
 
-function isDependencyOnlyBotPr(changedFiles) {
+function isDependencyOnlyBotPr(changedFiles, config) {
   if (process.env.GITHUB_ACTIONS !== "true") {
     return false;
   }
@@ -416,9 +416,13 @@ function isDependencyOnlyBotPr(changedFiles) {
     return false;
   }
 
+  const meaningfulChanges = changedFiles.filter((relativePath) =>
+    isCodeOrConfigChange(relativePath, config)
+  );
+
   return (
-    changedFiles.length > 0 &&
-    changedFiles.every((relativePath) => isDependencyManifestOrLockFile(relativePath))
+    meaningfulChanges.length > 0 &&
+    meaningfulChanges.every((relativePath) => isDependencyManifestOrLockFile(relativePath))
   );
 }
 
@@ -1206,7 +1210,7 @@ function validateDiffAwareState(
   const codeOrConfigChanges = changedFiles.filter((relativePath) =>
     isCodeOrConfigChange(relativePath, config)
   );
-  const dependencyOnlyBotPr = isDependencyOnlyBotPr(changedFiles);
+  const dependencyOnlyBotPr = isDependencyOnlyBotPr(changedFiles, config);
   const nightRunProfile = config.run_profile === "night";
   const docsOnlyChanges =
     changedFiles.length > 0 &&
