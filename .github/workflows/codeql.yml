@@ -1,6 +1,8 @@
 name: CodeQL
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   schedule:
@@ -9,7 +11,7 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || matrix.language == 'csharp' && 'windows-latest' || 'ubuntu-latest' }}
     permissions:
       security-events: write
       actions: read
@@ -29,7 +31,31 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build Windows solution
+        if: matrix.language == 'csharp'
+        shell: pwsh
+        run: ./windows/scripts/build-windows.ps1 -Configuration Debug
+
+      - name: Build macOS app
+        if: matrix.language == 'swift'
+        shell: bash
+        run: |
+          xcodebuild \
+            -quiet \
+            -project BugNarrator.xcodeproj \
+            -scheme BugNarrator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
       - name: Autobuild
+        if: matrix.language != 'csharp' && matrix.language != 'swift'
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis
