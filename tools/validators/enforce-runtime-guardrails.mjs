@@ -116,6 +116,39 @@ const FRONTEND_FILE_PATTERNS = [
   /\.scss$/,
   /\.less$/
 ];
+const DEPENDENCY_BOT_ACTORS = new Set([
+  "app/dependabot",
+  "dependabot[bot]",
+  "renovate[bot]"
+]);
+const DEPENDENCY_FILE_PATTERNS = [
+  /(^|\/)package\.json$/,
+  /(^|\/)package-lock\.json$/,
+  /(^|\/)npm-shrinkwrap\.json$/,
+  /(^|\/)pnpm-lock\.yaml$/,
+  /(^|\/)yarn\.lock$/,
+  /(^|\/)bun\.lockb?$/,
+  /(^|\/)Cargo\.toml$/,
+  /(^|\/)Cargo\.lock$/,
+  /(^|\/)go\.mod$/,
+  /(^|\/)go\.sum$/,
+  /(^|\/)Pipfile$/,
+  /(^|\/)Pipfile\.lock$/,
+  /(^|\/)pyproject\.toml$/,
+  /(^|\/)poetry\.lock$/,
+  /(^|\/)requirements([-.].+)?\.txt$/,
+  /(^|\/)Gemfile$/,
+  /(^|\/)Gemfile\.lock$/,
+  /(^|\/)composer\.json$/,
+  /(^|\/)composer\.lock$/,
+  /(^|\/)mix\.exs$/,
+  /(^|\/)mix\.lock$/,
+  /(^|\/)Podfile$/,
+  /(^|\/)Podfile\.lock$/,
+  /(^|\/)Directory\.Packages\.props$/,
+  /(^|\/)packages\.lock\.json$/,
+  /(^|\/)global\.json$/
+];
 
 function isFrontendFile(relativePath) {
   return FRONTEND_FILE_PATTERNS.some((pattern) => pattern.test(relativePath));
@@ -328,6 +361,36 @@ function isCodeOrConfigChange(relativePath, config) {
     !isDocFile(relativePath) &&
     !isStateOrMetaFile(relativePath) &&
     !isSupportingArtifactFile(relativePath, config)
+  );
+}
+
+function isDependencyManifestOrLockFile(relativePath) {
+  const normalized = normalizeRepoRelativePath(relativePath);
+  return DEPENDENCY_FILE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function isDependencyBotActor() {
+  const actor = String(
+    process.env.GITHUB_ACTOR || process.env.GITHUB_TRIGGERING_ACTOR || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return DEPENDENCY_BOT_ACTORS.has(actor);
+}
+
+function isDependencyOnlyBotPr(changedFiles) {
+  if (process.env.GITHUB_ACTIONS !== "true") {
+    return false;
+  }
+
+  if (!isDependencyBotActor()) {
+    return false;
+  }
+
+  return (
+    changedFiles.length > 0 &&
+    changedFiles.every((relativePath) => isDependencyManifestOrLockFile(relativePath))
   );
 }
 
@@ -1115,6 +1178,7 @@ function validateDiffAwareState(
   const codeOrConfigChanges = changedFiles.filter((relativePath) =>
     isCodeOrConfigChange(relativePath, config)
   );
+  const dependencyOnlyBotPr = isDependencyOnlyBotPr(changedFiles);
   const nightRunProfile = config.run_profile === "night";
   const docsOnlyChanges =
     changedFiles.length > 0 &&
@@ -1125,7 +1189,7 @@ function validateDiffAwareState(
         isSupportingArtifactFile(file, config)
     );
 
-  if (codeOrConfigChanges.length > 0) {
+  if (codeOrConfigChanges.length > 0 && !dependencyOnlyBotPr) {
     const requiredUpdates = nightRunProfile
       ? ["state/artifacts.json"]
       : ["state/tasks.json", "state/artifacts.json"];
