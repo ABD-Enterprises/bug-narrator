@@ -13,18 +13,12 @@ watch-open-prs → detects merge, advances state to ready_for_claude (if tasks r
 
 State flow: `ready_for_codex` → `ready_for_review` → (merge) → `ready_for_claude` | `done`
 Failure: `review_failed_fix_required` → fix → `ready_for_review`  
-Legacy replanning escape hatch: `ready_for_claude` → planning owner updates `ai/` → `ready_for_codex`
+Needs planning: `ready_for_claude` → Claude updates ai/ → `ready_for_codex`
 
 ## Role boundaries
 
-`ai.config.json` declares the repo execution mode:
-
-- `strict` — planning and implementation stay intentionally separated
-- `paired` — either Codex or Claude may own planning, but review and merge still happen through PR + CI
-- `solo` — one tool may plan and implement in the same lease, but it must still write planning artifacts before code changes, open a PR, and wait for external checks
-
-**Planning owner** — writes `ai/` files, updates `docs/roadmap/state.json` and repo policy config when needed, then sets `ready_for_codex`.
-**Execution owner** — implements the current task, runs local validation, opens/updates PR, and handles review remediation by default.
+**Claude** — plans tasks, writes `ai/` files, sets `ready_for_codex`. Never writes production code.  
+**Codex** — implements the current task only, runs local validation, opens/updates PR. Never re-plans.  
 **watch-open-prs** — merges green PRs, advances state automatically. Codex never merges its own PR.  
 **No agent-to-agent communication.** Coordination happens only through repo files and PR/CI state.
 
@@ -36,8 +30,8 @@ Neither mode relaxes evidence, PR, or CI requirements.
 
 ## State file ownership (critical)
 
-Execution owner writes: `state/current_task.md`, `state/controller.md`, `state/tasks.json`, `state/artifacts.json`, `state/implementation_notes.md`, `state/validation_report.md`, `state/handoff.json`
-Planning owner writes: `ai/` files, `docs/roadmap/state.json`, `ai.config.json`
+Codex writes: `state/current_task.md`, `state/controller.md`, `state/tasks.json`, `state/artifacts.json`, `state/implementation_notes.md`, `state/validation_report.md`, `state/handoff.json`  
+Claude writes: `ai/` files, `docs/roadmap/state.json`, `ai.config.json`  
 **Always commit state changes immediately** — automated readers use `git show origin/main:<file>` and will not see uncommitted local changes.
 
 ## Execution lease
@@ -86,9 +80,9 @@ Codex implements **up to 3 sequential tasks per run** on one branch and one PR:
 ## Scope rules
 
 - Work on the current task only — do not change files outside the declared scope in `ai/tasks.md`
-- Planning artifacts may be updated only to plan the active task before code changes begin
+- Never modify `ai/plan.md`, `ai/tasks.md`, `ai/acceptance.md`
 - Document any necessary out-of-scope changes in `state/implementation_notes.md`
-- If the task is ambiguous or blocked: set `ready_for_claude` only when the repo still uses that legacy replanning lane; otherwise update planning artifacts, document reason, clear lease, and stop
+- If the task is ambiguous or blocked: set `ready_for_claude`, document reason, clear lease, stop
 
 ## artifacts.json contract (validator-enforced — violations fail CI)
 
@@ -105,7 +99,6 @@ Valid `status` + `paths` combinations for each evidence type (`build`, `test`, `
 - `"status": "passed"` + empty `paths[]` → FAIL (passed requires artifacts)
 - `"status": "passed"` + `"metadata_only": true` → FAIL (double violation)
 - `"status": "not_run"` + `"metadata_only": true` + type NOT in `allowed_metadata_only_evidence_types` → FAIL
-- evidence paths that point at generated output trees like `dist/`, `build/`, `.next/`, `coverage/`, or `node_modules/` → FAIL
 
 **`code_changes_present`**: Set to `true` if any production code changed. Set to `false` only for state-only or docs-only commits.
 
