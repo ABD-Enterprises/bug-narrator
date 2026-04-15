@@ -71,3 +71,15 @@ Validation commands:
 
 - `./scripts/validate.sh`
 - `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n4-tests test -only-testing:BugNarratorTests/ScreenshotAnnotationTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests`
+
+### N6
+
+- the review screen shows a generated testing coverage summary for each session
+- the summary includes tested areas, issue counts by severity, and explicit coverage gaps
+- the summary can be exported as markdown without regressing existing review/export flows
+- runtime guardrails passes for the task branch
+
+Validation commands:
+
+- `./scripts/validate.sh`
+- `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n6-tests test -only-testing:BugNarratorTests/SessionSummaryTests`
