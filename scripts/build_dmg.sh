@@ -16,6 +16,7 @@ OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:-}"
 ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+ALLOW_NOTARIZATION_FAILURE="${ALLOW_NOTARIZATION_FAILURE:-NO}"
 ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/Resources/BugNarrator.entitlements}"
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
 APP_NAME="${APP_NAME:-BugNarrator}"
@@ -73,6 +74,56 @@ detach_attachment() {
 
 cleanup_mountpoints() {
     detach_attachment "$VERIFY_DEVICE" "$VERIFY_MOUNTPOINT"
+}
+
+verify_notarization_access() {
+    local notarization_check_output
+    local notarization_check_status
+
+    set +e
+    notarization_check_output="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json 2>&1)"
+    notarization_check_status=$?
+    set -e
+
+    if [[ "$notarization_check_status" -ne 0 ]]; then
+        printf '%s\n' "$notarization_check_output" >&2
+        echo "error: notarization preflight failed before building release artifacts." >&2
+
+        if [[ "$notarization_check_output" == *"required agreement is missing or has expired"* ]]; then
+            echo "error: Apple Developer Program agreements must be accepted before BugNarrator can be notarized for distribution." >&2
+        fi
+
+        echo "hint: resolve the Apple notarization account problem first, or rerun with NOTARIZE=NO for a non-distributable signed-only internal build." >&2
+        exit 1
+    fi
+}
+
+write_release_artifacts() {
+    cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
+
+    (
+        cd "$OUTPUT_DIR"
+        shasum -a 256 "$VERSIONED_DMG_NAME" >"$(basename "$VERSIONED_DMG_CHECKSUM_PATH")"
+        shasum -a 256 "$STABLE_DMG_NAME" >"$(basename "$STABLE_DMG_CHECKSUM_PATH")"
+    )
+}
+
+emit_release_summary() {
+    echo "Built $APP_NAME $VERSION ($BUILD_NUMBER)"
+    if [[ -n "$SIGNING_AUTHORITY" ]]; then
+        echo "Signing authority: $SIGNING_AUTHORITY"
+    fi
+    echo "Release app: $APP_PATH"
+    echo "Versioned DMG: $VERSIONED_DMG_PATH"
+    if [[ -f "$STABLE_DMG_PATH" ]]; then
+        echo "Stable DMG: $STABLE_DMG_PATH"
+    fi
+    if [[ -f "$VERSIONED_DMG_CHECKSUM_PATH" ]]; then
+        echo "Versioned DMG checksum: $VERSIONED_DMG_CHECKSUM_PATH"
+    fi
+    if [[ -f "$STABLE_DMG_CHECKSUM_PATH" ]]; then
+        echo "Stable DMG checksum: $STABLE_DMG_CHECKSUM_PATH"
+    fi
 }
 
 has_boolean_entitlement() {
@@ -136,6 +187,11 @@ fi
 if [[ "$NOTARIZE" == "YES" && -z "$NOTARY_PROFILE" ]]; then
     echo "error: notarization requires NOTARY_PROFILE to be set" >&2
     exit 1
+fi
+
+if [[ "$NOTARIZE" == "YES" && "$ALLOW_NOTARIZATION_FAILURE" != "YES" ]]; then
+    echo "Running notarization preflight..."
+    verify_notarization_access
 fi
 
 if [[ "$REQUIRE_RELEASE_SMOKE_TEST" == "YES" ]]; then
@@ -375,7 +431,33 @@ VERIFY_DEVICE=""
 
 if [[ "$NOTARIZE" == "YES" ]]; then
     echo "Submitting DMG for notarization with profile '$NOTARY_PROFILE'..."
-    xcrun notarytool submit "$VERSIONED_DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+    set +e
+    notarize_output="$(xcrun notarytool submit "$VERSIONED_DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)"
+    notarize_status=$?
+    set -e
+
+    if [[ "$notarize_status" -ne 0 ]]; then
+        printf '%s\n' "$notarize_output" >&2
+        echo "error: app signing succeeded, but notarization failed for $VERSIONED_DMG_PATH" >&2
+
+        if [[ "$notarize_output" == *"required agreement is missing or has expired"* ]]; then
+            echo "error: Apple Developer Program agreements must be accepted before notarization can continue." >&2
+        fi
+
+        if [[ "$ALLOW_NOTARIZATION_FAILURE" == "YES" ]]; then
+            write_release_artifacts
+            echo "warning: continuing because ALLOW_NOTARIZATION_FAILURE=YES. The generated DMG is signed but not notarized and must not be used as a public release artifact." >&2
+            emit_release_summary
+            exit 0
+        fi
+
+        echo "hint: resolve the notarization error and rerun, or use NOTARIZE=NO for a signed-only internal build." >&2
+        echo "hint: if you need the script to preserve the signed DMG when notarization fails, rerun with ALLOW_NOTARIZATION_FAILURE=YES." >&2
+        echo "Signed DMG path: $VERSIONED_DMG_PATH" >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$notarize_output"
     xcrun stapler staple -v "$VERSIONED_DMG_PATH"
     xcrun stapler validate "$VERSIONED_DMG_PATH"
     if ! dmg_spctl_output="$(spctl -a -vv -t open "$VERSIONED_DMG_PATH" 2>&1)"; then
@@ -392,20 +474,5 @@ if [[ "$NOTARIZE" == "YES" ]]; then
     spctl -a -vv "$APP_PATH"
 fi
 
-cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
-
-(
-    cd "$OUTPUT_DIR"
-    shasum -a 256 "$VERSIONED_DMG_NAME" >"$(basename "$VERSIONED_DMG_CHECKSUM_PATH")"
-    shasum -a 256 "$STABLE_DMG_NAME" >"$(basename "$STABLE_DMG_CHECKSUM_PATH")"
-)
-
-echo "Built $APP_NAME $VERSION ($BUILD_NUMBER)"
-if [[ -n "$SIGNING_AUTHORITY" ]]; then
-    echo "Signing authority: $SIGNING_AUTHORITY"
-fi
-echo "Release app: $APP_PATH"
-echo "Versioned DMG: $VERSIONED_DMG_PATH"
-echo "Stable DMG: $STABLE_DMG_PATH"
-echo "Versioned DMG checksum: $VERSIONED_DMG_CHECKSUM_PATH"
-echo "Stable DMG checksum: $STABLE_DMG_CHECKSUM_PATH"
+write_release_artifacts
+emit_release_summary

@@ -153,6 +153,33 @@ NOTARY_PROFILE=***REMOVED*** \
 ./scripts/build_dmg.sh
 ```
 
+If app signing succeeds but Apple's notarization service is temporarily unavailable or blocked by an expired Apple Developer agreement, the script now reports that explicitly instead of looking like a signing failure. You still have two safe options:
+
+- use `NOTARIZE=NO` for a signed-only internal build
+- use `ALLOW_NOTARIZATION_FAILURE=YES` if you want the script to preserve the signed DMG and checksum files even when notarization fails
+
+Example signed-only internal build:
+
+```bash
+CODE_SIGNING_ALLOWED=YES \
+CODE_SIGN_IDENTITY="Developer ID Application" \
+DEVELOPMENT_TEAM=***REMOVED*** \
+NOTARIZE=NO \
+./scripts/build_dmg.sh
+```
+
+Example "try notarization, but keep the signed artifact if Apple blocks notarization":
+
+```bash
+CODE_SIGNING_ALLOWED=YES \
+CODE_SIGN_IDENTITY="Developer ID Application" \
+DEVELOPMENT_TEAM=***REMOVED*** \
+NOTARIZE=YES \
+NOTARY_PROFILE=***REMOVED*** \
+ALLOW_NOTARIZATION_FAILURE=YES \
+./scripts/build_dmg.sh
+```
+
 The packaging script will:
 
 1. build the Release app
