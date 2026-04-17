@@ -181,11 +181,79 @@ final class TranscriptionClientTests: XCTestCase {
         }
     }
 
+    func testTranscribeMergesChunkedResultsAndAdjustsSegmentTimes() async throws {
+        let originalFileURL = try makeAudioFile(named: "chunked-original", contents: "audio-data")
+        let firstChunkURL = try makeAudioFile(named: "chunk-1", contents: "chunk-one")
+        let secondChunkURL = try makeAudioFile(named: "chunk-2", contents: "chunk-two")
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+
+            let payload: String
+            switch requestCount {
+            case 1:
+                payload = #"{"text":"First section","segments":[{"start":0,"end":4.5,"text":"First section"}]}"#
+            case 2:
+                payload = #"{"text":"Second section","segments":[{"start":0.25,"end":3.0,"text":"Second section"}]}"#
+            default:
+                XCTFail("Unexpected extra transcription request.")
+                payload = #"{"text":"","segments":[]}"#
+            }
+
+            return (response, Data(payload.utf8))
+        }
+
+        let client = TranscriptionClient(
+            session: makeMockURLSession(),
+            transcriptionChunker: MockTranscriptionChunker(
+                chunks: [
+                    TranscriptionAudioChunk(fileURL: firstChunkURL, startTime: 0, isTemporary: true),
+                    TranscriptionAudioChunk(fileURL: secondChunkURL, startTime: 120, isTemporary: true)
+                ]
+            )
+        )
+
+        let result = try await client.transcribe(
+            fileURL: originalFileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+        )
+
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(result.text, "First section\n\nSecond section")
+        XCTAssertEqual(result.segments.map(\.text), ["First section", "Second section"])
+        XCTAssertEqual(result.segments.count, 2)
+        XCTAssertEqual(result.segments[0].start, 0, accuracy: 0.001)
+        XCTAssertEqual(result.segments[0].end, 4.5, accuracy: 0.001)
+        XCTAssertEqual(result.segments[1].start, 120.25, accuracy: 0.001)
+        XCTAssertEqual(result.segments[1].end, 123.0, accuracy: 0.001)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstChunkURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondChunkURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalFileURL.path))
+    }
+
     private func makeAudioFile(named name: String, contents: String) throws -> URL {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-TranscriptionTests-\(name)")
             .appendingPathExtension("m4a")
         try Data(contents.utf8).write(to: fileURL)
         return fileURL
+    }
+}
+
+private struct MockTranscriptionChunker: TranscriptionChunking {
+    let chunks: [TranscriptionAudioChunk]
+
+    func chunks(for fileURL: URL) async throws -> [TranscriptionAudioChunk] {
+        chunks
     }
 }

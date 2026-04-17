@@ -1,0 +1,14 @@
+Running BugNarrator accessibility regression checks...
+ok  recording controls default action keyboard shortcut
+ok  recording controls cancel keyboard shortcut
+ok  recording toast accessibility announcement
+ok  session-library filter selected-state announcement
+ok  review workspace section heading announcement
+ok  issue export checkbox labeling
+ok  settings API key label
+ok  settings Jira issue type label
+ok  menu bar recording controls hint
+ok  menu bar microphone recovery label
+ok  hotkey recorder assignment label
+ok  hotkey recorder clear label
+Accessibility regression checks passed.

@@ -1,13 +1,15 @@
 # Validation Report
 
-task_id: N5
+task_id: N6
 result: passed
-summary: Runtime guardrails plus the targeted duplicate-detection, export provider, and similarity-review macOS tests passed for the N5 similar bug detection slice.
+summary: Local macOS validation passed for the transcription chunking hotfix and release-prep version bump.
 
 artifacts:
-- artifacts/n5-similar-bug-detection/validate.log
-- artifacts/n5-similar-bug-detection/xcodebuild-test.log
+- artifacts/release-1.0.23/accessibility.log
+- artifacts/release-1.0.23/release-smoke.log
+- artifacts/release-1.0.23/transcription-tests.log
 
 commands:
-- ./scripts/validate.sh -> PASS
-- xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-n5-tests test -parallel-testing-enabled NO -only-testing:BugNarratorTests/AppStateTests -only-testing:BugNarratorTests/GitHubExportProviderTests -only-testing:BugNarratorTests/JiraExportProviderTests -only-testing:BugNarratorTests/IssueExtractionServiceTests -> PASS
+- xcodebuild -quiet -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/bugnarrator-transcription-fix-tests test -only-testing:BugNarratorTests/TranscriptionClientTests -> PASS
+- ./scripts/accessibility_regression_check.sh -> PASS
+- ./scripts/release_smoke_test.sh -> PASS

@@ -2,7 +2,7 @@
 
 ## What This Repo Is
 
-BugNarrator is a desktop tool for narrated software testing sessions. macOS app (Swift/SwiftUI, menu bar) is production at v1.0.22. Windows app (C#/.NET 8/WPF, system tray) is in development.
+BugNarrator is a desktop tool for narrated software testing sessions. macOS app (Swift/SwiftUI, menu bar) is production at v1.0.23. Windows app (C#/.NET 8/WPF, system tray) is in development.
 
 Core workflow: `record -> review -> refine -> export`
 

@@ -1,0 +1,28 @@
+Running debug tests...
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:39:30: warning: 'SecKeychainGetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
+                             ^
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:40:29: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let disableStatus = SecKeychainSetUserInteractionAllowed(false)
+                            ^
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:45:21: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+                _ = SecKeychainSetUserInteractionAllowed(restoreState)
+                    ^
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')
+Testing started
+Running unsigned release build...
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:39:30: warning: 'SecKeychainGetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
+                             ^
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:40:29: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+        let disableStatus = SecKeychainSetUserInteractionAllowed(false)
+                            ^
+/tmp/bugnarrator-release-work/Sources/BugNarrator/Services/KeychainService.swift:45:21: warning: 'SecKeychainSetUserInteractionAllowed' was deprecated in macOS 10.10: SecKeychain is deprecated
+                _ = SecKeychainSetUserInteractionAllowed(restoreState)
+                    ^
+Running startup keychain smoke test...
+Startup keychain smoke test passed.
+App path: /private/tmp/bugnarrator-release-work/build/DerivedData/Build/Products/Release/BugNarrator.app
+Launch log: /var/folders/8c/chgwzrz94b7gv3h1b856_q880000gn/T/bugnarrator-startup-smoke.XXXXXX.log.uEc1Rh3JR8
+Release smoke test passed.
+Release app: /private/tmp/bugnarrator-release-work/build/DerivedData/Build/Products/Release/BugNarrator.app

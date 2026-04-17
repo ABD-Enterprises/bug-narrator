@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.23 - 2026-04-17
+
+- Fixed long-form transcription reliability by chunking extended recordings before upload, then stitching the returned transcript text and segment timestamps back together so BugNarrator no longer truncates or loops repeated sections on longer sessions.
+
 ## 1.0.22 - 2026-03-28
 
 - Preserved finished recordings when transcription cannot start because the OpenAI API key is missing, invalid, or revoked, and surfaced retry-needed sessions more clearly in the menu bar and session library so recovery is easier after relaunch.
