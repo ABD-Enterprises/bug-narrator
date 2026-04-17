@@ -1,36 +1,45 @@
 {
-  "last_updated": "2026-04-13T12:30:00Z",
-  "code_changes_present": false,
+  "last_updated": "2026-04-17T16:03:08Z",
+  "code_changes_present": true,
   "claims": {
-    "implementation": "not_started",
-    "validation": "not_started",
+    "implementation": "complete",
+    "validation": "complete",
     "deployment": "not_started"
   },
   "external_inputs": [],
   "evidence": {
     "build": {
-      "status": "not_run",
+      "status": "passed",
       "reason": "",
-      "updated_at": "2026-04-13T12:30:00Z",
-      "paths": []
+      "updated_at": "2026-04-17T16:03:08Z",
+      "paths": [
+        "artifacts/release-1.0.23/release-smoke.log"
+      ]
     },
     "test": {
-      "status": "not_run",
+      "status": "passed",
       "reason": "",
-      "updated_at": "2026-04-13T12:30:00Z",
-      "paths": []
+      "updated_at": "2026-04-17T16:03:08Z",
+      "paths": [
+        "artifacts/release-1.0.23/transcription-tests.log",
+        "artifacts/release-1.0.23/release-smoke.log"
+      ]
     },
     "run": {
-      "status": "not_run",
+      "status": "passed",
       "reason": "",
-      "updated_at": "2026-04-13T12:30:00Z",
-      "paths": []
+      "updated_at": "2026-04-17T16:03:08Z",
+      "paths": [
+        "artifacts/release-1.0.23/accessibility.log",
+        "artifacts/release-1.0.23/release-smoke.log"
+      ]
     },
     "deploy": {
       "status": "not_run",
-      "reason": "",
-      "updated_at": "2026-04-13T12:30:00Z",
-      "paths": []
+      "reason": "GitHub release publishing runs after merge from main.",
+      "updated_at": "2026-04-17T16:03:08Z",
+      "paths": [],
+      "metadata_only": true
     }
   }
 }

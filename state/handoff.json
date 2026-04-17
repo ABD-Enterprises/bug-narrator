@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-04-13T12:18:48Z",
-  "summary": "N5 is ready for review on codex/N5-similar-bug-detection-before-export with pre-export tracker duplicate checks, OpenAI confidence scoring, and duplicate-vs-related export decisions.",
-  "next_action": "Review the N5 PR, focusing on the similarity review sheet, GitHub/Jira search payloads, and how duplicate selections avoid filing new tickets.",
+  "last_updated": "2026-04-17T16:03:08Z",
+  "summary": "The 1.0.23 release branch fixes long-form transcription truncation by chunking extended recordings before upload and stitching the returned transcript plus segment timestamps back together.",
+  "next_action": "Run runtime guardrails, open and merge the release PR, then build and publish the 1.0.23 macOS DMG from main if notarization succeeds.",
   "discovered_issues": []
 }

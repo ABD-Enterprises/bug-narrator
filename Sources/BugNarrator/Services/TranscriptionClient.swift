@@ -1,3 +1,4 @@
+@preconcurrency import AVFoundation
 import Foundation
 
 struct TranscriptionRequest: Sendable {
@@ -22,10 +23,16 @@ actor TranscriptionClient: TranscriptionServing {
     private let validationEndpoint = URL(string: "https://api.openai.com/v1/models")!
     private let session: URLSession
     private let fileManager: FileManager
+    private let transcriptionChunker: any TranscriptionChunking
     private let logger = DiagnosticsLogger(category: .transcription)
 
-    init(session: URLSession? = nil, fileManager: FileManager = .default) {
+    init(
+        session: URLSession? = nil,
+        fileManager: FileManager = .default,
+        transcriptionChunker: (any TranscriptionChunking)? = nil
+    ) {
         self.fileManager = fileManager
+        self.transcriptionChunker = transcriptionChunker ?? DefaultTranscriptionChunker()
         if let session {
             self.session = session
         } else {
@@ -37,6 +44,83 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
+        try validateAudioFile(at: fileURL)
+
+        let fallbackChunk = TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)
+        let chunks = await preparedChunks(for: fileURL, fallback: fallbackChunk)
+
+        if chunks.count == 1 {
+            return try await transcribeSingleFile(fileURL: fileURL, apiKey: apiKey, request: request)
+        }
+
+        logger.info(
+            "transcription_chunked_requested",
+            "Uploading chunked audio to OpenAI for transcription.",
+            metadata: [
+                "file_name": fileURL.lastPathComponent,
+                "chunk_count": "\(chunks.count)",
+                "model": request.model
+            ]
+        )
+
+        defer { cleanupTemporaryChunks(chunks) }
+
+        var transcriptParts: [String] = []
+        var adjustedSegments: [TranscriptionSegment] = []
+
+        for (index, chunk) in chunks.enumerated() {
+            logger.debug(
+                "transcription_chunk_upload",
+                "Uploading a transcription chunk to OpenAI.",
+                metadata: [
+                    "chunk_index": "\(index + 1)",
+                    "chunk_count": "\(chunks.count)",
+                    "chunk_file_name": chunk.fileURL.lastPathComponent,
+                    "chunk_start_seconds": String(format: "%.2f", chunk.startTime)
+                ]
+            )
+
+            let result = try await transcribeSingleFile(fileURL: chunk.fileURL, apiKey: apiKey, request: request)
+            transcriptParts.append(result.text.trimmingCharacters(in: .whitespacesAndNewlines))
+            adjustedSegments.append(
+                contentsOf: result.segments.map { segment in
+                    TranscriptionSegment(
+                        start: segment.start + chunk.startTime,
+                        end: segment.end + chunk.startTime,
+                        text: segment.text
+                    )
+                }
+            )
+        }
+
+        let transcript = transcriptParts
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !transcript.isEmpty else {
+            logger.warning("transcription_empty", "OpenAI returned an empty transcript after chunked transcription.")
+            throw AppError.emptyTranscript
+        }
+
+        logger.info(
+            "transcription_chunked_completed",
+            "OpenAI returned a completed transcript after chunked transcription.",
+            metadata: [
+                "character_count": "\(transcript.count)",
+                "segments_count": "\(adjustedSegments.count)",
+                "chunk_count": "\(chunks.count)"
+            ]
+        )
+
+        return TranscriptionResult(text: transcript, segments: adjustedSegments)
+    }
+
+    private func transcribeSingleFile(
+        fileURL: URL,
+        apiKey: String,
+        request: TranscriptionRequest
+    ) async throws -> TranscriptionResult {
         let urlRequest = try makeURLRequest(fileURL: fileURL, apiKey: apiKey, request: request)
         logger.info(
             "transcription_requested",
@@ -93,6 +177,28 @@ actor TranscriptionClient: TranscriptionServing {
                 (error as? AppError)?.userMessage ?? error.localizedDescription
             )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.transcriptionFailure)
+        }
+    }
+
+    private func preparedChunks(
+        for fileURL: URL,
+        fallback fallbackChunk: TranscriptionAudioChunk
+    ) async -> [TranscriptionAudioChunk] {
+        do {
+            return try await transcriptionChunker.chunks(for: fileURL)
+        } catch {
+            logger.warning(
+                "transcription_chunking_unavailable",
+                "BugNarrator could not prepare transcription chunks and will fall back to a single upload.",
+                metadata: ["error": error.localizedDescription]
+            )
+            return [fallbackChunk]
+        }
+    }
+
+    private func cleanupTemporaryChunks(_ chunks: [TranscriptionAudioChunk]) {
+        for chunk in chunks where chunk.isTemporary {
+            try? fileManager.removeItem(at: chunk.fileURL)
         }
     }
 
@@ -220,6 +326,112 @@ actor TranscriptionClient: TranscriptionServing {
         default:
             return "application/octet-stream"
         }
+    }
+}
+
+struct TranscriptionAudioChunk: Sendable {
+    let fileURL: URL
+    let startTime: TimeInterval
+    let isTemporary: Bool
+}
+
+protocol TranscriptionChunking: Sendable {
+    func chunks(for fileURL: URL) async throws -> [TranscriptionAudioChunk]
+}
+
+struct DefaultTranscriptionChunker: TranscriptionChunking {
+    private let maxChunkDuration: TimeInterval
+
+    init(maxChunkDuration: TimeInterval = 8 * 60) {
+        self.maxChunkDuration = maxChunkDuration
+    }
+
+    func chunks(for fileURL: URL) async throws -> [TranscriptionAudioChunk] {
+        let asset = AVURLAsset(url: fileURL)
+        let durationTime = try await asset.load(.duration)
+        let totalDuration = CMTimeGetSeconds(durationTime)
+
+        guard totalDuration.isFinite, totalDuration > maxChunkDuration else {
+            return [TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)]
+        }
+
+        var chunks: [TranscriptionAudioChunk] = []
+        var startTime: TimeInterval = 0
+
+        while startTime < totalDuration {
+            let chunkDuration = min(maxChunkDuration, totalDuration - startTime)
+            let chunkURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("BugNarrator-Chunk-\(UUID().uuidString)")
+                .appendingPathExtension("m4a")
+
+            try await exportChunk(
+                from: asset,
+                startTime: startTime,
+                duration: chunkDuration,
+                outputURL: chunkURL
+            )
+
+            chunks.append(
+                TranscriptionAudioChunk(
+                    fileURL: chunkURL,
+                    startTime: startTime,
+                    isTemporary: true
+                )
+            )
+            startTime += chunkDuration
+        }
+
+        return chunks.isEmpty
+            ? [TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)]
+            : chunks
+    }
+
+    private func exportChunk(
+        from asset: AVURLAsset,
+        startTime: TimeInterval,
+        duration: TimeInterval,
+        outputURL: URL
+    ) async throws {
+        try? FileManager.default.removeItem(at: outputURL)
+
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw AppError.transcriptionFailure("The recorded audio could not be prepared for chunked transcription.")
+        }
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .m4a
+        exportSession.timeRange = CMTimeRange(
+            start: CMTime(seconds: startTime, preferredTimescale: 600),
+            duration: CMTime(seconds: duration, preferredTimescale: 600)
+        )
+        let exportBridge = AssetExportSessionBridge(exportSession)
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            exportBridge.session.exportAsynchronously {
+                switch exportBridge.session.status {
+                case .completed:
+                    continuation.resume()
+                case .failed:
+                    continuation.resume(throwing: exportBridge.session.error ?? AppError.transcriptionFailure("The recorded audio chunk export failed."))
+                case .cancelled:
+                    continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export was cancelled."))
+                default:
+                    continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export did not complete successfully."))
+                }
+            }
+        }
+
+        guard FileManager.default.fileExists(atPath: outputURL.path) else {
+            throw AppError.transcriptionFailure("The recorded audio chunk could not be created.")
+        }
+    }
+}
+
+private final class AssetExportSessionBridge: @unchecked Sendable {
+    let session: AVAssetExportSession
+
+    init(_ session: AVAssetExportSession) {
+        self.session = session
     }
 }
 
