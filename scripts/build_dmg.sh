@@ -10,12 +10,15 @@ OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 STAGING_DIR="${STAGING_DIR:-$ROOT_DIR/build/dmg-staging}"
 CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_STYLE="${CODE_SIGN_STYLE:-Automatic}"
-DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-}"
+DEFAULT_DEVELOPMENT_TEAM="***REMOVED***"
+DEFAULT_NOTARY_PROFILE="***REMOVED***"
+CANONICAL_NOTARY_APPLE_ID="***REMOVED***"
+DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:-}"
 ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
 ALLOW_NOTARIZATION_FAILURE="${ALLOW_NOTARIZATION_FAILURE:-NO}"
 ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/Resources/BugNarrator.entitlements}"
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
@@ -93,6 +96,7 @@ verify_notarization_access() {
             echo "error: Apple Developer Program agreements must be accepted before BugNarrator can be notarized for distribution." >&2
         fi
 
+        echo "hint: canonical BugNarrator notarization uses Apple ID $CANONICAL_NOTARY_APPLE_ID on team $DEFAULT_DEVELOPMENT_TEAM through keychain profile $DEFAULT_NOTARY_PROFILE." >&2
         echo "hint: resolve the Apple notarization account problem first, or rerun with NOTARIZE=NO for a non-distributable signed-only internal build." >&2
         exit 1
     fi

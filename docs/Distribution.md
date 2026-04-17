@@ -131,12 +131,25 @@ For broad public distribution outside your own Mac, you should use `Developer ID
 
 ### Developer ID And Notarization
 
+BugNarrator's canonical notarization identity is:
+
+- Apple ID: `***REMOVED***`
+- Team ID: `***REMOVED***`
+- Local keychain profile: `***REMOVED***`
+
+Do not store the app-specific password in the repo. Keep it only in:
+
+- 1Password item `***REMOVED***`
+- GitHub repository secret `APPLE_APP_SPECIFIC_PASSWORD`
+
+If the password is rotated, update both of those locations before the next release.
+
 First, store a notarization credential profile in your keychain:
 
 ```bash
 xcrun notarytool store-credentials ***REMOVED*** \
-  --apple-id YOUR_APPLE_ID \
-  --team-id YOUR_TEAM_ID \
+  --apple-id ***REMOVED*** \
+  --team-id ***REMOVED*** \
   --password YOUR_APP_SPECIFIC_PASSWORD
 ```
 
@@ -146,7 +159,7 @@ Then build, notarize, staple, and validate in one command:
 CODE_SIGNING_ALLOWED=YES \
 CODE_SIGN_STYLE=Automatic \
 CODE_SIGN_IDENTITY=\"Developer ID Application\" \
-DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+DEVELOPMENT_TEAM=***REMOVED*** \
 ALLOW_PROVISIONING_UPDATES=YES \
 NOTARIZE=YES \
 NOTARY_PROFILE=***REMOVED*** \
@@ -226,6 +239,10 @@ Recommended flow:
 6. optionally upload the versioned `dist/BugNarrator-vX.Y.Z-macOS.dmg`
 7. add release notes and link back to the changelog if needed
 8. verify the README top download link matches the uploaded stable DMG filename
+9. confirm GitHub Actions release secrets still match the canonical signing identity:
+   - `APPLE_ID=***REMOVED***`
+   - `APPLE_TEAM_ID=***REMOVED***`
+   - `APPLE_APP_SPECIFIC_PASSWORD` matches the current 1Password app-specific password
 
 ## Verify The DMG
 
