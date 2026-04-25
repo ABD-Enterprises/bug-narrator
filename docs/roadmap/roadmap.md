@@ -6,18 +6,8 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 - current production app version: `1.0.23`
 - current blocked phase: `RR-002 Windows Runtime Validation And Hardening`
-- recent completed work: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real Windows desktop validation, completed the hosted Node24 workflow validation slice, promoted both OPS-012 dependency remediation passes to `main`, covered the FAIL, NOT RUN, and missing-state-update guardrail rules with direct regression tests, closed the remaining Dependabot alerts, added a dedicated `Retry Needed` session-library filter for preserved-session recovery, and reconciled the repo to the latest `enterprise-ai-standards` validator and state contract
+- recent completed work: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real Windows desktop validation, completed the hosted Node24 workflow validation slice, promoted both OPS-012 dependency remediation passes to `main`, covered the FAIL, NOT RUN, and missing-state-update guardrail rules with direct regression tests, closed the remaining Dependabot alerts, added a dedicated `Retry Needed` session-library filter for preserved-session recovery
 
-## Execution System
-
-- execution state lives in `/state/*.json` and is summarized in `docs/roadmap/state.json`
-- reusable execution roles live in `/agents/*.md`
-- reusable execution prompts live in `/prompts/*.md`
-- `state/tasks.json`, `state/risks.json`, `state/decisions.json`, `state/artifacts.json`, and `state/handoff.json` are the canonical execution ledger
-- `state/session.json` is retained only as a legacy mirror and is no longer canonical execution state
-- `ai.config.json` and `scripts/validate.sh` define the repo-local validator contract and entrypoint
-- `tools/validators/enforce-runtime-guardrails.js` is the repo-local gatekeeper for execution, evidence, risk persistence, and phase-aware validation
-- repo execution state stays local to this repository and does not depend on external environment-management systems
 
 ## Completed Phases
 
@@ -28,7 +18,6 @@ Completed on `2026-03-23`
 Scope completed:
 
 - bootstrapped the required structured docs tree
-- created persistent roadmap state in `docs/roadmap/state.json`
 - added CI and release workflow scaffolding
 - added Terraform scaffolding for future distribution automation
 - added a Docusaurus site scaffold
@@ -160,7 +149,7 @@ Current execution slice:
 - run both `BugNarrator.Core.Tests` and `BugNarrator.Windows.Tests` in the scripted Windows baseline
 - fix Windows-targeted service compile blockers discovered while exercising the Windows test project from the phase branch
 - package a Windows `Release` zip in CI, validate that the published artifact contains the expected executable and runtime metadata, and run the packaged executable in a headless smoke mode
-- emit Windows validation and Codex-handoff artifacts from CI so a Codex instance on Windows can load the current RR-002 state and artifact paths without reconstructing them from chat history
+- emit Windows validation artifacts from CI so the current RR-002 state and artifact paths are visible directly in build evidence
 - keep GitHub Actions workflows on Node24-compatible action majors while RR-002 remains open, so CI evidence does not degrade under the hosted-runner runtime cutover
 - keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
 
@@ -199,9 +188,5 @@ Effort: Low
 - every unresolved risk must belong to a remediation phase
 - every opportunity must belong to a future phase
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
-- roadmap state in `state.json` is the source of truth for planning, risks, incidents, and phase status
-- `/state/tasks.json`, `/state/risks.json`, `/state/decisions.json`, `/state/artifacts.json`, and `/state/handoff.json` are the canonical execution ledger for task flow, unresolved-risk persistence, evidence, decisions, and run continuity
-- `tools/validators/enforce-runtime-guardrails.js` is the authoritative PR gatekeeper for runtime guardrails and phase-aware evidence enforcement
-- `ai.config.json` is the repo-local enterprise-ai standards config surface
-- `scripts/validate.sh` is the canonical local validator entrypoint
+- `docs/roadmap/roadmap.md` is the source of truth for planning, risks, incidents, and phase status
 - `CHANGELOG.md` is the source of truth for shipped change history

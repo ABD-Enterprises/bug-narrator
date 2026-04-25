@@ -1,1 +1,0 @@
-PASS node --check tools/validators/enforce-runtime-guardrails.js

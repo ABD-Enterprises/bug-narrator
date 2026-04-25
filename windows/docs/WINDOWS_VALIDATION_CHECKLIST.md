@@ -6,7 +6,6 @@ Source-of-truth documents:
 
 - [Canonical Product Spec](../../docs/architecture/product-spec.md)
 - [Cross-Platform Parity Matrix](../../docs/architecture/parity-matrix.md)
-- [Windows Codex Handoff](WINDOWS_CODEX_HANDOFF.md)
 - [Windows Implementation Roadmap](WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [Cross-Platform Guidelines](../../docs/CROSS_PLATFORM_GUIDELINES.md)
 
@@ -15,12 +14,6 @@ Source-of-truth documents:
 - Install Visual Studio 2022 with `.NET desktop development` if you want the easiest local run/debug flow.
 - Clone the repo and check out the active Windows branch.
 - Open the repo root and confirm `windows/` exists.
-- If Codex is taking over the phase, run the handoff command first and keep the generated report with the validation artifacts:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline
-```
-
 ## Build And Test Commands
 Run on Windows:
 
@@ -34,7 +27,6 @@ dotnet test windows/tests/BugNarrator.Windows.Tests/BugNarrator.Windows.Tests.cs
 Scripted equivalents:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline
 powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
@@ -50,7 +42,7 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
 - `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
-- CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, launches the packaged executable in a headless smoke mode, generates `windows-codex-handoff.json`, and uploads package, validation, and handoff artifacts from the Windows runner.
+- CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, launches the packaged executable in a headless smoke mode, and uploads package and validation artifacts from the Windows runner.
 - Current passing automated coverage on this branch is `9` core tests and `29` Windows tests when run on Windows.
 - Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live OpenAI transcription, live OpenAI issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
@@ -180,8 +172,6 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Confirm `windows/artifacts/packages/BugNarrator-windows-win-x64.zip` is created.
 - Run `powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64`.
 - Confirm the validation script reports that the package contains the expected executable, DLL, and runtime metadata files, confirms packaged-file hashes match the publish output, then validates the packaged app's smoke-report JSON.
-- Run `powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1`.
-- Confirm `windows/artifacts/handoff/windows-codex-handoff.json` is created and references the current branch, phase, blocking task, and Windows validation artifacts.
 
 ## Artifact Validation
 Inspect:
@@ -222,7 +212,6 @@ For Milestone 6 completion paths, confirm:
 - exported debug bundles do not contain OpenAI, GitHub, or Jira secrets
 - the package script outputs `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
 - the package validation script outputs `windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json`
-- the Codex handoff script outputs `windows/artifacts/handoff/windows-codex-handoff.json`
 
 For the hardening milestone, confirm:
 - corrupted or tampered session metadata does not cause the app to leave the BugNarrator session root when loading screenshots or exporting bundles

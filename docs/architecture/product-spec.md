@@ -19,7 +19,7 @@ Do not use this document as the source of truth for:
 
 Those live in:
 
-- [docs/roadmap/state.json](../roadmap/state.json) for delivery state, risks, incidents, and planned phases
+- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for delivery state, risks, incidents, and planned phases
 - [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for the human-readable roadmap
 - [CHANGELOG.md](../../CHANGELOG.md) for shipped change history
 - [parity-matrix.md](parity-matrix.md) for deliberate cross-platform parity decisions

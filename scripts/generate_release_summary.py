@@ -28,17 +28,17 @@ def extract_unreleased_bullets(changelog_text: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a BugNarrator release summary seed.")
     parser.add_argument("--version", default=None, help="Target release version or tag")
-    parser.add_argument("--state", default="docs/roadmap/state.json", help="Path to roadmap state.json")
+    parser.add_argument("--state", default=None, help="Optional path to roadmap state JSON")
     parser.add_argument("--changelog", default="CHANGELOG.md", help="Path to CHANGELOG.md")
     parser.add_argument("--output", default="build/release-summary.md", help="Path to the generated Markdown summary")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    state_path = (repo_root / args.state).resolve()
+    state_path = (repo_root / args.state).resolve() if args.state else None
     changelog_path = (repo_root / args.changelog).resolve()
     output_path = (repo_root / args.output).resolve()
 
-    state = json.loads(state_path.read_text())
+    state = json.loads(state_path.read_text()) if state_path else {}
     changelog_text = changelog_path.read_text()
     unreleased_bullets = extract_unreleased_bullets(changelog_text)
     unresolved_risks = [risk for risk in state.get("risks", []) if risk.get("status") != "resolved"]

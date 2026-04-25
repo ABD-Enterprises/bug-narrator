@@ -81,10 +81,6 @@ jobs:
         shell: pwsh
         run: ./windows/scripts/validate-windows-package.ps1 -Runtime win-x64
 
-      - name: Generate Windows Codex handoff report
-        shell: pwsh
-        run: ./windows/scripts/invoke-windows-codex-handoff.ps1
-
       - name: Upload Windows validation evidence
         uses: actions/upload-artifact@v6
         with:
@@ -93,13 +89,6 @@ jobs:
           path: |
             windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json
             windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json
-
-      - name: Upload Windows Codex handoff artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: bugnarrator-windows-handoff
-          if-no-files-found: error
-          path: windows/artifacts/handoff/windows-codex-handoff.json
 
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@v6

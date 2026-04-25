@@ -88,4 +88,4 @@ There is no live backend today. Infrastructure work is therefore focused on rele
 - Windows WPF runtime behavior has not yet been validated on real Windows hardware
 - accessibility validation for the live macOS UI is still heavily manual
 
-These risks are tracked in [docs/roadmap/state.json](../roadmap/state.json) and planned remediation phases in [docs/roadmap/roadmap.md](../roadmap/roadmap.md).
+These risks are tracked in [docs/roadmap/roadmap.md](../roadmap/roadmap.md).

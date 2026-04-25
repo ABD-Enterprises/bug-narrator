@@ -29,7 +29,7 @@ Do not release unless all of these are true:
 
 ## Current Maintainer Flow
 
-1. Review [docs/roadmap/state.json](../roadmap/state.json) for unresolved risks.
+1. Review [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for unresolved risks.
 2. Review [Product Spec](../architecture/product-spec.md) for the intended product behavior, terminology, and artifact contract.
 3. Update `CHANGELOG.md`.
 4. Run `./scripts/release_smoke_test.sh`.
@@ -73,7 +73,7 @@ Use:
 
 - [Product Spec](../architecture/product-spec.md) for intended product behavior and terminology
 - `CHANGELOG.md` for shipped or shipping change history
-- [docs/roadmap/state.json](../roadmap/state.json) for open risks, phase status, and release readiness context
+- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for open risks, phase status, and release readiness context
 
 Release notes should match the actual implemented changes and should not contradict the canonical product spec.
 

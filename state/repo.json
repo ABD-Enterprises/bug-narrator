@@ -1,8 +1,0 @@
-{
-  "observed_on": "2026-04-05",
-  "repository_detected": true,
-  "branch": "codex/open-at-startup-toggle",
-  "head_at_phase_start": "fb69f1f",
-  "phase": "RR-002",
-  "status": "pull request branch active"
-}

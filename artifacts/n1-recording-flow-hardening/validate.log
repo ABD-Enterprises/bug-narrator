@@ -1,5 +1,0 @@
-PASS:
-- Phase build (build) satisfies the runtime contract
-- 7 non-doc code/config file(s) require evidence in this diff
-- Run profile standard
-- Config loaded from ai.config.json

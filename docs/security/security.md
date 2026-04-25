@@ -47,7 +47,7 @@ Tracked active risks include:
 
 - Windows release and runtime security posture has not yet been validated on Windows hardware
 
-These are tracked in [docs/roadmap/state.json](../roadmap/state.json).
+These are tracked in [docs/roadmap/roadmap.md](../roadmap/roadmap.md).
 
 ## Security Validation Expectations
 

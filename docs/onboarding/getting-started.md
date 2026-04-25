@@ -20,7 +20,7 @@ Start here:
 3. Set up your machine with [Development Setup](../development/setup.md).
 4. Review the [Testing Guide](../testing/testing.md).
 5. Review the [Release Process](../release/release-process.md).
-6. Check the current [Roadmap](../roadmap/roadmap.md) and [state.json](../roadmap/state.json).
+6. Check the current [Roadmap](../roadmap/roadmap.md).
 
 ## If You Are Working On Windows Support
 
@@ -28,7 +28,6 @@ Use these docs first:
 
 - [Product Spec](../architecture/product-spec.md)
 - [windows/README.md](../../windows/README.md)
-- [windows/docs/WINDOWS_CODEX_HANDOFF.md](../../windows/docs/WINDOWS_CODEX_HANDOFF.md)
 - [windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md](../../windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)
 - [windows/docs/WINDOWS_VALIDATION_CHECKLIST.md](../../windows/docs/WINDOWS_VALIDATION_CHECKLIST.md)
 - [Cross-Platform Guidelines](../CROSS_PLATFORM_GUIDELINES.md)

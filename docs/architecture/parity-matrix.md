@@ -38,4 +38,4 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 
 - Add or update a row whenever a platform-specific deviation becomes intentional.
 - Do not use this document to justify undocumented drift.
-- If a row changes meaningfully, update [docs/roadmap/state.json](../roadmap/state.json) and the relevant implementation roadmap in the same phase.
+- If a row changes meaningfully, update [docs/roadmap/roadmap.md](../roadmap/roadmap.md) and the relevant implementation roadmap in the same phase.
