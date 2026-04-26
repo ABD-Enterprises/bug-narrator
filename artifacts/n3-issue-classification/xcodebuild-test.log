@@ -41,26 +41,26 @@ ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeD
 Build description signature: 7f5e936c9a66d6a108c8f87d33cc4ca3
 Build description path: /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/XCBuildData/7f5e936c9a66d6a108c8f87d33cc4ca3.xcbuilddata
 ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk /tmp/bugnarrator-n3-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
+    cd BugNarrator.xcodeproj
     /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o /tmp/bugnarrator-n3-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
 
 note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')
 CopySwiftLibs /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+    cd .
     builtin-swiftStdLibTool --copy --verbose --scan-executable /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/MacOS/BugNarrator.debug.dylib --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Library/SystemExtensions --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
 Ignoring --strip-bitcode because --sign was not passed
 
-ProcessInfoPlistFile /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist /Users/deffenda/Code/bug-narrator/Resources/Info.plist (in target 'BugNarrator' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
-    builtin-infoPlistUtility /Users/deffenda/Code/bug-narrator/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist -o /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist
+ProcessInfoPlistFile /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist Resources/Info.plist (in target 'BugNarrator' from project 'BugNarrator')
+    cd .
+    builtin-infoPlistUtility Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarrator.build/assetcatalog_generated_info.plist -o /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/Info.plist
 
 CopySwiftLibs /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest (in target 'BugNarratorTests' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+    cd .
     builtin-swiftStdLibTool --copy --verbose --scan-executable /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/MacOS/BugNarratorTests --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Frameworks --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/PlugIns --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Library/SystemExtensions --scan-folder /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Extensions --platform macosx --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
 Ignoring --strip-bitcode because --sign was not passed
 
 ProcessInfoPlistFile /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Info.plist /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/empty-BugNarratorTests.plist (in target 'BugNarratorTests' from project 'BugNarrator')
-    cd /Users/deffenda/Code/bug-narrator
+    cd .
     builtin-infoPlistUtility /tmp/bugnarrator-n3-tests/Build/Intermediates.noindex/BugNarrator.build/Debug/BugNarratorTests.build/empty-BugNarratorTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -o /tmp/bugnarrator-n3-tests/Build/Products/Debug/BugNarrator.app/Contents/PlugIns/BugNarratorTests.xctest/Contents/Info.plist
 
 2026-04-13 04:09:07.698211-0400 BugNarrator[57197:2184594] [settings] 2026-04-13T08:09:07.696Z [INFO] [settings] settings_loaded - Settings finished loading. debug_mode=disabled has_github_token=<redacted> has_jira_token=<redacted> has_openai_key=no launch_at_login=disabled launch_at_login_supported=yes

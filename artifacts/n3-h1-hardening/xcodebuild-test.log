@@ -31,7 +31,7 @@ GatherProvisioningInputs
 CreateBuildDescription
 
 ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk /tmp/bugnarrator-n3h1-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
-    cd /Users/deffenda/Code/bug-narrator/BugNarrator.xcodeproj
+    cd BugNarrator.xcodeproj
     /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk -o /tmp/bugnarrator-n3h1-tests/SDKStatCaches.noindex/macosx26.4-25E236-30f9ca8789b706f8bd3fc906a70d770f.sdkstatcache
 
 note: Disabling hardened runtime with ad-hoc codesigning. (in target 'BugNarrator' from project 'BugNarrator')

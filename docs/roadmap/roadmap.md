@@ -183,6 +183,7 @@ Effort: Medium
 Expected value: Medium
 Effort: Low
 
+
 ## Roadmap Rules
 
 - every unresolved risk must belong to a remediation phase
