@@ -61,3 +61,5 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
 else
   printf 'NOT RUN: Docker is unavailable in this environment\n' >"$SEMGREP_STATUS_FILE"
 fi
+
+node tools/validators/enforce-versioning-standard.mjs --repo .

@@ -1,0 +1,11 @@
+title = "BugNarrator gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "historical xcodebuild logs with redacted current-tree session ids"
+commits = [
+  "99a8810ca3d010fc9117a496e178ac1b6602b7bd",
+  "fad612c25cdca0316d3542cacece7cc4f949df5d"
+]
