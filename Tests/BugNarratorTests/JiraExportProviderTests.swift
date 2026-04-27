@@ -228,7 +228,7 @@ final class JiraExportProviderTests: XCTestCase {
             XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Basic ") == true)
 
             if requestCount == 1 {
-                XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issue/createmeta/FM/issuetypes?startAt=0&maxResults=100")
+                XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/project/FM")
                 let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
                 let data = Data(#"{"issueTypes":[{"id":"10001","name":"Task"},{"id":"10002","name":"Bug"}]}"#.utf8)
                 return (response, data)
@@ -256,11 +256,11 @@ final class JiraExportProviderTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
-            XCTAssertTrue(request.url?.absoluteString.contains("rest/api/3/issue/createmeta") == true)
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/project/search?startAt=0&maxResults=50")
 
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
             let data = Data(
-                #"{"projects":[{"key":"UCAP","name":"Unified Claims Access Portal"},{"key":"OPS","name":"Operations Support"}],"maxResults":50,"total":2}"#.utf8
+                #"{"values":[{"id":"10002","key":"UCAP","name":"Unified Claims Access Portal"},{"id":"10001","key":"OPS","name":"Operations Support"}],"maxResults":50,"total":2}"#.utf8
             )
             return (response, data)
         }
@@ -276,8 +276,8 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(
             projects,
             [
-                JiraProjectOption(key: "OPS", name: "Operations Support"),
-                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+                JiraProjectOption(projectID: "10001", key: "OPS", name: "Operations Support"),
+                JiraProjectOption(projectID: "10002", key: "UCAP", name: "Unified Claims Access Portal")
             ]
         )
     }
@@ -290,7 +290,7 @@ final class JiraExportProviderTests: XCTestCase {
             requestCount += 1
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
             let data = Data(
-                #"{"projects":[{"key":"UCAP","name":"Unified Claims Access Portal"}],"maxResults":0,"total":50}"#.utf8
+                #"{"values":[{"id":"10002","key":"UCAP","name":"Unified Claims Access Portal"}],"maxResults":0,"total":50}"#.utf8
             )
             return (response, data)
         }
@@ -306,7 +306,7 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
         XCTAssertEqual(
             projects,
-            [JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")]
+            [JiraProjectOption(projectID: "10002", key: "UCAP", name: "Unified Claims Access Portal")]
         )
     }
 
@@ -315,7 +315,7 @@ final class JiraExportProviderTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
-            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issue/createmeta/UCAP/issuetypes?startAt=0&maxResults=100")
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/project/UCAP")
 
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
             let data = Data(#"{"issueTypes":[{"id":"10001","name":"Task"},{"id":"10002","name":"Bug"},{"id":"10003","name":"Task"}]}"#.utf8)
@@ -336,6 +336,66 @@ final class JiraExportProviderTests: XCTestCase {
             [
                 JiraIssueTypeOption(id: "10001", name: "Task"),
                 JiraIssueTypeOption(id: "10002", name: "Bug")
+            ]
+        )
+    }
+
+    func testFetchIssueTypesUsesProjectIDWhenAvailable() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issuetype/project?projectId=10002")
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(#"[{"id":"10001","name":"Task"},{"id":"10002","name":"Bug"}]"#.utf8)
+            return (response, data)
+        }
+
+        let issueTypes = try await provider.fetchIssueTypes(
+            for: "UCAP",
+            projectID: "10002",
+            configuration: JiraConnectionConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token"
+            )
+        )
+
+        XCTAssertEqual(
+            issueTypes,
+            [
+                JiraIssueTypeOption(id: "10001", name: "Task"),
+                JiraIssueTypeOption(id: "10002", name: "Bug")
+            ]
+        )
+    }
+
+    func testFetchProjectsSkipsMalformedProjectRowsInsteadOfFailingDecode() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/project/search?startAt=0&maxResults=50")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"values":[{"id":"10002","key":"UCAP"},{"id":"10003","name":"Missing key"},{"id":"10001","key":"OPS","name":"Operations Support"}],"maxResults":50}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let projects = try await provider.fetchProjects(
+            configuration: JiraConnectionConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token"
+            )
+        )
+
+        XCTAssertEqual(
+            projects,
+            [
+                JiraProjectOption(projectID: "10001", key: "OPS", name: "Operations Support"),
+                JiraProjectOption(projectID: "10002", key: "UCAP", name: "UCAP")
             ]
         )
     }

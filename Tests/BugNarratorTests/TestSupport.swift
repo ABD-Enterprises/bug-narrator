@@ -351,6 +351,7 @@ actor MockExportService: IssueExporting {
 
     func fetchJiraIssueTypes(
         for projectKey: String,
+        projectID: String?,
         configuration: JiraConnectionConfiguration
     ) async throws -> [JiraIssueTypeOption] {
         jiraIssueTypeFetchCallCount += 1

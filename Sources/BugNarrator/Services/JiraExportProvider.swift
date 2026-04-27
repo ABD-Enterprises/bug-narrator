@@ -164,6 +164,7 @@ actor JiraExportProvider {
 
         let issueTypes = try await fetchIssueTypes(
             for: configuration.projectKey,
+            projectID: configuration.projectID,
             configuration: JiraConnectionConfiguration(
                 baseURL: configuration.baseURL,
                 email: configuration.email,
@@ -215,7 +216,7 @@ actor JiraExportProvider {
         var projects: [JiraProjectOption] = []
 
         while true {
-            let request = makeCreateMetadataProjectsRequest(configuration: configuration, startAt: startAt)
+            let request = makeProjectSearchRequest(configuration: configuration, startAt: startAt)
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -236,11 +237,13 @@ actor JiraExportProvider {
                 )
             }
 
-            let payload = try JSONDecoder().decode(JiraCreateMetadataProjectsResponse.self, from: data)
+            let payload = try decodeJiraPayload(
+                JiraCreateMetadataProjectsResponse.self,
+                from: data,
+                description: "project metadata"
+            )
             projects.append(
-                contentsOf: payload.projects.map {
-                    JiraProjectOption(projectID: $0.id, key: $0.key, name: $0.name)
-                }
+                contentsOf: payload.projects.compactMap(\.option)
             )
 
             let nextStartAt = startAt + (payload.maxResults ?? payload.projects.count)
@@ -262,6 +265,7 @@ actor JiraExportProvider {
 
     func fetchIssueTypes(
         for projectKey: String,
+        projectID: String? = nil,
         configuration: JiraConnectionConfiguration
     ) async throws -> [JiraIssueTypeOption] {
         guard configuration.isComplete, !projectKey.isEmpty else {
@@ -272,21 +276,21 @@ actor JiraExportProvider {
 
         let payload = try await fetchCreateIssueTypesPayload(
             for: projectKey,
+            projectID: projectID,
             configuration: configuration
         )
         var seenNames = Set<String>()
         return payload.issueTypes.compactMap { issueType in
-            let normalizedName = issueType.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !normalizedName.isEmpty else {
+            guard let option = issueType.option else {
                 return nil
             }
 
-            let key = normalizedName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            let key = option.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             guard seenNames.insert(key).inserted else {
                 return nil
             }
 
-            return JiraIssueTypeOption(id: issueType.id, name: normalizedName)
+            return option
         }
     }
 
@@ -352,12 +356,12 @@ actor JiraExportProvider {
         return request
     }
 
-    private func makeCreateMetadataProjectsRequest(
+    private func makeProjectSearchRequest(
         configuration: JiraConnectionConfiguration,
         startAt: Int
     ) -> URLRequest {
         var components = URLComponents(
-            url: configuration.baseURL.appending(path: "rest/api/3/issue/createmeta"),
+            url: configuration.baseURL.appending(path: "rest/api/3/project/search"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
@@ -376,20 +380,33 @@ actor JiraExportProvider {
         return request
     }
 
-    private func makeCreateIssueTypesRequest(
+    private func makeProjectIssueTypesRequest(
         configuration: JiraConnectionConfiguration,
-        projectKey: String
+        projectKey: String,
+        projectID: String?
     ) -> URLRequest {
-        var components = URLComponents(
-            url: configuration.baseURL.appending(path: "rest/api/3/issue/createmeta/\(projectKey)/issuetypes"),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
-            .init(name: "startAt", value: "0"),
-            .init(name: "maxResults", value: "100")
-        ]
+        if let normalizedProjectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+            var components = URLComponents(
+                url: configuration.baseURL.appending(path: "rest/api/3/issuetype/project"),
+                resolvingAgainstBaseURL: false
+            )!
+            components.queryItems = [
+                .init(name: "projectId", value: normalizedProjectID)
+            ]
 
-        var request = URLRequest(url: components.url!)
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "GET"
+            request.setValue(
+                "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
+                forHTTPHeaderField: "Authorization"
+            )
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+            return request
+        }
+
+        let url = configuration.baseURL.appending(path: "rest/api/3/project/\(projectKey)")
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(
             "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
@@ -427,11 +444,13 @@ actor JiraExportProvider {
 
     private func fetchCreateIssueTypesPayload(
         for projectKey: String,
+        projectID: String?,
         configuration: JiraConnectionConfiguration
     ) async throws -> JiraCreateMetaIssueTypesResponse {
-        let request = makeCreateIssueTypesRequest(
+        let request = makeProjectIssueTypesRequest(
             configuration: configuration,
-            projectKey: projectKey
+            projectKey: projectKey,
+            projectID: projectID
         )
         let (data, response) = try await session.data(for: request)
 
@@ -453,7 +472,11 @@ actor JiraExportProvider {
             )
         }
 
-        return try JSONDecoder().decode(JiraCreateMetaIssueTypesResponse.self, from: data)
+        return try decodeJiraPayload(
+            JiraCreateMetaIssueTypesResponse.self,
+            from: data,
+            description: "issue type metadata"
+        )
     }
 
     private func fetchRequiredCreateFields(
@@ -486,8 +509,34 @@ actor JiraExportProvider {
             )
         }
 
-        let payload = try JSONDecoder().decode(JiraCreateFieldMetadataResponse.self, from: data)
+        let payload = try decodeJiraPayload(
+            JiraCreateFieldMetadataResponse.self,
+            from: data,
+            description: "field metadata"
+        )
         return payload.fields.filter(\.required)
+    }
+
+    private func decodeJiraPayload<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        description: String
+    ) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            throw AppError.exportFailure(
+                "Jira returned \(description) in an unexpected format. \(Self.decodingFailureMessage(error))"
+            )
+        }
+    }
+
+    private static func decodingFailureMessage(_ error: Error) -> String {
+        guard case DecodingError.keyNotFound(let key, _) = error else {
+            return error.localizedDescription
+        }
+
+        return "Missing field '\(key.stringValue)'."
     }
 
     private func makeSearchRequest(
@@ -1061,31 +1110,94 @@ private struct JiraCreateMetadataProjectsResponse: Decodable {
     let projects: [JiraProjectSummary]
     let maxResults: Int?
     let total: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case projects
+        case values
+        case maxResults
+        case total
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        projects = try container.decodeIfPresent([JiraProjectSummary].self, forKey: .projects)
+            ?? container.decodeIfPresent([JiraProjectSummary].self, forKey: .values)
+            ?? []
+        maxResults = try container.decodeIfPresent(Int.self, forKey: .maxResults)
+        total = try container.decodeIfPresent(Int.self, forKey: .total) ?? projects.count
+    }
 }
 
 private struct JiraProjectSummary: Decodable {
     let id: String?
-    let key: String
-    let name: String
+    let key: String?
+    let name: String?
+
+    var option: JiraProjectOption? {
+        guard let normalizedKey = key?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+            return nil
+        }
+
+        let normalizedName = name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? normalizedKey
+        return JiraProjectOption(projectID: id, key: normalizedKey, name: normalizedName)
+    }
 }
 
 private struct JiraCreateMetaIssueTypesResponse: Decodable {
     let issueTypes: [JiraProjectIssueType]
+
+    private enum CodingKeys: String, CodingKey {
+        case issueTypes
+        case values
+    }
+
+    init(from decoder: any Decoder) throws {
+        if let issueTypes = try? [JiraProjectIssueType](from: decoder) {
+            self.issueTypes = issueTypes
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        issueTypes = try container.decodeIfPresent([JiraProjectIssueType].self, forKey: .issueTypes)
+            ?? container.decodeIfPresent([JiraProjectIssueType].self, forKey: .values)
+            ?? []
+    }
 }
 
 private struct JiraProjectIssueType: Decodable {
-    let id: String
-    let name: String
+    let id: String?
+    let name: String?
+
+    var option: JiraIssueTypeOption? {
+        guard let normalizedID = id?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+              let normalizedName = name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+            return nil
+        }
+
+        return JiraIssueTypeOption(id: normalizedID, name: normalizedName)
+    }
 }
 
 private struct JiraCreateFieldMetadataResponse: Decodable {
     let fields: [JiraCreateFieldMetadata]
+
+    private enum CodingKeys: String, CodingKey {
+        case fields
+        case values
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fields = try container.decodeIfPresent([JiraCreateFieldMetadata].self, forKey: .fields)
+            ?? container.decodeIfPresent([JiraCreateFieldMetadata].self, forKey: .values)
+            ?? []
+    }
 }
 
 private struct JiraCreateFieldMetadata: Decodable {
-    let fieldID: String
-    let key: String
-    let name: String
+    let fieldID: String?
+    let key: String?
+    let name: String?
     let required: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -1105,6 +1217,8 @@ private struct JiraCreateFieldMetadata: Decodable {
     }
 
     var displayName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? fieldID : name
+        let normalizedName = name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let normalizedFieldID = fieldID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        return normalizedName ?? normalizedFieldID ?? key ?? "Unknown field"
     }
 }

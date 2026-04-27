@@ -476,6 +476,7 @@ final class TrackerIntegrationController: ObservableObject {
         let task = Task {
             try await exportService.fetchJiraIssueTypes(
                 for: project.key,
+                projectID: project.projectID,
                 configuration: configuration
             )
         }

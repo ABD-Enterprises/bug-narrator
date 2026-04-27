@@ -29,9 +29,10 @@ actor ExportService: IssueExporting {
 
     func fetchJiraIssueTypes(
         for projectKey: String,
+        projectID: String?,
         configuration: JiraConnectionConfiguration
     ) async throws -> [JiraIssueTypeOption] {
-        try await jiraProvider.fetchIssueTypes(for: projectKey, configuration: configuration)
+        try await jiraProvider.fetchIssueTypes(for: projectKey, projectID: projectID, configuration: configuration)
     }
 
     func validateGitHubConfiguration(

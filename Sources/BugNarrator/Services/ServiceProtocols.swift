@@ -168,6 +168,7 @@ protocol IssueExporting: Sendable {
 
     func fetchJiraIssueTypes(
         for projectKey: String,
+        projectID: String?,
         configuration: JiraConnectionConfiguration
     ) async throws -> [JiraIssueTypeOption]
 
