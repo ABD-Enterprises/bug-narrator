@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.26 - 2026-04-27
+
+- Fixed tracker setup readiness so Jira project loading is enabled after entering only the Jira URL, email, and API token, before any project or issue type has been loaded.
+- Fixed Jira Cloud URL normalization for pasted `https://...atlassian.net` values and added regression coverage for loading Jira projects before a project selection exists.
+- Fixed GitHub setup readiness so repository validation can use typed owner/name values without requiring a picker-loaded repository ID, and replaced the misleading token placeholder that looked like a saved token.
+
 ## 1.0.25 - 2026-04-27
 
 - Added launch recovery for crash-left recordings so recovered audio and matching transcript files are imported into the session library instead of staying hidden in Application Support.

@@ -49,7 +49,7 @@ BugNarrator uses semantic versioning:
 - minor for meaningful new features
 - patch for fixes and internal hardening
 
-Current production application version is `1.0.25`.
+Current production application version is `1.0.26`.
 
 ## GitHub Workflow Scaffolding
 
