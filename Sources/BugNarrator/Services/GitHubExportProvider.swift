@@ -2,10 +2,14 @@ import Foundation
 
 actor GitHubExportProvider {
     private let session: URLSession
+    private let receiptStore: any ExportReceiptStoring
     private let logger = DiagnosticsLogger(category: .export)
     private let annotationRenderer = IssueScreenshotAnnotationRenderer()
 
-    init(session: URLSession? = nil) {
+    init(
+        session: URLSession? = nil,
+        receiptStore: any ExportReceiptStoring = ExportReceiptStore()
+    ) {
         if let session {
             self.session = session
         } else {
@@ -13,6 +17,71 @@ actor GitHubExportProvider {
             configuration.timeoutIntervalForRequest = 60
             configuration.timeoutIntervalForResource = 90
             self.session = URLSession(configuration: configuration)
+        }
+        self.receiptStore = receiptStore
+    }
+
+    func fetchRepositories(token: String) async throws -> [GitHubRepositoryOption] {
+        guard !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.exportConfigurationMissing(
+                "GitHub repository discovery requires a personal access token."
+            )
+        }
+
+        var page = 1
+        var repositories: [GitHubRepositoryOption] = []
+
+        while true {
+            let request = try makeRepositoryListRequest(token: token, page: page)
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AppError.exportFailure("GitHub returned an invalid response.")
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw mapGitHubError(
+                    statusCode: httpResponse.statusCode,
+                    data: data,
+                    configuration: GitHubExportConfiguration(
+                        token: token,
+                        owner: "",
+                        repository: "",
+                        labels: []
+                    )
+                )
+            }
+
+            let payload = try JSONDecoder().decode([GitHubRepositoryListItem].self, from: data)
+            repositories.append(
+                contentsOf: payload.compactMap { repo in
+                    guard repo.hasIssues else {
+                        return nil
+                    }
+
+                    if let permissions = repo.permissions,
+                       !permissions.canCreateIssues {
+                        return nil
+                    }
+
+                    return GitHubRepositoryOption(
+                        repositoryID: repo.nodeID,
+                        owner: repo.owner.login,
+                        name: repo.name,
+                        description: repo.description?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                    )
+                }
+            )
+
+            if payload.count < 100 {
+                break
+            }
+
+            page += 1
+        }
+
+        return repositories.sorted {
+            $0.fullName.localizedCaseInsensitiveCompare($1.fullName) == .orderedAscending
         }
     }
 
@@ -40,7 +109,35 @@ actor GitHubExportProvider {
         var results: [ExportResult] = []
 
         for issue in issues {
-            let request = try makeURLRequest(issue: issue, session: reviewSession, configuration: configuration)
+            let fingerprint = TrackerExportFingerprint.make(
+                destination: .github,
+                targetIdentity: configuration.targetIdentity,
+                sessionID: reviewSession.id,
+                issueID: issue.id
+            )
+
+            if let existingResult = try await existingExportResult(
+                fingerprint: fingerprint,
+                sourceIssueID: issue.id,
+                configuration: configuration
+            ) {
+                results.append(existingResult)
+                continue
+            }
+
+            try await receiptStore.markPending(
+                fingerprint: fingerprint,
+                sourceIssueID: issue.id,
+                destination: .github,
+                targetIdentity: configuration.targetIdentity
+            )
+
+            let request = try makeURLRequest(
+                issue: issue,
+                session: reviewSession,
+                configuration: configuration,
+                exportFingerprint: fingerprint
+            )
 
             do {
                 let (data, response) = try await session.data(for: request)
@@ -53,14 +150,21 @@ actor GitHubExportProvider {
                 }
 
                 let payload = try JSONDecoder().decode(GitHubIssueResponse.self, from: data)
-                results.append(
-                    ExportResult(
-                        sourceIssueID: issue.id,
-                        destination: .github,
-                        remoteIdentifier: "#\(payload.number)",
-                        remoteURL: payload.htmlURL
-                    )
+                try await receiptStore.markSucceeded(
+                    fingerprint: fingerprint,
+                    sourceIssueID: issue.id,
+                    destination: .github,
+                    targetIdentity: configuration.targetIdentity,
+                    remoteIdentifier: "#\(payload.number)",
+                    remoteURL: payload.htmlURL
                 )
+                let result = ExportResult(
+                    sourceIssueID: issue.id,
+                    destination: .github,
+                    remoteIdentifier: "#\(payload.number)",
+                    remoteURL: payload.htmlURL
+                )
+                results.append(result)
                 logger.info(
                     "github_issue_exported",
                     "Exported one issue to GitHub.",
@@ -78,6 +182,26 @@ actor GitHubExportProvider {
                         "source_issue_id": issue.id.uuidString
                     ]
                 )
+                do {
+                    if let reconciledResult = try await reconcilePendingExport(
+                        fingerprint: fingerprint,
+                        sourceIssueID: issue.id,
+                        configuration: configuration
+                    ) {
+                        results.append(reconciledResult)
+                        continue
+                    }
+                } catch {
+                    logger.warning(
+                        "github_export_reconciliation_failed",
+                        (error as? AppError)?.userMessage ?? error.localizedDescription,
+                        metadata: ["source_issue_id": issue.id.uuidString]
+                    )
+                }
+
+                if error is AppError {
+                    try? await receiptStore.clearReceipt(for: fingerprint)
+                }
                 let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
                 throw partialExportError(mappedError, successfulCount: results.count)
             }
@@ -92,6 +216,39 @@ actor GitHubExportProvider {
             ]
         )
         return results
+    }
+
+    func validate(configuration: GitHubExportConfiguration) async throws {
+        guard configuration.isComplete else {
+            throw AppError.exportConfigurationMissing(
+                "GitHub export requires a personal access token, repository owner, and repository name."
+            )
+        }
+
+        let request = try makeRepositoryValidationRequest(configuration: configuration)
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.exportFailure("GitHub returned an invalid response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw mapGitHubError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+        }
+
+        let repository = try JSONDecoder().decode(GitHubRepositoryValidationResponse.self, from: data)
+        guard repository.hasIssues else {
+            throw AppError.exportFailure(
+                "GitHub Issues are disabled for \(configuration.owner)/\(configuration.repository)."
+            )
+        }
+
+        if let permissions = repository.permissions,
+           !permissions.canCreateIssues {
+            throw AppError.exportFailure(
+                "The GitHub token can read \(configuration.owner)/\(configuration.repository), but it cannot create issues there."
+            )
+        }
     }
 
     func findOpenIssues(
@@ -129,13 +286,10 @@ actor GitHubExportProvider {
     func makeURLRequest(
         issue: ExtractedIssue,
         session reviewSession: TranscriptSession,
-        configuration: GitHubExportConfiguration
+        configuration: GitHubExportConfiguration,
+        exportFingerprint: String? = nil
     ) throws -> URLRequest {
-        let owner = configuration.owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-            ?? configuration.owner
-        let repository = configuration.repository.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-            ?? configuration.repository
-        let endpoint = URL(string: "https://api.github.com/repos/\(owner)/\(repository)/issues")!
+        let endpoint = issueEndpoint(configuration: configuration)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -146,10 +300,45 @@ actor GitHubExportProvider {
         request.httpBody = try JSONEncoder().encode(
             GitHubIssueRequest(
                 title: issue.title,
-                body: try makeIssueBody(issue: issue, session: reviewSession),
+                body: try makeIssueBody(
+                    issue: issue,
+                    session: reviewSession,
+                    exportFingerprint: exportFingerprint
+                ),
                 labels: configuration.labels.isEmpty ? nil : configuration.labels
             )
         )
+        return request
+    }
+
+    private func makeRepositoryValidationRequest(
+        configuration: GitHubExportConfiguration
+    ) throws -> URLRequest {
+        var request = URLRequest(url: repositoryEndpoint(configuration: configuration))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    private func makeRepositoryListRequest(
+        token: String,
+        page: Int
+    ) throws -> URLRequest {
+        var components = URLComponents(string: "https://api.github.com/user/repos")!
+        components.queryItems = [
+            .init(name: "affiliation", value: "owner,collaborator,organization_member"),
+            .init(name: "sort", value: "updated"),
+            .init(name: "per_page", value: "100"),
+            .init(name: "page", value: "\(page)")
+        ]
+
+        var request = URLRequest(url: try url(from: components))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         return request
     }
 
@@ -173,13 +362,42 @@ actor GitHubExportProvider {
         return request
     }
 
-    private func makeIssueBody(issue: ExtractedIssue, session: TranscriptSession) throws -> String {
+    private func makeExportFingerprintSearchRequest(
+        fingerprint: String,
+        configuration: GitHubExportConfiguration
+    ) throws -> URLRequest {
+        var components = URLComponents(string: "https://api.github.com/search/issues")!
+        let query = #"repo:\#(configuration.owner)/\#(configuration.repository) is:issue "\#(TrackerExportFingerprint.marker(for: fingerprint))""#
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "per_page", value: "1")
+        ]
+
+        var request = URLRequest(url: try url(from: components))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    private func makeIssueBody(
+        issue: ExtractedIssue,
+        session: TranscriptSession,
+        exportFingerprint: String?
+    ) throws -> String {
         var lines: [String] = [
             "## Summary",
-            issue.summary,
+            TrackerExportPayloadBudget.truncated(
+                issue.summary,
+                maxCharacters: TrackerExportPayloadBudget.issueSummaryLimit
+            ),
             "",
             "## Evidence",
-            issue.evidenceExcerpt,
+            TrackerExportPayloadBudget.truncated(
+                issue.evidenceExcerpt,
+                maxCharacters: TrackerExportPayloadBudget.evidenceLimit
+            ),
             ""
         ]
 
@@ -212,24 +430,31 @@ actor GitHubExportProvider {
            !note.isEmpty {
             lines.append("")
             lines.append("## Tracker Context")
-            lines.append(note)
+            lines.append(
+                TrackerExportPayloadBudget.truncated(
+                    note,
+                    maxCharacters: TrackerExportPayloadBudget.noteLimit
+                )
+            )
         }
 
         if !issue.reproductionSteps.isEmpty {
             lines.append("")
             lines.append("## Reproduction Steps")
 
-            for (index, step) in issue.reproductionSteps.enumerated() {
-                lines.append("\(index + 1). \(step.instruction)")
+            for (index, step) in issue.reproductionSteps.prefix(TrackerExportPayloadBudget.reproductionStepLimit).enumerated() {
+                lines.append(
+                    "\(index + 1). \(TrackerExportPayloadBudget.truncated(step.instruction, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))"
+                )
 
                 if let expectedResult = step.expectedResult?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !expectedResult.isEmpty {
-                    lines.append("   - Expected: \(expectedResult)")
+                    lines.append("   - Expected: \(TrackerExportPayloadBudget.truncated(expectedResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
                 }
 
                 if let actualResult = step.actualResult?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !actualResult.isEmpty {
-                    lines.append("   - Actual: \(actualResult)")
+                    lines.append("   - Actual: \(TrackerExportPayloadBudget.truncated(actualResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
                 }
 
                 if let reference = reproductionStepReference(step, session: session) {
@@ -242,14 +467,20 @@ actor GitHubExportProvider {
         if !annotationLines.isEmpty {
             lines.append("")
             lines.append("## Annotated Screenshots")
-            lines.append(contentsOf: annotationLines)
+            lines.append(
+                contentsOf: TrackerExportPayloadBudget.limitedList(
+                    annotationLines,
+                    maxItems: TrackerExportPayloadBudget.screenshotListLimit,
+                    maxCharactersPerItem: TrackerExportPayloadBudget.listEntryLimit
+                )
+            )
         }
 
         let screenshots = session.screenshots(for: issue)
         if !screenshots.isEmpty {
             lines.append("")
             lines.append("## Related Screenshots")
-            for screenshot in screenshots {
+            for screenshot in screenshots.prefix(TrackerExportPayloadBudget.screenshotListLimit) {
                 lines.append("- \(screenshot.fileName) (`\(screenshot.timeLabel)`) - attach manually from the exported session bundle if needed.")
             }
         }
@@ -258,7 +489,92 @@ actor GitHubExportProvider {
         lines.append("## Source")
         lines.append("Exported from BugNarrator. Review against the raw transcript before triage.")
 
-        return lines.joined(separator: "\n")
+        let footer = exportFingerprint.map { "\n\n\(TrackerExportFingerprint.marker(for: $0))" } ?? ""
+        return TrackerExportPayloadBudget.hardLimitMarkdown(
+            lines.joined(separator: "\n"),
+            maxCharacters: TrackerExportPayloadBudget.gitHubBodyLimit - footer.count
+        ) + footer
+    }
+
+    private func existingExportResult(
+        fingerprint: String,
+        sourceIssueID: UUID,
+        configuration: GitHubExportConfiguration
+    ) async throws -> ExportResult? {
+        if let receipt = await receiptStore.receipt(for: fingerprint),
+           let exportResult = receipt.asExportResult() {
+            return exportResult
+        }
+
+        guard await receiptStore.receipt(for: fingerprint)?.state == .pending else {
+            return nil
+        }
+
+        return try await reconcilePendingExport(
+            fingerprint: fingerprint,
+            sourceIssueID: sourceIssueID,
+            configuration: configuration
+        )
+    }
+
+    private func reconcilePendingExport(
+        fingerprint: String,
+        sourceIssueID: UUID,
+        configuration: GitHubExportConfiguration
+    ) async throws -> ExportResult? {
+        guard let candidate = try await findExportedIssue(
+            fingerprint: fingerprint,
+            configuration: configuration
+        ) else {
+            return nil
+        }
+
+        try await receiptStore.markSucceeded(
+            fingerprint: fingerprint,
+            sourceIssueID: sourceIssueID,
+            destination: .github,
+            targetIdentity: configuration.targetIdentity,
+            remoteIdentifier: candidate.remoteIdentifier,
+            remoteURL: candidate.remoteURL
+        )
+
+        return ExportResult(
+            sourceIssueID: sourceIssueID,
+            destination: .github,
+            remoteIdentifier: candidate.remoteIdentifier,
+            remoteURL: candidate.remoteURL
+        )
+    }
+
+    private func findExportedIssue(
+        fingerprint: String,
+        configuration: GitHubExportConfiguration
+    ) async throws -> TrackerIssueCandidate? {
+        let request = try makeExportFingerprintSearchRequest(
+            fingerprint: fingerprint,
+            configuration: configuration
+        )
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.exportFailure("GitHub returned an invalid response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw mapGitHubError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+        }
+
+        let payload = try JSONDecoder().decode(GitHubSearchResponse.self, from: data)
+        guard let item = payload.items.first else {
+            return nil
+        }
+
+        return TrackerIssueCandidate(
+            remoteIdentifier: "#\(item.number)",
+            title: item.title,
+            summary: item.body?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            remoteURL: item.htmlURL
+        )
     }
 
     private func reproductionStepReference(_ step: IssueReproductionStep, session: TranscriptSession) -> String? {
@@ -368,6 +684,18 @@ actor GitHubExportProvider {
 
         return url
     }
+
+    private func repositoryEndpoint(configuration: GitHubExportConfiguration) -> URL {
+        let owner = configuration.owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? configuration.owner
+        let repository = configuration.repository.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? configuration.repository
+        return URL(string: "https://api.github.com/repos/\(owner)/\(repository)")!
+    }
+
+    private func issueEndpoint(configuration: GitHubExportConfiguration) -> URL {
+        repositoryEndpoint(configuration: configuration).appendingPathComponent("issues")
+    }
 }
 
 private struct GitHubIssueRequest: Encodable {
@@ -383,6 +711,55 @@ private struct GitHubIssueResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case number
         case htmlURL = "html_url"
+    }
+}
+
+private struct GitHubRepositoryValidationResponse: Decodable {
+    let nodeID: String?
+    let name: String?
+    let owner: GitHubRepositoryOwner?
+    let hasIssues: Bool
+    let permissions: GitHubRepositoryPermissions?
+
+    enum CodingKeys: String, CodingKey {
+        case nodeID = "node_id"
+        case name
+        case owner
+        case hasIssues = "has_issues"
+        case permissions
+    }
+}
+
+private struct GitHubRepositoryListItem: Decodable {
+    let nodeID: String?
+    let name: String
+    let description: String?
+    let hasIssues: Bool
+    let permissions: GitHubRepositoryPermissions?
+    let owner: GitHubRepositoryOwner
+
+    enum CodingKeys: String, CodingKey {
+        case nodeID = "node_id"
+        case name
+        case description
+        case hasIssues = "has_issues"
+        case permissions
+        case owner
+    }
+}
+
+private struct GitHubRepositoryOwner: Decodable {
+    let login: String
+}
+
+private struct GitHubRepositoryPermissions: Decodable {
+    let admin: Bool?
+    let maintain: Bool?
+    let push: Bool?
+    let triage: Bool?
+
+    var canCreateIssues: Bool {
+        admin == true || maintain == true || push == true || triage == true
     }
 }
 

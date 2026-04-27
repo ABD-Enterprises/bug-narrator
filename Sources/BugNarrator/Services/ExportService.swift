@@ -15,6 +15,37 @@ actor ExportService: IssueExporting {
         self.similarIssueReviewService = similarIssueReviewService
     }
 
+    func fetchGitHubRepositories(
+        token: String
+    ) async throws -> [GitHubRepositoryOption] {
+        try await gitHubProvider.fetchRepositories(token: token)
+    }
+
+    func fetchJiraProjects(
+        _ configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraProjectOption] {
+        try await jiraProvider.fetchProjects(configuration: configuration)
+    }
+
+    func fetchJiraIssueTypes(
+        for projectKey: String,
+        configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraIssueTypeOption] {
+        try await jiraProvider.fetchIssueTypes(for: projectKey, configuration: configuration)
+    }
+
+    func validateGitHubConfiguration(
+        _ configuration: GitHubExportConfiguration
+    ) async throws {
+        try await gitHubProvider.validate(configuration: configuration)
+    }
+
+    func validateJiraConfiguration(
+        _ configuration: JiraExportConfiguration
+    ) async throws {
+        try await jiraProvider.validate(configuration: configuration)
+    }
+
     func prepareGitHubExportReview(
         issues: [ExtractedIssue],
         session: TranscriptSession,

@@ -158,6 +158,27 @@ protocol IssueExtracting: Sendable {
 }
 
 protocol IssueExporting: Sendable {
+    func fetchGitHubRepositories(
+        token: String
+    ) async throws -> [GitHubRepositoryOption]
+
+    func fetchJiraProjects(
+        _ configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraProjectOption]
+
+    func fetchJiraIssueTypes(
+        for projectKey: String,
+        configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraIssueTypeOption]
+
+    func validateGitHubConfiguration(
+        _ configuration: GitHubExportConfiguration
+    ) async throws
+
+    func validateJiraConfiguration(
+        _ configuration: JiraExportConfiguration
+    ) async throws
+
     func prepareGitHubExportReview(
         issues: [ExtractedIssue],
         session: TranscriptSession,

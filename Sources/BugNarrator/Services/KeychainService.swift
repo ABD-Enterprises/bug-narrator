@@ -28,25 +28,9 @@ final class KeychainService: KeychainServicing {
             let context = LAContext()
             context.interactionNotAllowed = true
             query[kSecUseAuthenticationContext] = context
-            query[kSecUseAuthenticationUI] = "u_AuthUIF" as CFString
         }
 
         return query
-    }
-
-    private static func performWithoutKeychainUserInteraction<T>(_ operation: () -> T) -> T {
-        var previousInteractionAllowed = DarwinBoolean(true)
-        let previousStatus = SecKeychainGetUserInteractionAllowed(&previousInteractionAllowed)
-        let disableStatus = SecKeychainSetUserInteractionAllowed(false)
-
-        defer {
-            if disableStatus == errSecSuccess {
-                let restoreState = previousStatus == errSecSuccess ? previousInteractionAllowed.boolValue : true
-                _ = SecKeychainSetUserInteractionAllowed(restoreState)
-            }
-        }
-
-        return operation()
     }
 
     func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
@@ -61,14 +45,7 @@ final class KeychainService: KeychainServicing {
         )
 
         var item: CFTypeRef?
-        let status: OSStatus
-        if allowInteraction {
-            status = SecItemCopyMatching(query as CFDictionary, &item)
-        } else {
-            status = Self.performWithoutKeychainUserInteraction {
-                SecItemCopyMatching(query as CFDictionary, &item)
-            }
-        }
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
 
         switch status {
         case errSecSuccess:

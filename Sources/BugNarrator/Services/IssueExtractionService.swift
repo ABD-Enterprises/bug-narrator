@@ -1019,8 +1019,4 @@ private extension String {
     var trimmedForExtraction: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
 }

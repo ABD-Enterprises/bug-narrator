@@ -237,13 +237,28 @@ actor MockExportService: IssueExporting {
     var jiraReview: IssueExportReview?
     var gitHubError: Error?
     var jiraError: Error?
+    var gitHubRepositories: [GitHubRepositoryOption] = []
+    var jiraProjects: [JiraProjectOption] = []
+    var jiraIssueTypesByProjectKey: [String: [JiraIssueTypeOption]] = [:]
+    var suspendJiraIssueTypeFetch = false
 
     private(set) var gitHubCallCount = 0
     private(set) var jiraCallCount = 0
     private(set) var gitHubReviewCallCount = 0
     private(set) var jiraReviewCallCount = 0
+    private(set) var gitHubValidationCallCount = 0
+    private(set) var jiraValidationCallCount = 0
+    private(set) var gitHubRepositoryFetchCallCount = 0
+    private(set) var jiraProjectFetchCallCount = 0
+    private(set) var jiraIssueTypeFetchCallCount = 0
     private(set) var lastGitHubIssues: [ExtractedIssue] = []
     private(set) var lastJiraIssues: [ExtractedIssue] = []
+    private var gitHubValidationError: Error?
+    private var jiraValidationError: Error?
+    private var gitHubRepositoriesError: Error?
+    private var jiraProjectsError: Error?
+    private var jiraIssueTypesError: Error?
+    private var jiraIssueTypeFetchContinuations: [(projectKey: String, continuation: CheckedContinuation<[JiraIssueTypeOption], Error>)] = []
 
     func setGitHubResults(_ results: [ExportResult]) {
         gitHubResults = results
@@ -267,6 +282,122 @@ actor MockExportService: IssueExporting {
 
     func setJiraReview(_ review: IssueExportReview) {
         jiraReview = review
+    }
+
+    func setGitHubValidationError(_ error: Error?) {
+        gitHubValidationError = error
+    }
+
+    func setJiraValidationError(_ error: Error?) {
+        jiraValidationError = error
+    }
+
+    func setGitHubRepositories(_ repositories: [GitHubRepositoryOption]) {
+        gitHubRepositories = repositories
+    }
+
+    func setGitHubRepositoriesError(_ error: Error?) {
+        gitHubRepositoriesError = error
+    }
+
+    func setJiraProjects(_ projects: [JiraProjectOption]) {
+        jiraProjects = projects
+    }
+
+    func setJiraIssueTypes(_ issueTypes: [JiraIssueTypeOption], for projectKey: String) {
+        jiraIssueTypesByProjectKey[projectKey] = issueTypes
+    }
+
+    func setJiraProjectsError(_ error: Error?) {
+        jiraProjectsError = error
+    }
+
+    func setJiraIssueTypesError(_ error: Error?) {
+        jiraIssueTypesError = error
+    }
+
+    func setSuspendJiraIssueTypeFetch(_ shouldSuspend: Bool) {
+        suspendJiraIssueTypeFetch = shouldSuspend
+    }
+
+    func fetchGitHubRepositories(
+        token: String
+    ) async throws -> [GitHubRepositoryOption] {
+        gitHubRepositoryFetchCallCount += 1
+
+        if let gitHubRepositoriesError {
+            throw gitHubRepositoriesError
+        }
+
+        return gitHubRepositories
+    }
+
+    func fetchJiraProjects(
+        _ configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraProjectOption] {
+        jiraProjectFetchCallCount += 1
+
+        if let jiraProjectsError {
+            throw jiraProjectsError
+        }
+
+        return jiraProjects
+    }
+
+    func fetchJiraIssueTypes(
+        for projectKey: String,
+        configuration: JiraConnectionConfiguration
+    ) async throws -> [JiraIssueTypeOption] {
+        jiraIssueTypeFetchCallCount += 1
+
+        if suspendJiraIssueTypeFetch {
+            return try await withCheckedThrowingContinuation { continuation in
+                jiraIssueTypeFetchContinuations.append((projectKey: projectKey, continuation: continuation))
+            }
+        }
+
+        if let jiraIssueTypesError {
+            throw jiraIssueTypesError
+        }
+
+        return jiraIssueTypesByProjectKey[projectKey] ?? []
+    }
+
+    func resumeJiraIssueTypeFetch(
+        for projectKey: String,
+        with result: Result<[JiraIssueTypeOption], Error>
+    ) {
+        guard let index = jiraIssueTypeFetchContinuations.firstIndex(where: { $0.projectKey == projectKey }) else {
+            return
+        }
+
+        let continuation = jiraIssueTypeFetchContinuations.remove(at: index).continuation
+        switch result {
+        case .success(let issueTypes):
+            continuation.resume(returning: issueTypes)
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+    }
+
+    func validateGitHubConfiguration(
+        _ configuration: GitHubExportConfiguration
+    ) async throws {
+        gitHubValidationCallCount += 1
+
+        if let gitHubValidationError {
+            throw gitHubValidationError
+        }
+    }
+
+    func validateJiraConfiguration(
+        _ configuration: JiraExportConfiguration
+    ) async throws {
+        jiraValidationCallCount += 1
+
+        if let jiraValidationError {
+            throw jiraValidationError
+        }
     }
 
     func prepareGitHubExportReview(

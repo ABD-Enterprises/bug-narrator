@@ -19,6 +19,7 @@ final class AppState: ObservableObject {
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
+    let trackerIntegration: TrackerIntegrationController
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -63,6 +64,42 @@ final class AppState: ObservableObject {
     private var isCapturingScreenshot = false
     private var toastDismissTask: Task<Void, Never>?
 
+    var gitHubValidationState: APIKeyValidationState {
+        trackerIntegration.gitHubValidationState
+    }
+
+    var jiraValidationState: APIKeyValidationState {
+        trackerIntegration.jiraValidationState
+    }
+
+    var gitHubRepositories: [GitHubRepositoryOption] {
+        trackerIntegration.gitHubRepositories
+    }
+
+    var isLoadingGitHubRepositories: Bool {
+        trackerIntegration.isLoadingGitHubRepositories
+    }
+
+    var jiraProjects: [JiraProjectOption] {
+        trackerIntegration.jiraProjects
+    }
+
+    var jiraIssueTypes: [JiraIssueTypeOption] {
+        trackerIntegration.jiraIssueTypes
+    }
+
+    var isLoadingJiraIssueTypes: Bool {
+        trackerIntegration.isLoadingJiraIssueTypes
+    }
+
+    var jiraProjectMetadataIsStale: Bool {
+        trackerIntegration.jiraProjectMetadataIsStale
+    }
+
+    var jiraIssueTypeMetadataIsStale: Bool {
+        trackerIntegration.jiraIssueTypeMetadataIsStale
+    }
+
     init(
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
@@ -95,6 +132,10 @@ final class AppState: ObservableObject {
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
+        self.trackerIntegration = TrackerIntegrationController(
+            settingsStore: settingsStore,
+            exportService: exportService
+        )
         self.selectedTranscriptID = transcriptStore.sessions.first?.id
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
@@ -104,6 +145,16 @@ final class AppState: ObservableObject {
                 self?.handleHotKeyPressed(action)
             }
         }
+
+        trackerIntegration.showSettingsWindow = { [weak self] in
+            self?.showSettingsWindow?()
+        }
+
+        trackerIntegration.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
 
         settingsStore.$startRecordingHotkeyShortcut
             .removeDuplicates()
@@ -740,6 +791,22 @@ final class AppState: ObservableObject {
         settingsLogger.info("openai_key_removed", "The user removed the OpenAI API key.")
     }
 
+    func validateGitHubConfiguration() async {
+        await trackerIntegration.validateGitHubConfiguration()
+    }
+
+    func loadGitHubRepositories() async {
+        await trackerIntegration.loadGitHubRepositories()
+    }
+
+    func validateJiraConfiguration() async {
+        await trackerIntegration.validateJiraConfiguration()
+    }
+
+    func refreshJiraIssueTypesForSelectedProject() async {
+        await trackerIntegration.refreshJiraIssueTypesForSelectedProject()
+    }
+
     func copyDisplayedTranscript() {
         guard let transcript = displayedTranscript else {
             return
@@ -1223,6 +1290,7 @@ final class AppState: ObservableObject {
                         "GitHub export requires a token, repository owner, and repository name."
                     )
                 }
+                try await exportService.validateGitHubConfiguration(configuration)
                 review = try await exportService.prepareGitHubExportReview(
                     issues: selectedIssues,
                     session: currentSession,
@@ -1236,6 +1304,7 @@ final class AppState: ObservableObject {
                         "Jira export requires a base URL, email, API token, project key, and issue type."
                     )
                 }
+                try await exportService.validateJiraConfiguration(configuration)
                 review = try await exportService.prepareJiraExportReview(
                     issues: selectedIssues,
                     session: currentSession,
@@ -2069,6 +2138,7 @@ final class AppState: ObservableObject {
     }
 
 }
+
 
 private extension AppStatus.Phase {
     var debugName: String {

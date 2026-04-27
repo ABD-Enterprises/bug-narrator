@@ -95,6 +95,88 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(payloadString.contains("modal-shot-annotated"))
     }
 
+    func testMakeURLRequestPreservesExportFingerprintWhenDescriptionIsTruncated() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let marker = TrackerExportFingerprint.marker(for: "bnexp-fixture")
+        let issue = ExtractedIssue(
+            title: "Oversized issue",
+            category: .bug,
+            summary: String(repeating: "Summary ", count: 10_000),
+            evidenceExcerpt: String(repeating: "Evidence ", count: 10_000),
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            ),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        let description = try XCTUnwrap(fields["description"] as? [String: Any])
+        let payloadData = try JSONSerialization.data(withJSONObject: description, options: [.sortedKeys])
+        let payloadString = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        XCTAssertLessThanOrEqual(payloadString.count, TrackerExportPayloadBudget.jiraTextLimit + 1_000)
+        XCTAssertTrue(payloadString.contains(marker))
+    }
+
+    func testMakeURLRequestEncodesIssueTypeNameWhenIDIsUnavailable() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        let issueType = try XCTUnwrap(fields["issuetype"] as? [String: Any])
+        XCTAssertNil(issueType["id"])
+        XCTAssertEqual(issueType["name"] as? String, "Task")
+    }
+
     func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
@@ -134,6 +216,166 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(matches.count, 1)
         XCTAssertEqual(matches.first?.remoteIdentifier, "FM-142")
         XCTAssertEqual(matches.first?.title, "Existing modal close affordance issue")
+    }
+
+    func testValidateConfigurationChecksProjectAndIssueType() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        var requestCount = 0
+
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Basic ") == true)
+
+            if requestCount == 1 {
+                XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issue/createmeta/FM/issuetypes?startAt=0&maxResults=100")
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+                let data = Data(#"{"issueTypes":[{"id":"10001","name":"Task"},{"id":"10002","name":"Bug"}]}"#.utf8)
+                return (response, data)
+            }
+
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issue/createmeta/FM/issuetypes/10001?startAt=0&maxResults=100")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(#"{"fields":[{"fieldId":"summary","key":"summary","name":"Summary","required":true},{"fieldId":"description","key":"description","name":"Description","required":false}]}"#.utf8)
+            return (response, data)
+        }
+
+        try await provider.validate(
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+    }
+
+    func testFetchProjectsLoadsAccessibleProjects() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertTrue(request.url?.absoluteString.contains("rest/api/3/issue/createmeta") == true)
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"projects":[{"key":"UCAP","name":"Unified Claims Access Portal"},{"key":"OPS","name":"Operations Support"}],"maxResults":50,"total":2}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let projects = try await provider.fetchProjects(
+            configuration: JiraConnectionConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token"
+            )
+        )
+
+        XCTAssertEqual(
+            projects,
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+    }
+
+    func testFetchProjectsStopsWhenPaginationDoesNotAdvance() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        var requestCount = 0
+
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"projects":[{"key":"UCAP","name":"Unified Claims Access Portal"}],"maxResults":0,"total":50}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let projects = try await provider.fetchProjects(
+            configuration: JiraConnectionConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token"
+            )
+        )
+
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(
+            projects,
+            [JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")]
+        )
+    }
+
+    func testFetchIssueTypesLoadsIssueTypesForSelectedProject() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/issue/createmeta/UCAP/issuetypes?startAt=0&maxResults=100")
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(#"{"issueTypes":[{"id":"10001","name":"Task"},{"id":"10002","name":"Bug"},{"id":"10003","name":"Task"}]}"#.utf8)
+            return (response, data)
+        }
+
+        let issueTypes = try await provider.fetchIssueTypes(
+            for: "UCAP",
+            configuration: JiraConnectionConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token"
+            )
+        )
+
+        XCTAssertEqual(
+            issueTypes,
+            [
+                JiraIssueTypeOption(id: "10001", name: "Task"),
+                JiraIssueTypeOption(id: "10002", name: "Bug")
+            ]
+        )
+    }
+
+    func testValidateConfigurationRejectsUnsupportedRequiredFields() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        var requestCount = 0
+
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if requestCount == 1 {
+                let data = Data(#"{"issueTypes":[{"id":"10001","name":"Task"}]}"#.utf8)
+                return (response, data)
+            }
+
+            let data = Data(#"{"fields":[{"fieldId":"summary","key":"summary","name":"Summary","required":true},{"fieldId":"customfield_10010","key":"customfield_10010","name":"Customer Impact","required":true}]}"#.utf8)
+            return (response, data)
+        }
+
+        do {
+            try await provider.validate(
+                configuration: JiraExportConfiguration(
+                    baseURL: URL(string: "https://acme.atlassian.net")!,
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    projectKey: "FM",
+                    issueType: "Task"
+                )
+            )
+            XCTFail("Expected Jira validation to fail.")
+        } catch let error as AppError {
+            guard case .exportFailure(let message) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+
+            XCTAssertTrue(message.contains("Customer Impact"))
+        }
     }
 
     func testExportMapsValidationFailure() async throws {

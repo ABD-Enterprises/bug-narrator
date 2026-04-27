@@ -24,7 +24,7 @@ final class KeychainServiceTests: XCTestCase {
         XCTAssertEqual(query[kSecAttrService] as? String, "BugNarrator.OpenAI")
         XCTAssertEqual(query[kSecAttrAccount] as? String, "openai-api-key")
         XCTAssertEqual(context?.interactionNotAllowed, true)
-        XCTAssertEqual(query[kSecUseAuthenticationUI] as? String, "u_AuthUIF")
+        XCTAssertNil(query[kSecUseAuthenticationUI])
     }
 
     func testInteractiveReadQueryDoesNotForceAuthenticationUIFailure() {

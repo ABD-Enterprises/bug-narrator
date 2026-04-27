@@ -22,6 +22,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.screenshotHotkeyShortcut, .disabled)
+        XCTAssertEqual(store.jiraIssueType, "")
     }
 
     func testSettingsPersistAcrossReloads() {
@@ -62,12 +63,15 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.githubToken = "fixture-github-token"
         firstStore.githubRepositoryOwner = "acme"
         firstStore.githubRepositoryName = "bugnarrator"
+        firstStore.githubRepositoryID = "R_kgDOFixture"
         firstStore.githubDefaultLabels = "bug,triage"
         firstStore.jiraBaseURL = "acme.atlassian.net"
         firstStore.jiraEmail = "you@example.com"
         firstStore.jiraAPIToken = "fixture-jira-token"
         firstStore.jiraProjectKey = "FM"
+        firstStore.jiraProjectID = "10000"
         firstStore.jiraIssueType = "Task"
+        firstStore.jiraIssueTypeID = "10001"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
         firstStore.refreshExportSecretsForUserInitiatedAccess()
 
@@ -105,12 +109,15 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(secondStore.githubToken, "fixture-github-token")
         XCTAssertEqual(secondStore.githubRepositoryOwner, "acme")
         XCTAssertEqual(secondStore.githubRepositoryName, "bugnarrator")
+        XCTAssertEqual(secondStore.githubRepositoryID, "R_kgDOFixture")
         XCTAssertEqual(secondStore.githubDefaultLabelsList, ["bug", "triage"])
         XCTAssertEqual(secondStore.jiraBaseURL, "acme.atlassian.net")
         XCTAssertEqual(secondStore.jiraEmail, "you@example.com")
         XCTAssertEqual(secondStore.jiraAPIToken, "fixture-jira-token")
         XCTAssertEqual(secondStore.jiraProjectKey, "FM")
+        XCTAssertEqual(secondStore.jiraProjectID, "10000")
         XCTAssertEqual(secondStore.jiraIssueType, "Task")
+        XCTAssertEqual(secondStore.jiraIssueTypeID, "10001")
     }
 
     func testAPIKeyStaysOutOfUserDefaultsWhenKeychainSucceeds() {
@@ -271,6 +278,33 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.jiraTokenPersistenceState, .keychain)
         XCTAssertEqual(keychain.values["BugNarrator.OpenAI::openai-api-key"], "draft-openai-key")
         XCTAssertEqual(keychain.values["BugNarrator.Jira::jira-api-token"], "draft-jira-token")
+    }
+
+    func testExportConfigurationsRequireVerifiedTrackerSelections() {
+        let suiteName = "BugNarrator-SettingsVerifiedTrackerSelectionTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.githubToken = "fixture-github-token"
+        store.githubRepositoryOwner = "acme"
+        store.githubRepositoryName = "bugnarrator"
+        store.jiraBaseURL = "acme.atlassian.net"
+        store.jiraEmail = "you@example.com"
+        store.jiraAPIToken = "fixture-jira-token"
+        store.jiraProjectKey = "FM"
+        store.jiraIssueType = "Task"
+
+        XCTAssertNil(store.githubExportConfiguration)
+        XCTAssertNil(store.jiraExportConfiguration)
+
+        store.githubRepositoryID = "R_kgDOFixture"
+        store.jiraProjectID = "10000"
+        store.jiraIssueTypeID = "10001"
+
+        XCTAssertNotNil(store.githubExportConfiguration)
+        XCTAssertNotNil(store.jiraExportConfiguration)
     }
 
     func testJiraTokenDraftOnlyPublishesPendingSaveTransitionOnce() {

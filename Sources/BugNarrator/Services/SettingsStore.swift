@@ -104,6 +104,9 @@ final class SettingsStore: ObservableObject {
     @Published var githubRepositoryOwner: String = "" {
         didSet {
             guard hasLoaded else { return }
+            if githubRepositoryOwner.compare(oldValue, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
+                githubRepositoryID = ""
+            }
             defaults.set(githubRepositoryOwner, forKey: Keys.githubRepositoryOwner)
         }
     }
@@ -111,7 +114,17 @@ final class SettingsStore: ObservableObject {
     @Published var githubRepositoryName: String = "" {
         didSet {
             guard hasLoaded else { return }
+            if githubRepositoryName.compare(oldValue, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
+                githubRepositoryID = ""
+            }
             defaults.set(githubRepositoryName, forKey: Keys.githubRepositoryName)
+        }
+    }
+
+    @Published var githubRepositoryID: String = "" {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(githubRepositoryID, forKey: Keys.githubRepositoryID)
         }
     }
 
@@ -146,14 +159,34 @@ final class SettingsStore: ObservableObject {
     @Published var jiraProjectKey: String = "" {
         didSet {
             guard hasLoaded else { return }
+            if normalizedJiraProjectKey != oldValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() {
+                jiraProjectID = ""
+            }
             defaults.set(jiraProjectKey, forKey: Keys.jiraProjectKey)
         }
     }
 
-    @Published var jiraIssueType: String = "Task" {
+    @Published var jiraIssueType: String = "" {
         didSet {
             guard hasLoaded else { return }
+            if normalizedJiraIssueType.compare(oldValue.trimmingCharacters(in: .whitespacesAndNewlines), options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
+                jiraIssueTypeID = ""
+            }
             defaults.set(jiraIssueType, forKey: Keys.jiraIssueType)
+        }
+    }
+
+    @Published var jiraProjectID: String = "" {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(jiraProjectID, forKey: Keys.jiraProjectID)
+        }
+    }
+
+    @Published var jiraIssueTypeID: String = "" {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(jiraIssueTypeID, forKey: Keys.jiraIssueTypeID)
         }
     }
 
@@ -262,6 +295,10 @@ final class SettingsStore: ObservableObject {
         githubRepositoryName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var normalizedGitHubRepositoryID: String {
+        githubRepositoryID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var githubDefaultLabelsList: [String] {
         githubDefaultLabels
             .split(whereSeparator: \.isNewline)
@@ -271,8 +308,13 @@ final class SettingsStore: ObservableObject {
     }
 
     var githubExportConfiguration: GitHubExportConfiguration? {
+        guard !normalizedGitHubRepositoryID.isEmpty else {
+            return nil
+        }
+
         let configuration = GitHubExportConfiguration(
             token: trimmedGitHubToken,
+            repositoryID: normalizedGitHubRepositoryID.nilIfEmpty,
             owner: normalizedGitHubRepositoryOwner,
             repository: normalizedGitHubRepositoryName,
             labels: githubDefaultLabelsList
@@ -315,27 +357,55 @@ final class SettingsStore: ObservableObject {
         jiraEmail.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    var normalizedJiraProjectKey: String {
-        jiraProjectKey.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-    }
-
-    var normalizedJiraIssueType: String {
-        jiraIssueType.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var jiraExportConfiguration: JiraExportConfiguration? {
+    var jiraConnectionConfiguration: JiraConnectionConfiguration? {
         let baseURLString = normalizedJiraBaseURL
         guard !baseURLString.isEmpty,
               let url = URL(string: "https://\(baseURLString)") ?? URL(string: baseURLString) else {
             return nil
         }
 
-        let configuration = JiraExportConfiguration(
+        let configuration = JiraConnectionConfiguration(
             baseURL: url,
             email: normalizedJiraEmail,
-            apiToken: trimmedJiraAPIToken,
+            apiToken: trimmedJiraAPIToken
+        )
+
+        return configuration.isComplete ? configuration : nil
+    }
+
+    var normalizedJiraProjectKey: String {
+        jiraProjectKey.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
+    var normalizedJiraProjectID: String {
+        jiraProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var normalizedJiraIssueType: String {
+        jiraIssueType.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var normalizedJiraIssueTypeID: String {
+        jiraIssueTypeID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var jiraExportConfiguration: JiraExportConfiguration? {
+        guard let connection = jiraConnectionConfiguration else {
+            return nil
+        }
+        guard !normalizedJiraProjectID.isEmpty,
+              !normalizedJiraIssueTypeID.isEmpty else {
+            return nil
+        }
+
+        let configuration = JiraExportConfiguration(
+            baseURL: connection.baseURL,
+            email: connection.email,
+            apiToken: connection.apiToken,
+            projectID: normalizedJiraProjectID.nilIfEmpty,
             projectKey: normalizedJiraProjectKey,
-            issueType: normalizedJiraIssueType
+            issueTypeID: normalizedJiraIssueTypeID,
+            issueTypeName: normalizedJiraIssueType
         )
 
         return configuration.isComplete ? configuration : nil
@@ -452,11 +522,14 @@ final class SettingsStore: ObservableObject {
 
         githubRepositoryOwner = stringValue(forKey: Keys.githubRepositoryOwner) ?? ""
         githubRepositoryName = stringValue(forKey: Keys.githubRepositoryName) ?? ""
+        githubRepositoryID = stringValue(forKey: Keys.githubRepositoryID) ?? ""
         githubDefaultLabels = stringValue(forKey: Keys.githubDefaultLabels) ?? ""
 
         jiraBaseURL = stringValue(forKey: Keys.jiraBaseURL) ?? ""
+        jiraProjectID = stringValue(forKey: Keys.jiraProjectID) ?? ""
         jiraProjectKey = stringValue(forKey: Keys.jiraProjectKey) ?? ""
-        jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? "Task"
+        jiraIssueTypeID = stringValue(forKey: Keys.jiraIssueTypeID) ?? ""
+        jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? ""
         migrateLegacyPlaintextJiraEmailIfNeeded()
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
@@ -1146,10 +1219,13 @@ private enum Keys {
     static let didMigrateLegacyBuiltInHotkeys = "settings.didMigrateLegacyBuiltInHotkeys"
     static let githubRepositoryOwner = "settings.githubRepositoryOwner"
     static let githubRepositoryName = "settings.githubRepositoryName"
+    static let githubRepositoryID = "settings.githubRepositoryID"
     static let githubDefaultLabels = "settings.githubDefaultLabels"
     static let jiraBaseURL = "settings.jiraBaseURL"
     static let jiraEmail = "settings.jiraEmail"
+    static let jiraProjectID = "settings.jiraProjectID"
     static let jiraProjectKey = "settings.jiraProjectKey"
+    static let jiraIssueTypeID = "settings.jiraIssueTypeID"
     static let jiraIssueType = "settings.jiraIssueType"
     static let debugMode = "settings.debugMode"
 }

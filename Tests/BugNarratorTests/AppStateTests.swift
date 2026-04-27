@@ -663,6 +663,258 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.apiKeyValidationState, .failure(AppError.missingAPIKey.userMessage))
     }
 
+    func testValidateGitHubConfigurationUpdatesValidationStateOnSuccess() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
+
+        await harness.appState.validateGitHubConfiguration()
+
+        XCTAssertEqual(
+            harness.appState.gitHubValidationState,
+            .success("GitHub accepted this token for acme/bugnarrator.")
+        )
+    }
+
+    func testLoadGitHubRepositoriesPopulatesPickerOptions() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        await harness.exportService.setGitHubRepositories(
+            [
+                GitHubRepositoryOption(owner: "acme", name: "bugnarrator", description: "Main app"),
+                GitHubRepositoryOption(owner: "acme", name: "internal-tools", description: nil)
+            ]
+        )
+
+        await harness.appState.loadGitHubRepositories()
+
+        XCTAssertEqual(
+            harness.appState.gitHubRepositories,
+            [
+                GitHubRepositoryOption(owner: "acme", name: "bugnarrator", description: "Main app"),
+                GitHubRepositoryOption(owner: "acme", name: "internal-tools", description: nil)
+            ]
+        )
+        XCTAssertEqual(
+            harness.appState.gitHubValidationState,
+            .success("Loaded 2 GitHub repositories where this token can create issues.")
+        )
+    }
+
+    func testValidateJiraConfigurationWithoutConfiguredFieldsShowsFailure() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .failure(AppError.exportConfigurationMissing("Jira project discovery requires a base URL, email, and API token.").userMessage)
+        )
+    }
+
+    func testValidateJiraConfigurationLoadsProjectsAndIssueTypes() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraIssueType = "Task"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        await harness.exportService.setJiraIssueTypes(
+            [
+                JiraIssueTypeOption(id: "10002", name: "Bug"),
+                JiraIssueTypeOption(id: "10001", name: "Task")
+            ],
+            for: "UCAP"
+        )
+
+        harness.settingsStore.jiraProjectKey = "UCAP"
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(
+            harness.appState.jiraProjects,
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        XCTAssertEqual(
+            harness.appState.jiraIssueTypes,
+            [
+                JiraIssueTypeOption(id: "10002", name: "Bug"),
+                JiraIssueTypeOption(id: "10001", name: "Task")
+            ]
+        )
+        XCTAssertEqual(harness.settingsStore.jiraProjectKey, "UCAP")
+        XCTAssertEqual(harness.settingsStore.jiraIssueType, "Task")
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .success("Loaded 2 Jira projects. UCAP - Unified Claims Access Portal is ready to export as Task.")
+        )
+    }
+
+    func testValidateJiraConfigurationFlagsSavedIssueTypeThatIsNoLongerAllowed() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraProjectKey = "UCAP"
+        harness.settingsStore.jiraIssueType = "Task"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        await harness.exportService.setJiraIssueTypes(
+            [
+                JiraIssueTypeOption(id: "10002", name: "Bug")
+            ],
+            for: "UCAP"
+        )
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(harness.settingsStore.jiraIssueType, "Task")
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .failure("Project UCAP - Unified Claims Access Portal does not allow issue type Task. Choose one of the available issue types.")
+        )
+    }
+
+    func testValidateJiraConfigurationDoesNotRetargetUnavailableSavedProject() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraProjectKey = "LEGACY"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(harness.settingsStore.jiraProjectKey, "LEGACY")
+        XCTAssertEqual(harness.appState.jiraIssueTypes, [])
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .failure("Loaded 2 Jira projects, but the saved project LEGACY is no longer available. Choose a project from the list.")
+        )
+    }
+
+    func testRefreshJiraIssueTypesAppliesLatestProjectAfterRapidSwitching() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraProjectKey = "OPS"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        await harness.appState.validateJiraConfiguration()
+
+        await harness.exportService.setJiraIssueTypes(
+            [JiraIssueTypeOption(id: "20001", name: "Story")],
+            for: "OPS"
+        )
+        await harness.exportService.setJiraIssueTypes(
+            [JiraIssueTypeOption(id: "10001", name: "Task")],
+            for: "UCAP"
+        )
+        await harness.appState.validateJiraConfiguration()
+        await harness.exportService.setSuspendJiraIssueTypeFetch(true)
+
+        await MainActor.run {
+            harness.settingsStore.jiraProjectKey = "UCAP"
+        }
+
+        let firstRefresh = Task {
+            await harness.appState.refreshJiraIssueTypesForSelectedProject()
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        await MainActor.run {
+            harness.settingsStore.jiraProjectKey = "OPS"
+        }
+
+        let secondRefresh = Task {
+            await harness.appState.refreshJiraIssueTypesForSelectedProject()
+        }
+
+        await harness.exportService.resumeJiraIssueTypeFetch(
+            for: "UCAP",
+            with: .success([JiraIssueTypeOption(id: "10001", name: "Task")])
+        )
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        await harness.exportService.resumeJiraIssueTypeFetch(
+            for: "OPS",
+            with: .success([JiraIssueTypeOption(id: "20001", name: "Story")])
+        )
+
+        _ = await firstRefresh.result
+        _ = await secondRefresh.result
+
+        XCTAssertEqual(
+            harness.appState.jiraIssueTypes,
+            [JiraIssueTypeOption(id: "20001", name: "Story")]
+        )
+        XCTAssertEqual(harness.settingsStore.jiraProjectKey, "OPS")
+    }
+
+    func testValidateJiraConfigurationKeepsLastKnownMetadataOnTransientIssueTypeFailure() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraProjectKey = "UCAP"
+        harness.settingsStore.jiraIssueType = "Task"
+        await harness.exportService.setJiraProjects([JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")])
+        await harness.exportService.setJiraIssueTypes([JiraIssueTypeOption(id: "10001", name: "Task")], for: "UCAP")
+
+        await harness.appState.validateJiraConfiguration()
+        await harness.exportService.setJiraIssueTypesError(AppError.exportFailure("Transient Jira outage"))
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(
+            harness.appState.jiraIssueTypes,
+            [JiraIssueTypeOption(id: "10001", name: "Task")]
+        )
+        XCTAssertTrue(harness.appState.jiraIssueTypeMetadataIsStale)
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .failure(AppError.exportFailure("Transient Jira outage").userMessage)
+        )
+    }
+
     func testAboutChangelogAndSupportActionsTriggerWindowCallbacks() {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -1019,6 +1271,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
 
         XCTAssertTrue(harness.appState.canExportIssues(from: session, to: .github))
     }
@@ -1070,6 +1323,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
 
         let session = TranscriptSession(
             createdAt: Date(),
@@ -1114,6 +1368,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
         await harness.exportService.setGitHubResults([
             ExportResult(
                 sourceIssueID: UUID(),
@@ -1158,6 +1413,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
 
         let sourceIssue = ExtractedIssue(
             title: "Login button is disabled",
@@ -1218,6 +1474,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
 
         let sourceIssue = ExtractedIssue(
             title: "Login button is disabled",
@@ -1278,6 +1535,7 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
         harness.settingsStore.githubRepositoryName = "bugnarrator"
+        harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
         await harness.exportService.setGitHubResults([
             ExportResult(
                 sourceIssueID: UUID(),

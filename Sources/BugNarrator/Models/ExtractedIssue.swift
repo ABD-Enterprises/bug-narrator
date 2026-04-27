@@ -529,12 +529,75 @@ struct IssueExportReview: Identifiable, Equatable {
 
 struct GitHubExportConfiguration: Equatable {
     let token: String
+    let repositoryID: String?
     let owner: String
     let repository: String
     let labels: [String]
 
+    init(
+        token: String,
+        repositoryID: String? = nil,
+        owner: String,
+        repository: String,
+        labels: [String]
+    ) {
+        self.token = token
+        self.repositoryID = repositoryID
+        self.owner = owner
+        self.repository = repository
+        self.labels = labels
+    }
+
     var isComplete: Bool {
         !token.isEmpty && !owner.isEmpty && !repository.isEmpty
+    }
+
+    var targetIdentity: String {
+        repositoryID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            ?? "\(owner.lowercased())/\(repository.lowercased())"
+    }
+}
+
+struct GitHubRepositoryOption: Equatable, Identifiable {
+    let repositoryID: String
+    let owner: String
+    let name: String
+    let description: String?
+
+    init(
+        repositoryID: String? = nil,
+        owner: String,
+        name: String,
+        description: String?
+    ) {
+        self.repositoryID = repositoryID ?? "\(owner.lowercased())/\(name.lowercased())"
+        self.owner = owner
+        self.name = name
+        self.description = description
+    }
+
+    var id: String { repositoryID }
+
+    var fullName: String {
+        "\(owner)/\(name)"
+    }
+
+    var displayLabel: String {
+        guard let description, !description.isEmpty else {
+            return fullName
+        }
+
+        return "\(fullName) - \(description)"
+    }
+}
+
+struct JiraConnectionConfiguration: Equatable {
+    let baseURL: URL
+    let email: String
+    let apiToken: String
+
+    var isComplete: Bool {
+        !email.isEmpty && !apiToken.isEmpty
     }
 }
 
@@ -542,15 +605,74 @@ struct JiraExportConfiguration: Equatable {
     let baseURL: URL
     let email: String
     let apiToken: String
+    let projectID: String?
     let projectKey: String
-    let issueType: String
+    let issueTypeID: String
+    let issueTypeName: String
+
+    init(
+        baseURL: URL,
+        email: String,
+        apiToken: String,
+        projectID: String? = nil,
+        projectKey: String,
+        issueTypeID: String = "",
+        issueTypeName: String? = nil,
+        issueType: String? = nil
+    ) {
+        self.baseURL = baseURL
+        self.email = email
+        self.apiToken = apiToken
+        self.projectID = projectID
+        self.projectKey = projectKey
+        self.issueTypeID = issueTypeID
+        self.issueTypeName = issueTypeName ?? issueType ?? ""
+    }
 
     var isComplete: Bool {
-        !email.isEmpty && !apiToken.isEmpty && !projectKey.isEmpty && !issueType.isEmpty
+        !email.isEmpty
+            && !apiToken.isEmpty
+            && !projectKey.isEmpty
+            && !(issueTypeID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                 && issueTypeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    var targetIdentity: String {
+        let normalizedProjectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? projectKey.uppercased()
+        let normalizedIssueTypeID = issueTypeID.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let normalizedIssueTypeName = issueTypeName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .nilIfEmpty
+            ?? "unknown"
+        return "\(normalizedProjectID)::\(normalizedIssueTypeID ?? normalizedIssueTypeName)"
     }
 }
 
-private extension String {
+struct JiraProjectOption: Equatable, Identifiable {
+    let projectID: String
+    let key: String
+    let name: String
+
+    init(projectID: String? = nil, key: String, name: String) {
+        self.projectID = projectID ?? key
+        self.key = key
+        self.name = name
+    }
+
+    var id: String { projectID }
+
+    var displayLabel: String {
+        "\(key) - \(name)"
+    }
+}
+
+struct JiraIssueTypeOption: Equatable, Identifiable {
+    let id: String
+    let name: String
+}
+
+extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }

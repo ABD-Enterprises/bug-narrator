@@ -91,6 +91,43 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.contains("review-shot-annotated"))
     }
 
+    func testMakeURLRequestPreservesExportFingerprintWhenBodyIsTruncated() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let marker = TrackerExportFingerprint.marker(for: "bnexp-fixture")
+        let issue = ExtractedIssue(
+            title: "Oversized issue",
+            category: .bug,
+            summary: String(repeating: "Summary ", count: 10_000),
+            evidenceExcerpt: String(repeating: "Evidence ", count: 10_000),
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            ),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertLessThanOrEqual(payload.body.count, TrackerExportPayloadBudget.gitHubBodyLimit)
+        XCTAssertTrue(payload.body.hasSuffix(marker))
+    }
+
     func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
@@ -127,6 +164,84 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(matches.count, 1)
         XCTAssertEqual(matches.first?.remoteIdentifier, "#142")
         XCTAssertEqual(matches.first?.title, "Login form validation broken")
+    }
+
+    func testValidateConfigurationChecksRepositoryAccess() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.absoluteString, "https://api.github.com/repos/acme/bugnarrator")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-github-token")
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"full_name":"acme/bugnarrator","has_issues":true,"permissions":{"push":true}}"#.utf8))
+        }
+
+        try await provider.validate(
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            )
+        )
+    }
+
+    func testValidateConfigurationRejectsReadOnlyRepositoryAccess() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"full_name":"acme/bugnarrator","has_issues":true,"permissions":{"pull":true,"push":false}}"#.utf8))
+        }
+
+        do {
+            try await provider.validate(
+                configuration: GitHubExportConfiguration(
+                    token: "fixture-github-token",
+                    owner: "acme",
+                    repository: "bugnarrator",
+                    labels: []
+                )
+            )
+            XCTFail("Expected GitHub validation to fail.")
+        } catch let error as AppError {
+            guard case .exportFailure(let message) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+
+            XCTAssertTrue(message.contains("cannot create issues"))
+        }
+    }
+
+    func testFetchRepositoriesReturnsWritableIssueReposOnly() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertTrue(request.url?.absoluteString.contains("/user/repos?") == true)
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"""
+                [
+                    {"name":"bugnarrator","description":"Main app","has_issues":true,"permissions":{"push":true},"owner":{"login":"acme"}},
+                    {"name":"docs","description":"Docs","has_issues":false,"permissions":{"push":true},"owner":{"login":"acme"}},
+                    {"name":"read-only","description":"Readonly","has_issues":true,"permissions":{"push":false},"owner":{"login":"acme"}}
+                ]
+                """#.utf8
+            )
+            return (response, data)
+        }
+
+        let repositories = try await provider.fetchRepositories(token: "fixture-github-token")
+
+        XCTAssertEqual(
+            repositories,
+            [GitHubRepositoryOption(owner: "acme", name: "bugnarrator", description: "Main app")]
+        )
     }
 
     func testExportMapsRepositoryNotFound() async throws {

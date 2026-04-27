@@ -224,10 +224,45 @@ struct SettingsView: View {
 
                             Spacer()
 
+                            Button(gitHubRepositoryActionTitle) {
+                                Task {
+                                    await appState.loadGitHubRepositories()
+                                }
+                            }
+                            .disabled(secureControlsDisabled || !canLoadGitHubRepositories || appState.isLoadingGitHubRepositories)
+
+                            Button(gitHubValidationActionTitle) {
+                                Task {
+                                    await appState.validateGitHubConfiguration()
+                                }
+                            }
+                            .disabled(secureControlsDisabled || !canAttemptGitHubValidation || appState.gitHubValidationState == .validating)
+
                             Button("Remove GitHub Token", role: .destructive) {
                                 settingsStore.removeGitHubToken()
                             }
                             .disabled(secureControlsDisabled || !settingsStore.hasGitHubToken)
+                        }
+
+                        labeledField(title: "Repository") {
+                            if appState.gitHubRepositories.isEmpty {
+                                Text("Load repositories first")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                Picker("GitHub repository", selection: gitHubRepositorySelection) {
+                                    Text("Choose a repository")
+                                        .tag("")
+                                    ForEach(appState.gitHubRepositories) { repository in
+                                        Text(repository.displayLabel)
+                                            .tag(repository.repositoryID)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .disabled(secureControlsDisabled || appState.isLoadingGitHubRepositories)
+                                .accessibilityLabel("GitHub repository")
+                            }
                         }
 
                         labeledField(title: "Repository Owner") {
@@ -256,6 +291,16 @@ struct SettingsView: View {
                                     ? .orange
                                     : .secondary
                             )
+
+                        if let message = appState.gitHubValidationState.message {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(appState.gitHubValidationState.isFailure ? .red : .green)
+                        }
+
+                        Text("Use Export to GitHub from Session Library > Extracted Issues after you extract issues from a transcript.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
 
                         Text("GitHub export is experimental. It creates Issues in the configured repository using the selected extracted issues. Screenshot filenames are referenced in the issue body for manual attachment.")
                             .font(.footnote)
@@ -293,22 +338,61 @@ struct SettingsView: View {
 
                             Spacer()
 
+                            Button(jiraValidationActionTitle) {
+                                Task {
+                                    await appState.validateJiraConfiguration()
+                                }
+                            }
+                            .disabled(secureControlsDisabled || !canAttemptJiraValidation || appState.jiraValidationState == .validating)
+
                             Button("Remove Jira Token", role: .destructive) {
                                 settingsStore.removeJiraAPIToken()
                             }
                             .disabled(secureControlsDisabled || !settingsStore.hasJiraAPIToken)
                         }
 
-                        labeledField(title: "Project Key") {
-                            TextField("for example FM", text: $settingsStore.jiraProjectKey)
-                                .textFieldStyle(.roundedBorder)
-                                .accessibilityLabel("Jira project key")
+                        labeledField(title: "Project") {
+                            if appState.jiraProjects.isEmpty {
+                                Text(settingsStore.normalizedJiraProjectKey.isEmpty ? "Load projects first" : settingsStore.normalizedJiraProjectKey)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityLabel("Jira project key")
+                            } else {
+                                Picker("Jira project", selection: jiraProjectSelection) {
+                                    Text("Choose a project")
+                                        .tag("")
+                                    ForEach(appState.jiraProjects) { project in
+                                        Text(project.displayLabel)
+                                            .tag(project.projectID)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .disabled(secureControlsDisabled || appState.jiraValidationState == .validating)
+                                .accessibilityLabel("Jira project")
+                            }
                         }
 
                         labeledField(title: "Issue Type") {
-                            TextField("for example Task", text: $settingsStore.jiraIssueType)
-                                .textFieldStyle(.roundedBorder)
+                            if appState.jiraIssueTypes.isEmpty {
+                                Text(settingsStore.normalizedJiraIssueType.isEmpty ? "Load a project first" : settingsStore.normalizedJiraIssueType)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityLabel("Jira issue type")
+                            } else {
+                                Picker("Jira issue type", selection: jiraIssueTypeSelection) {
+                                    Text("Choose an issue type")
+                                        .tag("")
+                                    ForEach(appState.jiraIssueTypes) { issueType in
+                                        Text(issueType.name)
+                                            .tag(issueType.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .disabled(secureControlsDisabled || appState.isLoadingJiraIssueTypes)
                                 .accessibilityLabel("Jira issue type")
+                            }
                         }
 
                         Text(settingsStore.jiraTokenStorageDescription)
@@ -319,6 +403,22 @@ struct SettingsView: View {
                                     ? .orange
                                     : .secondary
                             )
+
+                        if let message = appState.jiraValidationState.message {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(appState.jiraValidationState.isFailure ? .red : .green)
+                        }
+
+                        if appState.jiraProjectMetadataIsStale || appState.jiraIssueTypeMetadataIsStale {
+                            Text("Showing the last successfully loaded Jira metadata. Refresh after fixing the validation error to confirm it is still current.")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
+
+                        Text("Use Load Jira Projects here first. Then use Export to Jira from Session Library > Extracted Issues after you extract issues from a transcript.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
 
                         Text("Jira export is experimental. It creates issues in Jira Cloud using the selected extracted issues. Screenshot filenames are referenced in the description for manual attachment.")
                             .font(.footnote)
@@ -387,6 +487,15 @@ struct SettingsView: View {
             }
             .padding(24)
         }
+        .onChange(of: settingsStore.jiraProjectKey) { _, _ in
+            guard !appState.jiraProjects.isEmpty else {
+                return
+            }
+
+            Task {
+                await appState.refreshJiraIssueTypesForSelectedProject()
+            }
+        }
     }
 
     private var secureControlsDisabled: Bool {
@@ -403,8 +512,149 @@ struct SettingsView: View {
             : (settingsStore.apiKeyPersistenceState == .pendingSave ? "Save & Validate Key" : "Validate Key")
     }
 
+    private var gitHubValidationActionTitle: String {
+        if appState.gitHubValidationState == .validating {
+            return "Validating..."
+        }
+
+        return settingsStore.githubTokenPersistenceState == .pendingSave
+            ? "Save & Validate GitHub"
+            : "Validate GitHub Setup"
+    }
+
+    private var gitHubRepositoryActionTitle: String {
+        if appState.isLoadingGitHubRepositories {
+            return "Loading..."
+        }
+
+        return settingsStore.githubTokenPersistenceState == .pendingSave
+            ? "Save & Load GitHub Repos"
+            : (appState.gitHubRepositories.isEmpty ? "Load GitHub Repos" : "Refresh GitHub Repos")
+    }
+
+    private var jiraValidationActionTitle: String {
+        if appState.jiraValidationState == .validating {
+            return "Loading..."
+        }
+
+        return settingsStore.jiraTokenPersistenceState == .pendingSave ||
+            settingsStore.jiraEmailPersistenceState == .pendingSave
+            ? "Save & Load Jira Projects"
+            : (appState.jiraProjects.isEmpty ? "Load Jira Projects" : "Refresh Jira Projects")
+    }
+
+    private var canAttemptGitHubValidation: Bool {
+        let tokenAvailable = settingsStore.hasGitHubToken || settingsStore.githubTokenPersistenceState == .keychainLocked
+        return tokenAvailable &&
+            !settingsStore.normalizedGitHubRepositoryID.isEmpty &&
+            !settingsStore.normalizedGitHubRepositoryOwner.isEmpty &&
+            !settingsStore.normalizedGitHubRepositoryName.isEmpty
+    }
+
+    private var canLoadGitHubRepositories: Bool {
+        settingsStore.hasGitHubToken || settingsStore.githubTokenPersistenceState == .keychainLocked
+    }
+
+    private var canAttemptJiraValidation: Bool {
+        let emailAvailable = !settingsStore.normalizedJiraEmail.isEmpty || settingsStore.jiraEmailPersistenceState == .keychainLocked
+        let tokenAvailable = settingsStore.hasJiraAPIToken || settingsStore.jiraTokenPersistenceState == .keychainLocked
+        return tokenAvailable &&
+            emailAvailable &&
+            !settingsStore.normalizedJiraBaseURL.isEmpty &&
+            !settingsStore.normalizedJiraProjectID.isEmpty &&
+            !settingsStore.normalizedJiraIssueTypeID.isEmpty
+    }
+
+    private var jiraProjectSelection: Binding<String> {
+        Binding(
+            get: {
+                let currentProjectID = settingsStore.normalizedJiraProjectID
+                let currentProjectKey = settingsStore.normalizedJiraProjectKey
+                guard let selectedProject = appState.jiraProjects.first(where: {
+                    $0.projectID == currentProjectID || $0.key == currentProjectKey
+                }) else {
+                    return appState.jiraProjects.first(where: {
+                        $0.projectID == currentProjectID || $0.key == currentProjectKey
+                    })?.projectID ?? ""
+                }
+
+                return selectedProject.projectID
+            },
+            set: { selectedProjectID in
+                guard let selectedProject = appState.jiraProjects.first(where: { $0.projectID == selectedProjectID }) else {
+                    settingsStore.jiraProjectID = ""
+                    settingsStore.jiraProjectKey = ""
+                    settingsStore.jiraIssueTypeID = ""
+                    settingsStore.jiraIssueType = ""
+                    return
+                }
+
+                settingsStore.jiraProjectID = selectedProject.projectID
+                settingsStore.jiraProjectKey = selectedProject.key
+                settingsStore.jiraIssueTypeID = ""
+                settingsStore.jiraIssueType = ""
+            }
+        )
+    }
+
+    private var jiraIssueTypeSelection: Binding<String> {
+        Binding(
+            get: {
+                let currentIssueTypeID = settingsStore.normalizedJiraIssueTypeID
+                let currentIssueTypeName = settingsStore.normalizedJiraIssueType
+                guard let selectedIssueType = appState.jiraIssueTypes.first(where: {
+                    $0.id == currentIssueTypeID
+                        || $0.name.compare(currentIssueTypeName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                }) else {
+                    return ""
+                }
+
+                return selectedIssueType.id
+            },
+            set: { selectedIssueTypeID in
+                guard let selectedIssueType = appState.jiraIssueTypes.first(where: { $0.id == selectedIssueTypeID }) else {
+                    settingsStore.jiraIssueTypeID = ""
+                    settingsStore.jiraIssueType = ""
+                    return
+                }
+
+                settingsStore.jiraIssueTypeID = selectedIssueType.id
+                settingsStore.jiraIssueType = selectedIssueType.name
+            }
+        )
+    }
+
     private var debugInfoSnapshot: DebugInfoSnapshot {
         appState.debugInfoSnapshot
+    }
+
+    private var gitHubRepositorySelection: Binding<String> {
+        Binding(
+            get: {
+                let currentRepositoryID = settingsStore.normalizedGitHubRepositoryID
+                let currentOwner = settingsStore.normalizedGitHubRepositoryOwner
+                let currentRepository = settingsStore.normalizedGitHubRepositoryName
+                guard let selectedRepository = appState.gitHubRepositories.first(where: {
+                    $0.repositoryID == currentRepositoryID
+                        || ($0.owner.compare(currentOwner, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame &&
+                            $0.name.compare(currentRepository, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame)
+                }) else {
+                    return ""
+                }
+
+                return selectedRepository.repositoryID
+            },
+            set: { selectedRepositoryID in
+                guard let selectedRepository = appState.gitHubRepositories.first(where: { $0.repositoryID == selectedRepositoryID }) else {
+                    settingsStore.githubRepositoryID = ""
+                    return
+                }
+
+                settingsStore.githubRepositoryID = selectedRepository.repositoryID
+                settingsStore.githubRepositoryOwner = selectedRepository.owner
+                settingsStore.githubRepositoryName = selectedRepository.name
+            }
+        )
     }
 
     private func hotkeyRow(action: HotkeyAction, shortcut: Binding<HotkeyShortcut>) -> some View {
