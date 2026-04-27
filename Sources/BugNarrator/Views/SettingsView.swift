@@ -211,7 +211,7 @@ struct SettingsView: View {
                         sectionIntro("Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues. This integration is still experimental.")
 
                         labeledField(title: "Personal Access Token") {
-                            SecureField("github_pat_...", text: $settingsStore.githubToken)
+                            SecureField("Paste GitHub token", text: $settingsStore.githubToken)
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(secureControlsDisabled)
                                 .accessibilityLabel("GitHub personal access token")
@@ -229,14 +229,14 @@ struct SettingsView: View {
                                     await appState.loadGitHubRepositories()
                                 }
                             }
-                            .disabled(secureControlsDisabled || !canLoadGitHubRepositories || appState.isLoadingGitHubRepositories)
+                            .disabled(secureControlsDisabled || !settingsStore.gitHubRepositoryDiscoveryIsReady || appState.isLoadingGitHubRepositories)
 
                             Button(gitHubValidationActionTitle) {
                                 Task {
                                     await appState.validateGitHubConfiguration()
                                 }
                             }
-                            .disabled(secureControlsDisabled || !canAttemptGitHubValidation || appState.gitHubValidationState == .validating)
+                            .disabled(secureControlsDisabled || !settingsStore.gitHubConfigurationValidationIsReady || appState.gitHubValidationState == .validating)
 
                             Button("Remove GitHub Token", role: .destructive) {
                                 settingsStore.removeGitHubToken()
@@ -246,7 +246,7 @@ struct SettingsView: View {
 
                         labeledField(title: "Repository") {
                             if appState.gitHubRepositories.isEmpty {
-                                Text("Load repositories first")
+                                Text(settingsStore.gitHubRepositoryDiscoveryIsReady ? "Load repositories first" : "Paste a token, then load repositories")
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
@@ -343,7 +343,7 @@ struct SettingsView: View {
                                     await appState.validateJiraConfiguration()
                                 }
                             }
-                            .disabled(secureControlsDisabled || !canAttemptJiraValidation || appState.jiraValidationState == .validating)
+                            .disabled(secureControlsDisabled || !settingsStore.jiraProjectDiscoveryIsReady || appState.jiraValidationState == .validating)
 
                             Button("Remove Jira Token", role: .destructive) {
                                 settingsStore.removeJiraAPIToken()
@@ -353,7 +353,7 @@ struct SettingsView: View {
 
                         labeledField(title: "Project") {
                             if appState.jiraProjects.isEmpty {
-                                Text(settingsStore.normalizedJiraProjectKey.isEmpty ? "Load projects first" : settingsStore.normalizedJiraProjectKey)
+                                Text(settingsStore.normalizedJiraProjectKey.isEmpty ? jiraProjectPlaceholder : settingsStore.normalizedJiraProjectKey)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .accessibilityLabel("Jira project key")
@@ -543,26 +543,8 @@ struct SettingsView: View {
             : (appState.jiraProjects.isEmpty ? "Load Jira Projects" : "Refresh Jira Projects")
     }
 
-    private var canAttemptGitHubValidation: Bool {
-        let tokenAvailable = settingsStore.hasGitHubToken || settingsStore.githubTokenPersistenceState == .keychainLocked
-        return tokenAvailable &&
-            !settingsStore.normalizedGitHubRepositoryID.isEmpty &&
-            !settingsStore.normalizedGitHubRepositoryOwner.isEmpty &&
-            !settingsStore.normalizedGitHubRepositoryName.isEmpty
-    }
-
-    private var canLoadGitHubRepositories: Bool {
-        settingsStore.hasGitHubToken || settingsStore.githubTokenPersistenceState == .keychainLocked
-    }
-
-    private var canAttemptJiraValidation: Bool {
-        let emailAvailable = !settingsStore.normalizedJiraEmail.isEmpty || settingsStore.jiraEmailPersistenceState == .keychainLocked
-        let tokenAvailable = settingsStore.hasJiraAPIToken || settingsStore.jiraTokenPersistenceState == .keychainLocked
-        return tokenAvailable &&
-            emailAvailable &&
-            !settingsStore.normalizedJiraBaseURL.isEmpty &&
-            !settingsStore.normalizedJiraProjectID.isEmpty &&
-            !settingsStore.normalizedJiraIssueTypeID.isEmpty
+    private var jiraProjectPlaceholder: String {
+        settingsStore.jiraProjectDiscoveryIsReady ? "Load projects first" : "Enter Jira URL, email, and token first"
     }
 
     private var jiraProjectSelection: Binding<String> {

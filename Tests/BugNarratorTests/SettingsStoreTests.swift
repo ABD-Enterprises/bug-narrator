@@ -280,7 +280,38 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(keychain.values["BugNarrator.Jira::jira-api-token"], "draft-jira-token")
     }
 
-    func testExportConfigurationsRequireVerifiedTrackerSelections() {
+    func testTrackerSetupReadinessDoesNotRequireLoadedPickerSelections() {
+        let suiteName = "BugNarrator-SettingsTrackerSetupReadinessTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertFalse(store.gitHubRepositoryDiscoveryIsReady)
+        XCTAssertFalse(store.gitHubConfigurationValidationIsReady)
+        XCTAssertFalse(store.jiraProjectDiscoveryIsReady)
+
+        store.githubToken = "fixture-github-token"
+        XCTAssertTrue(store.gitHubRepositoryDiscoveryIsReady)
+        XCTAssertFalse(store.gitHubConfigurationValidationIsReady)
+
+        store.githubRepositoryOwner = "acme"
+        store.githubRepositoryName = "bugnarrator"
+        XCTAssertTrue(store.gitHubConfigurationValidationIsReady)
+        XCTAssertNotNil(store.githubExportConfiguration)
+
+        store.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net/"
+        store.jiraEmail = "alan.deffenderfer@gdit.com"
+        store.jiraAPIToken = "fixture-jira-token"
+
+        XCTAssertTrue(store.jiraProjectDiscoveryIsReady)
+        XCTAssertEqual(store.jiraConnectionConfiguration?.baseURL.scheme, "https")
+        XCTAssertEqual(store.jiraConnectionConfiguration?.baseURL.host, "digitaltransformation-csra.atlassian.net")
+        XCTAssertNil(store.jiraExportConfiguration)
+    }
+
+    func testExportConfigurationsMatchProviderSelectionRequirements() {
         let suiteName = "BugNarrator-SettingsVerifiedTrackerSelectionTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -296,7 +327,8 @@ final class SettingsStoreTests: XCTestCase {
         store.jiraProjectKey = "FM"
         store.jiraIssueType = "Task"
 
-        XCTAssertNil(store.githubExportConfiguration)
+        XCTAssertNotNil(store.githubExportConfiguration)
+        XCTAssertNil(store.githubExportConfiguration?.repositoryID)
         XCTAssertNil(store.jiraExportConfiguration)
 
         store.githubRepositoryID = "R_kgDOFixture"

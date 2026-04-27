@@ -750,6 +750,38 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testValidateJiraConfigurationLoadsProjectsBeforeProjectSelection() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net/"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+
+        await harness.appState.validateJiraConfiguration()
+
+        XCTAssertEqual(
+            harness.appState.jiraProjects,
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        XCTAssertEqual(harness.appState.jiraIssueTypes, [])
+        XCTAssertEqual(harness.settingsStore.jiraProjectID, "")
+        XCTAssertEqual(harness.settingsStore.jiraIssueTypeID, "")
+        XCTAssertEqual(
+            harness.appState.jiraValidationState,
+            .success("Loaded 2 Jira projects. Choose a project to load issue types.")
+        )
+    }
+
     func testValidateJiraConfigurationLoadsProjectsAndIssueTypes() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

@@ -271,6 +271,13 @@ final class SettingsStore: ObservableObject {
         !trimmedGitHubToken.isEmpty
     }
 
+    var gitHubRepositoryDiscoveryIsReady: Bool {
+        credentialIsAvailableForUserAction(
+            value: trimmedGitHubToken,
+            persistenceState: githubTokenPersistenceState
+        )
+    }
+
     var maskedGitHubToken: String {
         mask(
             secret: trimmedGitHubToken,
@@ -299,6 +306,12 @@ final class SettingsStore: ObservableObject {
         githubRepositoryID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var gitHubConfigurationValidationIsReady: Bool {
+        gitHubRepositoryDiscoveryIsReady &&
+            !normalizedGitHubRepositoryOwner.isEmpty &&
+            !normalizedGitHubRepositoryName.isEmpty
+    }
+
     var githubDefaultLabelsList: [String] {
         githubDefaultLabels
             .split(whereSeparator: \.isNewline)
@@ -308,10 +321,6 @@ final class SettingsStore: ObservableObject {
     }
 
     var githubExportConfiguration: GitHubExportConfiguration? {
-        guard !normalizedGitHubRepositoryID.isEmpty else {
-            return nil
-        }
-
         let configuration = GitHubExportConfiguration(
             token: trimmedGitHubToken,
             repositoryID: normalizedGitHubRepositoryID.nilIfEmpty,
@@ -357,10 +366,20 @@ final class SettingsStore: ObservableObject {
         jiraEmail.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var jiraProjectDiscoveryIsReady: Bool {
+        credentialIsAvailableForUserAction(
+            value: normalizedJiraEmail,
+            persistenceState: jiraEmailPersistenceState
+        ) &&
+            credentialIsAvailableForUserAction(
+                value: trimmedJiraAPIToken,
+                persistenceState: jiraTokenPersistenceState
+            ) &&
+            jiraBaseURLValue != nil
+    }
+
     var jiraConnectionConfiguration: JiraConnectionConfiguration? {
-        let baseURLString = normalizedJiraBaseURL
-        guard !baseURLString.isEmpty,
-              let url = URL(string: "https://\(baseURLString)") ?? URL(string: baseURLString) else {
+        guard let url = jiraBaseURLValue else {
             return nil
         }
 
@@ -371,6 +390,33 @@ final class SettingsStore: ObservableObject {
         )
 
         return configuration.isComplete ? configuration : nil
+    }
+
+    private var jiraBaseURLValue: URL? {
+        let rawValue = jiraBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        guard !rawValue.isEmpty else {
+            return nil
+        }
+
+        let candidate = rawValue.contains("://") ? rawValue : "https://\(rawValue)"
+        guard var components = URLComponents(string: candidate),
+              let host = components.host,
+              !host.isEmpty else {
+            return nil
+        }
+
+        if components.scheme?.isEmpty != false {
+            components.scheme = "https"
+        }
+
+        if components.path == "/" {
+            components.path = ""
+        }
+
+        return components.url
     }
 
     var normalizedJiraProjectKey: String {
@@ -1016,6 +1062,13 @@ final class SettingsStore: ObservableObject {
 
     private func hasPendingSecretChanges(for slot: SecretSlot) -> Bool {
         persistenceState(for: slot) == .pendingSave
+    }
+
+    private func credentialIsAvailableForUserAction(
+        value: String,
+        persistenceState: APIKeyPersistenceState
+    ) -> Bool {
+        !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || persistenceState == .keychainLocked
     }
 
     private func currentSecretValue(for slot: SecretSlot) -> String {
