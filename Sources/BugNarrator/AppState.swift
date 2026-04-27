@@ -823,6 +823,10 @@ final class AppState: ObservableObject {
         await trackerIntegration.validateJiraConfiguration()
     }
 
+    func selectJiraProject(projectID: String) {
+        trackerIntegration.selectJiraProject(projectID: projectID)
+    }
+
     func refreshJiraIssueTypesForSelectedProject() async {
         await trackerIntegration.refreshJiraIssueTypesForSelectedProject()
     }

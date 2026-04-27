@@ -72,9 +72,6 @@ final class TrackerIntegrationController: ObservableObject {
                 metadata: ["repository": "\(configurationSnapshot.owner)/\(configurationSnapshot.repository)"]
             )
         } catch is CancellationError {
-            if requestID == gitHubRepositoriesRequestID {
-                isLoadingGitHubRepositories = false
-            }
             return
         } catch {
             guard requestID == gitHubValidationRequestID else {
@@ -135,9 +132,6 @@ final class TrackerIntegrationController: ObservableObject {
                 )
             }
         } catch is CancellationError {
-            if requestID == jiraIssueTypesRequestID {
-                isLoadingJiraIssueTypes = false
-            }
             return
         } catch {
             guard requestID == gitHubRepositoriesRequestID else {
@@ -290,6 +284,24 @@ final class TrackerIntegrationController: ObservableObject {
             jiraValidationState = .failure(appError.userMessage)
             exportLogger.warning("validate_jira_configuration_failed", appError.userMessage)
         }
+    }
+
+    func selectJiraProject(projectID: String) {
+        guard let selectedProject = jiraProjects.first(where: { $0.projectID == projectID }) else {
+            settingsStore.jiraProjectID = ""
+            settingsStore.jiraProjectKey = ""
+            settingsStore.jiraIssueTypeID = ""
+            settingsStore.jiraIssueType = ""
+            jiraIssueTypes = []
+            jiraIssueTypesProjectKey = nil
+            jiraIssueTypeMetadataIsStale = false
+            return
+        }
+
+        settingsStore.jiraProjectID = selectedProject.projectID
+        settingsStore.jiraProjectKey = selectedProject.key
+        settingsStore.jiraIssueTypeID = ""
+        settingsStore.jiraIssueType = ""
     }
 
     func refreshJiraIssueTypesForSelectedProject() async {

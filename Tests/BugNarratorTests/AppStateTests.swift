@@ -738,6 +738,20 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testCredentialTokenFieldMasksAtRestAndDisablesPasswordAutofillTraits() {
+        let field = CredentialTokenTextField()
+
+        field.configureCredentialInput()
+
+        XCTAssertFalse(field.cell is NSSecureTextFieldCell)
+        XCTAssertFalse(field.isAutomaticTextCompletionEnabled)
+        if #available(macOS 11.0, *) {
+            XCTAssertNil(field.contentType)
+        }
+        XCTAssertEqual(CredentialTokenField.maskedDisplayValue(for: "github_pat_fixture_1234"), "••••••••1234")
+        XCTAssertEqual(CredentialTokenField.maskedDisplayValue(for: ""), "")
+    }
+
     func testValidateJiraConfigurationWithoutConfiguredFieldsShowsFailure() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -780,6 +794,44 @@ final class AppStateTests: XCTestCase {
             harness.appState.jiraValidationState,
             .success("Loaded 2 Jira projects. Choose a project to load issue types.")
         )
+    }
+
+    func testSelectJiraProjectLoadsIssueTypesOnlyAfterExplicitRefresh() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        await harness.exportService.setJiraProjects(
+            [
+                JiraProjectOption(key: "OPS", name: "Operations Support"),
+                JiraProjectOption(key: "UCAP", name: "Unified Claims Access Portal")
+            ]
+        )
+        await harness.exportService.setJiraIssueTypes(
+            [JiraIssueTypeOption(id: "10001", name: "Task")],
+            for: "UCAP"
+        )
+
+        await harness.appState.validateJiraConfiguration()
+
+        let selectedProject = try XCTUnwrap(harness.appState.jiraProjects.first(where: { $0.key == "UCAP" }))
+        harness.appState.selectJiraProject(projectID: selectedProject.projectID)
+
+        XCTAssertEqual(harness.settingsStore.jiraProjectKey, "UCAP")
+        XCTAssertEqual(harness.appState.jiraIssueTypes, [])
+        let fetchCountBeforeRefresh = await harness.exportService.jiraIssueTypeFetchCount()
+        XCTAssertEqual(fetchCountBeforeRefresh, 0)
+
+        await harness.appState.refreshJiraIssueTypesForSelectedProject()
+
+        XCTAssertEqual(
+            harness.appState.jiraIssueTypes,
+            [JiraIssueTypeOption(id: "10001", name: "Task")]
+        )
+        let fetchCountAfterRefresh = await harness.exportService.jiraIssueTypeFetchCount()
+        XCTAssertEqual(fetchCountAfterRefresh, 1)
     }
 
     func testValidateJiraConfigurationLoadsProjectsAndIssueTypes() async {

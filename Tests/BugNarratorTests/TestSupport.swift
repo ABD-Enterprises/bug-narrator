@@ -325,6 +325,10 @@ actor MockExportService: IssueExporting {
         suspendJiraIssueTypeFetch = shouldSuspend
     }
 
+    func jiraIssueTypeFetchCount() -> Int {
+        jiraIssueTypeFetchCallCount
+    }
+
     func fetchGitHubRepositories(
         token: String
     ) async throws -> [GitHubRepositoryOption] {
