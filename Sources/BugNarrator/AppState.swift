@@ -15,6 +15,8 @@ final class AppState: ObservableObject {
     @Published private(set) var issueExtractionSessionID: UUID?
     @Published private(set) var exportDestinationInProgress: ExportDestination?
     @Published private(set) var pendingExportReview: IssueExportReview?
+    @Published private(set) var exportHistory: [ExportReceipt] = []
+    @Published private(set) var recoveredRecordingImportCount = 0
     @Published private(set) var apiKeyValidationState: APIKeyValidationState = .idle
 
     let settingsStore: SettingsStore
@@ -40,6 +42,7 @@ final class AppState: ObservableObject {
     private let screenshotSelectionService: any ScreenshotSelecting
     private let issueExtractionService: any IssueExtracting
     private let exportService: any IssueExporting
+    private let recoveredRecordingImporter: any RecoveredRecordingImporting
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
@@ -112,6 +115,7 @@ final class AppState: ObservableObject {
         screenshotSelectionService: any ScreenshotSelecting = ScreenshotSelectionService(),
         issueExtractionService: any IssueExtracting = IssueExtractionService(),
         exportService: any IssueExporting = ExportService(),
+        recoveredRecordingImporter: any RecoveredRecordingImporting = RecoveredRecordingImporter(),
         artifactsService: any SessionArtifactsManaging = SessionArtifactsService(),
         clipboardService: any ClipboardWriting = SystemClipboardService(),
         urlHandler: any URLOpening = WorkspaceURLHandler(),
@@ -129,6 +133,7 @@ final class AppState: ObservableObject {
         self.screenshotSelectionService = screenshotSelectionService
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
+        self.recoveredRecordingImporter = recoveredRecordingImporter
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
@@ -209,6 +214,10 @@ final class AppState: ObservableObject {
             ]
         )
         validateRuntimeConfiguration()
+        importRecoveredRecordingsAtLaunch()
+        Task { [weak self] in
+            await self?.refreshExportHistory()
+        }
         logLaunchDiagnostics()
     }
 
@@ -272,6 +281,16 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             sessionID: currentDebugSessionID
         )
+    }
+
+    var storageRecoveryMessage: String? {
+        transcriptStore.lastLoadRecoveryEvent?.userMessage
+    }
+
+    var hasRecoveredRecordingPendingTranscription: Bool {
+        transcriptStore.pendingTranscriptionSessions.contains {
+            $0.pendingTranscription?.failureReason == .crashRecovery
+        }
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
@@ -472,6 +491,7 @@ final class AppState: ObservableObject {
                 markers: recordingSession.markers,
                 screenshots: recordingSession.screenshots,
                 sections: sections,
+                transcriptQualityFindings: transcriptionResult.qualityFindings,
                 artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
             )
 
@@ -807,6 +827,18 @@ final class AppState: ObservableObject {
         await trackerIntegration.refreshJiraIssueTypesForSelectedProject()
     }
 
+    func refreshExportHistory() async {
+        do {
+            exportHistory = try await exportService.exportHistory()
+        } catch {
+            exportLogger.warning(
+                "export_history_refresh_failed",
+                (error as? AppError)?.userMessage ?? error.localizedDescription
+            )
+            exportHistory = []
+        }
+    }
+
     func copyDisplayedTranscript() {
         guard let transcript = displayedTranscript else {
             return
@@ -888,6 +920,7 @@ final class AppState: ObservableObject {
                 sections: sections,
                 issueExtraction: nil,
                 pendingTranscription: nil,
+                transcriptQualityFindings: result.qualityFindings,
                 updatedAt: Date(),
                 artifactsDirectoryPath: session.artifactsDirectoryPath
             )
@@ -1378,8 +1411,8 @@ final class AppState: ObservableObject {
         }
 
         do {
-            let preparedIssues = try preparedIssuesForExport(from: review)
-            let duplicateMatches = try duplicateMatchResults(from: review)
+            let preparedIssues = try IssueExportReviewPolicy.preparedIssues(from: review)
+            let duplicateMatches = try IssueExportReviewPolicy.duplicateMatchResults(from: review)
 
             pendingExportReview = nil
             let combinedResults: [ExportResult]
@@ -1431,79 +1464,17 @@ final class AppState: ObservableObject {
                     "issue_count": "\(combinedResults.count)"
                 ]
             )
-            setStatus(.success(exportSummary(for: combinedResults, duplicateCount: duplicateMatches.count, destination: review.destination)))
+            setStatus(.success(IssueExportReviewPolicy.exportSummary(
+                for: combinedResults,
+                duplicateCount: duplicateMatches.count,
+                destination: review.destination
+            )))
+            await refreshExportHistory()
         } catch {
             exportDestinationInProgress = nil
             endActivity()
             presentError(error)
         }
-    }
-
-    private func preparedIssuesForExport(from review: IssueExportReview) throws -> [ExtractedIssue] {
-        try review.items.compactMap { item in
-            switch item.resolution {
-            case .exportNew:
-                return item.issue
-            case .linkAsRelated:
-                guard let match = item.selectedMatch else {
-                    throw AppError.exportFailure("Choose a related \(review.destination.rawValue) issue before linking.")
-                }
-
-                var issue = item.issue
-                issue.note = trackerContextNote(for: .linkAsRelated, match: match)
-                return issue
-            case .markDuplicate:
-                return nil
-            }
-        }
-    }
-
-    private func duplicateMatchResults(from review: IssueExportReview) throws -> [ExportResult] {
-        try review.items.compactMap { item in
-            guard item.resolution == .markDuplicate else {
-                return nil
-            }
-
-            guard let match = item.selectedMatch else {
-                throw AppError.exportFailure("Choose an existing \(review.destination.rawValue) issue to mark as duplicate.")
-            }
-
-            return ExportResult(
-                sourceIssueID: item.issue.id,
-                destination: review.destination,
-                remoteIdentifier: match.remoteIdentifier,
-                remoteURL: match.remoteURL
-            )
-        }
-    }
-
-    private func trackerContextNote(for resolution: SimilarIssueResolution, match: SimilarIssueMatch) -> String {
-        switch resolution {
-        case .exportNew:
-            return ""
-        case .linkAsRelated:
-            return "Related to \(match.remoteIdentifier) (\(match.confidenceLabel) match): \(match.title). \(match.reasoning)"
-        case .markDuplicate:
-            return "Marked as duplicate of \(match.remoteIdentifier) (\(match.confidenceLabel) match): \(match.title). \(match.reasoning)"
-        }
-    }
-
-    private func exportSummary(
-        for results: [ExportResult],
-        duplicateCount: Int,
-        destination: ExportDestination
-    ) -> String {
-        let createdCount = max(0, results.count - duplicateCount)
-
-        if duplicateCount > 0, createdCount > 0 {
-            return "Exported \(createdCount) new issue\(createdCount == 1 ? "" : "s") to \(destination.rawValue) and linked \(duplicateCount) to existing tracker items."
-        }
-
-        if duplicateCount > 0 {
-            return "Linked \(duplicateCount) issue\(duplicateCount == 1 ? "" : "s") to existing \(destination.rawValue) items without creating duplicates."
-        }
-
-        return "Exported \(createdCount) issues to \(destination.rawValue)."
     }
 
     func openScreenshot(_ screenshot: SessionScreenshot) {
@@ -2135,6 +2106,38 @@ final class AppState: ObservableObject {
                 "selected_transcript_id": selectedTranscriptID?.uuidString ?? "none"
             ]
         )
+    }
+
+    private func importRecoveredRecordingsAtLaunch() {
+        do {
+            let importedCount = try recoveredRecordingImporter.importRecoverableRecordings(
+                into: transcriptStore,
+                artifactsService: artifactsService
+            )
+            recoveredRecordingImportCount = importedCount
+
+            guard importedCount > 0 else {
+                return
+            }
+
+            selectedTranscriptID = transcriptStore.latestPendingTranscriptionSession?.id
+            sessionLibraryLogger.warning(
+                "recovered_recordings_imported",
+                "Imported recovered recordings as retryable transcript sessions.",
+                metadata: ["imported_count": "\(importedCount)"]
+            )
+            setStatus(
+                .error(importedCount == 1
+                    ? "Recovered 1 recording after an unexpected quit. Open Session Library to transcribe it."
+                    : "Recovered \(importedCount) recordings after an unexpected quit. Open Session Library to transcribe them."),
+                error: .transcriptionFailure("Recovered recordings are waiting for transcription.")
+            )
+            showTranscriptWindow?()
+        } catch {
+            let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+            sessionLibraryLogger.error("recovered_recording_import_failed", appError.userMessage)
+            setStatus(.error(appError.userMessage), error: appError)
+        }
     }
 
 }

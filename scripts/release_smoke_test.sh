@@ -11,6 +11,7 @@ CLEAN_LOCAL_BUILD_APPS="${CLEAN_LOCAL_BUILD_APPS:-NO}"
 RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-NO}"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/BugNarrator.app"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
+ENTITLEMENTS_PLIST="$ROOT_DIR/Resources/BugNarrator.entitlements"
 
 if [[ ! -d "$PROJECT_PATH" ]]; then
     echo "error: Xcode project not found at $PROJECT_PATH" >&2
@@ -64,9 +65,23 @@ if [[ -z "$MICROPHONE_USAGE_DESCRIPTION" ]]; then
     exit 1
 fi
 
+BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST" 2>/dev/null || true)"
+if [[ "$BUNDLE_IDENTIFIER" != "com.abdenterprises.bugnarrator" ]]; then
+    echo "error: release app bundle identifier is '$BUNDLE_IDENTIFIER', expected 'com.abdenterprises.bugnarrator'" >&2
+    exit 1
+fi
+
+ENTITLED_AUDIO_INPUT="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' "$ENTITLEMENTS_PLIST" 2>/dev/null || true)"
+if [[ "$ENTITLED_AUDIO_INPUT" != "true" ]]; then
+    echo "error: BugNarrator entitlements must include com.apple.security.device.audio-input=true" >&2
+    exit 1
+fi
+
 if [[ "$RUN_STARTUP_KEYCHAIN_SMOKE" == "YES" ]]; then
     echo "Running startup keychain smoke test..."
     APP_PATH="$APP_PATH" "$ROOT_DIR/scripts/keychain_startup_smoke_test.sh"
+else
+    echo "Startup keychain smoke test NOT RUN (set RUN_STARTUP_KEYCHAIN_SMOKE=YES to enable)."
 fi
 
 echo "Release smoke test passed."

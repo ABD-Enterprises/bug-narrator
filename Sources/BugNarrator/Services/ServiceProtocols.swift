@@ -206,6 +206,8 @@ protocol IssueExporting: Sendable {
         session: TranscriptSession,
         configuration: JiraExportConfiguration
     ) async throws -> [ExportResult]
+
+    func exportHistory() async throws -> [ExportReceipt]
 }
 
 protocol SessionArtifactsManaging {
@@ -221,6 +223,14 @@ protocol SessionArtifactsManaging {
         elapsedTime: TimeInterval
     ) -> URL
     func removeArtifactsDirectory(at directoryURL: URL)
+}
+
+protocol RecoveredRecordingImporting {
+    @MainActor
+    func importRecoverableRecordings(
+        into transcriptStore: TranscriptStore,
+        artifactsService: any SessionArtifactsManaging
+    ) throws -> Int
 }
 
 protocol ClipboardWriting {

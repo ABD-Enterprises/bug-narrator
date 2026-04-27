@@ -257,6 +257,40 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
     }
 
+    func testExtractIssuesBudgetsTranscriptAndScreenshotPayload() async throws {
+        let session = makeBudgetedReviewSession()
+        defer {
+            if let directoryURL = session.screenshots.first?.fileURL.deletingLastPathComponent() {
+                try? FileManager.default.removeItem(at: directoryURL)
+            }
+        }
+
+        MockURLProtocol.requestHandler = { request in
+            let body = try requestBodyData(from: request)
+            let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
+            let userContent = try XCTUnwrap(messages.last?["content"] as? [[String: Any]])
+            let textContent = userContent
+                .compactMap { $0["text"] as? String }
+                .joined(separator: "\n")
+
+            XCTAssertEqual(userContent.filter { ($0["type"] as? String) == "image_url" }.count, 4)
+            XCTAssertTrue(textContent.contains("Screenshot budget note: 2 screenshot(s) were omitted"))
+            XCTAssertTrue(textContent.contains("Budget note: omitted"))
+            XCTAssertFalse(textContent.contains("FINAL_SENTINEL_SHOULD_BE_OMITTED"))
+
+            return (
+                self.successResponse(for: request),
+                self.makeChatCompletionData(content: #"{"summary":"Budgeted.","guidanceNote":"","issues":[]}"#)
+            )
+        }
+
+        let service = IssueExtractionService(session: makeMockURLSession())
+        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+
+        XCTAssertEqual(result.summary, "Budgeted.")
+    }
+
     func testExtractIssuesTimesOutAfterConfiguredBudget() async throws {
         let session = makeReviewSession()
 
@@ -362,6 +396,45 @@ final class IssueExtractionServiceTests: XCTestCase {
                     text: "The save button is clipped and the modal is confusing.",
                     markerID: nil,
                     screenshotIDs: [screenshot.id]
+                )
+            ]
+        )
+    }
+
+    private func makeBudgetedReviewSession() -> TranscriptSession {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-IssueExtractionBudget-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+        let pngData = Data(
+            base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="
+        )!
+        let screenshots = (0..<6).map { index in
+            let screenshotURL = directoryURL.appendingPathComponent("review-shot-\(index).png")
+            try? pngData.write(to: screenshotURL)
+            return SessionScreenshot(elapsedTime: TimeInterval(index), filePath: screenshotURL.path)
+        }
+        let longTranscript = String(
+            repeating: "This transcript sentence should stay within the request budget while preserving useful issue context. ",
+            count: 450
+        ) + "FINAL_SENTINEL_SHOULD_BE_OMITTED"
+
+        return TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 20),
+            transcript: longTranscript,
+            duration: 180,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            screenshots: screenshots,
+            sections: [
+                TranscriptSection(
+                    title: "Long review",
+                    startTime: 0,
+                    endTime: 180,
+                    text: longTranscript,
+                    markerID: nil,
+                    screenshotIDs: screenshots.map(\.id)
                 )
             ]
         )

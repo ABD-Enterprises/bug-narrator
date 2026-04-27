@@ -54,6 +54,37 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testLaunchImportsRecoveredRecordingsAndSurfacesRecoveryStatus() {
+        let harness = AppStateHarness(recoveredImportResult: .success(1))
+        defer { harness.cleanup() }
+
+        XCTAssertEqual(harness.recoveredRecordingImporter.importCallCount, 1)
+        XCTAssertEqual(harness.appState.recoveredRecordingImportCount, 1)
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertTrue(harness.appState.status.detail?.contains("Recovered 1 recording") == true)
+    }
+
+    func testRefreshExportHistoryLoadsReceiptsForReviewSurface() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let receipt = ExportReceipt(
+            fingerprint: "github:fixture",
+            sourceIssueID: UUID(),
+            destination: .github,
+            targetIdentity: "deffenda/bug-narrator",
+            state: .succeeded,
+            remoteIdentifier: "#42",
+            remoteURL: URL(string: "https://github.com/deffenda/bug-narrator/issues/42"),
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        await harness.exportService.setExportReceipts([receipt])
+
+        await harness.appState.refreshExportHistory()
+
+        XCTAssertEqual(harness.appState.exportHistory, [receipt])
+    }
+
     func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }

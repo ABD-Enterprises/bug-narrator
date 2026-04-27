@@ -4,6 +4,7 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
     case missingAPIKey
     case invalidAPIKey
     case revokedAPIKey
+    case crashRecovery
 
     init?(appError: AppError) {
         switch appError {
@@ -26,6 +27,8 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             return "Recording saved locally. Replace the rejected OpenAI API key in Settings, then retry transcription from this session."
         case .revokedAPIKey:
             return "Recording saved locally. Add a new OpenAI API key in Settings, then retry transcription from this session."
+        case .crashRecovery:
+            return "Recovered recording found after an unexpected quit. Add or confirm your OpenAI API key, then transcribe the recovered audio."
         }
     }
 
@@ -37,6 +40,8 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             return .invalidAPIKey
         case .revokedAPIKey:
             return .revokedAPIKey
+        case .crashRecovery:
+            return .transcriptionFailure("A recovered recording is waiting for transcription.")
         }
     }
 }
@@ -45,6 +50,19 @@ struct PendingTranscription: Codable, Equatable {
     let audioFileName: String
     var failureReason: PendingTranscriptionFailureReason
     var preservedAt: Date
+    var recoveredSourceFileName: String?
+
+    init(
+        audioFileName: String,
+        failureReason: PendingTranscriptionFailureReason,
+        preservedAt: Date,
+        recoveredSourceFileName: String? = nil
+    ) {
+        self.audioFileName = audioFileName
+        self.failureReason = failureReason
+        self.preservedAt = preservedAt
+        self.recoveredSourceFileName = recoveredSourceFileName
+    }
 }
 
 struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
@@ -61,6 +79,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     let sections: [TranscriptSection]
     var issueExtraction: IssueExtractionResult?
     var pendingTranscription: PendingTranscription?
+    var transcriptQualityFindings: [TranscriptQualityFinding]
+    var recoveredSourceFileName: String?
     let artifactsDirectoryPath: String?
 
     init(
@@ -76,6 +96,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         sections: [TranscriptSection] = [],
         issueExtraction: IssueExtractionResult? = nil,
         pendingTranscription: PendingTranscription? = nil,
+        transcriptQualityFindings: [TranscriptQualityFinding] = [],
+        recoveredSourceFileName: String? = nil,
         updatedAt: Date? = nil,
         artifactsDirectoryPath: String? = nil
     ) {
@@ -92,6 +114,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         self.sections = sections
         self.issueExtraction = issueExtraction
         self.pendingTranscription = pendingTranscription
+        self.transcriptQualityFindings = transcriptQualityFindings
+        self.recoveredSourceFileName = recoveredSourceFileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.artifactsDirectoryPath = artifactsDirectoryPath
     }
 
@@ -112,6 +136,11 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         self.sections = try container.decodeIfPresent([TranscriptSection].self, forKey: .sections) ?? []
         self.issueExtraction = try container.decodeIfPresent(IssueExtractionResult.self, forKey: .issueExtraction)
         self.pendingTranscription = try container.decodeIfPresent(PendingTranscription.self, forKey: .pendingTranscription)
+        self.transcriptQualityFindings = try container.decodeIfPresent(
+            [TranscriptQualityFinding].self,
+            forKey: .transcriptQualityFindings
+        ) ?? []
+        self.recoveredSourceFileName = try container.decodeIfPresent(String.self, forKey: .recoveredSourceFileName)
         self.artifactsDirectoryPath = try container.decodeIfPresent(String.self, forKey: .artifactsDirectoryPath)
     }
 
@@ -130,6 +159,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         try container.encode(sections, forKey: .sections)
         try container.encodeIfPresent(issueExtraction, forKey: .issueExtraction)
         try container.encodeIfPresent(pendingTranscription, forKey: .pendingTranscription)
+        try container.encode(transcriptQualityFindings, forKey: .transcriptQualityFindings)
+        try container.encodeIfPresent(recoveredSourceFileName, forKey: .recoveredSourceFileName)
         try container.encodeIfPresent(artifactsDirectoryPath, forKey: .artifactsDirectoryPath)
     }
 
@@ -147,6 +178,8 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         case sections
         case issueExtraction
         case pendingTranscription
+        case transcriptQualityFindings
+        case recoveredSourceFileName
         case artifactsDirectoryPath
     }
 

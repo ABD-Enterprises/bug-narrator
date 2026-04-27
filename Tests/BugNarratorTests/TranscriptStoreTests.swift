@@ -102,6 +102,28 @@ final class TranscriptStoreTests: XCTestCase {
         let recoveredStore = TranscriptStore(storageURL: storageURL)
 
         XCTAssertEqual(recoveredStore.sessions, [session])
+        XCTAssertEqual(
+            recoveredStore.lastLoadRecoveryEvent,
+            TranscriptStoreRecoveryEvent(source: .backup, recoveredSessionCount: 1)
+        )
+    }
+
+    func testTranscriptStoreReportsFailedRecoveryWhenPrimaryAndBackupAreCorrupt() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let backupURL = storageURL.deletingPathExtension().appendingPathExtension("backup.json")
+        try Data("not-json".utf8).write(to: storageURL, options: [.atomic])
+        try Data("not-json".utf8).write(to: backupURL, options: [.atomic])
+
+        let store = TranscriptStore(storageURL: storageURL)
+
+        XCTAssertTrue(store.sessions.isEmpty)
+        XCTAssertEqual(
+            store.lastLoadRecoveryEvent,
+            TranscriptStoreRecoveryEvent(source: .failed, recoveredSessionCount: 0)
+        )
     }
 
     func testTranscriptStoreUpdatesLookupAndLibraryEntriesTogether() throws {

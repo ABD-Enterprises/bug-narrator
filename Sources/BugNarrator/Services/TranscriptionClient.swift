@@ -10,6 +10,17 @@ struct TranscriptionRequest: Sendable {
 struct TranscriptionResult: Sendable {
     let text: String
     let segments: [TranscriptionSegment]
+    let qualityFindings: [TranscriptQualityFinding]
+
+    init(
+        text: String,
+        segments: [TranscriptionSegment],
+        qualityFindings: [TranscriptQualityFinding] = []
+    ) {
+        self.text = text
+        self.segments = segments
+        self.qualityFindings = qualityFindings
+    }
 }
 
 struct TranscriptionSegment: Decodable, Sendable {
@@ -24,15 +35,21 @@ actor TranscriptionClient: TranscriptionServing {
     private let session: URLSession
     private let fileManager: FileManager
     private let transcriptionChunker: any TranscriptionChunking
+    private let audioUploadPolicy: AudioUploadPolicy
+    private let qualityInspector: TranscriptQualityInspector
     private let logger = DiagnosticsLogger(category: .transcription)
 
     init(
         session: URLSession? = nil,
         fileManager: FileManager = .default,
-        transcriptionChunker: (any TranscriptionChunking)? = nil
+        transcriptionChunker: (any TranscriptionChunking)? = nil,
+        audioUploadPolicy: AudioUploadPolicy? = nil,
+        qualityInspector: TranscriptQualityInspector = TranscriptQualityInspector()
     ) {
         self.fileManager = fileManager
         self.transcriptionChunker = transcriptionChunker ?? DefaultTranscriptionChunker()
+        self.audioUploadPolicy = audioUploadPolicy ?? AudioUploadPolicy(fileManager: fileManager)
+        self.qualityInspector = qualityInspector
         if let session {
             self.session = session
         } else {
@@ -44,7 +61,8 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
-        try validateAudioFile(at: fileURL)
+        _ = try validateAudioFile(at: fileURL)
+        await logLongRecordingIfNeeded(fileURL: fileURL)
 
         let fallbackChunk = TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)
         let chunks = await preparedChunks(for: fileURL, fallback: fallbackChunk)
@@ -103,6 +121,8 @@ actor TranscriptionClient: TranscriptionServing {
             throw AppError.emptyTranscript
         }
 
+        let qualityFindings = qualityInspector.findings(for: transcript)
+        logQualityFindings(qualityFindings, fileName: fileURL.lastPathComponent)
         logger.info(
             "transcription_chunked_completed",
             "OpenAI returned a completed transcript after chunked transcription.",
@@ -113,7 +133,11 @@ actor TranscriptionClient: TranscriptionServing {
             ]
         )
 
-        return TranscriptionResult(text: transcript, segments: adjustedSegments)
+        return TranscriptionResult(
+            text: transcript,
+            segments: adjustedSegments,
+            qualityFindings: qualityFindings
+        )
     }
 
     private func transcribeSingleFile(
@@ -162,6 +186,8 @@ actor TranscriptionClient: TranscriptionServing {
                 throw AppError.emptyTranscript
             }
 
+            let qualityFindings = qualityInspector.findings(for: transcript)
+            logQualityFindings(qualityFindings, fileName: fileURL.lastPathComponent)
             logger.info(
                 "transcription_completed",
                 "OpenAI returned a completed transcript.",
@@ -170,7 +196,11 @@ actor TranscriptionClient: TranscriptionServing {
                     "segments_count": "\(result.segments?.count ?? 0)"
                 ]
             )
-            return TranscriptionResult(text: transcript, segments: result.segments ?? [])
+            return TranscriptionResult(
+                text: transcript,
+                segments: result.segments ?? [],
+                qualityFindings: qualityFindings
+            )
         } catch {
             logger.error(
                 "transcription_failed",
@@ -244,7 +274,7 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func makeURLRequest(fileURL: URL, apiKey: String, request: TranscriptionRequest) throws -> URLRequest {
-        try validateAudioFile(at: fileURL)
+        _ = try validateAudioFile(at: fileURL)
 
         let boundary = "Boundary-\(UUID().uuidString)"
         var urlRequest = URLRequest(url: endpoint)
@@ -285,18 +315,18 @@ actor TranscriptionClient: TranscriptionServing {
         return body
     }
 
-    private func validateAudioFile(at fileURL: URL) throws {
-        guard fileManager.fileExists(atPath: fileURL.path) else {
-            logger.error("transcription_audio_missing", "The recorded audio file was missing before upload.", metadata: ["file_name": fileURL.lastPathComponent])
-            throw AppError.transcriptionFailure("The recorded audio file could not be found.")
-        }
-
-        let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
-        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
-
-        guard fileSize > 0 else {
-            logger.error("transcription_audio_empty", "The recorded audio file was empty before upload.", metadata: ["file_name": fileURL.lastPathComponent])
-            throw AppError.transcriptionFailure("The recorded audio file was empty.")
+    @discardableResult
+    private func validateAudioFile(at fileURL: URL) throws -> AudioFileInspection {
+        let inspection: AudioFileInspection
+        do {
+            inspection = try audioUploadPolicy.validate(fileURL: fileURL)
+        } catch {
+            logger.error(
+                "transcription_audio_invalid",
+                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                metadata: ["file_name": fileURL.lastPathComponent]
+            )
+            throw error
         }
 
         logger.debug(
@@ -304,7 +334,45 @@ actor TranscriptionClient: TranscriptionServing {
             "The recorded audio file passed local validation before upload.",
             metadata: [
                 "file_name": fileURL.lastPathComponent,
-                "file_size_bytes": "\(fileSize)"
+                "file_size_bytes": "\(inspection.fileSizeBytes)"
+            ]
+        )
+        return inspection
+    }
+
+    private func logLongRecordingIfNeeded(fileURL: URL) async {
+        let asset = AVURLAsset(url: fileURL)
+        guard let durationTime = try? await asset.load(.duration) else {
+            return
+        }
+
+        let duration = CMTimeGetSeconds(durationTime)
+        guard duration.isFinite, duration >= AudioUploadPolicy.warningDuration else {
+            return
+        }
+
+        logger.warning(
+            "transcription_audio_long_duration",
+            "The recording is long enough that chunking or review should be expected.",
+            metadata: [
+                "file_name": fileURL.lastPathComponent,
+                "duration_seconds": String(format: "%.2f", duration)
+            ]
+        )
+    }
+
+    private func logQualityFindings(_ findings: [TranscriptQualityFinding], fileName: String) {
+        guard !findings.isEmpty else {
+            return
+        }
+
+        logger.warning(
+            "transcription_quality_findings",
+            "Transcript quality checks found issues that should be reviewed.",
+            metadata: [
+                "file_name": fileName,
+                "finding_count": "\(findings.count)",
+                "finding_kinds": findings.map(\.kind.rawValue).joined(separator: ",")
             ]
         )
     }
@@ -318,11 +386,11 @@ actor TranscriptionClient: TranscriptionServing {
     private func mimeType(for fileURL: URL) -> String {
         switch fileURL.pathExtension.lowercased() {
         case "m4a":
-            return "audio/m4a"
-        case "wav":
-            return "audio/wav"
+            return "audio/mp4"
         case "mp3":
             return "audio/mpeg"
+        case "wav":
+            return "audio/wav"
         default:
             return "application/octet-stream"
         }

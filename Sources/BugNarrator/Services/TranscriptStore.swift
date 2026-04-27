@@ -3,6 +3,7 @@ import Foundation
 final class TranscriptStore: ObservableObject {
     @Published private(set) var sessions: [TranscriptSession] = []
     @Published private(set) var libraryEntries: [SessionLibraryEntry] = []
+    @Published private(set) var lastLoadRecoveryEvent: TranscriptStoreRecoveryEvent?
     private let logger = DiagnosticsLogger(category: .sessionLibrary)
 
     var pendingTranscriptionSessions: [TranscriptSession] {
@@ -107,6 +108,7 @@ final class TranscriptStore: ObservableObject {
     private func load() {
         if let storedSessions = loadSessions(from: storageURL) {
             replaceState(with: normalizedSessions(storedSessions))
+            lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
                 "Loaded session history from primary storage.",
@@ -119,6 +121,10 @@ final class TranscriptStore: ObservableObject {
             let normalizedBackupSessions = normalizedSessions(backupSessions)
             replaceState(with: normalizedBackupSessions)
             try? persist(normalizedBackupSessions)
+            lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
+                source: .backup,
+                recoveredSessionCount: normalizedBackupSessions.count
+            )
             logger.warning(
                 "session_store_recovered_from_backup",
                 "Recovered session history from the backup store after the primary store failed to load.",
@@ -128,6 +134,11 @@ final class TranscriptStore: ObservableObject {
         }
 
         replaceState(with: [])
+        if fileManager.fileExists(atPath: storageURL.path) {
+            lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(source: .failed, recoveredSessionCount: 0)
+        } else {
+            lastLoadRecoveryEvent = nil
+        }
         logger.info("session_store_empty", "No existing session history was found on disk.")
     }
 
@@ -186,5 +197,24 @@ final class TranscriptStore: ObservableObject {
 
     private static func makeBackupURL(for storageURL: URL) -> URL {
         storageURL.deletingPathExtension().appendingPathExtension("backup.json")
+    }
+}
+
+struct TranscriptStoreRecoveryEvent: Equatable {
+    enum Source: Equatable {
+        case backup
+        case failed
+    }
+
+    let source: Source
+    let recoveredSessionCount: Int
+
+    var userMessage: String {
+        switch source {
+        case .backup:
+            return "Session history was recovered from the local backup. \(recoveredSessionCount) session\(recoveredSessionCount == 1 ? "" : "s") restored."
+        case .failed:
+            return "Session history could not be read from the primary or backup store. A new empty library was opened."
+        }
     }
 }

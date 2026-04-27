@@ -32,6 +32,7 @@ struct ExportReceipt: Codable, Equatable {
 
 protocol ExportReceiptStoring: Sendable {
     func receipt(for fingerprint: String) async -> ExportReceipt?
+    func allReceipts() async -> [ExportReceipt]
     func markPending(
         fingerprint: String,
         sourceIssueID: UUID,
@@ -68,6 +69,12 @@ actor ExportReceiptStore: ExportReceiptStoring {
 
     func receipt(for fingerprint: String) async -> ExportReceipt? {
         await loadCacheIfNeeded()[fingerprint]
+    }
+
+    func allReceipts() async -> [ExportReceipt] {
+        await loadCacheIfNeeded()
+            .values
+            .sorted { $0.updatedAt > $1.updatedAt }
     }
 
     func markPending(

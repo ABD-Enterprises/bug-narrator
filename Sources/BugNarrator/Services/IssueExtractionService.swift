@@ -147,21 +147,7 @@ actor IssueExtractionService: IssueExtracting {
         lines.append("")
         lines.append("Transcript sections:")
 
-        if session.sections.isEmpty {
-            lines.append(session.transcript)
-        } else {
-            for section in session.sections {
-                lines.append("## \(section.title) [\(section.timeRangeLabel)]")
-                if !section.screenshotIDs.isEmpty {
-                    let fileNames = section.screenshotIDs.compactMap { session.screenshot(with: $0)?.fileName }
-                    if !fileNames.isEmpty {
-                        lines.append("Screenshots: \(fileNames.joined(separator: ", "))")
-                    }
-                }
-                lines.append(section.text)
-                lines.append("")
-            }
-        }
+        lines.append(contentsOf: IssueExtractionRequestBudget.transcriptLines(for: session))
 
         lines.append("Return a concise summary plus reviewable draft issues for product and engineering triage.")
         return lines.joined(separator: "\n")
@@ -216,14 +202,40 @@ actor IssueExtractionService: IssueExtracting {
     private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {
         var parts: [ChatMessageInputPart] = [.text(makePrompt(for: session))]
 
-        for screenshot in session.screenshots {
+        var includedScreenshotCount = 0
+        var omittedScreenshotCount = 0
+        var totalScreenshotBytes = 0
+
+        for screenshot in session.screenshots.prefix(IssueExtractionRequestBudget.maximumScreenshotCount) {
+            guard let byteCount = IssueExtractionRequestBudget.fileSize(for: screenshot.fileURL),
+                  byteCount <= IssueExtractionRequestBudget.maximumSingleScreenshotBytes,
+                  totalScreenshotBytes + byteCount <= IssueExtractionRequestBudget.maximumTotalScreenshotBytes else {
+                omittedScreenshotCount += 1
+                continue
+            }
+
             parts.append(.text("Screenshot reference: \(screenshot.fileName) at \(screenshot.timeLabel)."))
 
             guard let imagePart = makeScreenshotContentPart(for: screenshot) else {
+                omittedScreenshotCount += 1
                 continue
             }
 
             parts.append(imagePart)
+            includedScreenshotCount += 1
+            totalScreenshotBytes += byteCount
+        }
+
+        if session.screenshots.count > IssueExtractionRequestBudget.maximumScreenshotCount {
+            omittedScreenshotCount += session.screenshots.count - IssueExtractionRequestBudget.maximumScreenshotCount
+        }
+
+        if omittedScreenshotCount > 0 {
+            parts.append(.text("Screenshot budget note: \(omittedScreenshotCount) screenshot(s) were omitted from AI extraction to keep the request reliable. Use filenames and transcript context for any omitted screenshots."))
+        }
+
+        if includedScreenshotCount > 0 {
+            parts.append(.text("Screenshot budget note: included \(includedScreenshotCount) screenshot(s), \(totalScreenshotBytes) total bytes."))
         }
 
         return parts
@@ -309,6 +321,74 @@ private struct ChatCompletionRequest: Encodable {
         case temperature
         case responseFormat = "response_format"
         case messages
+    }
+}
+
+private enum IssueExtractionRequestBudget {
+    static let maximumTranscriptCharacters = 24_000
+    static let maximumScreenshotCount = 4
+    static let maximumSingleScreenshotBytes = 2 * 1_024 * 1_024
+    static let maximumTotalScreenshotBytes = 6 * 1_024 * 1_024
+
+    static func transcriptLines(for session: TranscriptSession) -> [String] {
+        var remainingCharacters = maximumTranscriptCharacters
+        var lines: [String] = []
+        var omittedCharacterCount = 0
+
+        func appendBudgetedText(_ text: String) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                return
+            }
+
+            if trimmed.count <= remainingCharacters {
+                lines.append(trimmed)
+                remainingCharacters -= trimmed.count
+                return
+            }
+
+            if remainingCharacters > 0 {
+                let endIndex = trimmed.index(trimmed.startIndex, offsetBy: remainingCharacters)
+                lines.append(String(trimmed[..<endIndex]))
+            }
+            omittedCharacterCount += trimmed.count - max(remainingCharacters, 0)
+            remainingCharacters = 0
+        }
+
+        if session.sections.isEmpty {
+            appendBudgetedText(session.transcript)
+        } else {
+            for section in session.sections {
+                guard remainingCharacters > 0 else {
+                    omittedCharacterCount += section.text.count
+                    continue
+                }
+
+                lines.append("## \(section.title) [\(section.timeRangeLabel)]")
+                if !section.screenshotIDs.isEmpty {
+                    let fileNames = section.screenshotIDs.compactMap { session.screenshot(with: $0)?.fileName }
+                    if !fileNames.isEmpty {
+                        lines.append("Screenshots: \(fileNames.joined(separator: ", "))")
+                    }
+                }
+                appendBudgetedText(section.text)
+                lines.append("")
+            }
+        }
+
+        if omittedCharacterCount > 0 {
+            lines.append("[Budget note: omitted \(omittedCharacterCount) transcript character(s) from the extraction request. Export or inspect the full transcript locally if needed.]")
+        }
+
+        return lines
+    }
+
+    static func fileSize(for url: URL) -> Int? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return nil
+        }
+
+        return (attributes[.size] as? NSNumber)?.intValue
     }
 }
 

@@ -76,6 +76,9 @@ struct TranscriptView: View {
         .onAppear {
             resolveInitialFilterIfNeeded()
             syncSelection()
+            Task {
+                await appState.refreshExportHistory()
+            }
         }
         .onChange(of: selectedFilter) { _, _ in
             syncSelection()
@@ -132,6 +135,7 @@ struct TranscriptView: View {
     private var sessionListColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
             sessionListHeader
+            storageRecoveryBanner
             pendingTranscriptionBanner
 
             if let emptyState {
@@ -263,33 +267,20 @@ struct TranscriptView: View {
     @ViewBuilder
     private var pendingTranscriptionBanner: some View {
         if transcriptStore.pendingTranscriptionSessionCount > 0 {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(pendingTranscriptionBannerTitle, systemImage: "arrow.clockwise.circle")
-                    .font(.subheadline.weight(.semibold))
+            PendingTranscriptionBanner(
+                count: transcriptStore.pendingTranscriptionSessionCount,
+                hasAPIKey: appState.settingsStore.hasAPIKey,
+                hasRecoveredRecording: appState.hasRecoveredRecordingPendingTranscription,
+                openLatest: openLatestPendingTranscriptionSession,
+                openSettings: appState.openSettings
+            )
+        }
+    }
 
-                Text("These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your OpenAI API key.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 10) {
-                    Button("Open Latest Retry Needed Session") {
-                        openLatestPendingTranscriptionSession()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-
-                    if !appState.settingsStore.hasAPIKey {
-                        Button("Open Settings") {
-                            appState.openSettings()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    @ViewBuilder
+    private var storageRecoveryBanner: some View {
+        if let message = appState.storageRecoveryMessage {
+            StorageRecoveryBanner(message: message)
         }
     }
 
@@ -560,13 +551,6 @@ struct TranscriptView: View {
         appState.selectedTranscriptID = filteredEntries.first?.id
     }
 
-    private var pendingTranscriptionBannerTitle: String {
-        let count = transcriptStore.pendingTranscriptionSessionCount
-        return count == 1
-            ? "1 session needs transcription retry"
-            : "\(count) sessions need transcription retry"
-    }
-
     private func openLatestPendingTranscriptionSession() {
         selectedFilter = .retryNeeded
         searchText = ""
@@ -814,8 +798,20 @@ struct TranscriptView: View {
                 reviewSummarySection(session)
             }
 
+            if !session.transcriptQualityFindings.isEmpty {
+                reviewSectionCard("Transcript Quality") {
+                    TranscriptQualityFindingsView(findings: session.transcriptQualityFindings)
+                }
+            }
+
             reviewSectionCard("Extracted Issues") {
                 extractedIssuesSection(session, availableWidth: availableWidth)
+            }
+
+            if !appState.exportHistory.isEmpty {
+                reviewSectionCard("Recent Export History") {
+                    ExportHistorySummaryView(receipts: appState.exportHistory)
+                }
             }
 
             reviewSectionCard("Screenshots") {

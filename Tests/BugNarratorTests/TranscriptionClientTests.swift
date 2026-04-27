@@ -67,6 +67,65 @@ final class TranscriptionClientTests: XCTestCase {
         }
     }
 
+    func testTranscribeRejectsOversizedAudioFileBeforeMakingNetworkCall() async throws {
+        let fileURL = try makeSparseAudioFile(
+            named: "oversized",
+            byteCount: AudioUploadPolicy.maximumSingleUploadBytes + 1
+        )
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("The network should not be called for an oversized file.")
+            let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data())
+        }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+
+        do {
+            _ = try await client.transcribe(
+                fileURL: fileURL,
+                apiKey: "fixture-openai-key",
+                request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+            )
+            XCTFail("Expected an error for an oversized audio file.")
+        } catch let error as AppError {
+            guard case .transcriptionFailure(let message) = error else {
+                XCTFail("Unexpected app error: \(error)")
+                return
+            }
+
+            XCTAssertTrue(message.contains("safe upload limit"))
+        }
+    }
+
+    func testTranscribeSurfacesRepeatedTranscriptQualityFinding() async throws {
+        let fileURL = try makeAudioFile(named: "repeated-transcript", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let repeatedText = Array(repeating: "show you how it works", count: 6).joined(separator: " ")
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = try JSONSerialization.data(
+                withJSONObject: [
+                    "text": repeatedText,
+                    "segments": []
+                ]
+            )
+            return (response, data)
+        }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+        let result = try await client.transcribe(
+            fileURL: fileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+        )
+
+        XCTAssertEqual(result.text, repeatedText)
+        XCTAssertEqual(result.qualityFindings.map(\.kind), [.repeatedText])
+    }
+
     func testTranscribeMapsAPIErrorResponse() async throws {
         let fileURL = try makeAudioFile(named: "api-error", contents: "audio-data")
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -246,6 +305,17 @@ final class TranscriptionClientTests: XCTestCase {
             .appendingPathComponent("BugNarrator-TranscriptionTests-\(name)")
             .appendingPathExtension("m4a")
         try Data(contents.utf8).write(to: fileURL)
+        return fileURL
+    }
+
+    private func makeSparseAudioFile(named name: String, byteCount: Int) throws -> URL {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-TranscriptionTests-\(name)")
+            .appendingPathExtension("m4a")
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: fileURL)
+        try handle.truncate(atOffset: UInt64(byteCount))
+        try handle.close()
         return fileURL
     }
 }

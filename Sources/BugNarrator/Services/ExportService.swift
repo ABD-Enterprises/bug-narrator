@@ -97,6 +97,10 @@ actor ExportService: IssueExporting {
     ) async throws -> [ExportResult] {
         try await jiraProvider.export(issues: issues, session: session, configuration: configuration)
     }
+
+    func exportHistory() async throws -> [ExportReceipt] {
+        await ExportReceiptStore().allReceipts()
+    }
 }
 
 struct TrackerIssueCandidate: Equatable {

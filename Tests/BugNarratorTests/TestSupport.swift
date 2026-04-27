@@ -235,6 +235,7 @@ actor MockExportService: IssueExporting {
     var jiraResults: [ExportResult] = []
     var gitHubReview: IssueExportReview?
     var jiraReview: IssueExportReview?
+    var exportReceipts: [ExportReceipt] = []
     var gitHubError: Error?
     var jiraError: Error?
     var gitHubRepositories: [GitHubRepositoryOption] = []
@@ -294,6 +295,10 @@ actor MockExportService: IssueExporting {
 
     func setGitHubRepositories(_ repositories: [GitHubRepositoryOption]) {
         gitHubRepositories = repositories
+    }
+
+    func setExportReceipts(_ receipts: [ExportReceipt]) {
+        exportReceipts = receipts
     }
 
     func setGitHubRepositoriesError(_ error: Error?) {
@@ -469,6 +474,10 @@ actor MockExportService: IssueExporting {
 
         return jiraResults
     }
+
+    func exportHistory() async throws -> [ExportReceipt] {
+        exportReceipts
+    }
 }
 
 final class MockArtifactsService: SessionArtifactsManaging {
@@ -513,6 +522,20 @@ final class MockArtifactsService: SessionArtifactsManaging {
     func removeArtifactsDirectory(at directoryURL: URL) {
         removedDirectories.append(directoryURL)
         try? fileManager.removeItem(at: directoryURL)
+    }
+}
+
+@MainActor
+final class MockRecoveredRecordingImporter: RecoveredRecordingImporting {
+    var importResult: Result<Int, Error> = .success(0)
+    private(set) var importCallCount = 0
+
+    func importRecoverableRecordings(
+        into transcriptStore: TranscriptStore,
+        artifactsService: any SessionArtifactsManaging
+    ) throws -> Int {
+        importCallCount += 1
+        return try importResult.get()
     }
 }
 
@@ -611,6 +634,7 @@ struct AppStateHarness {
     let urlHandler: MockURLHandler
     let issueExtractionService: MockIssueExtractionService
     let exportService: MockExportService
+    let recoveredRecordingImporter: MockRecoveredRecordingImporter
     let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
     let screenshotSelectionService: MockScreenshotSelectionService
     let appState: AppState
@@ -623,6 +647,7 @@ struct AppStateHarness {
         autoExtractIssues: Bool = false,
         screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
         screenshotSelectionService: MockScreenshotSelectionService = MockScreenshotSelectionService(),
+        recoveredImportResult: Result<Int, Error> = .success(0),
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
     ) {
         let fileManager = FileManager.default
@@ -654,6 +679,8 @@ struct AppStateHarness {
         let urlHandler = MockURLHandler()
         let issueExtractionService = MockIssueExtractionService()
         let exportService = MockExportService()
+        let recoveredRecordingImporter = MockRecoveredRecordingImporter()
+        recoveredRecordingImporter.importResult = recoveredImportResult
         let screenCapturePermissionAccess = MockScreenCapturePermissionAccess()
 
         self.rootDirectoryURL = rootDirectoryURL
@@ -670,6 +697,7 @@ struct AppStateHarness {
         self.urlHandler = urlHandler
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
+        self.recoveredRecordingImporter = recoveredRecordingImporter
         self.screenCapturePermissionAccess = screenCapturePermissionAccess
         self.screenshotSelectionService = screenshotSelectionService
         self.appState = AppState(
@@ -684,6 +712,7 @@ struct AppStateHarness {
             screenshotSelectionService: screenshotSelectionService,
             issueExtractionService: issueExtractionService,
             exportService: exportService,
+            recoveredRecordingImporter: recoveredRecordingImporter,
             artifactsService: artifactsService,
             clipboardService: clipboardService,
             urlHandler: urlHandler,
