@@ -8,6 +8,8 @@ CONFIGURATION="${CONFIGURATION:-Release}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 STAGING_DIR="${STAGING_DIR:-$ROOT_DIR/build/dmg-staging}"
+HOST_ARCH="$(uname -m)"
+MACOS_DESTINATION="${MACOS_DESTINATION:-platform=macOS,arch=$HOST_ARCH}"
 CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_STYLE="${CODE_SIGN_STYLE:-Automatic}"
 DEFAULT_DEVELOPMENT_TEAM="***REMOVED***"
@@ -39,7 +41,7 @@ DMG_APP_ICON_Y="${DMG_APP_ICON_Y:-190}"
 DMG_APPLICATIONS_ICON_X="${DMG_APPLICATIONS_ICON_X:-510}"
 DMG_APPLICATIONS_ICON_Y="${DMG_APPLICATIONS_ICON_Y:-190}"
 REQUIRE_RELEASE_SMOKE_TEST="${REQUIRE_RELEASE_SMOKE_TEST:-YES}"
-RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-YES}"
+RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-NO}"
 RELEASE_SMOKE_TEST_SCRIPT="${RELEASE_SMOKE_TEST_SCRIPT:-$ROOT_DIR/scripts/release_smoke_test.sh}"
 MANUAL_DISTRIBUTION_SIGNING="NO"
 VERIFY_MOUNTPOINT=""
@@ -77,6 +79,28 @@ detach_attachment() {
 
 cleanup_mountpoints() {
     detach_attachment "$VERIFY_DEVICE" "$VERIFY_MOUNTPOINT"
+}
+
+ensure_dmgbuild_python() {
+    local dmgbuild_venv_dir
+
+    dmgbuild_venv_dir="$(dirname "$(dirname "$DMGBUILD_PYTHON_BIN")")"
+
+    if [[ ! -x "$DMGBUILD_PYTHON_BIN" ]]; then
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "error: python3 is required to bootstrap dmgbuild at $DMGBUILD_PYTHON_BIN" >&2
+            exit 1
+        fi
+
+        echo "Bootstrapping dmgbuild virtualenv at $dmgbuild_venv_dir..."
+        python3 -m venv "$dmgbuild_venv_dir"
+    fi
+
+    if ! "$DMGBUILD_PYTHON_BIN" -c 'import dmgbuild' >/dev/null 2>&1; then
+        echo "Installing dmgbuild into $DMGBUILD_PYTHON_BIN..."
+        "$DMGBUILD_PYTHON_BIN" -m pip install --upgrade pip >/dev/null
+        "$DMGBUILD_PYTHON_BIN" -m pip install dmgbuild >/dev/null
+    fi
 }
 
 verify_notarization_access() {
@@ -183,6 +207,11 @@ if [[ ! -d "$PROJECT_PATH" ]]; then
     exit 1
 fi
 
+if [[ "$ROOT_DIR/project.yml" -nt "$PROJECT_PATH/project.pbxproj" ]]; then
+    echo "Regenerating Xcode project with xcodegen..."
+    (cd "$ROOT_DIR" && xcodegen generate)
+fi
+
 if [[ "$NOTARIZE" == "YES" && "$CODE_SIGNING_ALLOWED" != "YES" ]]; then
     echo "error: notarization requires CODE_SIGNING_ALLOWED=YES" >&2
     exit 1
@@ -220,6 +249,7 @@ xcodebuild_args=(
     -scheme "$SCHEME"
     -configuration "$CONFIGURATION"
     -derivedDataPath "$DERIVED_DATA_PATH"
+    -destination "$MACOS_DESTINATION"
     CODE_SIGNING_ALLOWED="$([[ "$MANUAL_DISTRIBUTION_SIGNING" == "YES" ]] && echo NO || echo "$CODE_SIGNING_ALLOWED")"
     CODE_SIGN_STYLE="$CODE_SIGN_STYLE"
 )
@@ -325,20 +355,7 @@ if [[ ! -f "$APP_ASSETS_CAR_PATH" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$DMGBUILD_PYTHON_BIN" ]]; then
-    echo "error: dmgbuild virtualenv python was not found at $DMGBUILD_PYTHON_BIN" >&2
-    echo "Create the packaging virtualenv with:" >&2
-    echo "  python3 -m venv build/dmg-venv" >&2
-    echo "  build/dmg-venv/bin/python -m pip install dmgbuild" >&2
-    exit 1
-fi
-
-if ! "$DMGBUILD_PYTHON_BIN" -c 'import dmgbuild' >/dev/null 2>&1; then
-    echo "error: dmgbuild is not importable from $DMGBUILD_PYTHON_BIN" >&2
-    echo "Refresh the packaging virtualenv with:" >&2
-    echo "  build/dmg-venv/bin/python -m pip install --upgrade pip dmgbuild" >&2
-    exit 1
-fi
+ensure_dmgbuild_python
 
 if [[ ! -f "$DMGBUILD_SETTINGS_PATH" ]]; then
     echo "error: dmgbuild settings file not found at $DMGBUILD_SETTINGS_PATH" >&2

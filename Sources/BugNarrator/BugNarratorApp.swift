@@ -1,8 +1,19 @@
 import Darwin
 import SwiftUI
 
+final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
+    @MainActor
+    static var appState: AppState?
+
+    @MainActor
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Self.appState?.applicationShouldTerminate() ?? .terminateNow
+    }
+}
+
 @main
 struct BugNarratorApp: App {
+    @NSApplicationDelegateAdaptor(AppLifecycleDelegate.self) private var appDelegate
     @StateObject private var settingsStore: SettingsStore
     @StateObject private var transcriptStore: TranscriptStore
     @StateObject private var appState: AppState
@@ -60,6 +71,7 @@ struct BugNarratorApp: App {
         _settingsStore = StateObject(wrappedValue: settingsStore)
         _transcriptStore = StateObject(wrappedValue: transcriptStore)
         _appState = StateObject(wrappedValue: appState)
+        AppLifecycleDelegate.appState = appState
         self.windowCoordinator = windowCoordinator
     }
 

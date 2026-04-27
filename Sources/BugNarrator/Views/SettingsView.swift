@@ -75,7 +75,8 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(
                                 settingsStore.apiKeyPersistenceState == .sessionOnly ||
-                                settingsStore.apiKeyPersistenceState == .keychainLocked
+                                settingsStore.apiKeyPersistenceState == .keychainLocked ||
+                                settingsStore.apiKeyPersistenceState == .pendingSave
                                     ? .orange
                                     : .secondary
                             )
@@ -249,7 +250,12 @@ struct SettingsView: View {
 
                         Text(settingsStore.githubTokenStorageDescription)
                             .font(.footnote)
-                            .foregroundStyle(settingsStore.githubTokenPersistenceState == .sessionOnly ? .orange : .secondary)
+                            .foregroundStyle(
+                                settingsStore.githubTokenPersistenceState == .sessionOnly ||
+                                settingsStore.githubTokenPersistenceState == .pendingSave
+                                    ? .orange
+                                    : .secondary
+                            )
 
                         Text("GitHub export is experimental. It creates Issues in the configured repository using the selected extracted issues. Screenshot filenames are referenced in the issue body for manual attachment.")
                             .font(.footnote)
@@ -307,7 +313,12 @@ struct SettingsView: View {
 
                         Text(settingsStore.jiraTokenStorageDescription)
                             .font(.footnote)
-                            .foregroundStyle(settingsStore.jiraTokenPersistenceState == .sessionOnly ? .orange : .secondary)
+                            .foregroundStyle(
+                                settingsStore.jiraTokenPersistenceState == .sessionOnly ||
+                                settingsStore.jiraTokenPersistenceState == .pendingSave
+                                    ? .orange
+                                    : .secondary
+                            )
 
                         Text("Jira export is experimental. It creates issues in Jira Cloud using the selected extracted issues. Screenshot filenames are referenced in the description for manual attachment.")
                             .font(.footnote)
@@ -389,7 +400,7 @@ struct SettingsView: View {
 
         return settingsStore.apiKeyPersistenceState == .keychainLocked && !settingsStore.hasAPIKey
             ? "Unlock Key"
-            : "Validate Key"
+            : (settingsStore.apiKeyPersistenceState == .pendingSave ? "Save & Validate Key" : "Validate Key")
     }
 
     private var debugInfoSnapshot: DebugInfoSnapshot {

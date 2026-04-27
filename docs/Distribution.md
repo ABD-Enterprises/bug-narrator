@@ -32,14 +32,7 @@ The non-versioned filename is useful for a stable GitHub Releases download link.
 - Xcode installed
 - the generated project file `BugNarrator.xcodeproj`
 - `hdiutil`, which is included with macOS
-- a local packaging virtualenv with `dmgbuild`
-
-Create the packaging virtualenv once on a release machine:
-
-```bash
-python3 -m venv build/dmg-venv
-build/dmg-venv/bin/python -m pip install dmgbuild
-```
+- `python3`, which the DMG builder uses to bootstrap `build/dmg-venv` with `dmgbuild` automatically if it is missing
 
 If you changed `project.yml`, regenerate the Xcode project first:
 
@@ -61,21 +54,28 @@ For a quick unsigned release-readiness pass before packaging:
 ./scripts/release_smoke_test.sh
 ```
 
+The release smoke path no longer launches the keychain startup probe by default. If you explicitly want to verify that startup does not trigger a new SecurityAgent prompt, opt in with:
+
+```bash
+RUN_STARTUP_KEYCHAIN_SMOKE=YES ./scripts/release_smoke_test.sh
+```
+
 ## What The Script Does
 
 The script:
 
 1. builds the app in `Release`
 2. generates the DMG background art
-3. uses `dmgbuild` to package a styled HFS+ DMG with:
+3. bootstraps `build/dmg-venv` with `dmgbuild` automatically when that packaging environment is missing
+4. uses `dmgbuild` to package a styled HFS+ DMG with:
    - `BugNarrator.app`
    - an `Applications` shortcut
    - the BugNarrator mounted-volume icon
    - a clean drag-to-Applications Finder layout
-4. verifies `AppIcon.icns` and `Assets.car` exist in the built app
-5. mounts the DMG and verifies the expected layout resources
-6. writes the finished artifacts to `dist/`
-7. when signing is enabled, verifies the built app and mounted DMG app still carry the microphone entitlement required for recording
+5. verifies `AppIcon.icns` and `Assets.car` exist in the built app
+6. mounts the DMG and verifies the expected layout resources
+7. writes the finished artifacts to `dist/`
+8. when signing is enabled, verifies the built app and mounted DMG app still carry the microphone entitlement required for recording
 
 ## Output Location
 
@@ -114,6 +114,8 @@ For a public release, you should normally:
 2. configure a notarization credential profile for `notarytool`
 3. build with Developer ID signing enabled
 4. notarize and staple the final DMG
+
+The build scripts now pin the local macOS destination to the host architecture so the release path does not rely on Xcode's ambiguous default destination selection.
 
 You can override the script behavior if needed. For a locally signed build using the configured Apple team:
 

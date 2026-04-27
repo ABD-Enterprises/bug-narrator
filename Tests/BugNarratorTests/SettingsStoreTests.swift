@@ -67,6 +67,8 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.jiraAPIToken = "fixture-jira-token"
         firstStore.jiraProjectKey = "FM"
         firstStore.jiraIssueType = "Task"
+        firstStore.refreshOpenAISecretForUserInitiatedAccess()
+        firstStore.refreshExportSecretsForUserInitiatedAccess()
 
         let secondStore = SettingsStore(
             defaults: defaults,
@@ -121,6 +123,11 @@ final class SettingsStoreTests: XCTestCase {
         store.apiKey = "saved-in-keychain"
 
         XCTAssertFalse(defaults.dictionaryRepresentation().keys.contains { $0.localizedCaseInsensitiveContains("apikey") })
+        XCTAssertEqual(store.apiKeyPersistenceState, .pendingSave)
+        XCTAssertTrue(keychain.values.isEmpty)
+
+        store.refreshOpenAISecretForUserInitiatedAccess()
+
         XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
     }
 
@@ -135,6 +142,11 @@ final class SettingsStoreTests: XCTestCase {
         store.jiraEmail = "secure@example.com"
 
         XCTAssertNil(defaults.string(forKey: "settings.jiraEmail"))
+        XCTAssertEqual(store.jiraEmailPersistenceState, .pendingSave)
+        XCTAssertTrue(keychain.values.isEmpty)
+
+        store.refreshExportSecretsForUserInitiatedAccess()
+
         XCTAssertEqual(store.jiraEmailPersistenceState, .keychain)
         XCTAssertEqual(
             keychain.values["BugNarrator.Jira::jira-email"],
@@ -153,6 +165,7 @@ final class SettingsStoreTests: XCTestCase {
 
         let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.apiKey = "fallback-key"
+        firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
         let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
 
@@ -233,6 +246,30 @@ final class SettingsStoreTests: XCTestCase {
             keychain.values["BugNarrator.Jira::jira-email"],
             "legacy@example.com"
         )
+    }
+
+    func testSecureDraftEditsDoNotTouchKeychainUntilUserInitiatesSave() {
+        let suiteName = "BugNarrator-SettingsDeferredSecretWriteTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        store.apiKey = "draft-openai-key"
+        store.jiraAPIToken = "draft-jira-token"
+
+        XCTAssertEqual(store.apiKeyPersistenceState, .pendingSave)
+        XCTAssertEqual(store.jiraTokenPersistenceState, .pendingSave)
+        XCTAssertTrue(keychain.values.isEmpty)
+
+        store.refreshOpenAISecretForUserInitiatedAccess()
+        store.refreshExportSecretsForUserInitiatedAccess()
+
+        XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
+        XCTAssertEqual(store.jiraTokenPersistenceState, .keychain)
+        XCTAssertEqual(keychain.values["BugNarrator.OpenAI::openai-api-key"], "draft-openai-key")
+        XCTAssertEqual(keychain.values["BugNarrator.Jira::jira-api-token"], "draft-jira-token")
     }
 
     func testDuplicateHotkeyAssignmentsAreRejectedAndKeepExistingAction() {

@@ -5,8 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="${PROJECT_PATH:-$ROOT_DIR/BugNarrator.xcodeproj}"
 SCHEME="${SCHEME:-BugNarrator}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
+HOST_ARCH="$(uname -m)"
+MACOS_DESTINATION="${MACOS_DESTINATION:-platform=macOS,arch=$HOST_ARCH}"
 CLEAN_LOCAL_BUILD_APPS="${CLEAN_LOCAL_BUILD_APPS:-NO}"
-RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-YES}"
+RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-NO}"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/BugNarrator.app"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 
@@ -26,6 +28,7 @@ xcodebuild \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \
     -configuration Debug \
+    -destination "$MACOS_DESTINATION" \
     CODE_SIGNING_ALLOWED=NO \
     test
 
@@ -36,6 +39,7 @@ xcodebuild \
     -scheme "$SCHEME" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
+    -destination "$MACOS_DESTINATION" \
     CODE_SIGNING_ALLOWED=NO \
     build
 

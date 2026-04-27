@@ -580,6 +580,30 @@ final class AppState: ObservableObject {
         showSettingsWindow?()
     }
 
+    func requestApplicationTermination() {
+        guard applicationShouldTerminate() == .terminateNow else {
+            return
+        }
+
+        NSApp.terminate(nil)
+    }
+
+    func applicationShouldTerminate() -> NSApplication.TerminateReply {
+        guard status.phase == .recording,
+              let activeRecordingSession else {
+            return .terminateNow
+        }
+
+        recordingLogger.warning(
+            "termination_blocked_while_recording",
+            "BugNarrator blocked an app termination request while a recording session was still active.",
+            metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+        )
+        showRecordingControlWindow?()
+        showToast("Stop recording before quitting BugNarrator.", style: .informational)
+        return .terminateCancel
+    }
+
     func openAbout() {
         showAboutWindow?()
     }

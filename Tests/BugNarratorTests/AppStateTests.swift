@@ -103,6 +103,32 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(harness.hotkeyManager.registeredShortcuts.isEmpty)
     }
 
+    func testApplicationShouldTerminateAllowsQuitWhenNotRecording() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        XCTAssertEqual(harness.appState.applicationShouldTerminate(), .terminateNow)
+    }
+
+    func testApplicationShouldTerminateCancelsQuitWhileRecording() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        var didOpenRecordingControls = false
+        harness.appState.showRecordingControlWindow = {
+            didOpenRecordingControls = true
+        }
+
+        await harness.appState.startSession()
+
+        let reply = harness.appState.applicationShouldTerminate()
+
+        XCTAssertEqual(reply, .terminateCancel)
+        XCTAssertTrue(didOpenRecordingControls)
+        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.transientToast?.message, "Stop recording before quitting BugNarrator.")
+    }
+
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

@@ -11,7 +11,7 @@ final class SettingsStore: ObservableObject {
     @Published var apiKey: String = "" {
         didSet {
             guard hasLoaded else { return }
-            apiKeyPersistenceState = persistSecret(apiKey, for: .openAI)
+            secretDidChange(.openAI)
         }
     }
 
@@ -97,7 +97,7 @@ final class SettingsStore: ObservableObject {
     @Published var githubToken: String = "" {
         didSet {
             guard hasLoaded else { return }
-            githubTokenPersistenceState = persistSecret(githubToken, for: .github)
+            secretDidChange(.github)
         }
     }
 
@@ -132,14 +132,14 @@ final class SettingsStore: ObservableObject {
     @Published var jiraEmail: String = "" {
         didSet {
             guard hasLoaded else { return }
-            jiraEmailPersistenceState = persistSecret(jiraEmail, for: .jiraEmail)
+            secretDidChange(.jiraEmail)
         }
     }
 
     @Published var jiraAPIToken: String = "" {
         didSet {
             guard hasLoaded else { return }
-            jiraTokenPersistenceState = persistSecret(jiraAPIToken, for: .jira)
+            secretDidChange(.jira)
         }
     }
 
@@ -351,6 +351,8 @@ final class SettingsStore: ObservableObject {
     private var isSynchronizingHotkeys = false
     private var isSynchronizingLaunchAtLogin = false
     private var sessionOnlySecrets: [SecretSlot: String] = [:]
+    private var committedSecrets: [SecretSlot: String] = [:]
+    private var committedSecretStates: [SecretSlot: APIKeyPersistenceState] = [:]
 
     init(
         defaults: UserDefaults = .standard,
@@ -375,31 +377,40 @@ final class SettingsStore: ObservableObject {
 
     func refreshSecretsForUserInitiatedAccess() {
         logger.debug("refresh_all_secrets", "Refreshing stored secrets after a user-initiated action.")
-        reloadSecrets(slots: Array(SecretSlot.allCases), allowInteraction: true, includeLegacyServices: true)
+        prepareSecretsForUserInitiatedAccess(
+            slots: Array(SecretSlot.allCases),
+            includeLegacyServices: true
+        )
     }
 
     func refreshOpenAISecretForUserInitiatedAccess() {
         logger.debug("refresh_openai_secret", "Refreshing the OpenAI API key after a user-initiated action.")
-        reloadSecrets(slots: [.openAI], allowInteraction: true, includeLegacyServices: true)
+        prepareSecretsForUserInitiatedAccess(slots: [.openAI], includeLegacyServices: true)
     }
 
     func refreshExportSecretsForUserInitiatedAccess() {
         logger.debug("refresh_export_secrets", "Refreshing export credentials after a user-initiated action.")
-        reloadSecrets(slots: [.github, .jiraEmail, .jira], allowInteraction: true, includeLegacyServices: true)
+        prepareSecretsForUserInitiatedAccess(
+            slots: [.github, .jiraEmail, .jira],
+            includeLegacyServices: true
+        )
     }
 
     func removeAPIKey() {
         apiKey = ""
+        apiKeyPersistenceState = persistSecret(apiKey, for: .openAI)
         logger.info("remove_openai_key", "The OpenAI API key was removed from local storage.")
     }
 
     func removeGitHubToken() {
         githubToken = ""
+        githubTokenPersistenceState = persistSecret(githubToken, for: .github)
         logger.info("remove_github_token", "The GitHub export token was removed from local storage.")
     }
 
     func removeJiraAPIToken() {
         jiraAPIToken = ""
+        jiraTokenPersistenceState = persistSecret(jiraAPIToken, for: .jira)
         logger.info("remove_jira_token", "The Jira API token was removed from local storage.")
     }
 
@@ -485,17 +496,20 @@ final class SettingsStore: ObservableObject {
             switch slot {
             case .openAI:
                 apiKey = secret.value
-                apiKeyPersistenceState = secret.state
+                setPersistenceState(secret.state, for: slot)
             case .github:
                 githubToken = secret.value
-                githubTokenPersistenceState = secret.state
+                setPersistenceState(secret.state, for: slot)
             case .jiraEmail:
                 jiraEmail = secret.value
-                jiraEmailPersistenceState = secret.state
+                setPersistenceState(secret.state, for: slot)
             case .jira:
                 jiraAPIToken = secret.value
-                jiraTokenPersistenceState = secret.state
+                setPersistenceState(secret.state, for: slot)
             }
+
+            committedSecrets[slot] = secret.value
+            committedSecretStates[slot] = secret.state
         }
 
         logger.debug(
@@ -728,6 +742,8 @@ final class SettingsStore: ObservableObject {
                 "A secure value was cleared from persistent storage.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            committedSecrets[slot] = ""
+            committedSecretStates[slot] = .empty
             return .empty
         }
 
@@ -742,6 +758,8 @@ final class SettingsStore: ObservableObject {
                 "A secure value was saved to Keychain.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            committedSecrets[slot] = trimmedValue
+            committedSecretStates[slot] = .keychain
             return .keychain
         } catch {
             sessionOnlySecrets[slot] = trimmedValue
@@ -750,6 +768,8 @@ final class SettingsStore: ObservableObject {
                 "Keychain storage was unavailable, so a secure value is only kept in memory for this run.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            committedSecrets[slot] = trimmedValue
+            committedSecretStates[slot] = .sessionOnly
             return .sessionOnly
         }
     }
@@ -861,6 +881,8 @@ final class SettingsStore: ObservableObject {
             return "Stored in your macOS Keychain. BugNarrator will only prompt to unlock it when you validate the key or run an action that needs it."
         case .sessionOnly:
             return "Keychain storage was unavailable, so this value is only kept in memory until you quit BugNarrator."
+        case .pendingSave:
+            return "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
         }
     }
 
@@ -877,6 +899,89 @@ final class SettingsStore: ObservableObject {
         let suffixCount = min(4, secret.count)
         let suffix = secret.suffix(suffixCount)
         return "••••••••\(suffix)"
+    }
+
+    private func prepareSecretsForUserInitiatedAccess(
+        slots: [SecretSlot],
+        includeLegacyServices: Bool
+    ) {
+        let pendingSlots = slots.filter(hasPendingSecretChanges)
+        for slot in pendingSlots {
+            setPersistenceState(persistSecret(currentSecretValue(for: slot), for: slot), for: slot)
+        }
+
+        let reloadableSlots = slots.filter {
+            !hasPendingSecretChanges(for: $0) && persistenceState(for: $0) == .keychainLocked
+        }
+
+        if !reloadableSlots.isEmpty {
+            reloadSecrets(
+                slots: reloadableSlots,
+                allowInteraction: true,
+                includeLegacyServices: includeLegacyServices
+            )
+        }
+    }
+
+    private func secretDidChange(_ slot: SecretSlot) {
+        let currentValue = currentSecretValue(for: slot).trimmingCharacters(in: .whitespacesAndNewlines)
+        let committedValue = (committedSecrets[slot] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let committedState = committedSecretStates[slot] ?? .empty
+
+        if currentValue == committedValue {
+            setPersistenceState(committedState, for: slot)
+            return
+        }
+
+        if currentValue.isEmpty && committedState == .empty {
+            setPersistenceState(.empty, for: slot)
+            return
+        }
+
+        setPersistenceState(.pendingSave, for: slot)
+    }
+
+    private func hasPendingSecretChanges(for slot: SecretSlot) -> Bool {
+        persistenceState(for: slot) == .pendingSave
+    }
+
+    private func currentSecretValue(for slot: SecretSlot) -> String {
+        switch slot {
+        case .openAI:
+            return apiKey
+        case .github:
+            return githubToken
+        case .jiraEmail:
+            return jiraEmail
+        case .jira:
+            return jiraAPIToken
+        }
+    }
+
+    private func persistenceState(for slot: SecretSlot) -> APIKeyPersistenceState {
+        switch slot {
+        case .openAI:
+            return apiKeyPersistenceState
+        case .github:
+            return githubTokenPersistenceState
+        case .jiraEmail:
+            return jiraEmailPersistenceState
+        case .jira:
+            return jiraTokenPersistenceState
+        }
+    }
+
+    private func setPersistenceState(_ state: APIKeyPersistenceState, for slot: SecretSlot) {
+        switch slot {
+        case .openAI:
+            apiKeyPersistenceState = state
+        case .github:
+            githubTokenPersistenceState = state
+        case .jiraEmail:
+            jiraEmailPersistenceState = state
+        case .jira:
+            jiraTokenPersistenceState = state
+        }
     }
 
     private func normalizeOptional(_ value: String) -> String? {
@@ -1050,6 +1155,7 @@ enum APIKeyPersistenceState: Equatable {
     case keychain
     case keychainLocked
     case sessionOnly
+    case pendingSave
 }
 
 enum SettingsCalloutTone: Equatable {

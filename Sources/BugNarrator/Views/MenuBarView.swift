@@ -418,7 +418,7 @@ struct MenuBarView: View {
                 .foregroundStyle(.secondary)
 
             Button("Quit") {
-                NSApp.terminate(nil)
+                appState.requestApplicationTermination()
             }
         }
     }
