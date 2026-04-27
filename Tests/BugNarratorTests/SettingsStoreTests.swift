@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import XCTest
 @testable import BugNarrator
 
@@ -270,6 +271,24 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.jiraTokenPersistenceState, .keychain)
         XCTAssertEqual(keychain.values["BugNarrator.OpenAI::openai-api-key"], "draft-openai-key")
         XCTAssertEqual(keychain.values["BugNarrator.Jira::jira-api-token"], "draft-jira-token")
+    }
+
+    func testJiraTokenDraftOnlyPublishesPendingSaveTransitionOnce() {
+        let suiteName = "BugNarrator-JiraTokenPendingSavePublisherTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        var observedStates: [APIKeyPersistenceState] = []
+        let cancellable = store.$jiraTokenPersistenceState.sink { observedStates.append($0) }
+        defer { cancellable.cancel() }
+
+        store.jiraAPIToken = "a"
+        store.jiraAPIToken = "ab"
+        store.jiraAPIToken = "abc"
+
+        XCTAssertEqual(observedStates, [.empty, .pendingSave])
     }
 
     func testDuplicateHotkeyAssignmentsAreRejectedAndKeepExistingAction() {

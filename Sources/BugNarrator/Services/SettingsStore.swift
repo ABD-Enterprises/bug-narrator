@@ -974,12 +974,16 @@ final class SettingsStore: ObservableObject {
     private func setPersistenceState(_ state: APIKeyPersistenceState, for slot: SecretSlot) {
         switch slot {
         case .openAI:
+            guard apiKeyPersistenceState != state else { return }
             apiKeyPersistenceState = state
         case .github:
+            guard githubTokenPersistenceState != state else { return }
             githubTokenPersistenceState = state
         case .jiraEmail:
+            guard jiraEmailPersistenceState != state else { return }
             jiraEmailPersistenceState = state
         case .jira:
+            guard jiraTokenPersistenceState != state else { return }
             jiraTokenPersistenceState = state
         }
     }
