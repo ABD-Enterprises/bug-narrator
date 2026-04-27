@@ -841,7 +841,7 @@ final class SettingsStore: ObservableObject {
         switch status {
         case .disabled, .enabled:
             openAtStartupStatusTone = .secondary
-        case .requiresApproval, .unavailable:
+        case .requiresApproval, .notFound, .unavailable:
             openAtStartupStatusTone = .warning
         }
     }

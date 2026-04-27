@@ -630,6 +630,28 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testLaunchAtLoginNotFoundKeepsToggleAvailableForRegistrationRetry() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginNotFoundTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService(status: .notFound)
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        XCTAssertFalse(store.openAtStartup)
+        XCTAssertTrue(store.openAtStartupSupported)
+        XCTAssertEqual(store.openAtStartupStatusTone, .warning)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator as a Login Item."
+        )
+    }
+
     func testLaunchAtLoginFailureRestoresActualStateAndShowsError() {
         let suiteName = "BugNarrator-SettingsLaunchAtLoginFailureTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
