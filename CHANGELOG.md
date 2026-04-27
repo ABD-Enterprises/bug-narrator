@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.27 - 2026-04-27
+
+- Switched Jira project discovery to Jira Cloud project search and issue-type discovery to the project issue-type APIs instead of relying on brittle create-metadata project listing responses.
+- Hardened Jira metadata decoding so malformed or partial rows are skipped and unexpected metadata formats surface a useful Jira error instead of Swift's generic missing-data decode message.
+
 ## 1.0.26 - 2026-04-27
 
 - Fixed tracker setup readiness so Jira project loading is enabled after entering only the Jira URL, email, and API token, before any project or issue type has been loaded.
