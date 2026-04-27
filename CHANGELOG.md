@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.0.25 - 2026-04-27
+
+- Added launch recovery for crash-left recordings so recovered audio and matching transcript files are imported into the session library instead of staying hidden in Application Support.
+- Added transcript quality findings for empty, suspiciously short, abruptly cut off, or repeated-loop transcript output so users can review risky transcripts before relying on them.
+- Added local audio upload and issue-extraction request budgets to reject oversized audio before upload and cap long transcript/screenshot payloads before OpenAI issue extraction.
+- Surfaced session-store backup recovery and recent tracker export receipt history in the session library review surface.
+- Hardened release validation with bundle identifier, microphone usage, and audio-input entitlement checks, and moved CodeQL to manual/scheduled runs to avoid automatic Swift analysis on every PR or push.
+
 ## 1.0.24 - 2026-04-27
 
 - Blocked app termination while a recording is active so BugNarrator no longer strands in-progress call audio in temporary storage when the app receives Quit.

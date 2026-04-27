@@ -4,7 +4,7 @@ This document is the human-readable roadmap companion to [state.json](state.json
 
 ## Current Status
 
-- current production app version: `1.0.24`
+- current production app version: `1.0.25`
 - current blocked phase: `RR-002 Windows Runtime Validation And Hardening`
 - recent completed work: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real Windows desktop validation, completed the hosted Node24 workflow validation slice, promoted both OPS-012 dependency remediation passes to `main`, covered the FAIL, NOT RUN, and missing-state-update guardrail rules with direct regression tests, closed the remaining Dependabot alerts, added a dedicated `Retry Needed` session-library filter for preserved-session recovery
 
