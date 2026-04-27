@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.28 - 2026-04-27
+
+- Replaced Settings token inputs with AppKit-backed credential fields that avoid macOS password/autofill UI while keeping saved tokens masked at rest.
+- Limited Jira issue-type refreshes to explicit project picker changes so Settings field focus and scrolling cannot trigger repeated metadata reloads.
+
 ## 1.0.27 - 2026-04-27
 
 - Switched Jira project discovery to Jira Cloud project search and issue-type discovery to the project issue-type APIs instead of relying on brittle create-metadata project listing responses.
