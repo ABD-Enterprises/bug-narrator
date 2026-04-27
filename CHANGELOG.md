@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.24 - 2026-04-27
+
+- Blocked app termination while a recording is active so BugNarrator no longer strands in-progress call audio in temporary storage when the app receives Quit.
+- Stopped secure settings fields from persisting to Keychain on every edit and moved those saves to explicit user actions so settings changes no longer trigger prompt storms.
+- Hardened the local release path so DMG packaging bootstraps its own `dmgbuild` environment, pins the host macOS build destination explicitly, and keeps the startup keychain smoke probe opt-in instead of default.
+
 ## 1.0.23 - 2026-04-17
 
 - Fixed long-form transcription reliability by chunking extended recordings before upload, then stitching the returned transcript text and segment timestamps back together so BugNarrator no longer truncates or loops repeated sections on longer sessions.
