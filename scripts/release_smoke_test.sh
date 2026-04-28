@@ -30,7 +30,9 @@ xcodebuild \
     -scheme "$SCHEME" \
     -configuration Debug \
     -destination "$MACOS_DESTINATION" \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_ALLOWED=YES \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGN_IDENTITY=- \
     test
 
 echo "Running unsigned release build..."

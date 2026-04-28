@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.29 - 2026-04-27
+
+- Restored the Open BugNarrator at Startup control when macOS reports the login item is not registered yet, so the signed app can register itself instead of showing the control as unavailable.
+- Added isolated Settings UI regression coverage for the startup toggle and GitHub/Jira token fields so field lockups and disabled Settings controls are caught locally before release.
+
 ## 1.0.28 - 2026-04-27
 
 - Replaced Settings token inputs with AppKit-backed credential fields that avoid macOS password/autofill UI while keeping saved tokens masked at rest.
