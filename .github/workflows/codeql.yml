@@ -2,6 +2,12 @@ name: CodeQL
 
 on:
   workflow_dispatch:
+    inputs:
+      include_swift:
+        description: "Run Swift analysis during this manual scan"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 4 * * 1'  # Weekly on Monday at 4 AM UTC
 
@@ -17,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, swift, python, javascript-typescript, csharp]
+        language: ${{ fromJSON(github.event_name == 'workflow_dispatch' && !inputs.include_swift && '["actions","python","javascript-typescript","csharp"]' || '["actions","swift","python","javascript-typescript","csharp"]') }}
 
     steps:
       - name: Checkout
