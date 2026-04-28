@@ -645,10 +645,34 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertFalse(store.openAtStartup)
         XCTAssertTrue(store.openAtStartupSupported)
+        XCTAssertTrue(store.openAtStartupControlIsEnabled)
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
             "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator as a Login Item."
+        )
+    }
+
+    func testLaunchAtLoginUnavailableDisablesStartupControl() {
+        let suiteName = "BugNarrator-SettingsLaunchAtLoginUnavailableTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchAtLoginService = MockLaunchAtLoginService(status: .unavailable)
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: launchAtLoginService
+        )
+
+        XCTAssertFalse(store.openAtStartup)
+        XCTAssertFalse(store.openAtStartupSupported)
+        XCTAssertFalse(store.openAtStartupControlIsEnabled)
+        XCTAssertEqual(store.openAtStartupStatusTone, .warning)
+        XCTAssertEqual(
+            store.openAtStartupStatusMessage,
+            "Open at Startup is unavailable for this app copy. Install BugNarrator in Applications and use a signed build if you want BugNarrator to launch automatically."
         )
     }
 
@@ -706,27 +730,5 @@ final class SettingsStoreTests: XCTestCase {
             store.openAtStartupStatusMessage,
             "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
         )
-    }
-}
-
-private final class MockLaunchAtLoginService: LaunchAtLoginControlling {
-    var status: LaunchAtLoginStatus
-    var setEnabledError: Error?
-
-    init(status: LaunchAtLoginStatus = .disabled) {
-        self.status = status
-    }
-
-    func currentStatus() -> LaunchAtLoginStatus {
-        status
-    }
-
-    func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {
-        if let setEnabledError {
-            throw setEnabledError
-        }
-
-        status = enabled ? .enabled : .disabled
-        return status
     }
 }

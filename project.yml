@@ -22,8 +22,8 @@ targets:
         PRODUCT_NAME: BugNarrator
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        CURRENT_PROJECT_VERSION: 28
-        MARKETING_VERSION: 1.0.27
+        CURRENT_PROJECT_VERSION: 29
+        MARKETING_VERSION: 1.0.28
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Resources/BugNarrator.entitlements
         ENABLE_HARDENED_RUNTIME: YES
@@ -39,5 +39,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.abdenterprises.bugnarrator.tests
         PRODUCT_NAME: BugNarratorTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+  BugNarratorUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/BugNarratorUITests
+    dependencies:
+      - target: BugNarrator
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.abdenterprises.bugnarrator.uitests
+        PRODUCT_NAME: BugNarratorUITests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic

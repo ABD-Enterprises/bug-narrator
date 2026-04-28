@@ -73,6 +73,12 @@ struct BugNarratorApp: App {
         _appState = StateObject(wrappedValue: appState)
         AppLifecycleDelegate.appState = appState
         self.windowCoordinator = windowCoordinator
+
+        if runtimeEnvironment.shouldOpenSettingsOnLaunch {
+            DispatchQueue.main.async {
+                windowCoordinator.showSettingsWindow()
+            }
+        }
     }
 
     var body: some Scene {

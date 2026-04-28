@@ -623,6 +623,28 @@ final class MockKeychainService: KeychainServicing {
     }
 }
 
+final class MockLaunchAtLoginService: LaunchAtLoginControlling {
+    var status: LaunchAtLoginStatus
+    var setEnabledError: Error?
+
+    init(status: LaunchAtLoginStatus = .disabled) {
+        self.status = status
+    }
+
+    func currentStatus() -> LaunchAtLoginStatus {
+        status
+    }
+
+    func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {
+        if let setEnabledError {
+            throw setEnabledError
+        }
+
+        status = enabled ? .enabled : .disabled
+        return status
+    }
+}
+
 @MainActor
 struct AppStateHarness {
     let rootDirectoryURL: URL
@@ -650,6 +672,7 @@ struct AppStateHarness {
         autoCopyTranscript: Bool = true,
         autoSaveTranscript: Bool = true,
         autoExtractIssues: Bool = false,
+        launchAtLoginStatus: LaunchAtLoginStatus = .disabled,
         screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
         screenshotSelectionService: MockScreenshotSelectionService = MockScreenshotSelectionService(),
         recoveredImportResult: Result<Int, Error> = .success(0),
@@ -665,7 +688,12 @@ struct AppStateHarness {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
         let keychainService = MockKeychainService()
-        let settingsStore = SettingsStore(defaults: defaults, keychainService: keychainService)
+        let launchAtLoginService = MockLaunchAtLoginService(status: launchAtLoginStatus)
+        let settingsStore = SettingsStore(
+            defaults: defaults,
+            keychainService: keychainService,
+            launchAtLoginService: launchAtLoginService
+        )
         settingsStore.apiKey = apiKey
         settingsStore.debugMode = debugMode
         settingsStore.autoCopyTranscript = autoCopyTranscript

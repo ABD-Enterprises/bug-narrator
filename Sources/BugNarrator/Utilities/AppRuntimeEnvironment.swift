@@ -27,13 +27,26 @@ struct AppRuntimeEnvironment: Equatable {
             || environment["XCTestSessionIdentifier"] != nil
     }
 
+    var isRunningSettingsUISmokeTest: Bool {
+        environment["BUGNARRATOR_SETTINGS_UI_SMOKE_TEST"] == "1"
+    }
+
+    var usesIsolatedRuntime: Bool {
+        isRunningUnderTests || isRunningSettingsUISmokeTest
+    }
+
     var shouldBypassSingleInstanceEnforcement: Bool {
-        isRunningUnderTests
+        usesIsolatedRuntime
+    }
+
+    var shouldOpenSettingsOnLaunch: Bool {
+        environment["BUGNARRATOR_OPEN_SETTINGS_ON_LAUNCH"] == "1"
     }
 
     var testIsolationScope: String {
         let rawScope = environment["XCTestSessionIdentifier"]
             ?? environment["XCTestConfigurationFilePath"]
+            ?? environment["BUGNARRATOR_SETTINGS_UI_SMOKE_SCOPE"]
             ?? ProcessInfo.processInfo.globallyUniqueString
 
         return rawScope.replacingOccurrences(
@@ -41,5 +54,20 @@ struct AppRuntimeEnvironment: Equatable {
             with: "-",
             options: .regularExpression
         )
+    }
+
+    var testLaunchAtLoginStatus: LaunchAtLoginStatus {
+        switch environment["BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS"] {
+        case "enabled":
+            return .enabled
+        case "requires_approval":
+            return .requiresApproval
+        case "not_found":
+            return .notFound
+        case "unavailable":
+            return .unavailable
+        default:
+            return .disabled
+        }
     }
 }

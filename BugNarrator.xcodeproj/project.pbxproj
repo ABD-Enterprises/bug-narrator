@@ -33,6 +33,7 @@
 		3FA2E58DF45C2A9FEBF9FE0B /* AtomicBundleDirectoryWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98A6F8F6072E7B0276FB5A9 /* AtomicBundleDirectoryWriter.swift */; };
 		40D75D2D2C83EE58CBB45F6B /* BugNarratorLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C80DD2FADBED13E068990D /* BugNarratorLinks.swift */; };
 		456F9629727CC070CD248B56 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AC8EFE20212B7DE69792FB /* AudioRecorder.swift */; };
+		45DE9D5541C2B8F54019E9F7 /* BugNarratorSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FD68D81A7568355BFAB9DF /* BugNarratorSettingsUITests.swift */; };
 		45F46F4649A31F438D58E465 /* BugNarratorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD698A35E065D940A06FB72 /* BugNarratorApp.swift */; };
 		474B8B38A576590B2AB08D3F /* IssueExportReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */; };
 		4D9A19996F3BCEC530DEA5F8 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865C5FE84904ECA5F4379637 /* MenuBarView.swift */; };
@@ -113,6 +114,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		1E73107E51BDE0EEB454FDBF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B0A3406A6BEA68197617663 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2BA743ACA3FDA34F10AB50A1;
+			remoteInfo = BugNarrator;
+		};
 		2831E521BF54F398FF34C46B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5B0A3406A6BEA68197617663 /* Project object */;
@@ -135,6 +143,8 @@
 		20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionServiceTests.swift; sourceTree = "<group>"; };
 		22447E5581818B8003AA49F8 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraft.swift; sourceTree = "<group>"; };
+		22FD68D81A7568355BFAB9DF /* BugNarratorSettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorSettingsUITests.swift; sourceTree = "<group>"; };
+		254021D1AC93E8A414D26241 /* BugNarratorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BugNarratorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		277DC17D4084F918920CB8C5 /* URLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLHandler.swift; sourceTree = "<group>"; };
 		28B463E2764267ED731EDB99 /* AppBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrap.swift; sourceTree = "<group>"; };
 		2D753EF601F00C09C7FF276C /* TransientToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToast.swift; sourceTree = "<group>"; };
@@ -305,6 +315,14 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		7E537D104A7237092C8B8BC4 /* BugNarratorUITests */ = {
+			isa = PBXGroup;
+			children = (
+				22FD68D81A7568355BFAB9DF /* BugNarratorSettingsUITests.swift */,
+			);
+			path = BugNarratorUITests;
+			sourceTree = "<group>";
+		};
 		7E857544F84A4D549D543D5F /* BugNarrator */ = {
 			isa = PBXGroup;
 			children = (
@@ -409,6 +427,7 @@
 			isa = PBXGroup;
 			children = (
 				2365FC0566C298691506FFDF /* BugNarratorTests */,
+				7E537D104A7237092C8B8BC4 /* BugNarratorUITests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -418,6 +437,7 @@
 			children = (
 				B294CC5102A78C8F1D01EEB6 /* BugNarrator.app */,
 				FED17EDC791F33BADA9E14D8 /* BugNarratorTests.xctest */,
+				254021D1AC93E8A414D26241 /* BugNarratorUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -425,6 +445,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		25531B4547189C07D281FC2B /* BugNarratorUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7D2EE17469768FE43B5CB5A /* Build configuration list for PBXNativeTarget "BugNarratorUITests" */;
+			buildPhases = (
+				F45F210E962225F317C86764 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				03DC3387BC05E112C82FA559 /* PBXTargetDependency */,
+			);
+			name = BugNarratorUITests;
+			packageProductDependencies = (
+			);
+			productName = BugNarratorUITests;
+			productReference = 254021D1AC93E8A414D26241 /* BugNarratorUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		2BA743ACA3FDA34F10AB50A1 /* BugNarrator */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 778E8AA3324F8A1888E6D06D /* Build configuration list for PBXNativeTarget "BugNarrator" */;
@@ -470,6 +508,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					25531B4547189C07D281FC2B = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 2BA743ACA3FDA34F10AB50A1;
+					};
 					2BA743ACA3FDA34F10AB50A1 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -494,6 +536,7 @@
 			targets = (
 				2BA743ACA3FDA34F10AB50A1 /* BugNarrator */,
 				D5449FFB685294D79BEC9611 /* BugNarratorTests */,
+				25531B4547189C07D281FC2B /* BugNarratorUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -543,6 +586,14 @@
 				3F4178877259A14D87101CE5 /* TranscriptQualityInspectorTests.swift in Sources */,
 				38B00E4AA8B374646877FBFB /* TranscriptStoreTests.swift in Sources */,
 				0C27546CA8851DF57ECF8C6E /* TranscriptionClientTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F45F210E962225F317C86764 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				45DE9D5541C2B8F54019E9F7 /* BugNarratorSettingsUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -629,6 +680,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		03DC3387BC05E112C82FA559 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2BA743ACA3FDA34F10AB50A1 /* BugNarrator */;
+			targetProxy = 1E73107E51BDE0EEB454FDBF /* PBXContainerItemProxy */;
+		};
 		23E8EC5C4A6BD24E4EF6E172 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 2BA743ACA3FDA34F10AB50A1 /* BugNarrator */;
@@ -637,6 +693,46 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0D280C8743AB87FD0B9BC6F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator.uitests;
+				PRODUCT_NAME = BugNarratorUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = BugNarrator;
+			};
+			name = Debug;
+		};
+		360D93820393CC087FA15EE7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator.uitests;
+				PRODUCT_NAME = BugNarratorUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = BugNarrator;
+			};
+			name = Release;
+		};
 		4AFE02E14C0E20165C28095A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -850,6 +946,15 @@
 			buildConfigurations = (
 				4AFE02E14C0E20165C28095A /* Debug */,
 				4E7149A5D5AF772838F6A2D9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A7D2EE17469768FE43B5CB5A /* Build configuration list for PBXNativeTarget "BugNarratorUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0D280C8743AB87FD0B9BC6F3 /* Debug */,
+				360D93820393CC087FA15EE7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -213,6 +213,10 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var openAtStartupStatusMessage: String?
     @Published private(set) var openAtStartupStatusTone: SettingsCalloutTone = .secondary
 
+    var openAtStartupControlIsEnabled: Bool {
+        openAtStartupSupported
+    }
+
     var trimmedAPIKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }

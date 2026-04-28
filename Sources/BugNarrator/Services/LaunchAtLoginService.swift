@@ -96,8 +96,14 @@ struct SystemLaunchAtLoginService: LaunchAtLoginControlling {
 }
 
 struct TestingLaunchAtLoginService: LaunchAtLoginControlling {
+    let status: LaunchAtLoginStatus
+
+    init(status: LaunchAtLoginStatus = .disabled) {
+        self.status = status
+    }
+
     func currentStatus() -> LaunchAtLoginStatus {
-        .disabled
+        status
     }
 
     func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {

@@ -150,7 +150,7 @@ struct SettingsView: View {
 
                         Toggle("Auto-copy transcript to clipboard", isOn: $settingsStore.autoCopyTranscript)
                         Toggle("Open BugNarrator at startup", isOn: $settingsStore.openAtStartup)
-                            .disabled(!settingsStore.openAtStartupSupported)
+                            .disabled(!settingsStore.openAtStartupControlIsEnabled)
                         Toggle("Debug mode enables verbose local diagnostics", isOn: $settingsStore.debugMode)
 
                         if let openAtStartupStatusMessage = settingsStore.openAtStartupStatusMessage {
