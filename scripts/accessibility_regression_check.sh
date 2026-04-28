@@ -64,6 +64,18 @@ check_literal \
   '.accessibilityLabel("Jira issue type")' \
   'settings Jira issue type label'
 check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  'OpenAI status:' \
+  'settings OpenAI status row label'
+check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  'GitHub export status:' \
+  'settings GitHub export status row label'
+check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  'Jira export status:' \
+  'settings Jira export status row label'
+check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/MenuBarView.swift" \
   '.accessibilityHint("Opens the recording controls window.")' \
   'menu bar recording controls hint'

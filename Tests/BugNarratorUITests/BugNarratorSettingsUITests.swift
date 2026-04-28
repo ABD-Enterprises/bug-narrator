@@ -20,6 +20,20 @@ final class BugNarratorSettingsUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsAtAGlanceStatusRowsExist() throws {
+        let app = launchSettingsApp(scope: "at-a-glance-status")
+        defer { app.terminate() }
+
+        let settingsWindow = app.windows["BugNarrator Settings"]
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+        waitForSettingsLayout()
+
+        XCTAssertTrue(app.descendants(matching: .any)["OpenAI status: Needs setup"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["GitHub export status: Needs setup"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Jira export status: Needs setup"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testSettingsCredentialFieldsAcceptTypingWithoutLockingWindow() throws {
         let app = launchSettingsApp(scope: "credential-fields-editable")
         defer { app.terminate() }
@@ -27,6 +41,12 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let settingsWindow = app.windows["BugNarrator Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
+
+        let openAIKeyField = app.textFields["OpenAI API Key"]
+        XCTAssertTrue(waitForSettingsElement(openAIKeyField, in: settingsWindow))
+        clickWhenHittable(openAIKeyField, in: settingsWindow)
+        openAIKeyField.typeText("sk-smoke-test")
+        XCTAssertTrue(settingsWindow.exists)
 
         let gitHubTokenField = app.textFields["GitHub personal access token"]
         XCTAssertTrue(waitForSettingsElement(gitHubTokenField, in: settingsWindow))

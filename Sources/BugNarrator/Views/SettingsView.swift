@@ -17,6 +17,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                statusSummary
+
                 GroupBox("Before You Start") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("BugNarrator requires your own OpenAI API key.")
@@ -222,6 +224,8 @@ struct SettingsView: View {
                             )
                         }
 
+                        gitHubPrerequisites
+
                         HStack(spacing: 12) {
                             Text(settingsStore.maskedGitHubToken)
                                 .font(.subheadline.monospaced())
@@ -337,6 +341,8 @@ struct SettingsView: View {
                                 accessibilityLabel: "Jira API token"
                             )
                         }
+
+                        jiraPrerequisites
 
                         HStack(spacing: 12) {
                             Text(settingsStore.maskedJiraAPIToken)
@@ -496,8 +502,170 @@ struct SettingsView: View {
         }
     }
 
+    private var statusSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Setup Status")
+                .font(.headline)
+
+            VStack(spacing: 8) {
+                settingsStatusRow(
+                    title: "OpenAI",
+                    detail: "Transcription and issue extraction",
+                    status: openAIReadiness,
+                    accessibilityLabel: "OpenAI status: \(openAIReadiness.title)"
+                )
+
+                settingsStatusRow(
+                    title: "GitHub Export",
+                    detail: "Issues destination",
+                    status: gitHubReadiness,
+                    accessibilityLabel: "GitHub export status: \(gitHubReadiness.title)"
+                )
+
+                settingsStatusRow(
+                    title: "Jira Export",
+                    detail: "Cloud project destination",
+                    status: jiraReadiness,
+                    accessibilityLabel: "Jira export status: \(jiraReadiness.title)"
+                )
+            }
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(.quaternary, lineWidth: 1)
+        )
+    }
+
+    private var gitHubPrerequisites: some View {
+        prerequisiteChecklist(
+            title: "GitHub export prerequisites",
+            rows: [
+                PrerequisiteRow(
+                    title: "Token",
+                    detail: gitHubTokenPrerequisiteDetail,
+                    status: prerequisiteStatus(
+                        for: settingsStore.githubTokenPersistenceState,
+                        isReady: settingsStore.gitHubRepositoryDiscoveryIsReady
+                    )
+                ),
+                PrerequisiteRow(
+                    title: "Repository",
+                    detail: settingsStore.gitHubConfigurationValidationIsReady
+                        ? "\(settingsStore.normalizedGitHubRepositoryOwner)/\(settingsStore.normalizedGitHubRepositoryName)"
+                        : "Choose or enter owner and repository name",
+                    status: settingsStore.gitHubConfigurationValidationIsReady ? .ready : .needsSetup
+                )
+            ]
+        )
+    }
+
+    private var jiraPrerequisites: some View {
+        prerequisiteChecklist(
+            title: "Jira export prerequisites",
+            rows: [
+                PrerequisiteRow(
+                    title: "Credentials",
+                    detail: jiraCredentialPrerequisiteDetail,
+                    status: jiraCredentialPrerequisiteStatus
+                ),
+                PrerequisiteRow(
+                    title: "Project",
+                    detail: settingsStore.normalizedJiraProjectKey.isEmpty
+                        ? "Load and choose a Jira project"
+                        : settingsStore.normalizedJiraProjectKey,
+                    status: settingsStore.normalizedJiraProjectKey.isEmpty ? .needsSetup : .ready
+                ),
+                PrerequisiteRow(
+                    title: "Issue Type",
+                    detail: settingsStore.normalizedJiraIssueType.isEmpty
+                        ? "Load and choose an issue type"
+                        : settingsStore.normalizedJiraIssueType,
+                    status: settingsStore.normalizedJiraIssueType.isEmpty ? .needsSetup : .ready
+                )
+            ]
+        )
+    }
+
     private var secureControlsDisabled: Bool {
         appState.status.phase == .recording || appState.status.phase == .transcribing
+    }
+
+    private var openAIReadiness: SettingsReadinessStatus {
+        credentialStatus(
+            valueIsPresent: settingsStore.hasAPIKey,
+            persistenceState: settingsStore.apiKeyPersistenceState
+        )
+    }
+
+    private var gitHubReadiness: SettingsReadinessStatus {
+        if settingsStore.githubTokenPersistenceState == .pendingSave {
+            return .pendingSave
+        }
+
+        if settingsStore.githubTokenPersistenceState == .keychainLocked {
+            return .locked
+        }
+
+        return settingsStore.githubExportConfiguration == nil ? .needsSetup : .ready
+    }
+
+    private var jiraReadiness: SettingsReadinessStatus {
+        if settingsStore.jiraEmailPersistenceState == .pendingSave ||
+            settingsStore.jiraTokenPersistenceState == .pendingSave {
+            return .pendingSave
+        }
+
+        if settingsStore.jiraEmailPersistenceState == .keychainLocked ||
+            settingsStore.jiraTokenPersistenceState == .keychainLocked {
+            return .locked
+        }
+
+        return settingsStore.jiraExportConfiguration == nil ? .needsSetup : .ready
+    }
+
+    private var gitHubTokenPrerequisiteDetail: String {
+        switch settingsStore.githubTokenPersistenceState {
+        case .pendingSave:
+            return "Save before loading repositories"
+        case .keychainLocked:
+            return "Unlock saved token"
+        default:
+            return settingsStore.hasGitHubToken ? "Token available" : "Paste a personal access token"
+        }
+    }
+
+    private var jiraCredentialPrerequisiteDetail: String {
+        if settingsStore.jiraEmailPersistenceState == .pendingSave ||
+            settingsStore.jiraTokenPersistenceState == .pendingSave {
+            return "Save credentials before loading projects"
+        }
+
+        if settingsStore.jiraEmailPersistenceState == .keychainLocked ||
+            settingsStore.jiraTokenPersistenceState == .keychainLocked {
+            return "Unlock saved Jira credentials"
+        }
+
+        if settingsStore.jiraProjectDiscoveryIsReady {
+            return "URL, email, and token available"
+        }
+
+        return "Enter Jira URL, email, and API token"
+    }
+
+    private var jiraCredentialPrerequisiteStatus: SettingsReadinessStatus {
+        if settingsStore.jiraEmailPersistenceState == .pendingSave ||
+            settingsStore.jiraTokenPersistenceState == .pendingSave {
+            return .pendingSave
+        }
+
+        if settingsStore.jiraEmailPersistenceState == .keychainLocked ||
+            settingsStore.jiraTokenPersistenceState == .keychainLocked {
+            return .locked
+        }
+
+        return settingsStore.jiraProjectDiscoveryIsReady ? .ready : .needsSetup
     }
 
     private var apiKeyActionTitle: String {
@@ -660,6 +828,170 @@ struct SettingsView: View {
         case .warning:
             return .orange
         case .error:
+            return .red
+        }
+    }
+
+    private func credentialStatus(valueIsPresent: Bool, persistenceState: APIKeyPersistenceState) -> SettingsReadinessStatus {
+        switch persistenceState {
+        case .pendingSave:
+            return .pendingSave
+        case .keychainLocked:
+            return .locked
+        case .empty:
+            return .needsSetup
+        case .keychain, .sessionOnly:
+            return valueIsPresent ? .ready : .needsSetup
+        }
+    }
+
+    private func prerequisiteStatus(
+        for persistenceState: APIKeyPersistenceState,
+        isReady: Bool
+    ) -> SettingsReadinessStatus {
+        switch persistenceState {
+        case .pendingSave:
+            return .pendingSave
+        case .keychainLocked:
+            return .locked
+        default:
+            return isReady ? .ready : .needsSetup
+        }
+    }
+
+    private func settingsStatusRow(
+        title: String,
+        detail: String,
+        status: SettingsReadinessStatus,
+        accessibilityLabel: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: status.symbolName)
+                .foregroundStyle(status.color)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(status.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(status.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(status.color.opacity(0.12), in: Capsule())
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private func prerequisiteChecklist(title: String, rows: [PrerequisiteRow]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 6) {
+                ForEach(rows) { row in
+                    prerequisiteRow(row)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(.quaternary, lineWidth: 1)
+        )
+    }
+
+    private func prerequisiteRow(_ row: PrerequisiteRow) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: row.status.symbolName)
+                .foregroundStyle(row.status.color)
+                .frame(width: 16)
+
+            Text(row.title)
+                .font(.caption.weight(.medium))
+
+            Text(row.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            Text(row.status.title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(row.status.color)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.title) prerequisite: \(row.status.title)")
+    }
+}
+
+private struct PrerequisiteRow: Identifiable {
+    let title: String
+    let detail: String
+    let status: SettingsReadinessStatus
+
+    var id: String {
+        title
+    }
+}
+
+private enum SettingsReadinessStatus {
+    case ready
+    case needsSetup
+    case pendingSave
+    case locked
+
+    var title: String {
+        switch self {
+        case .ready:
+            return "Ready"
+        case .needsSetup:
+            return "Needs setup"
+        case .pendingSave:
+            return "Pending save"
+        case .locked:
+            return "Locked"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .ready:
+            return "checkmark.circle.fill"
+        case .needsSetup:
+            return "exclamationmark.circle.fill"
+        case .pendingSave:
+            return "clock.fill"
+        case .locked:
+            return "lock.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ready:
+            return .green
+        case .needsSetup:
+            return .orange
+        case .pendingSave:
+            return .blue
+        case .locked:
             return .red
         }
     }
