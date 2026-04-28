@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.30 - 2026-04-27
+
+- Added deterministic local UI regression coverage for Settings, Session Library issue export, and Recording Controls so token fields, export buttons, per-issue tracker targets, and recording controls are exercised without touching production Keychain, microphone, GitHub, Jira, or OpenAI services.
+- Hardened UI accessibility targets for the main app dialogs with stable scroll-region labels and protected those labels in the accessibility regression check.
+- Routed extracted issues to GitHub and Jira using per-issue repository, project, issue-type, and label targets from the Session Library, with local regression coverage for grouped GitHub and Jira exports.
+- Improved Settings setup guidance with explicit OpenAI, GitHub, and Jira readiness status rows and clearer credential prerequisites.
+
 ## 1.0.29 - 2026-04-27
 
 - Restored the Open BugNarrator at Startup control when macOS reports the login item is not registered yet, so the signed app can register itself instead of showing the control as unavailable.
