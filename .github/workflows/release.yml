@@ -106,9 +106,11 @@ jobs:
         run: ./scripts/build_dmg.sh
 
       - name: Generate release summary seed
+        env:
+          RELEASE_SUMMARY_VERSION: ${{ inputs.release_tag || github.ref_name }}
         run: |
           python3 scripts/generate_release_summary.py \
-            --version "${{ inputs.release_tag || github.ref_name }}" \
+            --version "$RELEASE_SUMMARY_VERSION" \
             --output build/release-summary.md
 
       - name: Attach release summary to run summary
