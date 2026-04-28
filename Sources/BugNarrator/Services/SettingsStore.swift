@@ -443,8 +443,8 @@ final class SettingsStore: ObservableObject {
         guard let connection = jiraConnectionConfiguration else {
             return nil
         }
-        guard !normalizedJiraProjectID.isEmpty,
-              !normalizedJiraIssueTypeID.isEmpty else {
+        guard !normalizedJiraProjectKey.isEmpty,
+              !(normalizedJiraIssueTypeID.isEmpty && normalizedJiraIssueType.isEmpty) else {
             return nil
         }
 

@@ -329,7 +329,10 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertNotNil(store.githubExportConfiguration)
         XCTAssertNil(store.githubExportConfiguration?.repositoryID)
-        XCTAssertNil(store.jiraExportConfiguration)
+        XCTAssertNotNil(store.jiraExportConfiguration)
+        XCTAssertNil(store.jiraExportConfiguration?.projectID)
+        XCTAssertEqual(store.jiraExportConfiguration?.issueTypeID, "")
+        XCTAssertEqual(store.jiraExportConfiguration?.issueTypeName, "Task")
 
         store.githubRepositoryID = "R_kgDOFixture"
         store.jiraProjectID = "10000"

@@ -339,6 +339,19 @@ final class AppState: ObservableObject {
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
+        guard canRequestIssueExport(from: session) else {
+            return false
+        }
+
+        switch destination {
+        case .github:
+            return settingsStore.githubExportConfiguration != nil
+        case .jira:
+            return settingsStore.jiraExportConfiguration != nil
+        }
+    }
+
+    func canRequestIssueExport(from session: TranscriptSession) -> Bool {
         guard status.phase != .recording,
               status.phase != .transcribing,
               pendingExportReview == nil,
@@ -348,11 +361,21 @@ final class AppState: ObservableObject {
             return false
         }
 
+        return true
+    }
+
+    func issueExportSetupMessage(for destination: ExportDestination) -> String? {
         switch destination {
         case .github:
-            return settingsStore.githubExportConfiguration != nil
+            guard settingsStore.githubExportConfiguration == nil else {
+                return nil
+            }
+            return "GitHub setup is incomplete. Click Set Up GitHub to open Settings."
         case .jira:
-            return settingsStore.jiraExportConfiguration != nil
+            guard settingsStore.jiraExportConfiguration == nil else {
+                return nil
+            }
+            return "Jira setup is incomplete. Click Set Up Jira to open Settings."
         }
     }
 

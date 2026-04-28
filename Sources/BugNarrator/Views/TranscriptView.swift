@@ -808,14 +808,10 @@ struct TranscriptView: View {
                 extractedIssuesSection(session, availableWidth: availableWidth)
             }
 
-            if !appState.exportHistory.isEmpty {
-                reviewSectionCard("Recent Export History") {
-                    ExportHistorySummaryView(receipts: appState.exportHistory)
+            if session.issueExtraction == nil {
+                reviewSectionCard("Screenshots") {
+                    screenshotsSection(session, availableWidth: availableWidth)
                 }
-            }
-
-            reviewSectionCard("Screenshots") {
-                screenshotsSection(session, availableWidth: availableWidth)
             }
 
             reviewSectionCard("Transcript Timeline") {
@@ -1112,20 +1108,23 @@ struct TranscriptView: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(.secondary)
 
-                        HStack(spacing: 12) {
-                            Button(appState.isExporting(to: .github) ? "Exporting to GitHub..." : "Export to GitHub (Experimental)") {
-                                Task {
-                                    await appState.exportSelectedIssues(from: session, to: .github)
-                                }
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
+                                issueExportButton(destination: .github, session: session)
+                                issueExportButton(destination: .jira, session: session)
                             }
-                            .disabled(!appState.canExportIssues(from: session, to: .github) || appState.isExporting(to: .github))
 
-                            Button(appState.isExporting(to: .jira) ? "Exporting to Jira..." : "Export to Jira (Experimental)") {
-                                Task {
-                                    await appState.exportSelectedIssues(from: session, to: .jira)
-                                }
+                            if let gitHubSetupMessage = appState.issueExportSetupMessage(for: .github) {
+                                Text(gitHubSetupMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                            .disabled(!appState.canExportIssues(from: session, to: .jira) || appState.isExporting(to: .jira))
+
+                            if let jiraSetupMessage = appState.issueExportSetupMessage(for: .jira) {
+                                Text(jiraSetupMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -1165,6 +1164,48 @@ struct TranscriptView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func issueExportButton(destination: ExportDestination, session: TranscriptSession) -> some View {
+        let isConfigured = appState.canExportIssues(from: session, to: destination)
+        let isExporting = appState.isExporting(to: destination)
+        let canRequestExport = appState.canRequestIssueExport(from: session)
+
+        return Button(issueExportButtonTitle(destination: destination, isConfigured: isConfigured, isExporting: isExporting)) {
+            if isConfigured {
+                Task {
+                    await appState.exportSelectedIssues(from: session, to: destination)
+                }
+            } else {
+                appState.openSettings()
+            }
+        }
+        .disabled(!canRequestExport || isExporting)
+        .help(issueExportHelp(destination: destination, isConfigured: isConfigured))
+    }
+
+    private func issueExportButtonTitle(
+        destination: ExportDestination,
+        isConfigured: Bool,
+        isExporting: Bool
+    ) -> String {
+        if isExporting {
+            return "Sending to \(destination.rawValue)..."
+        }
+
+        if isConfigured {
+            return "Send to \(destination.rawValue)"
+        }
+
+        return "Set Up \(destination.rawValue)"
+    }
+
+    private func issueExportHelp(destination: ExportDestination, isConfigured: Bool) -> String {
+        if isConfigured {
+            return "Send the selected extracted issues to \(destination.rawValue)."
+        }
+
+        return "Open Settings to finish \(destination.rawValue) setup."
     }
 
     private func exportReviewSheet(_ review: IssueExportReview) -> some View {
@@ -1690,12 +1731,13 @@ struct TranscriptView: View {
     @ViewBuilder
     private func issueReviewBadge(issue: ExtractedIssue, session: TranscriptSession) -> some View {
         if extractedIssue(sessionID: session.id, issueID: issue.id)?.requiresReview ?? issue.requiresReview {
-            Text("Review")
+            Text("Needs review")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(.quaternary.opacity(0.45), in: Capsule())
+                .background(.quaternary.opacity(0.25), in: Capsule())
+                .help("AI confidence is low or the evidence is thin; review this issue before sending it.")
         }
     }
 

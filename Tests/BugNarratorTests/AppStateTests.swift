@@ -1379,9 +1379,17 @@ final class AppStateTests: XCTestCase {
             )
         )
 
+        XCTAssertFalse(harness.appState.canRequestIssueExport(from: session))
         XCTAssertFalse(harness.appState.canExportIssues(from: session, to: .github))
         XCTAssertNoThrow(try harness.transcriptStore.add(session))
         harness.appState.selectedTranscriptID = session.id
+
+        XCTAssertTrue(harness.appState.canRequestIssueExport(from: session))
+        XCTAssertFalse(harness.appState.canExportIssues(from: session, to: .github))
+        XCTAssertEqual(
+            harness.appState.issueExportSetupMessage(for: .github),
+            "GitHub setup is incomplete. Click Set Up GitHub to open Settings."
+        )
 
         harness.settingsStore.githubToken = "fixture-github-token"
         harness.settingsStore.githubRepositoryOwner = "acme"
@@ -1389,6 +1397,47 @@ final class AppStateTests: XCTestCase {
         harness.settingsStore.githubRepositoryID = "R_kgDOFixture"
 
         XCTAssertTrue(harness.appState.canExportIssues(from: session, to: .github))
+        XCTAssertNil(harness.appState.issueExportSetupMessage(for: .github))
+    }
+
+    func testCanExportIssuesAllowsJiraProjectKeyAndIssueTypeNameWithoutHiddenIDs() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(
+                summary: "Summary",
+                issues: [
+                    ExtractedIssue(
+                        title: "Issue",
+                        category: .bug,
+                        summary: "Summary",
+                        evidenceExcerpt: "Evidence",
+                        timestamp: 2,
+                        requiresReview: true,
+                        isSelectedForExport: true
+                    )
+                ]
+            )
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+
+        harness.settingsStore.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraEmail = "jira-user@example.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        harness.settingsStore.jiraProjectKey = "UCAP"
+        harness.settingsStore.jiraIssueType = "Task"
+
+        XCTAssertTrue(harness.appState.canRequestIssueExport(from: session))
+        XCTAssertTrue(harness.appState.canExportIssues(from: session, to: .jira))
+        XCTAssertNil(harness.appState.issueExportSetupMessage(for: .jira))
     }
 
     func testExportSelectedIssuesFailsFastWhenConfigurationIsMissing() async {

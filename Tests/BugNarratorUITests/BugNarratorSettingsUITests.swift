@@ -60,7 +60,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
     @MainActor
     private func waitForSettingsElement(_ element: XCUIElement, in settingsWindow: XCUIElement) -> Bool {
-        if element.waitForExistence(timeout: 4) {
+        if element.waitForExistence(timeout: 4), element.isHittable {
             return true
         }
 
@@ -73,7 +73,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
             for _ in 0..<8 {
                 scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(deltaY))
                 waitForSettingsLayout(interval: 0.15)
-                if element.waitForExistence(timeout: 0.5) {
+                if element.waitForExistence(timeout: 0.5), element.isHittable {
                     return true
                 }
             }
@@ -90,8 +90,11 @@ final class BugNarratorSettingsUITests: XCTestCase {
         line: UInt = #line
     ) {
         let scrollView = settingsWindow.scrollViews.firstMatch
-        for _ in 0..<12 where !element.isHittable {
-            scrollView.scroll(byDeltaX: 0, deltaY: -700)
+        for deltaY in [-700, 700] {
+            for _ in 0..<8 where !element.isHittable {
+                scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(deltaY))
+                waitForSettingsLayout(interval: 0.15)
+            }
         }
 
         XCTAssertTrue(element.isHittable, file: file, line: line)

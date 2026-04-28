@@ -57,7 +57,7 @@ check_literal \
   'issue export checkbox labeling'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
-  '.accessibilityLabel("OpenAI API Key")' \
+  'accessibilityLabel: "OpenAI API Key"' \
   'settings API key label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
