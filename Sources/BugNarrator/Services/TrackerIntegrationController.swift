@@ -9,6 +9,7 @@ final class TrackerIntegrationController: ObservableObject {
     @Published private(set) var isLoadingGitHubRepositories = false
     @Published private(set) var jiraProjects: [JiraProjectOption] = []
     @Published private(set) var jiraIssueTypes: [JiraIssueTypeOption] = []
+    @Published private(set) var jiraIssueTypesByProjectID: [String: [JiraIssueTypeOption]] = [:]
     @Published private(set) var isLoadingJiraIssueTypes = false
     @Published private(set) var jiraProjectMetadataIsStale = false
     @Published private(set) var jiraIssueTypeMetadataIsStale = false
@@ -304,6 +305,85 @@ final class TrackerIntegrationController: ObservableObject {
         settingsStore.jiraIssueType = ""
     }
 
+    func jiraIssueTypes(for target: JiraIssueExportTarget) -> [JiraIssueTypeOption] {
+        let keys = [
+            target.projectID,
+            target.projectKey.nilIfEmpty
+        ].compactMap { $0 }
+
+        for key in keys {
+            if let issueTypes = jiraIssueTypesByProjectID[key] {
+                return issueTypes
+            }
+        }
+
+        if target.projectKey == jiraIssueTypesProjectKey {
+            return jiraIssueTypes
+        }
+
+        return []
+    }
+
+    func loadJiraIssueTypes(forProjectID projectID: String) async {
+        guard let configuration = settingsStore.jiraConnectionConfiguration,
+              let project = jiraProjects.first(where: { $0.projectID == projectID }) else {
+            return
+        }
+
+        if isLoadingJiraIssueTypes {
+            jiraIssueTypesTask?.cancel()
+        }
+
+        jiraIssueTypesRequestID += 1
+        let requestID = jiraIssueTypesRequestID
+        isLoadingJiraIssueTypes = true
+
+        let task = Task {
+            try await exportService.fetchJiraIssueTypes(
+                for: project.key,
+                projectID: project.projectID,
+                configuration: configuration
+            )
+        }
+        jiraIssueTypesTask = task
+
+        defer {
+            if requestID == jiraIssueTypesRequestID {
+                isLoadingJiraIssueTypes = false
+            }
+        }
+
+        do {
+            let issueTypes = try await task.value
+            guard requestID == jiraIssueTypesRequestID else {
+                return
+            }
+
+            cacheJiraIssueTypes(issueTypes, for: project)
+
+            if settingsStore.normalizedJiraProjectKey == project.key {
+                jiraIssueTypes = issueTypes
+                jiraIssueTypesProjectKey = project.key
+                jiraIssueTypeMetadataIsStale = false
+                refreshSelectedJiraIssueType(using: issueTypes)
+            }
+
+            jiraValidationState = .success(
+                "\(project.displayLabel) has \(issueTypes.count) available issue type\(issueTypes.count == 1 ? "" : "s")."
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            guard requestID == jiraIssueTypesRequestID else {
+                return
+            }
+
+            let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
+            jiraValidationState = .failure(appError.userMessage)
+            exportLogger.warning("load_jira_issue_types_failed", appError.userMessage)
+        }
+    }
+
     func refreshJiraIssueTypesForSelectedProject() async {
         guard let configuration = settingsStore.jiraConnectionConfiguration else {
             return
@@ -442,6 +522,7 @@ final class TrackerIntegrationController: ObservableObject {
     private func resetJiraProjectMetadata() {
         jiraProjects = []
         jiraIssueTypes = []
+        jiraIssueTypesByProjectID = [:]
         jiraIssueTypesProjectKey = nil
         jiraProjectMetadataIsStale = false
         jiraIssueTypeMetadataIsStale = false
@@ -509,10 +590,16 @@ final class TrackerIntegrationController: ObservableObject {
 
         jiraIssueTypes = issueTypes
         jiraIssueTypesProjectKey = project.key
+        cacheJiraIssueTypes(issueTypes, for: project)
         jiraIssueTypeMetadataIsStale = false
         refreshSelectedJiraIssueType(using: issueTypes)
 
         return JiraIssueTypeLoadResult(issueTypes: issueTypes, applied: true)
+    }
+
+    private func cacheJiraIssueTypes(_ issueTypes: [JiraIssueTypeOption], for project: JiraProjectOption) {
+        jiraIssueTypesByProjectID[project.projectID] = issueTypes
+        jiraIssueTypesByProjectID[project.key] = issueTypes
     }
 
     private func applyJiraIssueTypeValidationState(

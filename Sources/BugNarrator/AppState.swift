@@ -91,6 +91,10 @@ final class AppState: ObservableObject {
         trackerIntegration.jiraIssueTypes
     }
 
+    func jiraIssueTypes(for target: JiraIssueExportTarget) -> [JiraIssueTypeOption] {
+        trackerIntegration.jiraIssueTypes(for: target)
+    }
+
     var isLoadingJiraIssueTypes: Bool {
         trackerIntegration.isLoadingJiraIssueTypes
     }
@@ -343,11 +347,15 @@ final class AppState: ObservableObject {
             return false
         }
 
+        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues else {
+            return false
+        }
+
         switch destination {
         case .github:
-            return settingsStore.githubExportConfiguration != nil
+            return (try? configuredGitHubIssueGroups(for: selectedIssues)) != nil
         case .jira:
-            return settingsStore.jiraExportConfiguration != nil
+            return (try? configuredJiraIssueGroups(for: selectedIssues)) != nil
         }
     }
 
@@ -367,16 +375,73 @@ final class AppState: ObservableObject {
     func issueExportSetupMessage(for destination: ExportDestination) -> String? {
         switch destination {
         case .github:
-            guard settingsStore.githubExportConfiguration == nil else {
+            guard !settingsStore.hasGitHubToken else {
                 return nil
             }
-            return "GitHub setup is incomplete. Click Set Up GitHub to open Settings."
+            return "GitHub token is missing. Click Set Up GitHub to open Settings."
         case .jira:
-            guard settingsStore.jiraExportConfiguration == nil else {
+            guard settingsStore.jiraConnectionConfiguration == nil else {
                 return nil
             }
-            return "Jira setup is incomplete. Click Set Up Jira to open Settings."
+            return "Jira connection is missing. Click Set Up Jira to open Settings."
         }
+    }
+
+    func issueExportRoutingMessage(for destination: ExportDestination, session: TranscriptSession) -> String? {
+        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues,
+              !selectedIssues.isEmpty else {
+            return nil
+        }
+
+        switch destination {
+        case .github:
+            guard settingsStore.hasGitHubToken else {
+                return nil
+            }
+
+            let missingCount = selectedIssues.filter { gitHubExportConfiguration(for: $0) == nil }.count
+            guard missingCount > 0 else {
+                return nil
+            }
+            return "Choose a GitHub repository for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
+        case .jira:
+            guard settingsStore.jiraConnectionConfiguration != nil else {
+                return nil
+            }
+
+            let missingCount = selectedIssues.filter { jiraExportConfiguration(for: $0) == nil }.count
+            guard missingCount > 0 else {
+                return nil
+            }
+            return "Choose a Jira project and issue type for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
+        }
+    }
+
+    func defaultGitHubIssueExportTarget() -> GitHubIssueExportTarget? {
+        guard !settingsStore.normalizedGitHubRepositoryOwner.isEmpty,
+              !settingsStore.normalizedGitHubRepositoryName.isEmpty else {
+            return nil
+        }
+
+        return GitHubIssueExportTarget(
+            repositoryID: settingsStore.normalizedGitHubRepositoryID.nilIfEmpty,
+            owner: settingsStore.normalizedGitHubRepositoryOwner,
+            repository: settingsStore.normalizedGitHubRepositoryName,
+            labels: settingsStore.githubDefaultLabelsList
+        )
+    }
+
+    func defaultJiraIssueExportTarget() -> JiraIssueExportTarget? {
+        guard !settingsStore.normalizedJiraProjectKey.isEmpty else {
+            return nil
+        }
+
+        return JiraIssueExportTarget(
+            projectID: settingsStore.normalizedJiraProjectID.nilIfEmpty,
+            projectKey: settingsStore.normalizedJiraProjectKey,
+            issueTypeID: settingsStore.normalizedJiraIssueTypeID,
+            issueTypeName: settingsStore.normalizedJiraIssueType
+        )
     }
 
     func startSession() async {
@@ -852,6 +917,10 @@ final class AppState: ObservableObject {
 
     func refreshJiraIssueTypesForSelectedProject() async {
         await trackerIntegration.refreshJiraIssueTypesForSelectedProject()
+    }
+
+    func loadJiraIssueTypes(forProjectID projectID: String) async {
+        await trackerIntegration.loadJiraIssueTypes(forProjectID: projectID)
     }
 
     func refreshExportHistory() async {
@@ -1345,33 +1414,39 @@ final class AppState: ObservableObject {
 
             switch destination {
             case .github:
-                guard let configuration = settingsStore.githubExportConfiguration else {
-                    throw AppError.exportConfigurationMissing(
-                        "GitHub export requires a token, repository owner, and repository name."
+                let groups = try configuredGitHubIssueGroups(for: selectedIssues)
+                var items: [IssueExportReviewItem] = []
+
+                for group in groups {
+                    try await exportService.validateGitHubConfiguration(group.configuration)
+                    let groupReview = try await exportService.prepareGitHubExportReview(
+                        issues: group.issues,
+                        session: currentSession,
+                        configuration: group.configuration,
+                        apiKey: settingsStore.trimmedAPIKey,
+                        model: settingsStore.issueExtractionModelValue
                     )
+                    items.append(contentsOf: groupReview.items)
                 }
-                try await exportService.validateGitHubConfiguration(configuration)
-                review = try await exportService.prepareGitHubExportReview(
-                    issues: selectedIssues,
-                    session: currentSession,
-                    configuration: configuration,
-                    apiKey: settingsStore.trimmedAPIKey,
-                    model: settingsStore.issueExtractionModelValue
-                )
+
+                review = IssueExportReview(destination: .github, sessionID: currentSession.id, items: items)
             case .jira:
-                guard let configuration = settingsStore.jiraExportConfiguration else {
-                    throw AppError.exportConfigurationMissing(
-                        "Jira export requires a base URL, email, API token, project key, and issue type."
+                let groups = try configuredJiraIssueGroups(for: selectedIssues)
+                var items: [IssueExportReviewItem] = []
+
+                for group in groups {
+                    try await exportService.validateJiraConfiguration(group.configuration)
+                    let groupReview = try await exportService.prepareJiraExportReview(
+                        issues: group.issues,
+                        session: currentSession,
+                        configuration: group.configuration,
+                        apiKey: settingsStore.trimmedAPIKey,
+                        model: settingsStore.issueExtractionModelValue
                     )
+                    items.append(contentsOf: groupReview.items)
                 }
-                try await exportService.validateJiraConfiguration(configuration)
-                review = try await exportService.prepareJiraExportReview(
-                    issues: selectedIssues,
-                    session: currentSession,
-                    configuration: configuration,
-                    apiKey: settingsStore.trimmedAPIKey,
-                    model: settingsStore.issueExtractionModelValue
-                )
+
+                review = IssueExportReview(destination: .jira, sessionID: currentSession.id, items: items)
             }
 
             exportDestinationInProgress = nil
@@ -1454,27 +1529,25 @@ final class AppState: ObservableObject {
                 let exportedResults: [ExportResult]
                 switch review.destination {
                 case .github:
-                    guard let configuration = settingsStore.githubExportConfiguration else {
-                        throw AppError.exportConfigurationMissing(
-                            "GitHub export requires a token, repository owner, and repository name."
+                    var results: [ExportResult] = []
+                    for group in try configuredGitHubIssueGroups(for: preparedIssues) {
+                        results += try await exportService.exportToGitHub(
+                            issues: group.issues,
+                            session: currentSession,
+                            configuration: group.configuration
                         )
                     }
-                    exportedResults = try await exportService.exportToGitHub(
-                        issues: preparedIssues,
-                        session: currentSession,
-                        configuration: configuration
-                    )
+                    exportedResults = results
                 case .jira:
-                    guard let configuration = settingsStore.jiraExportConfiguration else {
-                        throw AppError.exportConfigurationMissing(
-                            "Jira export requires a base URL, email, API token, project key, and issue type."
+                    var results: [ExportResult] = []
+                    for group in try configuredJiraIssueGroups(for: preparedIssues) {
+                        results += try await exportService.exportToJira(
+                            issues: group.issues,
+                            session: currentSession,
+                            configuration: group.configuration
                         )
                     }
-                    exportedResults = try await exportService.exportToJira(
-                        issues: preparedIssues,
-                        session: currentSession,
-                        configuration: configuration
-                    )
+                    exportedResults = results
                 }
 
                 combinedResults = exportedResults + duplicateMatches
@@ -1904,18 +1977,102 @@ final class AppState: ObservableObject {
     private func validateExportConfiguration(for destination: ExportDestination) throws {
         switch destination {
         case .github:
-            guard settingsStore.githubExportConfiguration != nil else {
+            guard settingsStore.hasGitHubToken else {
                 throw AppError.exportConfigurationMissing(
-                    "GitHub export requires a token, repository owner, and repository name."
+                    "GitHub export requires a personal access token."
                 )
             }
         case .jira:
-            guard settingsStore.jiraExportConfiguration != nil else {
+            guard settingsStore.jiraConnectionConfiguration != nil else {
                 throw AppError.exportConfigurationMissing(
-                    "Jira export requires a base URL, email, API token, project key, and issue type."
+                    "Jira export requires a base URL, email, and API token."
                 )
             }
         }
+    }
+
+    private func configuredGitHubIssueGroups(
+        for issues: [ExtractedIssue]
+    ) throws -> [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] {
+        var groups: [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] = []
+
+        for issue in issues {
+            guard let configuration = gitHubExportConfiguration(for: issue) else {
+                throw AppError.exportConfigurationMissing(
+                    "Choose a GitHub repository for every selected issue before exporting."
+                )
+            }
+
+            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
+                groups[groupIndex].issues.append(issue)
+            } else {
+                groups.append((configuration: configuration, issues: [issue]))
+            }
+        }
+
+        return groups
+    }
+
+    private func configuredJiraIssueGroups(
+        for issues: [ExtractedIssue]
+    ) throws -> [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] {
+        var groups: [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] = []
+
+        for issue in issues {
+            guard let configuration = jiraExportConfiguration(for: issue) else {
+                throw AppError.exportConfigurationMissing(
+                    "Choose a Jira project and issue type for every selected issue before exporting."
+                )
+            }
+
+            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
+                groups[groupIndex].issues.append(issue)
+            } else {
+                groups.append((configuration: configuration, issues: [issue]))
+            }
+        }
+
+        return groups
+    }
+
+    private func gitHubExportConfiguration(for issue: ExtractedIssue) -> GitHubExportConfiguration? {
+        guard settingsStore.hasGitHubToken else {
+            return nil
+        }
+
+        let target = issue.gitHubExportTarget ?? defaultGitHubIssueExportTarget()
+        guard let target, target.isComplete else {
+            return nil
+        }
+
+        return GitHubExportConfiguration(
+            token: settingsStore.trimmedGitHubToken,
+            repositoryID: target.repositoryID,
+            owner: target.owner,
+            repository: target.repository,
+            labels: target.labels
+        )
+    }
+
+    private func jiraExportConfiguration(for issue: ExtractedIssue) -> JiraExportConfiguration? {
+        guard let connection = settingsStore.jiraConnectionConfiguration else {
+            return nil
+        }
+
+        let target = issue.jiraExportTarget ?? defaultJiraIssueExportTarget()
+        guard let target, target.isComplete else {
+            return nil
+        }
+
+        return JiraExportConfiguration(
+            baseURL: connection.baseURL,
+            email: connection.email,
+            apiToken: connection.apiToken,
+            projectID: target.projectID,
+            projectKey: target.projectKey,
+            issueTypeID: target.issueTypeID,
+            issueTypeName: target.issueTypeName
+        )
     }
 
     private func editableSession(with sessionID: UUID) -> TranscriptSession? {

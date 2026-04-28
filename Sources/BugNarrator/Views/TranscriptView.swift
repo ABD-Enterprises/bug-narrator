@@ -1125,6 +1125,18 @@ struct TranscriptView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+
+                            if let gitHubRoutingMessage = appState.issueExportRoutingMessage(for: .github, session: session) {
+                                Text(gitHubRoutingMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+
+                            if let jiraRoutingMessage = appState.issueExportRoutingMessage(for: .jira, session: session) {
+                                Text(jiraRoutingMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -1170,24 +1182,31 @@ struct TranscriptView: View {
         let isConfigured = appState.canExportIssues(from: session, to: destination)
         let isExporting = appState.isExporting(to: destination)
         let canRequestExport = appState.canRequestIssueExport(from: session)
+        let setupMissing = appState.issueExportSetupMessage(for: destination) != nil
 
-        return Button(issueExportButtonTitle(destination: destination, isConfigured: isConfigured, isExporting: isExporting)) {
+        return Button(issueExportButtonTitle(
+            destination: destination,
+            isConfigured: isConfigured,
+            isExporting: isExporting,
+            setupMissing: setupMissing
+        )) {
             if isConfigured {
                 Task {
                     await appState.exportSelectedIssues(from: session, to: destination)
                 }
-            } else {
+            } else if setupMissing {
                 appState.openSettings()
             }
         }
-        .disabled(!canRequestExport || isExporting)
-        .help(issueExportHelp(destination: destination, isConfigured: isConfigured))
+        .disabled(!canRequestExport || isExporting || (!isConfigured && !setupMissing))
+        .help(issueExportHelp(destination: destination, isConfigured: isConfigured, setupMissing: setupMissing))
     }
 
     private func issueExportButtonTitle(
         destination: ExportDestination,
         isConfigured: Bool,
-        isExporting: Bool
+        isExporting: Bool,
+        setupMissing: Bool
     ) -> String {
         if isExporting {
             return "Sending to \(destination.rawValue)..."
@@ -1197,12 +1216,20 @@ struct TranscriptView: View {
             return "Send to \(destination.rawValue)"
         }
 
+        if !setupMissing {
+            return "Choose \(destination.rawValue) Target"
+        }
+
         return "Set Up \(destination.rawValue)"
     }
 
-    private func issueExportHelp(destination: ExportDestination, isConfigured: Bool) -> String {
+    private func issueExportHelp(destination: ExportDestination, isConfigured: Bool, setupMissing: Bool) -> String {
         if isConfigured {
             return "Send the selected extracted issues to \(destination.rawValue)."
+        }
+
+        if !setupMissing {
+            return "Choose a \(destination.rawValue) target for each selected issue."
         }
 
         return "Open Settings to finish \(destination.rawValue) setup."
@@ -1496,6 +1523,8 @@ struct TranscriptView: View {
                 .accessibilityLabel("Suggested component for \(issue.title)")
             }
 
+            issueExportTargetsSection(issue: extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue, session: session)
+
             if let timestampLabel = extractedIssue(sessionID: session.id, issueID: issue.id)?.timestampLabel ?? issue.timestampLabel {
                 Text("Timestamp: \(timestampLabel)")
                     .font(.system(.body, design: .monospaced))
@@ -1570,6 +1599,169 @@ struct TranscriptView: View {
                         .accessibilityLabel("Open related screenshot \(screenshot.fileName)")
                     }
                 }
+            }
+        }
+    }
+
+    private func issueExportTargetsSection(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Export Targets")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 10) {
+                issueGitHubTargetEditor(issue: issue, session: session)
+                issueJiraTargetEditor(issue: issue, session: session)
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Export targets for \(issue.title)")
+    }
+
+    private func issueGitHubTargetEditor(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+        let target = effectiveGitHubTarget(for: issue)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Label("GitHub", systemImage: "shippingbox")
+                    .font(.caption.weight(.semibold))
+
+                Text(target.displayLabel)
+                    .font(.caption)
+                    .foregroundStyle(target.isComplete ? Color.secondary : Color.orange)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 0)
+
+                Button(appState.isLoadingGitHubRepositories ? "Loading..." : "Load Repos") {
+                    Task {
+                        await appState.loadGitHubRepositories()
+                    }
+                }
+                .disabled(!appState.settingsStore.hasGitHubToken || appState.isLoadingGitHubRepositories)
+            }
+
+            if appState.gitHubRepositories.isEmpty {
+                HStack(spacing: 8) {
+                    TextField(
+                        "owner",
+                        text: issueGitHubTargetTextBinding(
+                            sessionID: session.id,
+                            issueID: issue.id,
+                            keyPath: \.owner,
+                            fallback: target.owner
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("GitHub repository owner for \(issue.title)")
+
+                    TextField(
+                        "repository",
+                        text: issueGitHubTargetTextBinding(
+                            sessionID: session.id,
+                            issueID: issue.id,
+                            keyPath: \.repository,
+                            fallback: target.repository
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("GitHub repository name for \(issue.title)")
+                }
+            } else {
+                Picker("GitHub Repository", selection: issueGitHubRepositorySelection(issue: issue, session: session)) {
+                    Text("Choose repository").tag("")
+                    ForEach(appState.gitHubRepositories) { repository in
+                        Text(repository.displayLabel).tag(repository.repositoryID)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("GitHub repository for \(issue.title)")
+            }
+
+            TextField(
+                "Labels, comma-separated",
+                text: issueGitHubLabelsBinding(sessionID: session.id, issueID: issue.id, fallback: target.labels)
+            )
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("GitHub labels for \(issue.title)")
+        }
+    }
+
+    private func issueJiraTargetEditor(issue: ExtractedIssue, session: TranscriptSession) -> some View {
+        let target = effectiveJiraTarget(for: issue)
+        let issueTypes = appState.jiraIssueTypes(for: target)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Jira", systemImage: "list.bullet.rectangle")
+                    .font(.caption.weight(.semibold))
+
+                Text(target.isComplete ? "\(target.projectKey) / \(target.issueTypeName.isEmpty ? target.issueTypeID : target.issueTypeName)" : "Choose project and issue type")
+                    .font(.caption)
+                    .foregroundStyle(target.isComplete ? Color.secondary : Color.orange)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 0)
+
+                Button(appState.jiraValidationState == .validating ? "Loading..." : "Load Projects") {
+                    Task {
+                        await appState.validateJiraConfiguration()
+                    }
+                }
+                .disabled(!appState.settingsStore.jiraProjectDiscoveryIsReady || appState.jiraValidationState == .validating)
+            }
+
+            if appState.jiraProjects.isEmpty {
+                TextField(
+                    "Project key",
+                    text: issueJiraProjectKeyBinding(sessionID: session.id, issueID: issue.id, fallback: target.projectKey)
+                )
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Jira project key for \(issue.title)")
+            } else {
+                Picker("Jira Project", selection: issueJiraProjectSelection(issue: issue, session: session)) {
+                    Text("Choose project").tag("")
+                    ForEach(appState.jiraProjects) { project in
+                        Text(project.displayLabel).tag(project.projectID)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Jira project for \(issue.title)")
+            }
+
+            if issueTypes.isEmpty {
+                HStack(spacing: 8) {
+                    TextField(
+                        "Issue type",
+                        text: issueJiraIssueTypeNameBinding(sessionID: session.id, issueID: issue.id, fallback: target.issueTypeName)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Jira issue type for \(issue.title)")
+
+                    Button(appState.isLoadingJiraIssueTypes ? "Loading..." : "Load Types") {
+                        guard let projectID = target.projectID else {
+                            return
+                        }
+
+                        Task {
+                            await appState.loadJiraIssueTypes(forProjectID: projectID)
+                        }
+                    }
+                    .disabled(target.projectID == nil || appState.isLoadingJiraIssueTypes)
+                }
+            } else {
+                Picker("Jira Issue Type", selection: issueJiraIssueTypeSelection(issue: issue, session: session, issueTypes: issueTypes)) {
+                    Text("Choose issue type").tag("")
+                    ForEach(issueTypes) { issueType in
+                        Text(issueType.name).tag(issueType.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Jira issue type for \(issue.title)")
             }
         }
     }
@@ -1787,6 +1979,46 @@ struct TranscriptView: View {
         return sourceSession?.issueExtraction?.issues.first(where: { $0.id == issueID })
     }
 
+    private func effectiveGitHubTarget(for issue: ExtractedIssue) -> GitHubIssueExportTarget {
+        issue.gitHubExportTarget ??
+            appState.defaultGitHubIssueExportTarget() ??
+            GitHubIssueExportTarget(labels: appState.settingsStore.githubDefaultLabelsList)
+    }
+
+    private func effectiveJiraTarget(for issue: ExtractedIssue) -> JiraIssueExportTarget {
+        issue.jiraExportTarget ?? appState.defaultJiraIssueExportTarget() ?? JiraIssueExportTarget()
+    }
+
+    private func updateGitHubTarget(
+        sessionID: UUID,
+        issueID: UUID,
+        update: (inout GitHubIssueExportTarget) -> Void
+    ) {
+        guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID) else {
+            return
+        }
+
+        var target = effectiveGitHubTarget(for: updatedIssue)
+        update(&target)
+        updatedIssue.gitHubExportTarget = target
+        appState.updateExtractedIssue(updatedIssue, in: sessionID)
+    }
+
+    private func updateJiraTarget(
+        sessionID: UUID,
+        issueID: UUID,
+        update: (inout JiraIssueExportTarget) -> Void
+    ) {
+        guard var updatedIssue = extractedIssue(sessionID: sessionID, issueID: issueID) else {
+            return
+        }
+
+        var target = effectiveJiraTarget(for: updatedIssue)
+        update(&target)
+        updatedIssue.jiraExportTarget = target
+        appState.updateExtractedIssue(updatedIssue, in: sessionID)
+    }
+
     private func reproductionStep(sessionID: UUID, issueID: UUID, stepID: UUID) -> IssueReproductionStep? {
         extractedIssue(sessionID: sessionID, issueID: issueID)?
             .reproductionSteps
@@ -1818,6 +2050,175 @@ struct TranscriptView: View {
 
                 updatedIssue[keyPath: keyPath] = newValue
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
+            }
+        )
+    }
+
+    private func issueGitHubRepositorySelection(issue: ExtractedIssue, session: TranscriptSession) -> Binding<String> {
+        Binding(
+            get: {
+                let target = effectiveGitHubTarget(for: extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue)
+                if let repositoryID = target.repositoryID,
+                   appState.gitHubRepositories.contains(where: { $0.repositoryID == repositoryID }) {
+                    return repositoryID
+                }
+
+                return appState.gitHubRepositories.first(where: {
+                    $0.owner.compare(target.owner, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame &&
+                        $0.name.compare(target.repository, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                })?.repositoryID ?? ""
+            },
+            set: { selectedRepositoryID in
+                guard let selectedRepository = appState.gitHubRepositories.first(where: { $0.repositoryID == selectedRepositoryID }) else {
+                    return
+                }
+
+                updateGitHubTarget(sessionID: session.id, issueID: issue.id) { target in
+                    target.repositoryID = selectedRepository.repositoryID
+                    target.owner = selectedRepository.owner
+                    target.repository = selectedRepository.name
+                }
+            }
+        )
+    }
+
+    private func issueJiraProjectSelection(issue: ExtractedIssue, session: TranscriptSession) -> Binding<String> {
+        Binding(
+            get: {
+                let target = effectiveJiraTarget(for: extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue)
+                if let projectID = target.projectID,
+                   appState.jiraProjects.contains(where: { $0.projectID == projectID }) {
+                    return projectID
+                }
+
+                return appState.jiraProjects.first(where: { $0.key == target.projectKey })?.projectID ?? ""
+            },
+            set: { selectedProjectID in
+                guard let selectedProject = appState.jiraProjects.first(where: { $0.projectID == selectedProjectID }) else {
+                    return
+                }
+
+                updateJiraTarget(sessionID: session.id, issueID: issue.id) { target in
+                    target.projectID = selectedProject.projectID
+                    target.projectKey = selectedProject.key
+                    target.projectName = selectedProject.name
+                    target.issueTypeID = ""
+                    target.issueTypeName = ""
+                }
+
+                Task {
+                    await appState.loadJiraIssueTypes(forProjectID: selectedProject.projectID)
+                }
+            }
+        )
+    }
+
+    private func issueJiraIssueTypeSelection(
+        issue: ExtractedIssue,
+        session: TranscriptSession,
+        issueTypes: [JiraIssueTypeOption]
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let target = effectiveJiraTarget(for: extractedIssue(sessionID: session.id, issueID: issue.id) ?? issue)
+                if issueTypes.contains(where: { $0.id == target.issueTypeID }) {
+                    return target.issueTypeID
+                }
+
+                return issueTypes.first(where: {
+                    $0.name.compare(target.issueTypeName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                })?.id ?? ""
+            },
+            set: { selectedIssueTypeID in
+                guard let selectedIssueType = issueTypes.first(where: { $0.id == selectedIssueTypeID }) else {
+                    return
+                }
+
+                updateJiraTarget(sessionID: session.id, issueID: issue.id) { target in
+                    target.issueTypeID = selectedIssueType.id
+                    target.issueTypeName = selectedIssueType.name
+                }
+            }
+        )
+    }
+
+    private func issueGitHubTargetTextBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        keyPath: WritableKeyPath<GitHubIssueExportTarget, String>,
+        fallback: String
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let target = extractedIssue(sessionID: sessionID, issueID: issueID)
+                    .map(effectiveGitHubTarget(for:)) ?? GitHubIssueExportTarget()
+                return target[keyPath: keyPath].isEmpty ? fallback : target[keyPath: keyPath]
+            },
+            set: { newValue in
+                updateGitHubTarget(sessionID: sessionID, issueID: issueID) { target in
+                    target[keyPath: keyPath] = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    target.repositoryID = nil
+                }
+            }
+        )
+    }
+
+    private func issueGitHubLabelsBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        fallback: [String]
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let target = extractedIssue(sessionID: sessionID, issueID: issueID)
+                    .map(effectiveGitHubTarget(for:)) ?? GitHubIssueExportTarget(labels: fallback)
+                return (target.labels.isEmpty ? fallback : target.labels).joined(separator: ", ")
+            },
+            set: { newValue in
+                updateGitHubTarget(sessionID: sessionID, issueID: issueID) { target in
+                    target.labels = parsedLabels(from: newValue)
+                }
+            }
+        )
+    }
+
+    private func issueJiraProjectKeyBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        fallback: String
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let target = extractedIssue(sessionID: sessionID, issueID: issueID)
+                    .map(effectiveJiraTarget(for:)) ?? JiraIssueExportTarget(projectKey: fallback)
+                return target.projectKey.isEmpty ? fallback : target.projectKey
+            },
+            set: { newValue in
+                updateJiraTarget(sessionID: sessionID, issueID: issueID) { target in
+                    target.projectID = nil
+                    target.projectName = nil
+                    target.projectKey = newValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                }
+            }
+        )
+    }
+
+    private func issueJiraIssueTypeNameBinding(
+        sessionID: UUID,
+        issueID: UUID,
+        fallback: String
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let target = extractedIssue(sessionID: sessionID, issueID: issueID)
+                    .map(effectiveJiraTarget(for:)) ?? JiraIssueExportTarget(issueTypeName: fallback)
+                return target.issueTypeName.isEmpty ? fallback : target.issueTypeName
+            },
+            set: { newValue in
+                updateJiraTarget(sessionID: sessionID, issueID: issueID) { target in
+                    target.issueTypeID = ""
+                    target.issueTypeName = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
             }
         )
     }
@@ -1912,6 +2313,14 @@ struct TranscriptView: View {
                 appState.updateExtractedIssue(updatedIssue, in: sessionID)
             }
         )
+    }
+
+    private func parsedLabels(from value: String) -> [String] {
+        value
+            .split(whereSeparator: \.isNewline)
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     private func updateScreenshotAnnotation(

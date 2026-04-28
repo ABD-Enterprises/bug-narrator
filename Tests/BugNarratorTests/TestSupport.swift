@@ -254,6 +254,10 @@ actor MockExportService: IssueExporting {
     private(set) var jiraIssueTypeFetchCallCount = 0
     private(set) var lastGitHubIssues: [ExtractedIssue] = []
     private(set) var lastJiraIssues: [ExtractedIssue] = []
+    private(set) var gitHubReviewConfigurations: [GitHubExportConfiguration] = []
+    private(set) var jiraReviewConfigurations: [JiraExportConfiguration] = []
+    private(set) var gitHubExportConfigurations: [GitHubExportConfiguration] = []
+    private(set) var jiraExportConfigurations: [JiraExportConfiguration] = []
     private var gitHubValidationError: Error?
     private var jiraValidationError: Error?
     private var gitHubRepositoriesError: Error?
@@ -418,6 +422,7 @@ actor MockExportService: IssueExporting {
         model: String
     ) async throws -> IssueExportReview {
         gitHubReviewCallCount += 1
+        gitHubReviewConfigurations.append(configuration)
 
         if let gitHubError {
             throw gitHubError
@@ -438,6 +443,7 @@ actor MockExportService: IssueExporting {
         model: String
     ) async throws -> IssueExportReview {
         jiraReviewCallCount += 1
+        jiraReviewConfigurations.append(configuration)
 
         if let jiraError {
             throw jiraError
@@ -457,6 +463,7 @@ actor MockExportService: IssueExporting {
     ) async throws -> [ExportResult] {
         gitHubCallCount += 1
         lastGitHubIssues = issues
+        gitHubExportConfigurations.append(configuration)
 
         if let gitHubError {
             throw gitHubError
@@ -472,6 +479,7 @@ actor MockExportService: IssueExporting {
     ) async throws -> [ExportResult] {
         jiraCallCount += 1
         lastJiraIssues = issues
+        jiraExportConfigurations.append(configuration)
 
         if let jiraError {
             throw jiraError

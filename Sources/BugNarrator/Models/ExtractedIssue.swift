@@ -166,6 +166,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
     var reproductionSteps: [IssueReproductionStep]
     var screenshotAnnotations: [IssueScreenshotAnnotation]
     var note: String?
+    var gitHubExportTarget: GitHubIssueExportTarget?
+    var jiraExportTarget: JiraIssueExportTarget?
 
     init(
         id: UUID = UUID(),
@@ -184,7 +186,9 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         sectionTitle: String? = nil,
         reproductionSteps: [IssueReproductionStep] = [],
         screenshotAnnotations: [IssueScreenshotAnnotation] = [],
-        note: String? = nil
+        note: String? = nil,
+        gitHubExportTarget: GitHubIssueExportTarget? = nil,
+        jiraExportTarget: JiraIssueExportTarget? = nil
     ) {
         self.id = id
         self.title = title
@@ -208,6 +212,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         self.reproductionSteps = reproductionSteps
         self.screenshotAnnotations = screenshotAnnotations
         self.note = note
+        self.gitHubExportTarget = gitHubExportTarget
+        self.jiraExportTarget = jiraExportTarget
     }
 
     init(from decoder: any Decoder) throws {
@@ -234,6 +240,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         reproductionSteps = try container.decodeIfPresent([IssueReproductionStep].self, forKey: .reproductionSteps) ?? []
         screenshotAnnotations = try container.decodeIfPresent([IssueScreenshotAnnotation].self, forKey: .screenshotAnnotations) ?? []
         note = try container.decodeIfPresent(String.self, forKey: .note)
+        gitHubExportTarget = try container.decodeIfPresent(GitHubIssueExportTarget.self, forKey: .gitHubExportTarget)
+        jiraExportTarget = try container.decodeIfPresent(JiraIssueExportTarget.self, forKey: .jiraExportTarget)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -255,6 +263,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         try container.encode(reproductionSteps, forKey: .reproductionSteps)
         try container.encode(screenshotAnnotations, forKey: .screenshotAnnotations)
         try container.encodeIfPresent(note, forKey: .note)
+        try container.encodeIfPresent(gitHubExportTarget, forKey: .gitHubExportTarget)
+        try container.encodeIfPresent(jiraExportTarget, forKey: .jiraExportTarget)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -275,6 +285,8 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         case reproductionSteps
         case screenshotAnnotations
         case note
+        case gitHubExportTarget
+        case jiraExportTarget
     }
 
     var timestampLabel: String? {
@@ -336,6 +348,69 @@ struct ExtractedIssue: Identifiable, Codable, Equatable {
         }
 
         return makeDeduplicationHint(title: title, summary: summary, evidenceExcerpt: evidenceExcerpt)
+    }
+}
+
+struct GitHubIssueExportTarget: Codable, Equatable {
+    var repositoryID: String?
+    var owner: String
+    var repository: String
+    var labels: [String]
+
+    init(
+        repositoryID: String? = nil,
+        owner: String = "",
+        repository: String = "",
+        labels: [String] = []
+    ) {
+        self.repositoryID = repositoryID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.owner = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.repository = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.labels = labels
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    var isComplete: Bool {
+        !owner.isEmpty && !repository.isEmpty
+    }
+
+    var displayLabel: String {
+        isComplete ? "\(owner)/\(repository)" : "Choose a GitHub repository"
+    }
+}
+
+struct JiraIssueExportTarget: Codable, Equatable {
+    var projectID: String?
+    var projectKey: String
+    var projectName: String?
+    var issueTypeID: String
+    var issueTypeName: String
+
+    init(
+        projectID: String? = nil,
+        projectKey: String = "",
+        projectName: String? = nil,
+        issueTypeID: String = "",
+        issueTypeName: String = ""
+    ) {
+        self.projectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.projectKey = projectKey.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        self.projectName = projectName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.issueTypeID = issueTypeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.issueTypeName = issueTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isComplete: Bool {
+        !projectKey.isEmpty && (!issueTypeID.isEmpty || !issueTypeName.isEmpty)
+    }
+
+    var projectDisplayLabel: String {
+        guard let projectName else {
+            return projectKey.isEmpty ? "Choose a Jira project" : projectKey
+        }
+
+        return "\(projectKey) - \(projectName)"
     }
 }
 
@@ -556,6 +631,15 @@ struct GitHubExportConfiguration: Equatable {
         repositoryID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? "\(owner.lowercased())/\(repository.lowercased())"
     }
+
+    var issueExportTarget: GitHubIssueExportTarget {
+        GitHubIssueExportTarget(
+            repositoryID: repositoryID,
+            owner: owner,
+            repository: repository,
+            labels: labels
+        )
+    }
 }
 
 struct GitHubRepositoryOption: Equatable, Identifiable {
@@ -646,6 +730,15 @@ struct JiraExportConfiguration: Equatable {
             .nilIfEmpty
             ?? "unknown"
         return "\(normalizedProjectID)::\(normalizedIssueTypeID ?? normalizedIssueTypeName)"
+    }
+
+    var issueExportTarget: JiraIssueExportTarget {
+        JiraIssueExportTarget(
+            projectID: projectID,
+            projectKey: projectKey,
+            issueTypeID: issueTypeID,
+            issueTypeName: issueTypeName
+        )
     }
 }
 

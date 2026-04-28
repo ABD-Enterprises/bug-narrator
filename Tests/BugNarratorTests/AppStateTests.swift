@@ -1388,7 +1388,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(harness.appState.canExportIssues(from: session, to: .github))
         XCTAssertEqual(
             harness.appState.issueExportSetupMessage(for: .github),
-            "GitHub setup is incomplete. Click Set Up GitHub to open Settings."
+            "GitHub token is missing. Click Set Up GitHub to open Settings."
         )
 
         harness.settingsStore.githubToken = "fixture-github-token"
@@ -1568,6 +1568,134 @@ final class AppStateTests: XCTestCase {
         let callCount = await harness.exportService.gitHubCallCount
         XCTAssertEqual(callCount, 1)
         XCTAssertEqual(harness.appState.status.phase, .success)
+    }
+
+    func testExportSelectedIssuesUsesPerIssueGitHubTargets() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+
+        let firstIssue = ExtractedIssue(
+            title: "First issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: 2,
+            isSelectedForExport: true,
+            gitHubExportTarget: GitHubIssueExportTarget(
+                owner: "acme",
+                repository: "frontend",
+                labels: ["bug", "ui"]
+            )
+        )
+        let secondIssue = ExtractedIssue(
+            title: "Second issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: 3,
+            isSelectedForExport: true,
+            gitHubExportTarget: GitHubIssueExportTarget(
+                owner: "acme",
+                repository: "backend",
+                labels: ["api"]
+            )
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [firstIssue, secondIssue])
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+
+        XCTAssertTrue(harness.appState.canExportIssues(from: session, to: .github))
+
+        await harness.appState.exportSelectedIssues(from: session, to: .github)
+
+        let reviewConfigurations = await harness.exportService.gitHubReviewConfigurations
+        let exportConfigurations = await harness.exportService.gitHubExportConfigurations
+        let reviewCallCount = await harness.exportService.gitHubReviewCallCount
+        let exportCallCount = await harness.exportService.gitHubCallCount
+
+        XCTAssertEqual(reviewCallCount, 2)
+        XCTAssertEqual(exportCallCount, 2)
+        XCTAssertEqual(reviewConfigurations.map(\.targetIdentity), ["acme/frontend", "acme/backend"])
+        XCTAssertEqual(exportConfigurations.map(\.targetIdentity), ["acme/frontend", "acme/backend"])
+        XCTAssertEqual(exportConfigurations.first?.labels, ["bug", "ui"])
+        XCTAssertEqual(exportConfigurations.last?.labels, ["api"])
+    }
+
+    func testExportSelectedIssuesUsesPerIssueJiraTargets() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.jiraBaseURL = "https://example.atlassian.net"
+        harness.settingsStore.jiraEmail = "jira-user@example.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+
+        let firstIssue = ExtractedIssue(
+            title: "First issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: 2,
+            isSelectedForExport: true,
+            jiraExportTarget: JiraIssueExportTarget(
+                projectID: "10000",
+                projectKey: "APP",
+                projectName: "App",
+                issueTypeID: "10001",
+                issueTypeName: "Bug"
+            )
+        )
+        let secondIssue = ExtractedIssue(
+            title: "Second issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: 3,
+            isSelectedForExport: true,
+            jiraExportTarget: JiraIssueExportTarget(
+                projectID: "20000",
+                projectKey: "OPS",
+                projectName: "Operations",
+                issueTypeID: "20001",
+                issueTypeName: "Task"
+            )
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [firstIssue, secondIssue])
+        )
+        XCTAssertNoThrow(try harness.transcriptStore.add(session))
+        harness.appState.selectedTranscriptID = session.id
+
+        XCTAssertTrue(harness.appState.canExportIssues(from: session, to: .jira))
+
+        await harness.appState.exportSelectedIssues(from: session, to: .jira)
+
+        let reviewConfigurations = await harness.exportService.jiraReviewConfigurations
+        let exportConfigurations = await harness.exportService.jiraExportConfigurations
+        let reviewCallCount = await harness.exportService.jiraReviewCallCount
+        let exportCallCount = await harness.exportService.jiraCallCount
+
+        XCTAssertEqual(reviewCallCount, 2)
+        XCTAssertEqual(exportCallCount, 2)
+        XCTAssertEqual(reviewConfigurations.map(\.targetIdentity), ["10000::10001", "20000::20001"])
+        XCTAssertEqual(exportConfigurations.map(\.targetIdentity), ["10000::10001", "20000::20001"])
+        XCTAssertEqual(exportConfigurations.first?.projectKey, "APP")
+        XCTAssertEqual(exportConfigurations.last?.issueTypeName, "Task")
     }
 
     func testExportSelectedIssuesPresentsSimilarIssueReviewWhenMatchesExist() async {

@@ -56,6 +56,18 @@ check_literal \
   'Select issue ' \
   'issue export checkbox labeling'
 check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  'Export targets for ' \
+  'per-issue export target labeling'
+check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  'GitHub repository for ' \
+  'per-issue GitHub repository labeling'
+check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  'Jira project for ' \
+  'per-issue Jira project labeling'
+check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
   'accessibilityLabel: "OpenAI API Key"' \
   'settings API key label'
