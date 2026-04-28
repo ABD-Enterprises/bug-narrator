@@ -31,6 +31,10 @@
     },
     "minimatch": {
       "brace-expansion": "1.1.13"
+    },
+    "postcss": "8.5.10",
+    "sockjs": {
+      "uuid": "14.0.0"
     }
   }
 }
