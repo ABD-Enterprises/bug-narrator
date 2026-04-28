@@ -129,6 +129,7 @@ struct TranscriptView: View {
             }
             .padding(16)
         }
+        .accessibilityLabel("Session filters")
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -178,6 +179,7 @@ struct TranscriptView: View {
                     }
                 }
                 .listStyle(.plain)
+                .accessibilityLabel("Session list")
             }
         }
         .padding(16)
@@ -662,6 +664,7 @@ struct TranscriptView: View {
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityLabel("Session detail")
         }
     }
 

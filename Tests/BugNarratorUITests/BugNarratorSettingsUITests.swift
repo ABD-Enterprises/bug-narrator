@@ -323,7 +323,8 @@ final class BugNarratorSettingsUITests: XCTestCase {
             return true
         }
 
-        let scrollView = settingsWindow.scrollViews.firstMatch
+        let labeledScrollView = settingsWindow.scrollViews["Settings scroll area"].firstMatch
+        let scrollView = labeledScrollView.exists ? labeledScrollView : settingsWindow.scrollViews.firstMatch
         guard scrollView.waitForExistence(timeout: 2) else {
             return false
         }
@@ -348,7 +349,8 @@ final class BugNarratorSettingsUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let scrollView = settingsWindow.scrollViews.firstMatch
+        let labeledScrollView = settingsWindow.scrollViews["Settings scroll area"].firstMatch
+        let scrollView = labeledScrollView.exists ? labeledScrollView : settingsWindow.scrollViews.firstMatch
         for deltaY in [-700, 700] {
             for _ in 0..<8 where !element.isHittable {
                 scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(deltaY))
@@ -366,8 +368,15 @@ final class BugNarratorSettingsUITests: XCTestCase {
             return true
         }
 
-        for index in 0..<window.scrollViews.count {
-            let scrollView = window.scrollViews.element(boundBy: index)
+        let preferredScrollLabels = ["Session detail", "Settings scroll area", "Session filters"]
+        var scrollViews: [XCUIElement] = preferredScrollLabels
+            .map { window.scrollViews[$0].firstMatch }
+            .filter(\.exists)
+        scrollViews.append(contentsOf: (0..<window.scrollViews.count).map {
+            window.scrollViews.element(boundBy: $0)
+        })
+
+        for scrollView in scrollViews {
             guard scrollView.exists, scrollView.isHittable else { continue }
 
             for deltaY in [-650, 650] {

@@ -38,6 +38,7 @@ struct RecordingControlPanelView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: appState.transientToast)
         .accessibilityElement(children: .contain)
+        .accessibilityLabel("Recording controls dialog")
         .onChange(of: appState.transientToast?.message) { _, newMessage in
             announceAccessibilityMessage(newMessage)
         }

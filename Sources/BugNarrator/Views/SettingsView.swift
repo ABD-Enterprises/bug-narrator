@@ -500,6 +500,7 @@ struct SettingsView: View {
             }
             .padding(24)
         }
+        .accessibilityLabel("Settings scroll area")
     }
 
     private var statusSummary: some View {

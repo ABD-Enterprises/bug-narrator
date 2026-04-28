@@ -44,6 +44,10 @@ check_literal \
   'announcementRequested' \
   'recording toast accessibility announcement'
 check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/RecordingControlPanelView.swift" \
+  '.accessibilityLabel("Recording controls dialog")' \
+  'recording controls dialog label'
+check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
   '.accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])' \
   'session-library filter selected-state announcement'
@@ -68,9 +72,17 @@ check_literal \
   'Jira project for ' \
   'per-issue Jira project labeling'
 check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  '.accessibilityLabel("Session detail")' \
+  'session detail scroll area label'
+check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
   'accessibilityLabel: "OpenAI API Key"' \
   'settings API key label'
+check_literal \
+  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  '.accessibilityLabel("Settings scroll area")' \
+  'settings scroll area label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
   '.accessibilityLabel("Jira issue type")' \
