@@ -1955,6 +1955,7 @@ struct TranscriptView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(.quaternary, lineWidth: 1)
                 )
+                .accessibilityLabel(title)
         }
     }
 

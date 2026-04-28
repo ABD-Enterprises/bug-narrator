@@ -32,11 +32,38 @@ struct BugNarratorApp: App {
 
         let settingsStore = bootstrap.settingsStore
         let transcriptStore = bootstrap.transcriptStore
-        let appState = AppState(
+        #if DEBUG
+        UITestRuntimeSupport.seedIfNeeded(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            runtimeEnvironment: runtimeEnvironment,
+            storageRootURL: bootstrap.isolatedStorageRootURL
+        )
+        #endif
+
+        let appState: AppState
+        #if DEBUG
+        if runtimeEnvironment.shouldUseDeterministicUITestServices {
+            appState = UITestRuntimeSupport.makeAppState(
+                settingsStore: settingsStore,
+                transcriptStore: transcriptStore,
+                runtimeEnvironment: runtimeEnvironment,
+                storageRootURL: bootstrap.isolatedStorageRootURL
+            )
+        } else {
+            appState = AppState(
+                settingsStore: settingsStore,
+                transcriptStore: transcriptStore,
+                runtimeEnvironment: runtimeEnvironment
+            )
+        }
+        #else
+        appState = AppState(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
             runtimeEnvironment: runtimeEnvironment
         )
+        #endif
         let windowCoordinator = WindowCoordinator(
             appState: appState,
             transcriptStore: transcriptStore,
@@ -77,6 +104,18 @@ struct BugNarratorApp: App {
         if runtimeEnvironment.shouldOpenSettingsOnLaunch {
             DispatchQueue.main.async {
                 windowCoordinator.showSettingsWindow()
+            }
+        }
+
+        if runtimeEnvironment.shouldOpenSessionLibraryOnLaunch {
+            DispatchQueue.main.async {
+                windowCoordinator.showTranscriptWindow()
+            }
+        }
+
+        if runtimeEnvironment.shouldOpenRecordingControlsOnLaunch {
+            DispatchQueue.main.async {
+                windowCoordinator.showRecordingControlWindow()
             }
         }
     }

@@ -31,8 +31,12 @@ struct AppRuntimeEnvironment: Equatable {
         environment["BUGNARRATOR_SETTINGS_UI_SMOKE_TEST"] == "1"
     }
 
+    var isRunningBugNarratorUITest: Bool {
+        isRunningSettingsUISmokeTest || environment["BUGNARRATOR_UI_TEST_MODE"] == "1"
+    }
+
     var usesIsolatedRuntime: Bool {
-        isRunningUnderTests || isRunningSettingsUISmokeTest
+        isRunningUnderTests || isRunningBugNarratorUITest
     }
 
     var shouldBypassSingleInstanceEnforcement: Bool {
@@ -41,6 +45,22 @@ struct AppRuntimeEnvironment: Equatable {
 
     var shouldOpenSettingsOnLaunch: Bool {
         environment["BUGNARRATOR_OPEN_SETTINGS_ON_LAUNCH"] == "1"
+    }
+
+    var shouldOpenSessionLibraryOnLaunch: Bool {
+        environment["BUGNARRATOR_OPEN_SESSION_LIBRARY_ON_LAUNCH"] == "1"
+    }
+
+    var shouldOpenRecordingControlsOnLaunch: Bool {
+        environment["BUGNARRATOR_OPEN_RECORDING_CONTROLS_ON_LAUNCH"] == "1"
+    }
+
+    var shouldSeedSessionLibraryUITestData: Bool {
+        environment["BUGNARRATOR_SEED_SESSION_LIBRARY_UI_TEST_DATA"] == "1"
+    }
+
+    var shouldUseDeterministicUITestServices: Bool {
+        environment["BUGNARRATOR_UI_TEST_SAFE_SERVICES"] == "1"
     }
 
     var testIsolationScope: String {
