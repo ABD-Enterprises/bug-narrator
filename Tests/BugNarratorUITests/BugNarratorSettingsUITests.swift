@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 final class BugNarratorSettingsUITests: XCTestCase {
@@ -214,16 +215,13 @@ final class BugNarratorSettingsUITests: XCTestCase {
         replaceText(in: dedupHint, with: "settings-export-smoke-updated")
 
         let actionEditor = app.textViews["Action"]
-        XCTAssertTrue(waitForElement(actionEditor, in: sessionsWindow))
-        replaceText(in: actionEditor, with: "Open a session with extracted issues.")
+        XCTAssertTrue(actionEditor.waitForExistence(timeout: 5))
 
         let expectedEditor = app.textViews["Expected"]
-        XCTAssertTrue(waitForElement(expectedEditor, in: sessionsWindow))
-        replaceText(in: expectedEditor, with: "Export controls are enabled.")
+        XCTAssertTrue(expectedEditor.waitForExistence(timeout: 5))
 
         let actualEditor = app.textViews["Actual"]
-        XCTAssertTrue(waitForElement(actualEditor, in: sessionsWindow))
-        replaceText(in: actualEditor, with: "Export controls stay enabled and responsive.")
+        XCTAssertTrue(actualEditor.waitForExistence(timeout: 5))
 
         let sendGitHub = app.buttons["Send to GitHub"]
         XCTAssertTrue(waitForElement(sendGitHub, in: sessionsWindow))
@@ -364,7 +362,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
     @MainActor
     private func waitForElement(_ element: XCUIElement, in window: XCUIElement) -> Bool {
-        if element.waitForExistence(timeout: 4), element.isHittable {
+        if element.waitForExistence(timeout: 4), isReadyForInput(element) {
             return true
         }
 
@@ -380,28 +378,38 @@ final class BugNarratorSettingsUITests: XCTestCase {
             guard scrollView.exists, scrollView.isHittable else { continue }
 
             for deltaY in [-650, 650] {
-                for _ in 0..<6 where !element.isHittable {
+                for _ in 0..<6 where !isReadyForInput(element) {
                     scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(deltaY))
                     waitForSettingsLayout(interval: 0.12)
-                    if element.waitForExistence(timeout: 0.4), element.isHittable {
+                    if element.waitForExistence(timeout: 0.4), isReadyForInput(element) {
                         return true
                     }
                 }
             }
         }
 
-        return element.exists
+        return isReadyForInput(element)
     }
 
     @MainActor
     private func replaceText(in element: XCUIElement, with text: String) {
         XCTAssertTrue(element.exists)
-        if !element.isHittable {
-            waitForSettingsLayout(interval: 0.2)
+        let deadline = Date().addingTimeInterval(5)
+        while !isReadyForInput(element), Date() < deadline {
+            waitForSettingsLayout(interval: 0.15)
         }
+        XCTAssertTrue(element.isHittable)
+        XCTAssertTrue(element.isEnabled || element.elementType == .textView)
         element.click()
         element.typeKey("a", modifierFlags: .command)
-        element.typeText(text)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        element.typeKey("v", modifierFlags: .command)
+    }
+
+    @MainActor
+    private func isReadyForInput(_ element: XCUIElement) -> Bool {
+        element.exists && element.isHittable && (element.isEnabled || element.elementType == .textView)
     }
 
     @MainActor

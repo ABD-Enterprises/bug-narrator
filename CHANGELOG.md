@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.31 - 2026-04-28
+
+- Hardened recording startup so duplicate start actions while a draft is already active restore the active recording state instead of failing or discarding in-progress artifacts.
+- Scoped the active recording banner in the Session Library to the active draft session only, so unrelated saved sessions no longer show the current recording at the top.
+- Moved live recorder output into BugNarrator's recoverable recordings directory and allowed oversized source recordings to transcribe through validated chunks, improving resilience for long sessions.
+
 ## 1.0.30 - 2026-04-27
 
 - Added deterministic local UI regression coverage for Settings, Session Library issue export, and Recording Controls so token fields, export buttons, per-issue tracker targets, and recording controls are exercised without touching production Keychain, microphone, GitHub, Jira, or OpenAI services.
