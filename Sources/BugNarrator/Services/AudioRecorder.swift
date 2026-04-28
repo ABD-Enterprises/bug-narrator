@@ -11,6 +11,7 @@ struct RecordedAudio {
 final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
+    private let recoveryDirectoryURL: URL
 
     private var recorder: AVAudioRecorder?
     private var currentFileURL: URL?
@@ -19,8 +20,13 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     private var pendingStopResult: RecordedAudio?
     private var isCancelling = false
 
-    init(permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess()) {
+    init(
+        permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess(),
+        recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+    ) {
         self.permissionAccess = permissionAccess
+        self.recoveryDirectoryURL = recoveryDirectoryURL
     }
 
     var currentDuration: TimeInterval {
@@ -103,11 +109,10 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             throw prerequisiteError
         }
 
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BugNarrator-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+        let fileURL = makeRecoverableRecordingURL()
 
         do {
+            try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
             let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
             recorder.delegate = self
             guard recorder.prepareToRecord() else {
@@ -289,6 +294,18 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
     private func resolvedMicrophoneAccessError(defaultMessage: String) -> AppError {
         permissionBlockedError ?? .microphoneUnavailable(defaultMessage)
+    }
+
+    private func makeRecoverableRecordingURL() -> URL {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+        let timestamp = formatter
+            .string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+
+        return recoveryDirectoryURL
+            .appendingPathComponent("\(timestamp)-recording-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
     }
 
     private var recordingSettings: [String: Any] {

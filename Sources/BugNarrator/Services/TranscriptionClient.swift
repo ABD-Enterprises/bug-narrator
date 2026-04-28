@@ -61,14 +61,31 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
-        _ = try validateAudioFile(at: fileURL)
+        _ = try validateRecordingSource(at: fileURL)
         await logLongRecordingIfNeeded(fileURL: fileURL)
 
         let fallbackChunk = TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)
         let chunks = await preparedChunks(for: fileURL, fallback: fallbackChunk)
 
         if chunks.count == 1 {
-            return try await transcribeSingleFile(fileURL: fileURL, apiKey: apiKey, request: request)
+            defer { cleanupTemporaryChunks(chunks) }
+            let chunk = chunks[0]
+            let result = try await transcribeSingleFile(fileURL: chunk.fileURL, apiKey: apiKey, request: request)
+            guard chunk.startTime > 0 else {
+                return result
+            }
+
+            return TranscriptionResult(
+                text: result.text,
+                segments: result.segments.map { segment in
+                    TranscriptionSegment(
+                        start: segment.start + chunk.startTime,
+                        end: segment.end + chunk.startTime,
+                        text: segment.text
+                    )
+                },
+                qualityFindings: result.qualityFindings
+            )
         }
 
         logger.info(
@@ -332,6 +349,31 @@ actor TranscriptionClient: TranscriptionServing {
         logger.debug(
             "transcription_audio_validated",
             "The recorded audio file passed local validation before upload.",
+            metadata: [
+                "file_name": fileURL.lastPathComponent,
+                "file_size_bytes": "\(inspection.fileSizeBytes)"
+            ]
+        )
+        return inspection
+    }
+
+    @discardableResult
+    private func validateRecordingSource(at fileURL: URL) throws -> AudioFileInspection {
+        let inspection: AudioFileInspection
+        do {
+            inspection = try audioUploadPolicy.validateRecordingSource(fileURL: fileURL)
+        } catch {
+            logger.error(
+                "transcription_audio_invalid",
+                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                metadata: ["file_name": fileURL.lastPathComponent]
+            )
+            throw error
+        }
+
+        logger.debug(
+            "transcription_audio_source_validated",
+            "The recorded audio source exists and can be prepared for upload.",
             metadata: [
                 "file_name": fileURL.lastPathComponent,
                 "file_size_bytes": "\(inspection.fileSizeBytes)"

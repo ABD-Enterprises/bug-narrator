@@ -300,6 +300,103 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: originalFileURL.path))
     }
 
+    func testTranscribeAllowsOversizedOriginalWhenChunkerProvidesSafeChunks() async throws {
+        let originalFileURL = try makeSparseAudioFile(
+            named: "two-hour-original",
+            byteCount: AudioUploadPolicy.maximumSingleUploadBytes + 1
+        )
+        let firstChunkURL = try makeAudioFile(named: "two-hour-chunk-1", contents: "chunk-one")
+        let secondChunkURL = try makeAudioFile(named: "two-hour-chunk-2", contents: "chunk-two")
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            let body = try requestBodyData(from: request)
+            let bodyString = try XCTUnwrap(String(data: body, encoding: .utf8))
+            XCTAssertFalse(bodyString.contains(originalFileURL.lastPathComponent))
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            let payload = #"{"text":"Chunk \#(requestCount) transcript","segments":[]}"#
+            return (response, Data(payload.utf8))
+        }
+
+        let client = TranscriptionClient(
+            session: makeMockURLSession(),
+            transcriptionChunker: MockTranscriptionChunker(
+                chunks: [
+                    TranscriptionAudioChunk(fileURL: firstChunkURL, startTime: 0, isTemporary: true),
+                    TranscriptionAudioChunk(fileURL: secondChunkURL, startTime: 8 * 60, isTemporary: true)
+                ]
+            )
+        )
+
+        let result = try await client.transcribe(
+            fileURL: originalFileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+        )
+
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(result.text, "Chunk 1 transcript\n\nChunk 2 transcript")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstChunkURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondChunkURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalFileURL.path))
+    }
+
+    func testTranscribeUsesSingleTemporaryChunkInsteadOfOversizedOriginal() async throws {
+        let originalFileURL = try makeSparseAudioFile(
+            named: "single-chunk-original",
+            byteCount: AudioUploadPolicy.maximumSingleUploadBytes + 1
+        )
+        let chunkURL = try makeAudioFile(named: "single-safe-chunk", contents: "safe-chunk")
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        MockURLProtocol.requestHandler = { request in
+            let body = try requestBodyData(from: request)
+            let bodyString = try XCTUnwrap(String(data: body, encoding: .utf8))
+            XCTAssertTrue(bodyString.contains(chunkURL.lastPathComponent))
+            XCTAssertFalse(bodyString.contains(originalFileURL.lastPathComponent))
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (
+                response,
+                Data(#"{"text":"Single chunk transcript","segments":[{"start":1,"end":3,"text":"Single chunk transcript"}]}"#.utf8)
+            )
+        }
+
+        let client = TranscriptionClient(
+            session: makeMockURLSession(),
+            transcriptionChunker: MockTranscriptionChunker(
+                chunks: [
+                    TranscriptionAudioChunk(fileURL: chunkURL, startTime: 120, isTemporary: true)
+                ]
+            )
+        )
+
+        let result = try await client.transcribe(
+            fileURL: originalFileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+        )
+
+        XCTAssertEqual(result.text, "Single chunk transcript")
+        let segment = try XCTUnwrap(result.segments.first)
+        XCTAssertEqual(segment.start, 121, accuracy: 0.001)
+        XCTAssertEqual(segment.end, 123, accuracy: 0.001)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: chunkURL.path))
+    }
+
     private func makeAudioFile(named name: String, contents: String) throws -> URL {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-TranscriptionTests-\(name)")

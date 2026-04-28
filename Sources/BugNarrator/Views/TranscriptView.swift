@@ -733,7 +733,7 @@ struct TranscriptView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
-            } else if appState.status.phase == .recording {
+            } else if appState.isActiveRecordingSession(session.id) {
                 HStack(spacing: 10) {
                     Label("Recording is active", systemImage: "record.circle.fill")
                         .foregroundStyle(.red)

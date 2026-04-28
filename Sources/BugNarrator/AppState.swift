@@ -237,6 +237,10 @@ final class AppState: ObservableObject {
         activeRecordingSession?.screenshots.count ?? 0
     }
 
+    func isActiveRecordingSession(_ sessionID: UUID) -> Bool {
+        status.phase == .recording && activeRecordingSession?.sessionID == sessionID
+    }
+
     var displayedTranscript: TranscriptSession? {
         if let selectedTranscriptID {
             if currentTranscript?.id == selectedTranscriptID {
@@ -452,8 +456,20 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard status.phase != .recording, status.phase != .transcribing else {
+        if status.phase == .recording || status.phase == .transcribing {
             recordingLogger.warning("session_start_rejected", "The start request was rejected because BugNarrator is already busy.")
+            return
+        }
+
+        if let activeRecordingSession {
+            recordingLogger.warning(
+                "session_start_reconciled_active_session",
+                "A start request arrived while a recording session draft was still active; restoring recording state instead of starting a duplicate recorder.",
+                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+            )
+            setStatus(.recording(recordingDetailMessage()))
+            beginActivity(reason: "Recording a spoken feedback session")
+            startTimer()
             return
         }
 
@@ -468,11 +484,6 @@ final class AppState: ObservableObject {
         defer { isStartingSession = false }
 
         do {
-            if let activeRecordingSession {
-                artifactsService.removeArtifactsDirectory(at: activeRecordingSession.artifactsDirectoryURL)
-                self.activeRecordingSession = nil
-            }
-
             let sessionID = UUID()
             let artifactsDirectoryURL = try artifactsService.createArtifactsDirectory(for: sessionID)
 
@@ -484,14 +495,8 @@ final class AppState: ObservableObject {
                     sessionID: sessionID,
                     artifactsDirectoryURL: artifactsDirectoryURL
                 )
-                let recordingDetail: String
-                if settingsStore.hasAPIKey {
-                    recordingDetail = "Recording in progress."
-                } else {
-                    recordingDetail = "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
-                }
 
-                setStatus(.recording(recordingDetail))
+                setStatus(.recording(recordingDetailMessage()))
                 beginActivity(reason: "Recording a spoken feedback session")
                 startTimer()
                 recordingLogger.info(
@@ -509,6 +514,14 @@ final class AppState: ObservableObject {
         } catch {
             presentError(error)
         }
+    }
+
+    private func recordingDetailMessage() -> String {
+        if settingsStore.hasAPIKey {
+            return "Recording in progress."
+        }
+
+        return "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
     }
 
     func stopSession() async {

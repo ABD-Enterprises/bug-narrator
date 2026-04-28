@@ -165,10 +165,27 @@ final class AppStateTests: XCTestCase {
         defer { harness.cleanup() }
 
         await harness.appState.startSession()
+        let activeSessionID = harness.appState.activeRecordingSession?.sessionID
         await harness.appState.startSession()
 
         XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
         XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.activeRecordingSession?.sessionID, activeSessionID)
+        XCTAssertTrue(harness.artifactsService.removedDirectories.isEmpty)
+    }
+
+    func testActiveRecordingSessionStatusIsScopedToActiveDraftOnly() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let savedSession = makeSampleTranscriptSession(index: 1)
+        try harness.transcriptStore.add(savedSession)
+
+        await harness.appState.startSession()
+
+        let activeSessionID = try XCTUnwrap(harness.appState.activeRecordingSession?.sessionID)
+        XCTAssertTrue(harness.appState.isActiveRecordingSession(activeSessionID))
+        XCTAssertFalse(harness.appState.isActiveRecordingSession(savedSession.id))
     }
 
     func testStartSessionWithDeniedMicrophonePermissionFailsBeforeRecorderStarts() async {
