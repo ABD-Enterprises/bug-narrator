@@ -1238,6 +1238,64 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.transientToast?.message, "Screenshot canceled")
     }
 
+    func testCancelSessionCancelsPendingScreenshotSelectionAndClearsBusyState() async {
+        let selectionStarted = expectation(description: "screenshot selection started")
+        let selectionService = MockScreenshotSelectionService()
+        selectionService.suspendUntilCancelled = true
+        selectionService.onSelectRegionStart = {
+            selectionStarted.fulfill()
+        }
+        let harness = AppStateHarness(screenshotSelectionService: selectionService)
+        defer { harness.cleanup() }
+
+        await harness.appState.startSession()
+
+        async let capture: Void = harness.appState.captureScreenshot()
+        await fulfillment(of: [selectionStarted], timeout: 1.0)
+
+        XCTAssertTrue(harness.appState.isScreenshotCaptureInProgress)
+
+        await harness.appState.cancelSession()
+        _ = await capture
+
+        XCTAssertEqual(selectionService.cancelActiveSelectionCallCount, 1)
+        XCTAssertFalse(harness.appState.isScreenshotCaptureInProgress)
+        XCTAssertEqual(harness.appState.status.phase, .idle)
+        XCTAssertNil(harness.appState.activeRecordingSession)
+    }
+
+    func testStopSessionCancelsPendingScreenshotSelectionAndClearsBusyState() async throws {
+        let selectionStarted = expectation(description: "screenshot selection started")
+        let selectionService = MockScreenshotSelectionService()
+        selectionService.suspendUntilCancelled = true
+        selectionService.onSelectRegionStart = {
+            selectionStarted.fulfill()
+        }
+        let harness = AppStateHarness(screenshotSelectionService: selectionService)
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "stopped-with-pending-screenshot")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Stopped while screenshot selection was open.", segments: []))
+        )
+
+        await harness.appState.startSession()
+
+        async let capture: Void = harness.appState.captureScreenshot()
+        await fulfillment(of: [selectionStarted], timeout: 1.0)
+
+        XCTAssertTrue(harness.appState.isScreenshotCaptureInProgress)
+
+        await harness.appState.stopSession()
+        _ = await capture
+
+        XCTAssertEqual(selectionService.cancelActiveSelectionCallCount, 1)
+        XCTAssertFalse(harness.appState.isScreenshotCaptureInProgress)
+        XCTAssertEqual(harness.appState.status.phase, .success)
+        XCTAssertNil(harness.appState.activeRecordingSession)
+    }
+
     func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async {
         let harness = AppStateHarness(
             screenshotCaptureService: MockScreenshotCaptureService(

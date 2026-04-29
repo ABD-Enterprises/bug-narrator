@@ -182,7 +182,7 @@ struct RecordingControlPanelView: View {
     }
 
     private var canUseLiveControls: Bool {
-        appState.status.phase == .recording
+        appState.status.phase == .recording && !appState.isScreenshotCaptureInProgress
     }
 
     private var statusHeadline: String {

@@ -330,6 +330,8 @@ private final class UITestScreenshotSelectionService: ScreenshotSelecting {
     func selectRegion() async throws -> ScreenshotSelectionResult {
         .selected(CGRect(x: 10, y: 10, width: 120, height: 80))
     }
+
+    func cancelActiveSelection() {}
 }
 
 private final class UITestScreenshotCaptureService: ScreenshotCapturing {

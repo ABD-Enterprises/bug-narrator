@@ -64,7 +64,7 @@ final class AppState: ObservableObject {
     private var isStoppingSession = false
     private var isCancellingSession = false
     private var isValidatingAPIKey = false
-    private var isCapturingScreenshot = false
+    @Published private(set) var isScreenshotCaptureInProgress = false
     private var toastDismissTask: Task<Void, Never>?
 
     var gitHubValidationState: APIKeyValidationState {
@@ -543,6 +543,7 @@ final class AppState: ObservableObject {
         isStoppingSession = true
         defer { isStoppingSession = false }
 
+        cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
         stopTimer(resetElapsed: false)
         let request = makeTranscriptionRequest()
 
@@ -713,6 +714,7 @@ final class AppState: ObservableObject {
         defer { isCancellingSession = false }
 
         showDiscardConfirmation = false
+        cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
         stopTimer(resetElapsed: true)
         endActivity()
         await audioRecorder.cancelRecording(preserveFile: settingsStore.debugMode)
@@ -771,6 +773,7 @@ final class AppState: ObservableObject {
             "BugNarrator blocked an app termination request while a recording session was still active.",
             metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
         )
+        cancelPendingScreenshotSelection(reason: "Quit was requested while recording, so pending screenshot selection was cancelled.")
         showRecordingControlWindow?()
         showToast("Stop recording before quitting BugNarrator.", style: .informational)
         return .terminateCancel
@@ -1184,7 +1187,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        if isCapturingScreenshot {
+        if isScreenshotCaptureInProgress {
             let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
             screenshotLogger.warning("screenshot_rejected_busy", error.userMessage)
             setStatus(.recording(error.userMessage), error: error)
@@ -1195,7 +1198,7 @@ final class AppState: ObservableObject {
         let markerIndex = recordingSession.markers.count + 1
         let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
         let markerID = UUID()
-            let markerTitle = "Screenshot \(screenshotIndex)"
+        let markerTitle = "Screenshot \(screenshotIndex)"
 
         do {
             let screenshot = try await performScreenshotCapture(
@@ -1210,6 +1213,7 @@ final class AppState: ObservableObject {
                       activeRecordingSession?.sessionID == recordingSession.sessionID else {
                     return
                 }
+                setStatus(.recording(recordingDetailMessage()))
                 showToast("Screenshot canceled", style: .informational)
                 return
             }
@@ -2132,12 +2136,12 @@ final class AppState: ObservableObject {
         elapsedTime: TimeInterval,
         associatedMarkerID: UUID?
     ) async throws -> SessionScreenshot? {
-        guard !isCapturingScreenshot else {
+        guard !isScreenshotCaptureInProgress else {
             throw AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
         }
 
-        isCapturingScreenshot = true
-        defer { isCapturingScreenshot = false }
+        isScreenshotCaptureInProgress = true
+        defer { isScreenshotCaptureInProgress = false }
 
         let preflightResult = await screenCapturePermissionService.preflightForScreenshotCapture(
             screenshotCaptureService: screenshotCaptureService,
@@ -2147,6 +2151,7 @@ final class AppState: ObservableObject {
             throw preflightError
         }
 
+        setStatus(.recording("Drag to select a screenshot region. Press Esc to cancel."))
         prepareForScreenshotSelection?()
         defer {
             restoreAfterScreenshotSelection?()
@@ -2182,6 +2187,15 @@ final class AppState: ObservableObject {
             filePath: screenshotURL.path,
             associatedMarkerID: associatedMarkerID
         )
+    }
+
+    private func cancelPendingScreenshotSelection(reason: String) {
+        guard isScreenshotCaptureInProgress else {
+            return
+        }
+
+        screenshotLogger.info("screenshot_selection_cancel_requested", reason)
+        screenshotSelectionService.cancelActiveSelection()
     }
 
     private func showToast(_ message: String, style: TransientToastStyle = .success) {
