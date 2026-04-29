@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.32 - 2026-04-29
+
+- Hardened screenshot region capture so an abandoned selection cannot leave future screenshot attempts stuck in a busy state, and stopping or discarding a recording now cancels any pending screenshot selection cleanly.
+
 ## 1.0.31 - 2026-04-28
 
 - Hardened recording startup so duplicate start actions while a draft is already active restore the active recording state instead of failing or discarding in-progress artifacts.
