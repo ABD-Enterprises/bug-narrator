@@ -63,12 +63,22 @@ final class ScreenshotSelectionService: ScreenshotSelecting {
 
         return result
     }
+
+    func cancelActiveSelection() {
+        overlayController?.cancelSelection()
+    }
 }
 
 @MainActor
 private final class ScreenshotSelectionOverlayController {
+    private static let selectionTimeoutNanoseconds: UInt64 = 30_000_000_000
+
     private let window: ScreenshotSelectionOverlayWindow
     private let overlayView: ScreenshotSelectionOverlayView
+    private var continuation: CheckedContinuation<ScreenshotSelectionResult, Never>?
+    private var timeoutTask: Task<Void, Never>?
+    private var hasFinished = false
+    private var didPushCursor = false
 
     init() throws {
         let overlayFrame = NSScreen.screens
@@ -96,39 +106,86 @@ private final class ScreenshotSelectionOverlayController {
         window.level = .screenSaver
         window.ignoresMouseEvents = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        window.onResignedKey = { [weak self] in
+            self?.cancelSelection()
+        }
     }
 
     func presentSelectionOverlay() async -> ScreenshotSelectionResult {
         await withCheckedContinuation { continuation in
+            self.continuation = continuation
             overlayView.onSelectionCompleted = { [weak self] rect in
-                self?.finish()
-                continuation.resume(returning: .selected(rect.offsetBy(
-                    dx: self?.window.frame.minX ?? 0,
-                    dy: self?.window.frame.minY ?? 0
+                guard let self else {
+                    continuation.resume(returning: .cancelled)
+                    return
+                }
+
+                self.complete(.selected(rect.offsetBy(
+                    dx: self.window.frame.minX,
+                    dy: self.window.frame.minY
                 )))
             }
 
             overlayView.onSelectionCancelled = { [weak self] in
-                self?.finish()
-                continuation.resume(returning: .cancelled)
+                self?.cancelSelection()
             }
 
             NSCursor.crosshair.push()
+            didPushCursor = true
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(overlayView)
             NSApp.activate(ignoringOtherApps: true)
+            timeoutTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: Self.selectionTimeoutNanoseconds)
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                self?.cancelSelection()
+            }
         }
     }
 
-    private func finish() {
+    func cancelSelection() {
+        complete(.cancelled)
+    }
+
+    private func complete(_ result: ScreenshotSelectionResult) {
+        guard !hasFinished else {
+            return
+        }
+
+        hasFinished = true
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        overlayView.onSelectionCompleted = nil
+        overlayView.onSelectionCancelled = nil
+        finishPresentation()
+
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume(returning: result)
+    }
+
+    private func finishPresentation() {
         window.orderOut(nil)
-        NSCursor.pop()
+        if didPushCursor {
+            NSCursor.pop()
+            didPushCursor = false
+        }
     }
 }
 
 private final class ScreenshotSelectionOverlayWindow: NSWindow {
+    var onResignedKey: (() -> Void)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func resignKey() {
+        super.resignKey()
+        onResignedKey?()
+    }
 }
 
 private final class ScreenshotSelectionOverlayView: NSView {
@@ -138,6 +195,7 @@ private final class ScreenshotSelectionOverlayView: NSView {
     private let overlayCornerRadius: CGFloat = 8
     private var dragStartPoint: CGPoint?
     private var currentSelectionRect: CGRect?
+    private var hasCompletedSelection = false
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -165,13 +223,17 @@ private final class ScreenshotSelectionOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard !hasCompletedSelection else {
+            return
+        }
+
         dragStartPoint = convert(event.locationInWindow, from: nil)
         currentSelectionRect = nil
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let dragStartPoint else {
+        guard !hasCompletedSelection, let dragStartPoint else {
             return
         }
 
@@ -185,8 +247,12 @@ private final class ScreenshotSelectionOverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        guard !hasCompletedSelection else {
+            return
+        }
+
         guard let dragStartPoint else {
-            onSelectionCancelled?()
+            completeSelection(with: nil)
             return
         }
 
@@ -200,18 +266,18 @@ private final class ScreenshotSelectionOverlayView: NSView {
         currentSelectionRect = nil
         needsDisplay = true
 
-        if let selectedRect {
-            onSelectionCompleted?(selectedRect)
-        } else {
-            onSelectionCancelled?()
-        }
+        completeSelection(with: selectedRect)
     }
 
     override func cancelOperation(_ sender: Any?) {
+        guard !hasCompletedSelection else {
+            return
+        }
+
         dragStartPoint = nil
         currentSelectionRect = nil
         needsDisplay = true
-        onSelectionCancelled?()
+        completeSelection(with: nil)
     }
 
     override func keyDown(with event: NSEvent) {
@@ -225,6 +291,19 @@ private final class ScreenshotSelectionOverlayView: NSView {
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .crosshair)
+    }
+
+    private func completeSelection(with rect: CGRect?) {
+        guard !hasCompletedSelection else {
+            return
+        }
+
+        hasCompletedSelection = true
+        if let rect {
+            onSelectionCompleted?(rect)
+        } else {
+            onSelectionCancelled?()
+        }
     }
 
     private func drawInstructionHint() {

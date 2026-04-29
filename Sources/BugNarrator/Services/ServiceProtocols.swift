@@ -147,6 +147,7 @@ protocol ScreenshotCapturing {
 @MainActor
 protocol ScreenshotSelecting {
     func selectRegion() async throws -> ScreenshotSelectionResult
+    func cancelActiveSelection()
 }
 
 protocol IssueExtracting: Sendable {
