@@ -1,6 +1,6 @@
 # Roadmap
 
-This document is the human-readable roadmap companion to [state.json](state.json).
+This document is product roadmap context only. AI task state lives in GitHub Issues through `ai-pipeline`.
 
 ## Current Status
 
@@ -189,5 +189,6 @@ Effort: Low
 - every unresolved risk must belong to a remediation phase
 - every opportunity must belong to a future phase
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
-- `docs/roadmap/roadmap.md` is the source of truth for planning, risks, incidents, and phase status
+- `docs/roadmap/roadmap.md` is the source of truth for product roadmap context, risks, incidents, and phase history
+- GitHub Issues are the source of truth for active AI planning and task state
 - `CHANGELOG.md` is the source of truth for shipped change history
