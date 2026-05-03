@@ -1,12 +1,32 @@
 # Roadmap
 
-This document is product roadmap context only. AI task state lives in GitHub Issues through `ai-pipeline`.
+This document is historical roadmap context only.
 
-## Current Status
+Active planning, backlog, bugs, risks, and remediation now live in [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) through `ai-pipeline`.
 
-- current production app version: `1.0.27`
-- current blocked phase: `RR-002 Windows Runtime Validation And Hardening`
-- recent completed work: added phase-branch CI coverage, explicit Windows test-project execution, fixed Windows-targeted service compile blockers, added packaged-app smoke execution, kept package artifact validation/upload in CI without claiming real Windows desktop validation, completed the hosted Node24 workflow validation slice, promoted both OPS-012 dependency remediation passes to `main`, covered the FAIL, NOT RUN, and missing-state-update guardrail rules with direct regression tests, closed the remaining Dependabot alerts, added a dedicated `Retry Needed` session-library filter for preserved-session recovery
+Use this file for:
+
+- completed phase history
+- high-level product roadmap context
+- durable historical notes that should survive issue closure
+
+Do not use this file for:
+
+- current AI task state
+- active bug tracking
+- active risk tracking
+- the live implementation backlog
+
+## Active Work
+
+Use [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for:
+
+- active bugs such as `BN-*`
+- remediation work such as `RR-*`
+- Windows milestones such as `WIN-*`
+- operational work such as `OPS-*`
+
+The current shipped app version lives in `VERSION` and GitHub Releases.
 
 
 ## Completed Phases
@@ -131,64 +151,11 @@ Scope completed:
 - kept retry-needed counts visible in the session-library summary while the new filtered slice is active
 - added SessionLibrary regression coverage for retry-needed filtering, counts, and empty-state behavior
 
-## Risk Remediation Phases
-
-### RR-002 Windows Runtime Validation And Hardening
-
-Priority: High
-
-Grouped risks:
-
-- WPF tray, recording, and screenshot milestones have not yet been validated on a real Windows machine or VM
-- CI and runtime confidence for Windows remain lower than macOS
-
-Current execution slice:
-
-- run Windows CI on `phase/*` branches so the required phase-branch workflow is actually exercised
-- build the Windows solution through the scripted entrypoint instead of ad hoc CI commands
-- run both `BugNarrator.Core.Tests` and `BugNarrator.Windows.Tests` in the scripted Windows baseline
-- fix Windows-targeted service compile blockers discovered while exercising the Windows test project from the phase branch
-- package a Windows `Release` zip in CI, validate that the published artifact contains the expected executable and runtime metadata, and run the packaged executable in a headless smoke mode
-- emit Windows validation artifacts from CI so the current RR-002 state and artifact paths are visible directly in build evidence
-- keep GitHub Actions workflows on Node24-compatible action majors while RR-002 remains open, so CI evidence does not degrade under the hosted-runner runtime cutover
-- keep the phase open because real desktop tray, recording, screenshot, and hotkey validation on Windows is still pending
-
-### RR-005 Assistive Technology Runtime And Docs Validation
-
-Priority: Low
-
-Grouped risks:
-
-- a real VoiceOver-driven runtime pass and docs-site accessibility validation still need to be run once the site is published and release-candidate UI is exercised live
-
-## Upcoming Feature / Opportunity Phases
-
-### WIN-005 Windows Transcription And Session Library
-
-Expected value: High
-Effort: High
-
-### WIN-006 Windows Review, Extraction, And Export
-
-Expected value: High
-Effort: High
-
-### OPS-008 Docs Site Publication
-
-Expected value: Medium
-Effort: Medium
-
-### OPS-009 Release Summary Promotion
-
-Expected value: Medium
-Effort: Low
-
-
 ## Roadmap Rules
 
-- every unresolved risk must belong to a remediation phase
-- every opportunity must belong to a future phase
+- every unresolved risk should exist as a GitHub issue
+- every planned opportunity should exist as a GitHub issue
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
-- `docs/roadmap/roadmap.md` is the source of truth for product roadmap context, risks, incidents, and phase history
+- `docs/roadmap/roadmap.md` is the source of truth for historical roadmap context and completed phase history
 - GitHub Issues are the source of truth for active AI planning and task state
 - `CHANGELOG.md` is the source of truth for shipped change history

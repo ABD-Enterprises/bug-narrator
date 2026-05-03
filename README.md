@@ -26,7 +26,8 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 - [Canonical product spec](docs/architecture/product-spec.md)
 - [Getting started for maintainers and testers](docs/onboarding/getting-started.md)
 - [Release process](docs/release/release-process.md)
-- [Roadmap and planned phases](docs/roadmap/roadmap.md)
+- [Roadmap history and completed phases](docs/roadmap/roadmap.md)
+- [GitHub issues and active work](https://github.com/deffenda/bug-narrator/issues)
 - [Detailed user guide](docs/UserGuide.md)
 - [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
 - [Hosted documentation](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
@@ -221,7 +222,7 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 - [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
 - [Support development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 - [Changelog](CHANGELOG.md)
-- [Post-1.0.0 bug log](docs/PostV1BugLog.md)
+- [GitHub issues](https://github.com/deffenda/bugnarrator/issues)
 
 ## Build From Source
 
@@ -271,7 +272,6 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 - [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md)
 - [docs/TESTING_NOTES.md](docs/TESTING_NOTES.md)
 - [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
-- [docs/PostV1BugLog.md](docs/PostV1BugLog.md)
 - [SECURITY.md](SECURITY.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 

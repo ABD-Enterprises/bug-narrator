@@ -26,4 +26,5 @@ The repository remains the source of truth for the full documentation set:
 - [Onboarding](https://github.com/deffenda/bugnarrator/blob/main/docs/onboarding/getting-started.md)
 - [User Manual](https://github.com/deffenda/bugnarrator/blob/main/docs/user/user-manual.md)
 - [Release Process](https://github.com/deffenda/bugnarrator/blob/main/docs/release/release-process.md)
-- [Roadmap](https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md)
+- [GitHub Issues](https://github.com/deffenda/bugnarrator/issues)
+- [Roadmap History](https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md)

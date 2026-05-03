@@ -92,7 +92,7 @@ On macOS, you can prepare or edit the Windows workspace, but you cannot honestly
 - follow [docs/CROSS_PLATFORM_GUIDELINES.md](../CROSS_PLATFORM_GUIDELINES.md) for parity decisions
 - prefer secure local secret storage patterns
 - never commit real API keys, tokens, or notarization credentials
-- update roadmap state when phase decisions, risks, or opportunities change
+- update GitHub Issues when phase decisions, risks, or opportunities change
 
 ## Related Docs
 

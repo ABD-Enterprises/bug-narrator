@@ -47,7 +47,7 @@ Tracked active risks include:
 
 - Windows release and runtime security posture has not yet been validated on Windows hardware
 
-These are tracked in [docs/roadmap/roadmap.md](../roadmap/roadmap.md).
+Track these in [GitHub Issues](https://github.com/deffenda/bugnarrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
 
 ## Security Validation Expectations
 

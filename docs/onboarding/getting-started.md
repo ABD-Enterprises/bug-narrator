@@ -20,7 +20,7 @@ Start here:
 3. Set up your machine with [Development Setup](../development/setup.md).
 4. Review the [Testing Guide](../testing/testing.md).
 5. Review the [Release Process](../release/release-process.md).
-6. Check the current [Roadmap](../roadmap/roadmap.md).
+6. Check the active [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) and use the [Roadmap](../roadmap/roadmap.md) only for historical context.
 
 ## If You Are Working On Windows Support
 
@@ -34,7 +34,7 @@ Use these docs first:
 
 ## Ground Rules
 
-- keep the roadmap state current
-- do not leave unresolved risks unplanned
-- prefer explicit remediation phases over vague future work
+- keep active work and risks in GitHub Issues
+- do not leave unresolved risks untracked
+- prefer explicit GitHub issues over vague future work
 - keep docs aligned with actual product behavior

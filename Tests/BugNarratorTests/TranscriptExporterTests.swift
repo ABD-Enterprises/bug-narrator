@@ -55,7 +55,7 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains(session.transcript))
     }
 
-    func testWriteBundleSkipsMissingScreenshotFilesButStillCreatesScreenshotsDirectory() throws {
+    func testWriteBundleFailsWhenReferencedScreenshotFileIsMissing() throws {
         let fileManager = FileManager.default
         let rootDirectoryURL = fileManager.temporaryDirectory
             .appendingPathComponent("TranscriptExporterMissingScreenshotsTests-\(UUID().uuidString)", isDirectory: true)
@@ -76,12 +76,20 @@ final class TranscriptExporterTests: XCTestCase {
         )
 
         let exporter = TranscriptExporter(fileManager: fileManager)
-        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
-        let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots", isDirectory: true)
+        do {
+            _ = try exporter.writeBundle(session: session, to: rootDirectoryURL)
+            XCTFail("Expected bundle export to fail when a referenced screenshot is missing.")
+        } catch let error as AppError {
+            XCTAssertEqual(
+                error,
+                .exportFailure(
+                    "This session bundle is missing referenced screenshot files: missing-capture.png. Recreate the screenshots or remove the stale references before exporting."
+                )
+            )
+        }
 
-        XCTAssertTrue(fileManager.fileExists(atPath: screenshotsDirectoryURL.path))
-        let screenshotContents = try fileManager.contentsOfDirectory(atPath: screenshotsDirectoryURL.path)
-        XCTAssertTrue(screenshotContents.isEmpty)
+        let createdDirectories = try fileManager.contentsOfDirectory(atPath: rootDirectoryURL.path)
+        XCTAssertFalse(createdDirectories.contains { $0.contains(session.suggestedBundleDirectoryName) })
     }
 
     func testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames() throws {

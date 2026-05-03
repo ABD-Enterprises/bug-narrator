@@ -21,7 +21,8 @@ Start with these canonical repository docs:
 - [Development Setup](https://github.com/deffenda/bugnarrator/blob/main/docs/development/setup.md)
 - [Testing Guide](https://github.com/deffenda/bugnarrator/blob/main/docs/testing/testing.md)
 - [Release Process](https://github.com/deffenda/bugnarrator/blob/main/docs/release/release-process.md)
-- [Roadmap](https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md)
+- [GitHub Issues](https://github.com/deffenda/bugnarrator/issues)
+- [Roadmap History](https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md)
 
 ## If You Are Working On Windows Support
 

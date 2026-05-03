@@ -19,6 +19,12 @@ BugNarrator.xcodeproj/project.xcworkspace/xcuserdata/
 .env.*
 *.local
 
+# Local AI standards adapters are machine-local and should never be committed.
+.ai/
+.agent/
+AGENTS.md
+CLAUDE.md
+
 infra/terraform/.terraform/
 infra/terraform/*.tfstate
 infra/terraform/*.tfstate.*

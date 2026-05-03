@@ -29,7 +29,7 @@ Do not release unless all of these are true:
 
 ## Current Maintainer Flow
 
-1. Review [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for unresolved risks.
+1. Review [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for unresolved risks and active release blockers.
 2. Review [Product Spec](../architecture/product-spec.md) for the intended product behavior, terminology, and artifact contract.
 3. Update `CHANGELOG.md`.
 4. Run `./scripts/release_smoke_test.sh`.
@@ -49,7 +49,7 @@ BugNarrator uses semantic versioning:
 - minor for meaningful new features
 - patch for fixes and internal hardening
 
-Current production application version is `1.0.27`.
+The current production application version lives in `VERSION` and the latest GitHub Release.
 
 ## GitHub Workflow Scaffolding
 
@@ -65,7 +65,7 @@ These workflows support:
 - docs-site build validation
 - manual release packaging
 - optional signed/notarized packaging when secrets are configured
-- internal release-summary seed generation from roadmap state and the `Unreleased` changelog section
+- internal release-summary seed generation from the `Unreleased` changelog section plus GitHub issue review
 
 ## Release Notes Source Of Truth
 
@@ -73,7 +73,8 @@ Use:
 
 - [Product Spec](../architecture/product-spec.md) for intended product behavior and terminology
 - `CHANGELOG.md` for shipped or shipping change history
-- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for open risks, phase status, and release readiness context
+- [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for open risks, active release blockers, and task state
+- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context and completed phase history
 
 Release notes should match the actual implemented changes and should not contradict the canonical product spec.
 

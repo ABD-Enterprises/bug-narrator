@@ -67,7 +67,7 @@ const config = {
           title: 'Maintainers',
           items: [
             { label: 'Release Process (Repo)', href: 'https://github.com/deffenda/bugnarrator/blob/main/docs/release/release-process.md' },
-            { label: 'Roadmap (Repo)', href: 'https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md' }
+            { label: 'Roadmap History (Repo)', href: 'https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md' }
           ]
         }
       ],

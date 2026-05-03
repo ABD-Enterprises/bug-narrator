@@ -19,8 +19,8 @@ Do not use this document as the source of truth for:
 
 Those live in:
 
-- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for delivery state, risks, incidents, and planned phases
-- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for the human-readable roadmap
+- [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for active delivery state, risks, incidents, and planned work
+- [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context and completed phase history
 - [CHANGELOG.md](../../CHANGELOG.md) for shipped change history
 - [parity-matrix.md](parity-matrix.md) for deliberate cross-platform parity decisions
 - platform implementation docs such as [windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md](../../windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md) for Windows-specific execution details

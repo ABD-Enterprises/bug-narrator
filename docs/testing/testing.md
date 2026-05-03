@@ -80,8 +80,8 @@ When a test fails:
 
 1. capture the failing command or manual step
 2. record whether it is reproducible
-3. log the risk or incident in roadmap state if it is material
-4. assign unresolved issues to a remediation phase
+3. file or update a GitHub issue if the risk or incident is material
+4. link unresolved issues to the appropriate GitHub work item or remediation issue
 
 ## Related Docs
 

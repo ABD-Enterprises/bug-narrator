@@ -92,8 +92,15 @@ struct TranscriptExporter {
     }
 
     func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {
+        let missingScreenshots = missingScreenshots(for: session)
+        if !missingScreenshots.isEmpty {
+            let missingList = missingScreenshots.map(\.fileName).joined(separator: ", ")
+            throw AppError.exportFailure(
+                "This session bundle is missing referenced screenshot files: \(missingList). Recreate the screenshots or remove the stale references before exporting."
+            )
+        }
+
         var copiedScreenshotCount = 0
-        var missingScreenshotCount = 0
 
         let bundleDirectoryURL = try bundleWriter.writeBundle(
             in: destinationRoot,
@@ -109,11 +116,6 @@ struct TranscriptExporter {
             try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
 
             for screenshot in session.screenshots {
-                guard fileManager.fileExists(atPath: screenshot.fileURL.path) else {
-                    missingScreenshotCount += 1
-                    continue
-                }
-
                 let destinationURL = uniqueScreenshotDestinationURL(
                     for: screenshot.fileName,
                     in: screenshotsDirectoryURL
@@ -130,11 +132,17 @@ struct TranscriptExporter {
                 "session_id": session.id.uuidString,
                 "screenshot_count": "\(session.screenshotCount)",
                 "copied_screenshot_count": "\(copiedScreenshotCount)",
-                "missing_screenshot_count": "\(missingScreenshotCount)"
+                "missing_screenshot_count": "0"
             ]
         )
 
         return bundleDirectoryURL
+    }
+
+    private func missingScreenshots(for session: TranscriptSession) -> [SessionScreenshot] {
+        session.screenshots.filter { screenshot in
+            !fileManager.fileExists(atPath: screenshot.fileURL.path)
+        }
     }
 
     private func uniqueScreenshotDestinationURL(for fileName: String, in directoryURL: URL) -> URL {

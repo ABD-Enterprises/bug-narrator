@@ -19,7 +19,7 @@ Use rollback when a published build introduces:
 3. Re-publish or re-promote the last known good DMG on GitHub Releases.
 4. Update release notes or pinned issue guidance so testers know which version to use.
 5. If a stable asset link is affected, restore `BugNarrator-macOS.dmg` to the last known good artifact.
-6. Capture the incident and follow-up remediation in [docs/roadmap/roadmap.md](../roadmap/roadmap.md).
+6. Capture the incident and follow-up remediation in [GitHub Issues](https://github.com/deffenda/bugnarrator/issues). Update [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only if the rollback changes historical phase context.
 
 ## Local Rollback Support
 

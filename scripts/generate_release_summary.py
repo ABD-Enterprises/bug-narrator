@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,22 +27,17 @@ def extract_unreleased_bullets(changelog_text: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a BugNarrator release summary seed.")
     parser.add_argument("--version", default=None, help="Target release version or tag")
-    parser.add_argument("--state", default=None, help="Optional path to roadmap state JSON")
     parser.add_argument("--changelog", default="CHANGELOG.md", help="Path to CHANGELOG.md")
     parser.add_argument("--output", default="build/release-summary.md", help="Path to the generated Markdown summary")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    state_path = (repo_root / args.state).resolve() if args.state else None
     changelog_path = (repo_root / args.changelog).resolve()
     output_path = (repo_root / args.output).resolve()
 
-    state = json.loads(state_path.read_text()) if state_path else {}
     changelog_text = changelog_path.read_text()
     unreleased_bullets = extract_unreleased_bullets(changelog_text)
-    unresolved_risks = [risk for risk in state.get("risks", []) if risk.get("status") != "resolved"]
-    completed_phases = state.get("completed_phases", [])[-5:]
-    version = args.version or state.get("version", "unversioned")
+    version = args.version or "unversioned"
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     lines = [
@@ -64,38 +58,19 @@ def main() -> int:
     lines.extend(
         [
             "",
-            "## Recently Completed Phases",
+            "## Tracker Context",
+            "- Active bugs, risks, and release blockers live in GitHub Issues.",
+            "- Historical phase context lives in `docs/roadmap/roadmap.md`.",
+            "- This summary seed is changelog-driven and must be reviewed against the current issue tracker before release.",
         ]
     )
-
-    if completed_phases:
-        for phase in completed_phases:
-            lines.append(f"- `{phase['id']}` {phase['name']}: {phase['summary']}")
-    else:
-        lines.append("- No completed phases are recorded in roadmap state.")
-
-    lines.extend(
-        [
-            "",
-            "## Unresolved Risks",
-        ]
-    )
-
-    if unresolved_risks:
-        for risk in unresolved_risks:
-            lines.append(
-                f"- `{risk['id']}` ({risk['severity']}): {risk['description']} "
-                f"Planned in `{risk['phase_association']}`."
-            )
-    else:
-        lines.append("- No unresolved risks are recorded in roadmap state.")
 
     lines.extend(
         [
             "",
             "## Human Review Required",
             "- Confirm the `Unreleased` changelog bullets describe only user-visible release changes before publishing.",
-            "- Confirm the unresolved risks listed above are acceptable for the target release.",
+            "- Confirm the current GitHub Issues backlog does not contain an unresolved release blocker for the target release.",
             "- Review signing, notarization, and QA gates before using this summary in public release notes.",
             "",
         ]
