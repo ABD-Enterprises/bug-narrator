@@ -515,8 +515,24 @@ if [[ "$NOTARIZE" == "YES" ]]; then
 
     rm -rf "$STAGING_DIR"
 
+    # The rebuilt DMG has a different hash than the originally notarized one,
+    # so it must be submitted for notarization separately.
+    echo "Submitting rebuilt DMG for notarization..."
+    set +e
+    rebuilt_notarize_output="$(xcrun notarytool submit "$VERSIONED_DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)"
+    rebuilt_notarize_status=$?
+    set -e
+
+    if [[ "$rebuilt_notarize_status" -ne 0 ]]; then
+        printf '%s\n' "$rebuilt_notarize_output" >&2
+        echo "error: rebuilt DMG notarization failed for $VERSIONED_DMG_PATH" >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$rebuilt_notarize_output"
+
     # Staple the DMG itself as well so both layers carry the ticket.
-    echo "Stapling notarization ticket to the DMG..."
+    echo "Stapling notarization ticket to the rebuilt DMG..."
     xcrun stapler staple -v "$VERSIONED_DMG_PATH"
     xcrun stapler validate "$VERSIONED_DMG_PATH"
     if ! dmg_spctl_output="$(spctl -a -vv -t open "$VERSIONED_DMG_PATH" 2>&1)"; then
