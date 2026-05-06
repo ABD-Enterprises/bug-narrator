@@ -157,22 +157,63 @@ actor TranscriptionClient: TranscriptionServing {
         )
     }
 
+    private static let maxRetryAttempts = 3
+    private static let initialBackoffSeconds: TimeInterval = 2
+
     private func transcribeSingleFile(
         fileURL: URL,
         apiKey: String,
         request: TranscriptionRequest
     ) async throws -> TranscriptionResult {
+        var lastError: Error?
+
+        for attempt in 0..<Self.maxRetryAttempts {
+            do {
+                return try await attemptTranscription(fileURL: fileURL, apiKey: apiKey, request: request, attempt: attempt)
+            } catch let error as AppError {
+                if case .rateLimited(let retryAfter) = error, attempt < Self.maxRetryAttempts - 1 {
+                    let delay = retryAfter ?? (Self.initialBackoffSeconds * pow(2, Double(attempt)))
+                    let clampedDelay = min(delay, 60)
+                    logger.warning(
+                        "transcription_rate_limited_retrying",
+                        "OpenAI rate limit hit. Backing off before retry.",
+                        metadata: [
+                            "attempt": "\(attempt + 1)",
+                            "backoff_seconds": String(format: "%.1f", clampedDelay)
+                        ]
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(clampedDelay * 1_000_000_000))
+                    lastError = error
+                    continue
+                }
+                throw error
+            } catch {
+                throw error
+            }
+        }
+
+        throw lastError ?? AppError.transcriptionFailure("Transcription failed after retries.")
+    }
+
+    private func attemptTranscription(
+        fileURL: URL,
+        apiKey: String,
+        request: TranscriptionRequest,
+        attempt: Int
+    ) async throws -> TranscriptionResult {
         let urlRequest = try makeURLRequest(fileURL: fileURL, apiKey: apiKey, request: request)
-        logger.info(
-            "transcription_requested",
-            "Uploading audio to OpenAI for transcription.",
-            metadata: [
-                "file_name": fileURL.lastPathComponent,
-                "model": request.model,
-                "has_language_hint": request.languageHint == nil ? "no" : "yes",
-                "has_prompt": request.prompt == nil ? "no" : "yes"
-            ]
-        )
+        if attempt == 0 {
+            logger.info(
+                "transcription_requested",
+                "Uploading audio to OpenAI for transcription.",
+                metadata: [
+                    "file_name": fileURL.lastPathComponent,
+                    "model": request.model,
+                    "has_language_hint": request.languageHint == nil ? "no" : "yes",
+                    "has_prompt": request.prompt == nil ? "no" : "yes"
+                ]
+            )
+        }
 
         do {
             let (data, response) = try await session.data(for: urlRequest)
@@ -191,7 +232,8 @@ actor TranscriptionClient: TranscriptionServing {
                 throw OpenAIErrorMapper.mapResponse(
                     statusCode: httpResponse.statusCode,
                     data: data,
-                    fallback: AppError.transcriptionFailure
+                    fallback: AppError.transcriptionFailure,
+                    responseHeaders: httpResponse.allHeaderFields
                 )
             }
 

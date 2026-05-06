@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.33 - 2026-05-06
+
+- Added concurrent retry guard to prevent duplicate transcription retry attempts from compounding failures.
+- Added retry attempt counting to preserved sessions so repeated failures surface clearer guidance instead of silently accepting infinite retries.
+- Added exponential backoff with Retry-After header support for OpenAI 429 rate-limit responses in the transcription client.
+- Fixed DMG packaging to staple the notarization ticket to the app bundle before packaging, so users who drag BugNarrator out of the DMG get an app that passes Gatekeeper even offline. Previously only the DMG carried the stapled ticket, which caused "BugNarrator is damaged" alerts when the online notarization check failed or timed out.
+
 ## 1.0.32 - 2026-04-29
 
 - Hardened screenshot region capture so an abandoned selection cannot leave future screenshot attempts stuck in a busy state, and stopping or discarding a recording now cancels any pending screenshot selection cleanly.

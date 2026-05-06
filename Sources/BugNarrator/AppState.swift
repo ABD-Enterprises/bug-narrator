@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     @Published private(set) var exportHistory: [ExportReceipt] = []
     @Published private(set) var recoveredRecordingImportCount = 0
     @Published private(set) var apiKeyValidationState: APIKeyValidationState = .idle
+    @Published private(set) var retryingSessionID: UUID?
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
@@ -971,6 +972,18 @@ final class AppState: ObservableObject {
             return
         }
 
+        guard retryingSessionID == nil else {
+            transcriptionLogger.warning(
+                "transcription_retry_already_in_progress",
+                "Ignoring duplicate retry request while a retry is already in progress.",
+                metadata: [
+                    "requested_session_id": sessionID.uuidString,
+                    "active_retry_session_id": retryingSessionID?.uuidString ?? "unknown"
+                ]
+            )
+            return
+        }
+
         guard var session = sessionSnapshot(with: sessionID),
               let pendingTranscription = session.pendingTranscription,
               let audioFileURL = session.pendingTranscriptionAudioURL else {
@@ -992,6 +1005,7 @@ final class AppState: ObservableObject {
         }
 
         let request = makeTranscriptionRequest()
+        retryingSessionID = sessionID
         selectedTranscriptID = session.id
         currentTranscript = session
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
@@ -1001,7 +1015,8 @@ final class AppState: ObservableObject {
             "Retrying transcription from preserved audio.",
             metadata: [
                 "session_id": session.id.uuidString,
-                "failure_reason": pendingTranscription.failureReason.rawValue
+                "failure_reason": pendingTranscription.failureReason.rawValue,
+                "attempt_count": "\(pendingTranscription.attemptCount + 1)"
             ]
         )
 
@@ -1059,6 +1074,7 @@ final class AppState: ObservableObject {
                     try persistUpdatedSession(updatedSession)
                 } catch {
                     cleanupPreservedRetryAudioIfNeeded(at: audioFileURL)
+                    retryingSessionID = nil
                     endActivity()
                     issueExtractionSessionID = nil
                     presentPostTranscriptionError(error)
@@ -1069,6 +1085,7 @@ final class AppState: ObservableObject {
             }
 
             cleanupPreservedRetryAudioIfNeeded(at: audioFileURL)
+            retryingSessionID = nil
             showTranscriptWindow?()
             endActivity()
             setStatus(.success(
@@ -1083,7 +1100,8 @@ final class AppState: ObservableObject {
                 session.pendingTranscription = PendingTranscription(
                     audioFileName: pendingTranscription.audioFileName,
                     failureReason: failureReason,
-                    preservedAt: pendingTranscription.preservedAt
+                    preservedAt: pendingTranscription.preservedAt,
+                    attemptCount: pendingTranscription.attemptCount + 1
                 )
 
                 do {
@@ -1093,17 +1111,23 @@ final class AppState: ObservableObject {
                     selectedTranscriptID = session.id
                 }
 
+                retryingSessionID = nil
                 endActivity()
                 let appError = failureReason.appError
                 logAppError(appError, context: "retry_pending_transcription")
+
+                let attemptMessage = pendingTranscription.attemptCount >= 2
+                    ? " This session has been retried \(pendingTranscription.attemptCount + 1) times."
+                    : ""
                 setStatus(.error(
-                    session.transcriptionRecoveryMessage ?? appError.userMessage
+                    (session.transcriptionRecoveryMessage ?? appError.userMessage) + attemptMessage
                 ), error: appError)
                 showTranscriptWindow?()
                 showSettingsWindow?()
                 return
             }
 
+            retryingSessionID = nil
             presentError(error)
         }
     }
@@ -2221,7 +2245,7 @@ final class AppState: ObservableObject {
             settingsLogger.warning("app_error", error.userMessage, metadata: metadata)
         case .recordingFailure:
             recordingLogger.error("app_error", error.userMessage, metadata: metadata)
-        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure:
+        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited:
             transcriptionLogger.error("app_error", error.userMessage, metadata: metadata)
         case .screenshotCaptureFailure:
             screenshotLogger.error("app_error", error.userMessage, metadata: metadata)
