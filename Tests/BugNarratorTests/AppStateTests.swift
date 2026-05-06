@@ -2044,4 +2044,91 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .success)
         XCTAssertNil(harness.appState.activeRecordingSession)
     }
+
+    // MARK: - Concurrent Retry Guard
+
+    func testRetryPendingTranscriptionClearsRetryingSessionIDOnSuccess() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-guard-success")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let preservedSession = try XCTUnwrap(harness.transcriptStore.sessions.first)
+
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Recovered", segments: []))
+        )
+
+        XCTAssertNil(harness.appState.retryingSessionID)
+        await harness.appState.retryPendingTranscription(for: preservedSession.id)
+        XCTAssertNil(harness.appState.retryingSessionID)
+    }
+
+    func testRetryPendingTranscriptionClearsRetryingSessionIDOnFailure() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-guard-failure")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let preservedSession = try XCTUnwrap(harness.transcriptStore.sessions.first)
+
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(
+            .failure(AppError.invalidAPIKey)
+        )
+
+        await harness.appState.retryPendingTranscription(for: preservedSession.id)
+        XCTAssertNil(harness.appState.retryingSessionID)
+    }
+
+    // MARK: - Attempt Counting
+
+    func testRetryPendingTranscriptionIncrementsAttemptCount() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-attempt-count")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let preservedSession = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        XCTAssertEqual(preservedSession.pendingTranscription?.attemptCount, 0)
+
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(
+            .failure(AppError.invalidAPIKey)
+        )
+
+        await harness.appState.retryPendingTranscription(for: preservedSession.id)
+
+        let updatedSession = try XCTUnwrap(harness.transcriptStore.session(with: preservedSession.id))
+        XCTAssertEqual(updatedSession.pendingTranscription?.attemptCount, 1)
+    }
+
+    func testPendingTranscriptionAttemptCountDefaultsToZeroForLegacyData() throws {
+        let json = """
+        {
+            "audioFileName": "test.m4a",
+            "failureReason": "missingAPIKey",
+            "preservedAt": 0
+        }
+        """
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(PendingTranscription.self, from: data)
+        XCTAssertEqual(decoded.attemptCount, 0)
+    }
 }

@@ -479,6 +479,44 @@ if [[ "$NOTARIZE" == "YES" ]]; then
     fi
 
     printf '%s\n' "$notarize_output"
+
+    # Staple the notarization ticket to the .app before rebuilding the DMG.
+    # Without this, users who drag BugNarrator.app out of the DMG get an app
+    # without a stapled ticket. Gatekeeper then requires an online check and
+    # shows a "damaged" alert when the check fails or times out.
+    echo "Stapling notarization ticket to the app bundle..."
+    xcrun stapler staple -v "$APP_PATH"
+    xcrun stapler validate "$APP_PATH"
+
+    # Rebuild the DMG with the now-stapled .app inside it.
+    echo "Rebuilding DMG with stapled app bundle..."
+    rm -f "$VERSIONED_DMG_PATH"
+
+    mkdir -p "$STAGING_BACKGROUND_DIR"
+    swift "$BACKGROUND_RENDER_SCRIPT" "$STAGING_BACKGROUND_PATH"
+
+    "$DMGBUILD_PYTHON_BIN" -m dmgbuild \
+        -s "$DMGBUILD_SETTINGS_PATH" \
+        -D "app_path=$APP_PATH" \
+        -D "background_path=$STAGING_BACKGROUND_PATH" \
+        -D "volume_icon_path=$APP_ICON_ICNS_PATH" \
+        -D "window_left=$DMG_WINDOW_LEFT" \
+        -D "window_top=$DMG_WINDOW_TOP" \
+        -D "window_width=$DMG_WINDOW_WIDTH" \
+        -D "window_height=$DMG_WINDOW_HEIGHT" \
+        -D "icon_size=$DMG_ICON_SIZE" \
+        -D "text_size=$DMG_TEXT_SIZE" \
+        -D "app_icon_x=$DMG_APP_ICON_X" \
+        -D "app_icon_y=$DMG_APP_ICON_Y" \
+        -D "applications_icon_x=$DMG_APPLICATIONS_ICON_X" \
+        -D "applications_icon_y=$DMG_APPLICATIONS_ICON_Y" \
+        "$VOLUME_NAME" \
+        "$VERSIONED_DMG_PATH"
+
+    rm -rf "$STAGING_DIR"
+
+    # Staple the DMG itself as well so both layers carry the ticket.
+    echo "Stapling notarization ticket to the DMG..."
     xcrun stapler staple -v "$VERSIONED_DMG_PATH"
     xcrun stapler validate "$VERSIONED_DMG_PATH"
     if ! dmg_spctl_output="$(spctl -a -vv -t open "$VERSIONED_DMG_PATH" 2>&1)"; then
