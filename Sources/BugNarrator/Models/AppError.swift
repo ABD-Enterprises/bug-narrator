@@ -17,6 +17,7 @@ enum AppError: LocalizedError, Equatable {
     case emptyTranscript
     case networkTimeout
     case networkFailure
+    case rateLimited(retryAfter: TimeInterval?)
     case exportConfigurationMissing(String)
     case exportFailure(String)
     case storageFailure(String)
@@ -56,6 +57,11 @@ enum AppError: LocalizedError, Equatable {
             return "The request to OpenAI timed out. Check your connection and try again."
         case .networkFailure:
             return "BugNarrator could not reach OpenAI. Check your internet connection and try again."
+        case .rateLimited(let retryAfter):
+            if let retryAfter {
+                return "OpenAI rate limit reached. Try again in \(Int(retryAfter)) seconds."
+            }
+            return "OpenAI rate limit reached. Wait a moment and try again."
         case .exportConfigurationMissing(let message):
             return "Export setup is incomplete: \(message)"
         case .exportFailure(let message):
@@ -89,7 +95,7 @@ enum AppError: LocalizedError, Equatable {
             return "Screenshot Failed"
         case .issueExtractionFailure:
             return "Issue Extraction Failed"
-        case .networkTimeout, .networkFailure:
+        case .networkTimeout, .networkFailure, .rateLimited:
             return "Network Issue"
         case .exportConfigurationMissing:
             return "Export Setup Needed"
@@ -118,7 +124,7 @@ enum AppError: LocalizedError, Equatable {
             return "Add your OpenAI API key before continuing."
         case .invalidAPIKey, .revokedAPIKey:
             return "Replace your OpenAI API key before continuing."
-        case .networkTimeout, .networkFailure:
+        case .networkTimeout, .networkFailure, .rateLimited:
             return "BugNarrator could not reach OpenAI."
         case .exportConfigurationMissing:
             return "Finish export setup before continuing."

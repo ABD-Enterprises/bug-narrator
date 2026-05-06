@@ -397,6 +397,44 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: chunkURL.path))
     }
 
+    func testTranscribeMapsRateLimitResponse() async throws {
+        let fileURL = try makeAudioFile(named: "rate-limited", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            let headers = ["Retry-After": "1"]
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: headers
+            )!
+            let data = Data(#"{"error":{"message":"Rate limit exceeded."}}"#.utf8)
+            return (response, data)
+        }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+
+        do {
+            _ = try await client.transcribe(
+                fileURL: fileURL,
+                apiKey: "fixture-openai-key",
+                request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+            )
+            XCTFail("Expected a rate limit error.")
+        } catch let error as AppError {
+            guard case .rateLimited(let retryAfter) = error else {
+                XCTFail("Unexpected app error: \(error)")
+                return
+            }
+            XCTAssertEqual(retryAfter, 1)
+        }
+
+        XCTAssertGreaterThan(requestCount, 1, "Expected at least one retry before giving up.")
+    }
+
     private func makeAudioFile(named name: String, contents: String) throws -> URL {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-TranscriptionTests-\(name)")
