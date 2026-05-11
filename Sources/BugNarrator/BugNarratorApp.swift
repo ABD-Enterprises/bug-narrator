@@ -4,10 +4,16 @@ import SwiftUI
 final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     static var appState: AppState?
+    @MainActor
+    static var launchContinuityMonitor: LaunchContinuityMonitor?
 
     @MainActor
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Self.appState?.applicationShouldTerminate() ?? .terminateNow
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Self.launchContinuityMonitor?.markGracefulTermination()
     }
 }
 
@@ -23,6 +29,12 @@ struct BugNarratorApp: App {
     init() {
         let runtimeEnvironment = AppRuntimeEnvironment()
         let bootstrap = AppBootstrap(runtimeEnvironment: runtimeEnvironment)
+        let telemetryStorageURL = bootstrap.isolatedStorageRootURL?
+            .appendingPathComponent("operational-telemetry.jsonl")
+        let launchStateURL = bootstrap.isolatedStorageRootURL?
+            .appendingPathComponent("launch-state.json")
+        let telemetryRecorder = OperationalTelemetryRecorder(storageURL: telemetryStorageURL)
+        let launchContinuityMonitor = LaunchContinuityMonitor(stateURL: launchStateURL)
 
         if !runtimeEnvironment.shouldBypassSingleInstanceEnforcement {
             guard SingleInstanceController.enforcePrimaryInstance() else {
@@ -99,7 +111,22 @@ struct BugNarratorApp: App {
         _transcriptStore = StateObject(wrappedValue: transcriptStore)
         _appState = StateObject(wrappedValue: appState)
         AppLifecycleDelegate.appState = appState
+        AppLifecycleDelegate.launchContinuityMonitor = launchContinuityMonitor
         self.windowCoordinator = windowCoordinator
+
+        if let observation = launchContinuityMonitor.beginLaunch() {
+            let timestampFormatter = BugNarratorDiagnostics.makeTimestampFormatter()
+            let metadata = [
+                "previous_launch_started_at": timestampFormatter.string(from: observation.previousLaunchStartedAt),
+                "detected_at": timestampFormatter.string(from: observation.detectedAt)
+            ]
+            DiagnosticsLogger(category: .settings).warning(
+                "unclean_exit_detected",
+                "BugNarrator detected that the previous launch did not terminate cleanly.",
+                metadata: metadata
+            )
+            telemetryRecorder.record("unclean_exit_detected", metadata: metadata)
+        }
 
         if runtimeEnvironment.shouldOpenSettingsOnLaunch {
             DispatchQueue.main.async {

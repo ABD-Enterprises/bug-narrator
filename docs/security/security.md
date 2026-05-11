@@ -23,6 +23,8 @@ Current approach:
 - if secure storage is unavailable, credentials are kept in memory only for the active run
 - debug bundle export excludes raw secrets
 - logs must not include authorization headers, tokens, or API keys
+- operational telemetry is local-only and redacted before persistence
+- unclean-exit detection is stored as a local launch marker and never shipped remotely by default
 
 ## Permission Model
 
@@ -47,7 +49,7 @@ Tracked active risks include:
 
 - Windows release and runtime security posture has not yet been validated on Windows hardware
 
-Track these in [GitHub Issues](https://github.com/deffenda/bugnarrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
+Track these in [GitHub Issues](https://github.com/deffenda/bug-narrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
 
 ## Security Validation Expectations
 
@@ -55,6 +57,7 @@ When changing sensitive code paths, validate:
 
 - no secret leakage in logs
 - no secret leakage in debug bundles
+- no secret leakage in local telemetry files
 - permission gating remains explicit and least-privilege
 - invalid credentials fail clearly and safely
 - release artifacts retain required entitlements and signing identity

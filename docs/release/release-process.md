@@ -29,7 +29,7 @@ Do not release unless all of these are true:
 
 ## Current Maintainer Flow
 
-1. Review [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for unresolved risks and active release blockers.
+1. Review [GitHub Issues](https://github.com/deffenda/bug-narrator/issues) for unresolved risks and active release blockers.
 2. Review [Product Spec](../architecture/product-spec.md) for the intended product behavior, terminology, and artifact contract.
 3. Update `CHANGELOG.md`.
 4. Run `./scripts/release_smoke_test.sh`.
@@ -73,7 +73,7 @@ Use:
 
 - [Product Spec](../architecture/product-spec.md) for intended product behavior and terminology
 - `CHANGELOG.md` for shipped or shipping change history
-- [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for open risks, active release blockers, and task state
+- [GitHub Issues](https://github.com/deffenda/bug-narrator/issues) for open risks, active release blockers, and task state
 - [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context and completed phase history
 
 Release notes should match the actual implemented changes and should not contradict the canonical product spec.
