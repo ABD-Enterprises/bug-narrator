@@ -2,7 +2,7 @@
 
 This page mirrors the canonical BugNarrator product spec at a high level.
 
-The full authoritative version lives in the repository at [docs/architecture/product-spec.md](https://github.com/deffenda/bugnarrator/blob/main/docs/architecture/product-spec.md).
+The full authoritative version lives in the repository at [docs/architecture/product-spec.md](https://github.com/deffenda/bug-narrator/blob/main/docs/architecture/product-spec.md).
 
 ## Product Identity
 
@@ -43,6 +43,6 @@ Its durable workflow is:
 
 ## Related Docs
 
-- [Cross-Platform Guidelines](https://github.com/deffenda/bugnarrator/blob/main/docs/CROSS_PLATFORM_GUIDELINES.md)
-- [Cross-Platform Parity Matrix](https://github.com/deffenda/bugnarrator/blob/main/docs/architecture/parity-matrix.md)
-- [Windows Implementation Roadmap](https://github.com/deffenda/bugnarrator/blob/main/windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)
+- [Cross-Platform Guidelines](https://github.com/deffenda/bug-narrator/blob/main/docs/CROSS_PLATFORM_GUIDELINES.md)
+- [Cross-Platform Parity Matrix](https://github.com/deffenda/bug-narrator/blob/main/docs/architecture/parity-matrix.md)
+- [Windows Implementation Roadmap](https://github.com/deffenda/bug-narrator/blob/main/windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md)

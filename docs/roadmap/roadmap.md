@@ -2,7 +2,7 @@
 
 This document is historical roadmap context only.
 
-Active planning, backlog, bugs, risks, and remediation now live in [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) through `ai-pipeline`.
+Active planning, backlog, bugs, risks, and remediation now live in [GitHub Issues](https://github.com/deffenda/bug-narrator/issues) through `ai-pipeline`.
 
 Use this file for:
 
@@ -19,7 +19,7 @@ Do not use this file for:
 
 ## Active Work
 
-Use [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) for:
+Use [GitHub Issues](https://github.com/deffenda/bug-narrator/issues) for:
 
 - active bugs such as `BN-*`
 - remediation work such as `RR-*`

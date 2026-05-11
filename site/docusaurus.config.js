@@ -6,9 +6,10 @@ const config = {
   tagline: 'User, release, and roadmap documentation for BugNarrator',
   favicon: 'img/favicon.png',
   url: 'https://deffenda.github.io',
-  baseUrl: '/bugnarrator/',
+  baseUrl: '/bug-narrator/',
+  trailingSlash: true,
   organizationName: 'deffenda',
-  projectName: 'bugnarrator',
+  projectName: 'bug-narrator',
   onBrokenLinks: 'throw',
   markdown: {
     hooks: {
@@ -45,7 +46,7 @@ const config = {
           position: 'left'
         },
         {
-          href: 'https://github.com/deffenda/bugnarrator',
+          href: 'https://github.com/deffenda/bug-narrator',
           label: 'GitHub',
           position: 'right'
         }
@@ -66,8 +67,8 @@ const config = {
         {
           title: 'Maintainers',
           items: [
-            { label: 'Release Process (Repo)', href: 'https://github.com/deffenda/bugnarrator/blob/main/docs/release/release-process.md' },
-            { label: 'Roadmap History (Repo)', href: 'https://github.com/deffenda/bugnarrator/blob/main/docs/roadmap/roadmap.md' }
+            { label: 'Release Process (Repo)', href: 'https://github.com/deffenda/bug-narrator/blob/main/docs/release/release-process.md' },
+            { label: 'Roadmap History (Repo)', href: 'https://github.com/deffenda/bug-narrator/blob/main/docs/roadmap/roadmap.md' }
           ]
         }
       ],

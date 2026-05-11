@@ -48,6 +48,19 @@ The repo now includes lightweight GitHub workflow support for non-release automa
 
 The production release path remains locally controlled and documented. GitHub Actions do not compile, sign, notarize, or package the macOS app.
 
+## Docs Site Publication
+
+The Docusaurus docs site is published separately from the macOS app release flow.
+
+Current manual publish path:
+
+1. run `npm run build --prefix site`
+2. run `cd site && GIT_USER=deffenda USE_SSH=false npx docusaurus deploy`
+3. if the `gh-pages` branch does not exist yet, publish the built `site/build` output to a new `gh-pages` branch first, then rerun the deploy command
+4. confirm the site resolves at `https://deffenda.github.io/bug-narrator/`
+
+This keeps docs publication reproducible without adding new recurring GitHub Actions jobs.
+
 ## Terraform Scope
 
 `infra/terraform` currently provides reproducibility scaffolding for future distribution automation and environment metadata. It does not yet provision active runtime infrastructure because the product is a local desktop application.

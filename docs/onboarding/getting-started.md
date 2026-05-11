@@ -20,7 +20,7 @@ Start here:
 3. Set up your machine with [Development Setup](../development/setup.md).
 4. Review the [Testing Guide](../testing/testing.md).
 5. Review the [Release Process](../release/release-process.md).
-6. Check the active [GitHub Issues](https://github.com/deffenda/bugnarrator/issues) and use the [Roadmap](../roadmap/roadmap.md) only for historical context.
+6. Check the active [GitHub Issues](https://github.com/deffenda/bug-narrator/issues) and use the [Roadmap](../roadmap/roadmap.md) only for historical context.
 
 ## If You Are Working On Windows Support
 

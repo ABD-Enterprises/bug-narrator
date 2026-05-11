@@ -9,8 +9,8 @@ BugNarrator intentionally runs as a single-instance menu bar app. If you launch 
 
 ## Download BugNarrator
 
-- [Download the latest macOS DMG](https://github.com/deffenda/bugnarrator/releases/latest/download/BugNarrator-macOS.dmg)
-- [View the latest release page](https://github.com/deffenda/bugnarrator/releases/latest)
+- [Download the latest macOS DMG](https://github.com/deffenda/bug-narrator/releases/latest/download/BugNarrator-macOS.dmg)
+- [View the latest release page](https://github.com/deffenda/bug-narrator/releases/latest)
 
 If the direct DMG link is not live yet, use the release page and download the newest `BugNarrator-macOS.dmg` or `BugNarrator-vX.Y.Z-macOS.dmg` asset there.
 
@@ -30,8 +30,8 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 - [GitHub issues and active work](https://github.com/deffenda/bug-narrator/issues)
 - [Detailed user guide](docs/UserGuide.md)
 - [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
-- [Hosted documentation](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
-- [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
+- [Hosted documentation](https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md)
+- [Report a bug or request a feature](https://github.com/deffenda/bug-narrator/issues/new)
 - [View the changelog](CHANGELOG.md)
 
 ## What BugNarrator Does
@@ -73,7 +73,7 @@ Important:
 
 ## Install On macOS
 
-1. Download the latest DMG from [GitHub Releases](https://github.com/deffenda/bugnarrator/releases/latest).
+1. Download the latest DMG from [GitHub Releases](https://github.com/deffenda/bug-narrator/releases/latest).
 2. Open the DMG. It should present a drag-to-Applications install window.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
@@ -216,13 +216,13 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 
 ## Download, Help, And Support Links
 
-- [Latest macOS release page](https://github.com/deffenda/bugnarrator/releases/latest)
+- [Latest macOS release page](https://github.com/deffenda/bug-narrator/releases/latest)
 - [User documentation](docs/UserGuide.md)
-- [Hosted user guide](https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md)
-- [Report a bug or request a feature](https://github.com/deffenda/bugnarrator/issues/new)
+- [Hosted user guide](https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md)
+- [Report a bug or request a feature](https://github.com/deffenda/bug-narrator/issues/new)
 - [Support development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 - [Changelog](CHANGELOG.md)
-- [GitHub issues](https://github.com/deffenda/bugnarrator/issues)
+- [GitHub issues](https://github.com/deffenda/bug-narrator/issues)
 
 ## Build From Source
 
@@ -286,7 +286,7 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 
 BugNarrator is not currently accepting outside code contributions or pull requests.
 
-Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/deffenda/bugnarrator/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
+Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/deffenda/bug-narrator/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
 
 ## License
 

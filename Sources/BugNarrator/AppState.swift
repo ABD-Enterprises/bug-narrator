@@ -2374,7 +2374,12 @@ final class AppState: ObservableObject {
     }
 
     private func logAppError(_ error: AppError, context: String) {
-        let metadata = ["context": context]
+        let metadata = [
+            "context": context,
+            "error_type": telemetryErrorType(for: error)
+        ]
+
+        telemetryRecorder.record("app_error", metadata: metadata)
 
         switch error {
         case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable, .screenRecordingPermissionDenied:
@@ -2395,6 +2400,53 @@ final class AppState: ObservableObject {
             recordingLogger.warning("app_error", error.userMessage, metadata: metadata)
         case .diagnosticsFailure:
             settingsLogger.error("app_error", error.userMessage, metadata: metadata)
+        }
+    }
+
+    private func telemetryErrorType(for error: AppError) -> String {
+        switch error {
+        case .microphonePermissionDenied:
+            return "microphone_permission_denied"
+        case .microphonePermissionRestricted:
+            return "microphone_permission_restricted"
+        case .microphoneUnavailable:
+            return "microphone_unavailable"
+        case .screenRecordingPermissionDenied:
+            return "screen_recording_permission_denied"
+        case .missingAPIKey:
+            return "missing_api_key"
+        case .invalidAPIKey:
+            return "invalid_api_key"
+        case .revokedAPIKey:
+            return "revoked_api_key"
+        case .recordingFailure:
+            return "recording_failure"
+        case .transcriptionFailure:
+            return "transcription_failure"
+        case .openAIRequestRejected:
+            return "openai_request_rejected"
+        case .issueExtractionFailure:
+            return "issue_extraction_failure"
+        case .emptyTranscript:
+            return "empty_transcript"
+        case .networkTimeout:
+            return "network_timeout"
+        case .networkFailure:
+            return "network_failure"
+        case .rateLimited:
+            return "rate_limited"
+        case .screenshotCaptureFailure:
+            return "screenshot_capture_failure"
+        case .exportConfigurationMissing:
+            return "export_configuration_missing"
+        case .exportFailure:
+            return "export_failure"
+        case .storageFailure:
+            return "storage_failure"
+        case .noActiveSession:
+            return "no_active_session"
+        case .diagnosticsFailure:
+            return "diagnostics_failure"
         }
     }
 
