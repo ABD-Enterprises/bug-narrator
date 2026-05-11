@@ -3,6 +3,7 @@ using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Hotkeys;
 using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Windows.Tray;
+using BugNarrator.Core.Workflow;
 using System.Windows;
 
 namespace BugNarrator.Windows.Shell;
@@ -31,6 +32,11 @@ public sealed class WindowsAppShell : IDisposable
         this.windowCoordinator = windowCoordinator;
         this.trayShell = trayShell;
 
+        recordingLifecycleService.StateChanged += OnRecordingStateChanged;
+        trayShell.StartRecordingRequested += OnStartRecordingRequested;
+        trayShell.StopRecordingRequested += OnStopRecordingRequested;
+        trayShell.CaptureScreenshotRequested += OnCaptureScreenshotRequested;
+        trayShell.ToggleRecordingControlsRequested += OnToggleRecordingControlsRequested;
         trayShell.ShowRecordingControlsRequested += OnShowRecordingControlsRequested;
         trayShell.OpenSessionLibraryRequested += OnOpenSessionLibraryRequested;
         trayShell.SettingsRequested += OnSettingsRequested;
@@ -59,6 +65,7 @@ public sealed class WindowsAppShell : IDisposable
         });
 
         trayShell.Initialize();
+        trayShell.ApplyRecordingState(recordingLifecycleService.CurrentState);
         Application.Current.Dispatcher.BeginInvoke(async () =>
         {
             try
@@ -81,6 +88,11 @@ public sealed class WindowsAppShell : IDisposable
 
     public void Dispose()
     {
+        recordingLifecycleService.StateChanged -= OnRecordingStateChanged;
+        trayShell.StartRecordingRequested -= OnStartRecordingRequested;
+        trayShell.StopRecordingRequested -= OnStopRecordingRequested;
+        trayShell.CaptureScreenshotRequested -= OnCaptureScreenshotRequested;
+        trayShell.ToggleRecordingControlsRequested -= OnToggleRecordingControlsRequested;
         trayShell.ShowRecordingControlsRequested -= OnShowRecordingControlsRequested;
         trayShell.OpenSessionLibraryRequested -= OnOpenSessionLibraryRequested;
         trayShell.SettingsRequested -= OnSettingsRequested;
@@ -95,6 +107,27 @@ public sealed class WindowsAppShell : IDisposable
         diagnostics.Info("app", "app exit");
     }
 
+    private void OnCaptureScreenshotRequested(object? sender, EventArgs e)
+    {
+        Application.Current.Dispatcher.BeginInvoke(async () =>
+        {
+            try
+            {
+                var result = await recordingLifecycleService.CaptureScreenshotAsync();
+                if (result.Status == ScreenshotCaptureResultStatus.Failed
+                    || result.Status == ScreenshotCaptureResultStatus.Unavailable)
+                {
+                    trayShell.ShowWarning("BugNarrator Screenshot", result.Message);
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Error("tray", "capture screenshot request failed", exception);
+                trayShell.ShowWarning("BugNarrator Screenshot", exception.Message);
+            }
+        });
+    }
+
     private void OnAboutRequested(object? sender, EventArgs e)
     {
         windowCoordinator.ShowAbout();
@@ -105,6 +138,11 @@ public sealed class WindowsAppShell : IDisposable
         windowCoordinator.ShowSessionLibrary();
     }
 
+    private void OnRecordingStateChanged(object? sender, RecordingControlState state)
+    {
+        Application.Current.Dispatcher.BeginInvoke(() => trayShell.ApplyRecordingState(state));
+    }
+
     private void OnQuitRequested(object? sender, EventArgs e)
     {
         Application.Current.Shutdown();
@@ -113,6 +151,43 @@ public sealed class WindowsAppShell : IDisposable
     private void OnSettingsRequested(object? sender, EventArgs e)
     {
         windowCoordinator.ShowSettings();
+    }
+
+    private void OnStartRecordingRequested(object? sender, EventArgs e)
+    {
+        Application.Current.Dispatcher.BeginInvoke(async () =>
+        {
+            try
+            {
+                await recordingLifecycleService.StartRecordingAsync();
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Error("tray", "start recording request failed", exception);
+                trayShell.ShowWarning("BugNarrator Recording", exception.Message);
+            }
+        });
+    }
+
+    private void OnStopRecordingRequested(object? sender, EventArgs e)
+    {
+        Application.Current.Dispatcher.BeginInvoke(async () =>
+        {
+            try
+            {
+                await recordingLifecycleService.StopRecordingAsync();
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Error("tray", "stop recording request failed", exception);
+                trayShell.ShowWarning("BugNarrator Recording", exception.Message);
+            }
+        });
+    }
+
+    private void OnToggleRecordingControlsRequested(object? sender, EventArgs e)
+    {
+        windowCoordinator.ToggleRecordingControls();
     }
 
     private void OnShowRecordingControlsRequested(object? sender, EventArgs e)

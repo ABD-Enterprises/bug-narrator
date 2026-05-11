@@ -51,6 +51,7 @@ public partial class App : Application
         diagnostics.Info("app", "starting Windows shell bootstrap");
 
         var singleInstanceService = new SingleInstanceService("ABDEnterprises.BugNarrator.Windows");
+        var audioInputDeviceCatalog = new NAudioInputDeviceCatalog();
         var microphonePreflightService = new MicrophonePreflightService();
         var screenCapturePreflightService = new ScreenCapturePreflightService();
         var audioRecorderService = new NAudioRecorderService();
@@ -78,6 +79,7 @@ public partial class App : Application
             diagnostics);
         var recordingLifecycleService = new RecordingLifecycleService(
             audioRecorderService,
+            audioInputDeviceCatalog,
             microphonePreflightService,
             sessionDraftStore,
             completedSessionStore,
@@ -102,7 +104,8 @@ public partial class App : Application
             settingsStore,
             hotkeyService,
             secretStore,
-            transcriptionClient);
+            transcriptionClient,
+            audioInputDeviceCatalog);
         var trayShell = new TrayShell(diagnostics);
 
         appShell = new WindowsAppShell(

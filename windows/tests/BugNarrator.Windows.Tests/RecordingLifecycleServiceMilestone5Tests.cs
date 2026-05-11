@@ -100,6 +100,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
             var diagnostics = new WindowsDiagnostics(storagePaths);
 
             AudioRecorderService = new FakeAudioRecorderService();
+            AudioInputDeviceCatalog = new FakeAudioInputDeviceCatalog();
             MicrophonePreflightService = new FakeMicrophonePreflightService();
             ScreenCapturePreflightService = new FakeScreenCapturePreflightService();
             OverlayService = new FakeScreenshotSelectionOverlayService();
@@ -112,6 +113,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
 
             Service = new RecordingLifecycleService(
                 AudioRecorderService,
+                AudioInputDeviceCatalog,
                 MicrophonePreflightService,
                 DraftStore,
                 CompletedSessionStore,
@@ -125,6 +127,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
+        public FakeAudioInputDeviceCatalog AudioInputDeviceCatalog { get; }
         public FileCompletedSessionStore CompletedSessionStore { get; }
         public FileSessionDraftStore DraftStore { get; }
         public FakeScreenshotImageCaptureService ImageCaptureService { get; }
@@ -155,10 +158,13 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         {
         }
 
-        public Task StartAsync(string audioFilePath, CancellationToken cancellationToken = default)
+        public int? LastDeviceNumber { get; private set; }
+
+        public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
             File.WriteAllText(audioFilePath, "fake audio");
+            LastDeviceNumber = deviceNumber;
             IsRecording = true;
             return Task.CompletedTask;
         }
@@ -172,12 +178,29 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
 
     private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
     {
-        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording)
+        public int? LastDeviceNumber { get; private set; }
+
+        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
         {
+            LastDeviceNumber = deviceNumber;
             return new RecordingPreflightResult(
                 RecordingPreflightStatus.Ready,
                 CanStart: true,
                 "Microphone ready.");
+        }
+    }
+
+    private sealed class FakeAudioInputDeviceCatalog : IAudioInputDeviceCatalog
+    {
+        public IReadOnlyList<AudioInputDeviceOption> Devices { get; set; } =
+        [
+            new AudioInputDeviceOption(0, "Built-in Microphone"),
+            new AudioInputDeviceOption(1, "USB Headset")
+        ];
+
+        public IReadOnlyList<AudioInputDeviceOption> GetAvailableInputDevices()
+        {
+            return Devices;
         }
     }
 

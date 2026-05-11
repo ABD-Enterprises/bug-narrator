@@ -8,6 +8,7 @@ public sealed record WindowsAppSettings(
     string LanguageHint,
     string TranscriptionPrompt,
     string IssueExtractionModel,
+    string AudioInputDeviceName,
     string GitHubRepositoryOwner,
     string GitHubRepositoryName,
     string GitHubDefaultLabels,
@@ -23,6 +24,7 @@ public sealed record WindowsAppSettings(
         LanguageHint: string.Empty,
         TranscriptionPrompt: string.Empty,
         IssueExtractionModel: "gpt-4.1-mini",
+        AudioInputDeviceName: string.Empty,
         GitHubRepositoryOwner: string.Empty,
         GitHubRepositoryName: string.Empty,
         GitHubDefaultLabels: string.Empty,
@@ -52,6 +54,11 @@ public sealed record WindowsAppSettings(
         string.IsNullOrWhiteSpace(IssueExtractionModel)
             ? Default.IssueExtractionModel
             : IssueExtractionModel.Trim();
+
+    public string? EffectiveAudioInputDeviceName =>
+        string.IsNullOrWhiteSpace(AudioInputDeviceName)
+            ? null
+            : AudioInputDeviceName.Trim();
 
     public string NormalizedGitHubRepositoryOwner =>
         string.IsNullOrWhiteSpace(GitHubRepositoryOwner)

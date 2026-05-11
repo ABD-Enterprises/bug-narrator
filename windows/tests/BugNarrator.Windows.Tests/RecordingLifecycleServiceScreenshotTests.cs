@@ -132,6 +132,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
             var diagnostics = new WindowsDiagnostics(storagePaths);
 
             AudioRecorderService = new FakeAudioRecorderService();
+            AudioInputDeviceCatalog = new FakeAudioInputDeviceCatalog();
             MicrophonePreflightService = new FakeMicrophonePreflightService();
             ScreenCapturePreflightService = new FakeScreenCapturePreflightService();
             OverlayService = new FakeScreenshotSelectionOverlayService();
@@ -144,6 +145,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
 
             Service = new RecordingLifecycleService(
                 AudioRecorderService,
+                AudioInputDeviceCatalog,
                 MicrophonePreflightService,
                 SessionDraftStore,
                 CompletedSessionStore,
@@ -157,6 +159,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
+        public FakeAudioInputDeviceCatalog AudioInputDeviceCatalog { get; }
         public FakeCompletedSessionStore CompletedSessionStore { get; }
         public FakeScreenshotImageCaptureService ImageCaptureService { get; }
         public FakeMicrophonePreflightService MicrophonePreflightService { get; }
@@ -192,7 +195,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
         {
         }
 
-        public Task StartAsync(string audioFilePath, CancellationToken cancellationToken = default)
+        public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
             File.WriteAllText(audioFilePath, string.Empty);
@@ -214,9 +217,22 @@ public sealed class RecordingLifecycleServiceScreenshotTests
             CanStart: true,
             "Microphone ready.");
 
-        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording)
+        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
         {
             return Result;
+        }
+    }
+
+    private sealed class FakeAudioInputDeviceCatalog : IAudioInputDeviceCatalog
+    {
+        public IReadOnlyList<AudioInputDeviceOption> Devices { get; set; } =
+        [
+            new AudioInputDeviceOption(0, "Built-in Microphone")
+        ];
+
+        public IReadOnlyList<AudioInputDeviceOption> GetAvailableInputDevices()
+        {
+            return Devices;
         }
     }
 

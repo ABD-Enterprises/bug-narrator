@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Hotkeys;
 using BugNarrator.Windows.Services.Secrets;
@@ -12,6 +13,8 @@ namespace BugNarrator.Windows.Views;
 public sealed class SettingsWindow : Window
 {
     private readonly PasswordBox apiKeyPasswordBox;
+    private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
+    private readonly ComboBox audioInputDeviceComboBox;
     private readonly WindowsDiagnostics diagnostics;
     private readonly Dictionary<WindowsHotkeyAction, WindowsHotkeyShortcut> draftHotkeys = [];
     private readonly TextBox gitHubDefaultLabelsTextBox;
@@ -41,13 +44,15 @@ public sealed class SettingsWindow : Window
         ISecretStore secretStore,
         ITranscriptionClient transcriptionClient,
         IWindowsGlobalHotkeyService hotkeyService,
-        WindowsDiagnostics diagnostics)
+        WindowsDiagnostics diagnostics,
+        IAudioInputDeviceCatalog audioInputDeviceCatalog)
     {
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
         this.transcriptionClient = transcriptionClient;
         this.hotkeyService = hotkeyService;
         this.diagnostics = diagnostics;
+        this.audioInputDeviceCatalog = audioInputDeviceCatalog;
 
         foreach (var action in WindowsHotkeyActionExtensions.All)
         {
@@ -89,6 +94,12 @@ public sealed class SettingsWindow : Window
         issueExtractionModelTextBox = new TextBox
         {
             Margin = new Thickness(0, 0, 0, 14),
+        };
+
+        audioInputDeviceComboBox = new ComboBox
+        {
+            Margin = new Thickness(0, 0, 0, 14),
+            DisplayMemberPath = nameof(AudioInputDeviceOption.DisplayName),
         };
 
         gitHubTokenPasswordBox = new PasswordBox
@@ -263,6 +274,9 @@ public sealed class SettingsWindow : Window
                     BuildLabel("Issue Extraction Model"),
                     issueExtractionModelTextBox,
                     BuildHint("Defaults to gpt-4.1-mini for structured draft issue extraction after transcription."),
+                    BuildLabel("Microphone Input Device"),
+                    audioInputDeviceComboBox,
+                    BuildHint("Choose a specific Windows microphone if you use more than one. If the saved device disappears, BugNarrator will ask you to choose another instead of silently using the wrong microphone."),
                     statusTextBlock,
                 },
             },
@@ -472,6 +486,7 @@ public sealed class SettingsWindow : Window
             languageHintTextBox.Text = settings.EffectiveLanguageHint ?? string.Empty;
             promptTextBox.Text = settings.EffectiveTranscriptionPrompt ?? string.Empty;
             issueExtractionModelTextBox.Text = settings.EffectiveIssueExtractionModel;
+            PopulateAudioInputDevices(settings.EffectiveAudioInputDeviceName);
             gitHubTokenPasswordBox.Password = gitHubToken ?? string.Empty;
             gitHubOwnerTextBox.Text = settings.NormalizedGitHubRepositoryOwner;
             gitHubRepositoryTextBox.Text = settings.NormalizedGitHubRepositoryName;
@@ -510,6 +525,7 @@ public sealed class SettingsWindow : Window
                 LanguageHint: languageHintTextBox.Text,
                 TranscriptionPrompt: promptTextBox.Text,
                 IssueExtractionModel: issueExtractionModelTextBox.Text,
+                AudioInputDeviceName: (audioInputDeviceComboBox.SelectedItem as AudioInputDeviceOption)?.DisplayName ?? string.Empty,
                 GitHubRepositoryOwner: gitHubOwnerTextBox.Text,
                 GitHubRepositoryName: gitHubRepositoryTextBox.Text,
                 GitHubDefaultLabels: gitHubDefaultLabelsTextBox.Text,
@@ -671,6 +687,34 @@ public sealed class SettingsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         hotkeyService.StateChanged -= OnHotkeyStateChanged;
+    }
+
+    private void PopulateAudioInputDevices(string? selectedDeviceName)
+    {
+        var availableDevices = audioInputDeviceCatalog.GetAvailableInputDevices();
+        audioInputDeviceComboBox.ItemsSource = availableDevices;
+
+        if (availableDevices.Count == 0)
+        {
+            audioInputDeviceComboBox.SelectedItem = null;
+            statusTextBlock.Text = "No Windows microphone device is currently available.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(selectedDeviceName))
+        {
+            audioInputDeviceComboBox.SelectedItem = availableDevices[0];
+            return;
+        }
+
+        audioInputDeviceComboBox.SelectedItem = availableDevices.FirstOrDefault(device =>
+            string.Equals(device.DisplayName, selectedDeviceName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (audioInputDeviceComboBox.SelectedItem is null)
+        {
+            audioInputDeviceComboBox.SelectedItem = availableDevices[0];
+            statusTextBlock.Text = $"Saved microphone \"{selectedDeviceName.Trim()}\" is unavailable. Choose another input device and click Save.";
+        }
     }
 
     private static string BuildLoadStatusMessage(WindowsHotkeyRuntimeSnapshot snapshot)

@@ -206,6 +206,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
                 LanguageHint: string.Empty,
                 TranscriptionPrompt: string.Empty,
                 IssueExtractionModel: "gpt-4.1-mini",
+                AudioInputDeviceName: string.Empty,
                 GitHubRepositoryOwner: "acme",
                 GitHubRepositoryName: "bugnarrator",
                 GitHubDefaultLabels: "bug, triage",

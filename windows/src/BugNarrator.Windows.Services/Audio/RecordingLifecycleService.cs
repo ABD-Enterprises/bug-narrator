@@ -13,6 +13,7 @@ namespace BugNarrator.Windows.Services.Audio;
 public sealed class RecordingLifecycleService : IRecordingLifecycleService
 {
     private readonly IAudioRecorderService audioRecorderService;
+    private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ICompletedSessionStore completedSessionStore;
     private readonly WindowsDiagnostics diagnostics;
     private readonly IMicrophonePreflightService microphonePreflightService;
@@ -30,6 +31,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
 
     public RecordingLifecycleService(
         IAudioRecorderService audioRecorderService,
+        IAudioInputDeviceCatalog audioInputDeviceCatalog,
         IMicrophonePreflightService microphonePreflightService,
         ISessionDraftStore sessionDraftStore,
         ICompletedSessionStore completedSessionStore,
@@ -42,6 +44,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         WindowsDiagnostics diagnostics)
     {
         this.audioRecorderService = audioRecorderService;
+        this.audioInputDeviceCatalog = audioInputDeviceCatalog;
         this.microphonePreflightService = microphonePreflightService;
         this.sessionDraftStore = sessionDraftStore;
         this.completedSessionStore = completedSessionStore;
@@ -94,7 +97,26 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             return;
         }
 
-        var preflightResult = microphonePreflightService.CheckReadyToRecord(audioRecorderService.IsRecording);
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var deviceSelection = AudioInputDeviceSelection.Resolve(
+            settings.EffectiveAudioInputDeviceName,
+            audioInputDeviceCatalog.GetAvailableInputDevices());
+
+        if (!deviceSelection.IsResolved)
+        {
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Failed,
+                CanStart: true,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                deviceSelection.ErrorMessage ?? "No microphone device is available.",
+                ActiveSession: null));
+            return;
+        }
+
+        var preflightResult = microphonePreflightService.CheckReadyToRecord(
+            audioRecorderService.IsRecording,
+            deviceSelection.DeviceNumber);
         diagnostics.Info("recording", $"microphone preflight result: {preflightResult.Status}");
 
         if (!preflightResult.CanStart)
@@ -117,7 +139,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             createdDraft = await sessionDraftStore.CreateDraftAsync(startedAt, cancellationToken);
             activeSession = createdDraft;
 
-            await audioRecorderService.StartAsync(createdDraft.AudioFilePath, cancellationToken);
+            await audioRecorderService.StartAsync(createdDraft.AudioFilePath, deviceSelection.DeviceNumber, cancellationToken);
 
             var recordingDraft = createdDraft with
             {

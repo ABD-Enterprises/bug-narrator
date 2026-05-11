@@ -5,7 +5,7 @@ namespace BugNarrator.Windows.Services.Permissions;
 
 public sealed class MicrophonePreflightService : IMicrophonePreflightService
 {
-    public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording)
+    public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
     {
         if (isAlreadyRecording)
         {
@@ -28,7 +28,7 @@ public sealed class MicrophonePreflightService : IMicrophonePreflightService
             using var probe = new WaveInEvent
             {
                 BufferMilliseconds = 125,
-                DeviceNumber = 0,
+                DeviceNumber = deviceNumber,
                 WaveFormat = new WaveFormat(16000, 16, 1),
             };
 
