@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ${{ fromJSON(github.event_name == 'workflow_dispatch' && !inputs.include_swift && '["actions","python","javascript-typescript","csharp"]' || '["actions","swift","python","javascript-typescript","csharp"]') }}
+        language: ${{ fromJSON('["actions","python","javascript-typescript","csharp"]') }}
 
     steps:
       - name: Checkout
@@ -45,20 +45,8 @@ jobs:
         shell: pwsh
         run: ./windows/scripts/build-windows.ps1 -Configuration Debug
 
-      - name: Build macOS app
-        if: matrix.language == 'swift'
-        shell: bash
-        run: |
-          xcodebuild \
-            -quiet \
-            -project BugNarrator.xcodeproj \
-            -scheme BugNarrator \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
       - name: Autobuild
-        if: matrix.language != 'csharp' && matrix.language != 'swift'
+        if: matrix.language != 'csharp'
         uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis

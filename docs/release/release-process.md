@@ -13,7 +13,7 @@ Detailed companion docs:
 
 BugNarrator is currently released as a macOS DMG through GitHub Releases.
 
-The working production release path is still the locally controlled signing and packaging flow described in `scripts/build_dmg.sh` and the detailed companion docs. GitHub workflow automation has been scaffolded in this phase, but it is not yet the sole authoritative production path until runner-side certificate/notarization validation is proven.
+The authoritative production release path is the locally controlled signing and packaging flow described in `scripts/build_dmg.sh` and the detailed companion docs. macOS build, signing, notarization, and packaging are intentionally local-only so release work does not consume GitHub Actions runner minutes.
 
 ## Release Decision Gates
 
@@ -51,21 +51,21 @@ BugNarrator uses semantic versioning:
 
 The current production application version lives in `VERSION` and the latest GitHub Release.
 
-## GitHub Workflow Scaffolding
+## GitHub Workflow Scope
 
 The repo now contains:
 
 - `.github/workflows/ci.yml`
-- `.github/workflows/release.yml`
+- `.github/workflows/codeql.yml`
 
 These workflows support:
 
-- CI validation for macOS and Windows workspace builds
+- runtime guardrails validation
 - lightweight accessibility regression checks for the most accessibility-sensitive macOS surfaces
 - docs-site build validation
-- manual release packaging
-- optional signed/notarized packaging when secrets are configured
-- internal release-summary seed generation from the `Unreleased` changelog section plus GitHub issue review
+- code scanning for non-macOS languages
+
+They do not build, sign, notarize, or package the macOS app. Release packaging remains local-only.
 
 ## Release Notes Source Of Truth
 

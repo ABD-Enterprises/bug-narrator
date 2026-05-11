@@ -241,10 +241,9 @@ Recommended flow:
 6. optionally upload the versioned `dist/BugNarrator-vX.Y.Z-macOS.dmg`
 7. add release notes and link back to the changelog if needed
 8. verify the README top download link matches the uploaded stable DMG filename
-9. confirm GitHub Actions release secrets still match the canonical signing identity:
-   - `APPLE_ID=abdeffenderfer@icloud.com`
-   - `APPLE_TEAM_ID=2R4WAH4R53`
-   - `APPLE_APP_SPECIFIC_PASSWORD` matches the current 1Password app-specific password
+9. keep Apple signing credentials and the notary profile valid on the local release Mac before the next release
+
+BugNarrator release builds are intentionally local-only. Do not rely on GitHub Actions to compile, sign, notarize, or package the macOS app.
 
 ## Verify The DMG
 

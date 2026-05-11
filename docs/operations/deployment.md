@@ -41,12 +41,12 @@ These are produced by `scripts/build_dmg.sh`.
 
 ## GitHub Workflow Support
 
-The repo now includes workflow scaffolding for CI and manual release packaging:
+The repo now includes lightweight GitHub workflow support for non-release automation:
 
 - `.github/workflows/ci.yml`
-- `.github/workflows/release.yml`
+- `.github/workflows/codeql.yml`
 
-The current production release path remains locally controlled and documented. The workflow scaffolding is intended to reduce drift and prepare for fuller automation, not to replace already-working signed local release steps before secrets and runner validation are proven.
+The production release path remains locally controlled and documented. GitHub Actions do not compile, sign, notarize, or package the macOS app.
 
 ## Terraform Scope
 
