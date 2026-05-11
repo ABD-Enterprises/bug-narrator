@@ -17,6 +17,43 @@ final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+private struct WindowSceneRegistrar: View {
+    @ObservedObject var appState: AppState
+    let windowCoordinator: WindowCoordinator
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .onAppear {
+                windowCoordinator.configureSceneActions(
+                    showTranscript: { openWindow(id: WindowCoordinator.SceneID.transcript) },
+                    showSettings: { openWindow(id: WindowCoordinator.SceneID.settings) },
+                    showAbout: { openWindow(id: WindowCoordinator.SceneID.about) },
+                    showChangelog: { openWindow(id: WindowCoordinator.SceneID.changelog) },
+                    showSupport: { openWindow(id: WindowCoordinator.SceneID.support) }
+                )
+
+                appState.showTranscriptWindow = { [weak windowCoordinator] in
+                    windowCoordinator?.showTranscriptWindow()
+                }
+                appState.showSettingsWindow = { [weak windowCoordinator] in
+                    windowCoordinator?.showSettingsWindow()
+                }
+                appState.showAboutWindow = { [weak windowCoordinator] in
+                    windowCoordinator?.showAboutWindow()
+                }
+                appState.showChangelogWindow = { [weak windowCoordinator] in
+                    windowCoordinator?.showChangelogWindow()
+                }
+                appState.showSupportWindow = { [weak windowCoordinator] in
+                    windowCoordinator?.showSupportWindow()
+                }
+            }
+    }
+}
+
 @main
 struct BugNarratorApp: App {
     @NSApplicationDelegateAdaptor(AppLifecycleDelegate.self) private var appDelegate
@@ -82,21 +119,6 @@ struct BugNarratorApp: App {
             settingsStore: settingsStore
         )
 
-        appState.showTranscriptWindow = { [weak windowCoordinator] in
-            windowCoordinator?.showTranscriptWindow()
-        }
-        appState.showSettingsWindow = { [weak windowCoordinator] in
-            windowCoordinator?.showSettingsWindow()
-        }
-        appState.showAboutWindow = { [weak windowCoordinator] in
-            windowCoordinator?.showAboutWindow()
-        }
-        appState.showChangelogWindow = { [weak windowCoordinator] in
-            windowCoordinator?.showChangelogWindow()
-        }
-        appState.showSupportWindow = { [weak windowCoordinator] in
-            windowCoordinator?.showSupportWindow()
-        }
         appState.showRecordingControlWindow = { [weak windowCoordinator] in
             windowCoordinator?.showRecordingControlWindow()
         }
@@ -154,12 +176,43 @@ struct BugNarratorApp: App {
                 recordingTimer: appState.recordingTimer,
                 transcriptStore: transcriptStore
             )
+            .background(WindowSceneRegistrar(appState: appState, windowCoordinator: windowCoordinator))
         } label: {
             MenuBarLabelView(
                 status: appState.status,
                 recordingTimer: appState.recordingTimer
             )
+            .background(WindowSceneRegistrar(appState: appState, windowCoordinator: windowCoordinator))
         }
         .menuBarExtraStyle(.window)
+
+        Window("BugNarrator Sessions", id: WindowCoordinator.SceneID.transcript) {
+            TranscriptView(
+                appState: appState,
+                recordingTimer: appState.recordingTimer,
+                transcriptStore: transcriptStore
+            )
+        }
+        .defaultSize(width: 1120, height: 720)
+
+        Window("BugNarrator Settings", id: WindowCoordinator.SceneID.settings) {
+            SettingsView(appState: appState, settingsStore: settingsStore)
+        }
+        .defaultSize(width: 760, height: 900)
+
+        Window("About BugNarrator", id: WindowCoordinator.SceneID.about) {
+            AboutBugNarratorView(appState: appState)
+        }
+        .defaultSize(width: 620, height: 720)
+
+        Window("What’s New", id: WindowCoordinator.SceneID.changelog) {
+            ChangelogView(appState: appState)
+        }
+        .defaultSize(width: 760, height: 760)
+
+        Window("Support BugNarrator", id: WindowCoordinator.SceneID.support) {
+            SupportView(appState: appState)
+        }
+        .defaultSize(width: 520, height: 460)
     }
 }

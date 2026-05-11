@@ -26,9 +26,7 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
         }
 
         let alreadyImported = Set(
-            transcriptStore.sessions.compactMap { session in
-                session.recoveredSourceFileName ?? session.pendingTranscription?.recoveredSourceFileName
-            }
+            transcriptStore.libraryEntries.compactMap(\.recoveredSourceFileName)
         )
 
         let audioFiles = try fileManager

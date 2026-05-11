@@ -39,6 +39,8 @@ final class SettingsStoreTests: XCTestCase {
             launchAtLoginService: launchAtLoginService
         )
         firstStore.apiKey = "persisted-api-key"
+        firstStore.aiProvider = .localCompatible
+        firstStore.openAIBaseURL = "http://localhost:1234/v1"
         firstStore.preferredModel = "whisper-1"
         firstStore.languageHint = "en"
         firstStore.transcriptionPrompt = "Focus on bugs."
@@ -83,6 +85,8 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(secondStore.apiKey, "")
         XCTAssertEqual(secondStore.openAIAPIKeyForUserInitiatedAccess(), "persisted-api-key")
+        XCTAssertEqual(secondStore.aiProvider, .localCompatible)
+        XCTAssertEqual(secondStore.openAIBaseURL, "http://localhost:1234/v1")
         XCTAssertEqual(secondStore.preferredModel, "whisper-1")
         XCTAssertEqual(secondStore.languageHint, "en")
         XCTAssertEqual(secondStore.transcriptionPrompt, "Focus on bugs.")
@@ -203,6 +207,57 @@ final class SettingsStoreTests: XCTestCase {
             SettingsStore.normalizedOpenAIBaseURL(from: "").absoluteString,
             "https://api.openai.com"
         )
+    }
+
+    func testLocalCompatibleProviderRequiresExplicitBaseURLAndModels() {
+        let suiteName = "BugNarrator-SettingsProviderCompatibility-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .localCompatible
+
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Choose your local-compatible base URL before validating or transcribing."
+        )
+
+        store.openAIBaseURL = "http://localhost:1234/v1"
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
+        )
+
+        store.preferredModel = "whisper-large-v3"
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider."
+        )
+
+        store.issueExtractionModel = "llama3.1:8b"
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+    }
+
+    func testOpenAICompatibleProviderRequiresNonDefaultBaseURL() {
+        let suiteName = "BugNarrator-SettingsOpenAICompatible-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .openAICompatible
+        store.apiKey = "enterprise-token"
+
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Choose a non-default API base URL for the OpenAI-Compatible provider."
+        )
+
+        store.openAIBaseURL = "https://gateway.example.com/openai"
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
     func testSettingsLoadFromLegacyDefaultsDomain() throws {

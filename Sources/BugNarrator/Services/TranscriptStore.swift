@@ -7,15 +7,24 @@ final class TranscriptStore: ObservableObject {
     private let logger = DiagnosticsLogger(category: .sessionLibrary)
 
     var pendingTranscriptionSessions: [TranscriptSession] {
-        sessions.filter(\.requiresTranscriptionRetry)
+        libraryEntries
+            .filter(\.isPendingTranscription)
+            .compactMap { session(with: $0.id) }
     }
 
     var pendingTranscriptionSessionCount: Int {
-        pendingTranscriptionSessions.count
+        libraryEntries.filter(\.isPendingTranscription).count
     }
 
     var latestPendingTranscriptionSession: TranscriptSession? {
-        pendingTranscriptionSessions.first
+        guard let pendingEntry = libraryEntries.first(where: \.isPendingTranscription) else {
+            return nil
+        }
+        return session(with: pendingEntry.id)
+    }
+
+    var sessionCount: Int {
+        libraryEntries.count
     }
 
     private enum StoragePolicy {
@@ -56,20 +65,26 @@ final class TranscriptStore: ObservableObject {
     }
 
     func add(_ session: TranscriptSession) throws {
-        var updatedSessions = sessions
-        updatedSessions.removeAll { $0.id == session.id }
-        updatedSessions.insert(session, at: 0)
-        updatedSessions = normalizedSessions(updatedSessions)
+        var updatedEntries = libraryEntries
+        updatedEntries.removeAll { $0.id == session.id }
+        updatedEntries.insert(SessionLibraryEntry(session: session), at: 0)
+        updatedEntries = normalizedEntries(updatedEntries)
+        let retainedIDs = Set(updatedEntries.map(\.id))
 
         do {
-            try persist(updatedSessions)
-            replaceState(with: updatedSessions)
+            try persistSessionFile(for: session)
+            try persistIndex(updatedEntries)
+            try cleanupUnreferencedSessionFiles(retainedIDs: retainedIDs)
+            replaceState(
+                with: updatedEntries,
+                loadedSessions: upsertLoadedSession(session, retainedIDs: retainedIDs)
+            )
             logger.debug(
                 "session_saved",
                 "Saved session history entry.",
                 metadata: [
                     "session_id": session.id.uuidString,
-                    "stored_sessions": "\(sessions.count)"
+                    "stored_sessions": "\(libraryEntries.count)"
                 ]
             )
         } catch {
@@ -88,18 +103,25 @@ final class TranscriptStore: ObservableObject {
             return []
         }
 
-        let removedSessions = sessions.filter { ids.contains($0.id) }
-        let remainingSessions = sessions.filter { !ids.contains($0.id) }
+        let removedSessions = ids.compactMap { session(with: $0) }
+        let remainingEntries = libraryEntries.filter { !ids.contains($0.id) }
 
         do {
-            try persist(remainingSessions)
-            replaceState(with: remainingSessions)
+            try persistIndex(remainingEntries)
+            for id in ids {
+                try? fileManager.removeItem(at: sessionFileURL(for: id))
+            }
+            try cleanupUnreferencedSessionFiles(retainedIDs: Set(remainingEntries.map(\.id)))
+            replaceState(
+                with: remainingEntries,
+                loadedSessions: sessions.filter { !ids.contains($0.id) }
+            )
             logger.info(
                 "sessions_deleted",
                 "Removed sessions from local history.",
                 metadata: [
                     "removed_count": "\(removedSessions.count)",
-                    "remaining_sessions": "\(remainingSessions.count)"
+                    "remaining_sessions": "\(remainingEntries.count)"
                 ]
             )
             return removedSessions
@@ -114,54 +136,76 @@ final class TranscriptStore: ObservableObject {
     }
 
     func session(with id: UUID) -> TranscriptSession? {
-        sessionLookup[id]
+        guard libraryEntries.contains(where: { $0.id == id }) else {
+            return nil
+        }
+
+        if let session = sessionLookup[id] {
+            return session
+        }
+
+        guard let session = loadSessionFile(with: id) else {
+            return nil
+        }
+
+        cacheLoadedSession(session)
+        return session
+    }
+
+    func allStoredSessionIDs() -> [UUID] {
+        libraryEntries.map(\.id)
+    }
+
+    func allStoredSessions() -> [TranscriptSession] {
+        libraryEntries.compactMap { session(with: $0.id) }
     }
 
     private func load() {
-        if let storedSessions = loadPartitionedSessions(from: indexURL) {
-            replaceState(with: normalizedSessions(storedSessions))
+        if let state = loadPartitionedState(from: indexURL) {
+            replaceState(with: state.entries, loadedSessions: state.loadedSessions)
             lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
                 "Loaded partitioned session history from primary storage.",
-                metadata: ["session_count": "\(sessions.count)"]
+                metadata: ["session_count": "\(libraryEntries.count)"]
             )
             return
         }
 
-        if let backupSessions = loadPartitionedSessions(from: backupIndexURL) {
-            let normalizedBackupSessions = normalizedSessions(backupSessions)
-            replaceState(with: normalizedBackupSessions)
-            try? persist(normalizedBackupSessions)
+        if let backupState = loadPartitionedState(from: backupIndexURL) {
+            replaceState(with: backupState.entries, loadedSessions: backupState.loadedSessions)
+            try? persistIndex(backupState.entries)
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
-                recoveredSessionCount: normalizedBackupSessions.count
+                recoveredSessionCount: backupState.entries.count
             )
             logger.warning(
                 "session_store_recovered_from_backup",
                 "Recovered partitioned session history from the backup index after the primary index failed to load.",
-                metadata: ["session_count": "\(sessions.count)"]
+                metadata: ["session_count": "\(libraryEntries.count)"]
             )
             return
         }
 
         if let storedSessions = loadSessions(from: storageURL) {
             let normalizedStoredSessions = normalizedSessions(storedSessions)
-            replaceState(with: normalizedStoredSessions)
+            let entries = normalizedStoredSessions.map(SessionLibraryEntry.init(session:))
             try? persist(normalizedStoredSessions)
+            replaceState(with: entries, loadedSessions: [])
             lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
                 "Loaded legacy session history from primary storage and migrated it to partitioned storage.",
-                metadata: ["session_count": "\(sessions.count)"]
+                metadata: ["session_count": "\(libraryEntries.count)"]
             )
             return
         }
 
         if let backupSessions = loadSessions(from: backupStorageURL) {
             let normalizedBackupSessions = normalizedSessions(backupSessions)
-            replaceState(with: normalizedBackupSessions)
+            let entries = normalizedBackupSessions.map(SessionLibraryEntry.init(session:))
             try? persist(normalizedBackupSessions)
+            replaceState(with: entries, loadedSessions: [])
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
                 recoveredSessionCount: normalizedBackupSessions.count
@@ -169,12 +213,12 @@ final class TranscriptStore: ObservableObject {
             logger.warning(
                 "session_store_recovered_from_backup",
                 "Recovered session history from the backup store after the primary store failed to load.",
-                metadata: ["session_count": "\(sessions.count)"]
+                metadata: ["session_count": "\(libraryEntries.count)"]
             )
             return
         }
 
-        replaceState(with: [])
+        replaceState(with: [], loadedSessions: [])
         if fileManager.fileExists(atPath: storageURL.path) ||
             fileManager.fileExists(atPath: indexURL.path) ||
             fileManager.fileExists(atPath: backupStorageURL.path) ||
@@ -195,29 +239,15 @@ final class TranscriptStore: ObservableObject {
             try fileManager.createDirectory(at: sessionsDirectoryURL, withIntermediateDirectories: true)
         }
 
-        let normalizedIDs = Set(sessions.map(\.id))
-        for session in sessions {
+        let normalizedSessions = normalizedSessions(sessions)
+        let normalizedIDs = Set(normalizedSessions.map(\.id))
+        for session in normalizedSessions {
             let data = try sessionDataProtector.protect(encoder.encode(session))
             try data.write(to: sessionFileURL(for: session.id), options: [.atomic])
         }
 
-        let index = TranscriptStoreIndex(sessionIDs: sessions.map(\.id))
-        let indexData = try encoder.encode(index)
-        try indexData.write(to: indexURL, options: [.atomic])
-        try? indexData.write(to: backupIndexURL, options: [.atomic])
-
-        if let fileURLs = try? fileManager.contentsOfDirectory(
-            at: sessionsDirectoryURL,
-            includingPropertiesForKeys: nil
-        ) {
-            for fileURL in fileURLs where fileURL.pathExtension == "json" {
-                let rawID = fileURL.deletingPathExtension().lastPathComponent
-                guard let id = UUID(uuidString: rawID), !normalizedIDs.contains(id) else {
-                    continue
-                }
-                try? fileManager.removeItem(at: fileURL)
-            }
-        }
+        try persistIndex(normalizedSessions.map(SessionLibraryEntry.init(session:)))
+        try cleanupUnreferencedSessionFiles(retainedIDs: normalizedIDs)
     }
 
     private func loadSessions(from url: URL) -> [TranscriptSession]? {
@@ -238,7 +268,7 @@ final class TranscriptStore: ObservableObject {
         }
     }
 
-    private func loadPartitionedSessions(from indexURL: URL) -> [TranscriptSession]? {
+    private func loadPartitionedState(from indexURL: URL) -> (entries: [SessionLibraryEntry], loadedSessions: [TranscriptSession])? {
         guard fileManager.fileExists(atPath: indexURL.path) else {
             return nil
         }
@@ -246,17 +276,50 @@ final class TranscriptStore: ObservableObject {
         do {
             let indexData = try Data(contentsOf: indexURL)
             let index = try decoder.decode(TranscriptStoreIndex.self, from: indexData)
-            let sessions = try index.sessionIDs.map { id in
-                let data = try Data(contentsOf: sessionFileURL(for: id))
-                let unprotectedData = try sessionDataProtector.unprotect(data)
-                return try decoder.decode(TranscriptSession.self, from: unprotectedData)
+
+            if !index.entries.isEmpty {
+                return (normalizedEntries(index.entries), [])
             }
-            return sessions
+
+            let storedSessions = index.sessionIDs.compactMap { id in
+                loadSessionFile(with: id)
+            }
+            guard storedSessions.count == index.sessionIDs.count else {
+                return nil
+            }
+
+            let normalizedStoredSessions = normalizedSessions(storedSessions)
+            let entries = normalizedStoredSessions.map(SessionLibraryEntry.init(session:))
+            try? persistIndex(entries)
+            return (entries, [])
         } catch {
             logger.warning(
                 "session_store_partitioned_decode_failed",
                 "Partitioned session history could not be decoded from disk.",
                 metadata: ["file": indexURL.lastPathComponent]
+            )
+            return nil
+        }
+    }
+
+    private func loadSessionFile(with id: UUID) -> TranscriptSession? {
+        let fileURL = sessionFileURL(for: id)
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            return nil
+        }
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let unprotectedData = try sessionDataProtector.unprotect(data)
+            return try decoder.decode(TranscriptSession.self, from: unprotectedData)
+        } catch {
+            logger.warning(
+                "session_body_decode_failed",
+                "A stored session body could not be decoded from disk.",
+                metadata: [
+                    "session_id": id.uuidString,
+                    "file": fileURL.lastPathComponent
+                ]
             )
             return nil
         }
@@ -276,10 +339,84 @@ final class TranscriptStore: ObservableObject {
             .map { $0 }
     }
 
-    private func replaceState(with sessions: [TranscriptSession]) {
-        self.sessions = sessions
+    private func normalizedEntries(_ entries: [SessionLibraryEntry]) -> [SessionLibraryEntry] {
+        let uniqueEntries = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) }).values
+        return Array(uniqueEntries)
+            .sorted { lhs, rhs in
+                if lhs.createdAt == rhs.createdAt {
+                    return lhs.id.uuidString > rhs.id.uuidString
+                }
+
+                return lhs.createdAt > rhs.createdAt
+            }
+            .prefix(StoragePolicy.maximumStoredSessions)
+            .map { $0 }
+    }
+
+    private func replaceState(with entries: [SessionLibraryEntry], loadedSessions: [TranscriptSession]) {
+        libraryEntries = normalizedEntries(entries)
+        let retainedIDs = Set(libraryEntries.map(\.id))
+        sessions = normalizedSessions(loadedSessions).filter { retainedIDs.contains($0.id) }
         sessionLookup = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-        libraryEntries = sessions.map(SessionLibraryEntry.init(session:))
+    }
+
+    private func persistIndex(_ entries: [SessionLibraryEntry]) throws {
+        let parentDirectoryURL = indexURL.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: parentDirectoryURL.path) {
+            try fileManager.createDirectory(at: parentDirectoryURL, withIntermediateDirectories: true)
+        }
+
+        let normalizedEntries = normalizedEntries(entries)
+        let index = TranscriptStoreIndex(entries: normalizedEntries)
+        let indexData = try encoder.encode(index)
+        try indexData.write(to: indexURL, options: [.atomic])
+        try? indexData.write(to: backupIndexURL, options: [.atomic])
+    }
+
+    private func persistSessionFile(for session: TranscriptSession) throws {
+        let parentDirectoryURL = indexURL.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: parentDirectoryURL.path) {
+            try fileManager.createDirectory(at: parentDirectoryURL, withIntermediateDirectories: true)
+        }
+        if !fileManager.fileExists(atPath: sessionsDirectoryURL.path) {
+            try fileManager.createDirectory(at: sessionsDirectoryURL, withIntermediateDirectories: true)
+        }
+
+        let data = try sessionDataProtector.protect(encoder.encode(session))
+        try data.write(to: sessionFileURL(for: session.id), options: [.atomic])
+    }
+
+    private func cleanupUnreferencedSessionFiles(retainedIDs: Set<UUID>) throws {
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: sessionsDirectoryURL,
+            includingPropertiesForKeys: nil
+        ) else {
+            return
+        }
+
+        for fileURL in fileURLs where fileURL.pathExtension == "json" {
+            let rawID = fileURL.deletingPathExtension().lastPathComponent
+            guard let id = UUID(uuidString: rawID), !retainedIDs.contains(id) else {
+                continue
+            }
+            try? fileManager.removeItem(at: fileURL)
+        }
+    }
+
+    private func cacheLoadedSession(_ session: TranscriptSession) {
+        guard libraryEntries.contains(where: { $0.id == session.id }) else {
+            return
+        }
+
+        sessionLookup[session.id] = session
+        sessions = upsertLoadedSession(session, retainedIDs: Set(libraryEntries.map(\.id)))
+    }
+
+    private func upsertLoadedSession(_ session: TranscriptSession, retainedIDs: Set<UUID>) -> [TranscriptSession] {
+        var updatedSessions = sessions.filter { retainedIDs.contains($0.id) }
+        updatedSessions.removeAll { $0.id == session.id }
+        updatedSessions.insert(session, at: 0)
+        return normalizedSessions(updatedSessions)
     }
 
     private static func makeAppSupportDirectory(fileManager: FileManager) -> URL {
@@ -297,11 +434,13 @@ final class TranscriptStore: ObservableObject {
 
 private struct TranscriptStoreIndex: Codable {
     let version: Int
+    let entries: [SessionLibraryEntry]
     let sessionIDs: [UUID]
 
-    init(version: Int = 1, sessionIDs: [UUID]) {
+    init(version: Int = 2, entries: [SessionLibraryEntry], sessionIDs: [UUID]? = nil) {
         self.version = version
-        self.sessionIDs = sessionIDs
+        self.entries = entries
+        self.sessionIDs = sessionIDs ?? entries.map(\.id)
     }
 }
 

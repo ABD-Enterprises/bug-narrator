@@ -3,6 +3,83 @@ import Combine
 import Foundation
 
 @MainActor
+final class AIProviderSettingsController: ObservableObject {
+    @Published private(set) var apiKeyValidationState: APIKeyValidationState = .idle
+
+    var showSettingsWindow: (() -> Void)?
+
+    private let settingsStore: SettingsStore
+    private let transcriptionClient: any TranscriptionServing
+    private let logger = DiagnosticsLogger(category: .settings)
+    private var isValidating = false
+
+    init(
+        settingsStore: SettingsStore,
+        transcriptionClient: any TranscriptionServing
+    ) {
+        self.settingsStore = settingsStore
+        self.transcriptionClient = transcriptionClient
+    }
+
+    func validateConnection() async {
+        guard !isValidating else {
+            return
+        }
+
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            apiKeyValidationState = .failure(compatibilityIssue)
+            showSettingsWindow?()
+            return
+        }
+
+        guard let providerCredential = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+            let provider = settingsStore.aiProvider
+            let message = provider.requiresAPIKey
+                ? AppError.missingAPIKey.userMessage
+                : "Choose a valid \(provider.displayName) base URL before validating the connection."
+            apiKeyValidationState = .failure(message)
+            showSettingsWindow?()
+            return
+        }
+
+        isValidating = true
+        apiKeyValidationState = .validating
+        defer { isValidating = false }
+
+        do {
+            try await transcriptionClient.validateAPIKey(
+                providerCredential,
+                apiBaseURL: settingsStore.openAIBaseURLValue
+            )
+            apiKeyValidationState = .success(settingsStore.aiProvider.successMessage)
+            logger.info(
+                "validate_ai_provider_succeeded",
+                "The AI provider validation flow succeeded.",
+                metadata: ["provider": settingsStore.aiProvider.rawValue]
+            )
+        } catch {
+            let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
+            apiKeyValidationState = .failure(appError.userMessage)
+            logger.warning(
+                "validate_ai_provider_failed",
+                appError.userMessage,
+                metadata: ["provider": settingsStore.aiProvider.rawValue]
+            )
+        }
+    }
+
+    func removeCredential() {
+        settingsStore.removeAPIKey()
+        apiKeyValidationState = .idle
+        logger.info(
+            "remove_ai_provider_credential",
+            "The AI provider credential was removed from local storage.",
+            metadata: ["provider": settingsStore.aiProvider.rawValue]
+        )
+    }
+}
+
+@MainActor
 final class AppState: ObservableObject {
     @Published private(set) var status: AppStatus = .idle()
     @Published private(set) var currentError: AppError?
@@ -16,12 +93,12 @@ final class AppState: ObservableObject {
     @Published private(set) var pendingExportReview: IssueExportReview?
     @Published private(set) var exportHistory: [ExportReceipt] = []
     @Published private(set) var recoveredRecordingImportCount = 0
-    @Published private(set) var apiKeyValidationState: APIKeyValidationState = .idle
     @Published private(set) var retryingSessionID: UUID?
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
     let trackerIntegration: TrackerIntegrationController
+    let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
 
     private let runtimeEnvironment: AppRuntimeEnvironment
@@ -66,7 +143,6 @@ final class AppState: ObservableObject {
     private var isStartingSession = false
     private var isStoppingSession = false
     private var isCancellingSession = false
-    private var isValidatingAPIKey = false
     @Published private(set) var isScreenshotCaptureInProgress = false
     private var toastDismissTask: Task<Void, Never>?
 
@@ -76,6 +152,10 @@ final class AppState: ObservableObject {
 
     var jiraValidationState: APIKeyValidationState {
         trackerIntegration.jiraValidationState
+    }
+
+    var apiKeyValidationState: APIKeyValidationState {
+        aiProviderSettings.apiKeyValidationState
     }
 
     var gitHubRepositories: [GitHubRepositoryOption] {
@@ -190,7 +270,11 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             exportService: exportService
         )
-        self.selectedTranscriptID = transcriptStore.sessions.first?.id
+        self.aiProviderSettings = AIProviderSettingsController(
+            settingsStore: settingsStore,
+            transcriptionClient: transcriptionClient
+        )
+        self.selectedTranscriptID = transcriptStore.libraryEntries.first?.id
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
@@ -204,7 +288,17 @@ final class AppState: ObservableObject {
             self?.showSettingsWindow?()
         }
 
+        aiProviderSettings.showSettingsWindow = { [weak self] in
+            self?.showSettingsWindow?()
+        }
+
         trackerIntegration.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        aiProviderSettings.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -252,6 +346,7 @@ final class AppState: ObservableObject {
             "BugNarrator finished initializing application state.",
             metadata: [
                 "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no",
+                "ai_provider": settingsStore.aiProvider.rawValue,
                 "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
             ]
         )
@@ -298,7 +393,7 @@ final class AppState: ObservableObject {
             return currentTranscript
         }
 
-        return transcriptStore.sessions.first
+        return transcriptStore.libraryEntries.first.flatMap { transcriptStore.session(with: $0.id) }
     }
 
     var currentTranscriptIsPersisted: Bool {
@@ -310,7 +405,7 @@ final class AppState: ObservableObject {
     }
 
     var needsAPIKeySetup: Bool {
-        !settingsStore.hasAPIKey
+        !settingsStore.hasUsableAIProviderCredential || settingsStore.aiProviderCompatibilityIssue != nil
     }
 
     var preferredRecordingWorkflowSummary: String {
@@ -546,12 +641,16 @@ final class AppState: ObservableObject {
                     "A feedback session started successfully.",
                     metadata: [
                         "session_id": sessionID.uuidString,
-                        "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no"
+                        "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                        "ai_provider": settingsStore.aiProvider.rawValue
                     ]
                 )
                 telemetryRecorder.record(
                     "recording_started",
-                    metadata: ["has_openai_key": settingsStore.hasAPIKey ? "yes" : "no"]
+                    metadata: [
+                        "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                        "ai_provider": settingsStore.aiProvider.rawValue
+                    ]
                 )
             } catch {
                 artifactsService.removeArtifactsDirectory(at: artifactsDirectoryURL)
@@ -563,11 +662,15 @@ final class AppState: ObservableObject {
     }
 
     private func recordingDetailMessage() -> String {
-        if settingsStore.hasAPIKey {
+        if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
             return "Recording in progress."
         }
 
-        return "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            return "Recording in progress. \(compatibilityIssue)"
+        }
+
+        return "Recording in progress. Finish the AI provider setup in Settings before stopping to transcribe this session."
     }
 
     func stopSession() async {
@@ -602,7 +705,7 @@ final class AppState: ObservableObject {
             let recordedAudio = try await audioRecorder.stopRecording()
             pendingRecordedAudio = recordedAudio
 
-            guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+            guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 preserveRetryableSession(
                     from: recordingSession,
                     recordedAudio: recordedAudio,
@@ -939,7 +1042,7 @@ final class AppState: ObservableObject {
         do {
             let diagnostics = await makePrivacyDataExportDiagnosticsSnapshot()
             guard let bundleURL = try privacyDataExporter.export(
-                sessions: transcriptStore.sessions,
+                sessions: transcriptStore.allStoredSessions(),
                 settings: makePrivacyDataExportSettingsSnapshot(),
                 diagnostics: diagnostics
             ) else {
@@ -949,11 +1052,11 @@ final class AppState: ObservableObject {
             sessionLibraryLogger.info(
                 "privacy_data_exported",
                 "Exported a local privacy data bundle.",
-                metadata: ["session_count": "\(transcriptStore.sessions.count)"]
+                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
             )
             telemetryRecorder.record(
                 "privacy_data_exported",
-                metadata: ["session_count": "\(transcriptStore.sessions.count)"]
+                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
             )
             NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
             setStatus(.success("Data export created. API keys and tracker credentials were not included."))
@@ -969,7 +1072,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        let idsToDelete = Set(transcriptStore.sessions.map(\.id))
+        let idsToDelete = Set(transcriptStore.allStoredSessionIDs())
             .union(currentTranscript.map { [$0.id] } ?? [])
         let deletedSessionCount = idsToDelete.count
 
@@ -992,39 +1095,11 @@ final class AppState: ObservableObject {
     }
 
     func validateAPIKey() async {
-        guard !isValidatingAPIKey else {
-            return
-        }
-
-        guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
-            settingsLogger.warning("validate_openai_key_rejected", "OpenAI key validation was requested without a saved key.")
-            apiKeyValidationState = .failure(AppError.missingAPIKey.userMessage)
-            showSettingsWindow?()
-            return
-        }
-
-        isValidatingAPIKey = true
-        apiKeyValidationState = .validating
-        defer { isValidatingAPIKey = false }
-
-        do {
-            try await transcriptionClient.validateAPIKey(
-                apiKey,
-                apiBaseURL: settingsStore.openAIBaseURLValue
-            )
-            apiKeyValidationState = .success("OpenAI accepted this key.")
-            settingsLogger.info("validate_openai_key_succeeded", "The OpenAI API key validation flow succeeded.")
-        } catch {
-            let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
-            apiKeyValidationState = .failure(appError.userMessage)
-            settingsLogger.warning("validate_openai_key_failed", appError.userMessage)
-        }
+        await aiProviderSettings.validateConnection()
     }
 
     func removeAPIKey() {
-        settingsStore.removeAPIKey()
-        apiKeyValidationState = .idle
-        settingsLogger.info("openai_key_removed", "The user removed the OpenAI API key.")
+        aiProviderSettings.removeCredential()
     }
 
     func validateGitHubConfiguration() async {
@@ -1102,7 +1177,13 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard settingsStore.hasAPIKey else {
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            setStatus(.error(compatibilityIssue), error: .transcriptionFailure(compatibilityIssue))
+            showSettingsWindow?()
+            return
+        }
+
+        guard settingsStore.hasUsableAIProviderCredential else {
             setStatus(.error(
                 session.transcriptionRecoveryMessage ?? AppError.missingAPIKey.userMessage
             ), error: .missingAPIKey)
@@ -1132,7 +1213,7 @@ final class AppState: ObservableObject {
         )
 
         do {
-            guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+            guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 throw AppError.missingAPIKey
             }
 
@@ -1420,7 +1501,7 @@ final class AppState: ObservableObject {
             )
 
             do {
-                guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+                guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                     throw AppError.missingAPIKey
                 }
 
@@ -1551,7 +1632,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+        guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
             presentError(AppError.missingAPIKey)
             return
         }
@@ -2108,7 +2189,11 @@ final class AppState: ObservableObject {
     }
 
     private func preflightForIssueExtraction(_ session: TranscriptSession) -> AppError? {
-        guard settingsStore.hasAPIKey else {
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            return .transcriptionFailure(compatibilityIssue)
+        }
+
+        guard settingsStore.hasUsableAIProviderCredential else {
             return .missingAPIKey
         }
 
@@ -2234,7 +2319,7 @@ final class AppState: ObservableObject {
             return currentTranscript.id
         }
 
-        return transcriptStore.sessions.first?.id
+        return transcriptStore.libraryEntries.first?.id
     }
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
@@ -2527,7 +2612,7 @@ final class AppState: ObservableObject {
             "launch_session_store_snapshot",
             "Captured the initial session library state at launch.",
             metadata: [
-                "stored_session_count": "\(transcriptStore.sessions.count)",
+                "stored_session_count": "\(transcriptStore.sessionCount)",
                 "selected_transcript_id": selectedTranscriptID?.uuidString ?? "none"
             ]
         )

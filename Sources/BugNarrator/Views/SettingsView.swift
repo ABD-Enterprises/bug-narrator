@@ -13,7 +13,7 @@ struct SettingsView: View {
                     Text("BugNarrator Settings")
                         .font(.title2.weight(.semibold))
 
-                    Text("Set up your OpenAI key, review workflow defaults, export destinations, and local diagnostics in one place.")
+                    Text("Set up your AI provider, review workflow defaults, export destinations, and local diagnostics in one place.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -22,37 +22,52 @@ struct SettingsView: View {
 
                 GroupBox("Before You Start") {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("BugNarrator requires your own OpenAI API key.")
+                        Text("BugNarrator requires your own AI provider configuration.")
                             .font(.headline)
 
-                        Text("BugNarrator does not ship with OpenAI access or bundled credits. Paste your own key below before you transcribe a session or run issue extraction.")
+                        Text("BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")
                             .foregroundStyle(.secondary)
 
-                        Text("Transcription and issue extraction use the OpenAI API and may incur charges on your OpenAI account.")
+                        Text("Transcription and issue extraction use the selected provider and may incur charges on that provider account.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                GroupBox("OpenAI Setup") {
+                GroupBox("AI Provider Setup") {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionIntro("Recording can start without a key, but transcription and issue extraction require your own OpenAI API key.")
+                        sectionIntro(settingsStore.aiProvider.setupDescription)
 
-                        labeledField(title: "OpenAI API Key") {
+                        labeledField(title: "AI Provider") {
+                            Picker("AI provider", selection: $settingsStore.aiProvider) {
+                                ForEach(AIProvider.allCases) { provider in
+                                    Text(provider.displayName)
+                                        .tag(provider)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .accessibilityLabel("AI provider")
+                        }
+
+                        labeledField(title: settingsStore.aiProvider.credentialFieldTitle) {
                             CredentialTokenField(
                                 placeholder: "sk-...",
                                 text: apiKeyBinding,
                                 isDisabled: secureControlsDisabled,
-                                accessibilityLabel: "OpenAI API Key"
+                                accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle
                             )
                         }
 
                         labeledField(title: "API Base URL") {
-                            TextField("https://api.openai.com", text: $settingsStore.openAIBaseURL)
+                            TextField(settingsStore.aiProvider.baseURLPlaceholder, text: $settingsStore.openAIBaseURL)
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(secureControlsDisabled)
-                                .accessibilityLabel("OpenAI API base URL")
+                                .accessibilityLabel("AI provider base URL")
                         }
+
+                        Text(settingsStore.aiProvider.baseURLHint)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
 
                         HStack(spacing: 12) {
                             Text(settingsStore.maskedAPIKey)
@@ -68,7 +83,7 @@ struct SettingsView: View {
                             }
                             .disabled(
                                 secureControlsDisabled ||
-                                (!settingsStore.hasAPIKey && settingsStore.apiKeyPersistenceState != .keychainLocked) ||
+                                (!settingsStore.hasAPIKey && settingsStore.aiProvider.requiresAPIKey && settingsStore.apiKeyPersistenceState != .keychainLocked) ||
                                 appState.apiKeyValidationState == .validating
                             )
 
@@ -84,6 +99,12 @@ struct SettingsView: View {
                                 .foregroundStyle(appState.apiKeyValidationState.isFailure ? .red : .green)
                         }
 
+                        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+                            Text(compatibilityIssue)
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
+
                         Text(settingsStore.apiKeyStorageDescription)
                             .font(.footnote)
                             .foregroundStyle(
@@ -94,7 +115,7 @@ struct SettingsView: View {
                                     : .secondary
                             )
 
-                        Text("BugNarrator stores the key in your macOS Keychain when available and never bundles it with the app or source code.")
+                        Text("BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -102,7 +123,7 @@ struct SettingsView: View {
 
                 GroupBox("Transcription Defaults") {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionIntro("Choose the default transcription model and optional hints BugNarrator sends to OpenAI.")
+                        sectionIntro("Choose the default transcription model and optional hints BugNarrator sends to the selected provider.")
 
                         labeledField(title: "Model") {
                             TextField("whisper-1", text: $settingsStore.preferredModel)
@@ -130,7 +151,7 @@ struct SettingsView: View {
                                 .accessibilityLabel("Transcription prompt")
                         }
 
-                        Text("Transcription uses the OpenAI audio transcription API. Keep prompt guidance short and use the language hint only when it improves recognition.")
+                        Text("Transcription uses the selected provider endpoint. Keep prompt guidance short and use the language hint only when it improves recognition.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -559,10 +580,10 @@ struct SettingsView: View {
 
             VStack(spacing: 8) {
                 settingsStatusRow(
-                    title: "OpenAI",
+                    title: settingsStore.aiProvider.statusTitle,
                     detail: "Transcription and issue extraction",
                     status: openAIReadiness,
-                    accessibilityLabel: "OpenAI status: \(openAIReadiness.title)"
+                    accessibilityLabel: "AI provider status: \(openAIReadiness.title)"
                 )
 
                 settingsStatusRow(
@@ -651,7 +672,7 @@ struct SettingsView: View {
 
     private var openAIReadiness: SettingsReadinessStatus {
         credentialStatus(
-            valueIsPresent: settingsStore.hasAPIKey,
+            valueIsPresent: settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil,
             persistenceState: settingsStore.apiKeyPersistenceState
         )
     }
@@ -731,8 +752,8 @@ struct SettingsView: View {
         }
 
         return settingsStore.apiKeyPersistenceState == .keychainLocked && !settingsStore.hasAPIKey
-            ? "Unlock Key"
-            : (settingsStore.apiKeyPersistenceState == .pendingSave ? "Save & Validate Key" : "Validate Key")
+            ? "Unlock Credential"
+            : (settingsStore.apiKeyPersistenceState == .pendingSave ? "Save & \(settingsStore.aiProvider.validationActionTitle)" : settingsStore.aiProvider.validationActionTitle)
     }
 
     private var gitHubValidationActionTitle: String {

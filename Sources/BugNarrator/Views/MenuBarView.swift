@@ -24,7 +24,7 @@ struct MenuBarView: View {
             }
             controlsSection
 
-            if !transcriptStore.sessions.isEmpty {
+            if !transcriptStore.libraryEntries.isEmpty {
                 sessionLibraryCard
             }
 

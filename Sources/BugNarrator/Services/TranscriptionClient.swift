@@ -343,7 +343,9 @@ actor TranscriptionClient: TranscriptionServing {
     func makeValidationRequest(apiKey: String, apiBaseURL: URL = URL(string: "https://api.openai.com")!) -> URLRequest {
         var request = URLRequest(url: endpoint(for: "v1/models", baseURL: apiBaseURL))
         request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         return request
     }
 
@@ -353,7 +355,9 @@ actor TranscriptionClient: TranscriptionServing {
         let boundary = "Boundary-\(UUID().uuidString)"
         var urlRequest = URLRequest(url: endpoint(for: "v1/audio/transcriptions", baseURL: request.apiBaseURL))
         urlRequest.httpMethod = "POST"
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try makeBody(fileURL: fileURL, request: request, boundary: boundary)
 

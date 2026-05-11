@@ -135,7 +135,7 @@ enum UITestRuntimeSupport {
         settingsStore.autoExtractIssues = true
         settingsStore.refreshSecretsForUserInitiatedAccess()
 
-        guard transcriptStore.sessions.isEmpty else {
+        guard transcriptStore.libraryEntries.isEmpty else {
             return
         }
 

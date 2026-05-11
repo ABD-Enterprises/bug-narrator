@@ -1,6 +1,109 @@
 import Combine
 import Foundation
 
+enum AIProvider: String, CaseIterable, Codable, Identifiable {
+    case openAI
+    case openAICompatible
+    case localCompatible
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .openAI:
+            return "OpenAI"
+        case .openAICompatible:
+            return "OpenAI-Compatible"
+        case .localCompatible:
+            return "Local-Compatible"
+        }
+    }
+
+    var setupDescription: String {
+        switch self {
+        case .openAI:
+            return "Use OpenAI-hosted transcription and issue extraction with your own API key."
+        case .openAICompatible:
+            return "Use an enterprise proxy or hosted provider that exposes OpenAI-compatible endpoints."
+        case .localCompatible:
+            return "Use a local or self-hosted endpoint such as LM Studio or Ollama when it exposes OpenAI-compatible APIs."
+        }
+    }
+
+    var baseURLPlaceholder: String {
+        switch self {
+        case .openAI:
+            return "https://api.openai.com"
+        case .openAICompatible:
+            return "https://gateway.example.com/openai"
+        case .localCompatible:
+            return "http://localhost:1234/v1"
+        }
+    }
+
+    var baseURLHint: String {
+        switch self {
+        case .openAI:
+            return "Leave blank to use the default OpenAI API endpoint."
+        case .openAICompatible:
+            return "Enter the enterprise or hosted OpenAI-compatible base URL."
+        case .localCompatible:
+            return "Enter the local-compatible base URL. BugNarrator will not assume api.openai.com for this provider."
+        }
+    }
+
+    var credentialFieldTitle: String {
+        switch self {
+        case .openAI:
+            return "OpenAI API Key"
+        case .openAICompatible:
+            return "Provider API Key"
+        case .localCompatible:
+            return "Provider API Key (Optional)"
+        }
+    }
+
+    var validationActionTitle: String {
+        switch self {
+        case .openAI:
+            return "Validate Key"
+        case .openAICompatible, .localCompatible:
+            return "Validate Connection"
+        }
+    }
+
+    var successMessage: String {
+        switch self {
+        case .openAI:
+            return "OpenAI accepted this key."
+        case .openAICompatible:
+            return "The OpenAI-compatible provider accepted this configuration."
+        case .localCompatible:
+            return "The local-compatible provider accepted this configuration."
+        }
+    }
+
+    var requiresAPIKey: Bool {
+        switch self {
+        case .openAI, .openAICompatible:
+            return true
+        case .localCompatible:
+            return false
+        }
+    }
+
+    var statusTitle: String {
+        switch self {
+        case .openAI:
+            return "OpenAI"
+        case .openAICompatible:
+            return "Compatible Provider"
+        case .localCompatible:
+            return "Local Provider"
+        }
+    }
+}
+
 final class SettingsStore: ObservableObject {
     static let defaultLegacyDefaultsDomains = [
         "com.abdenterprises.sessionmic"
@@ -25,6 +128,13 @@ final class SettingsStore: ObservableObject {
         didSet {
             guard hasLoaded else { return }
             defaults.set(openAIBaseURL, forKey: Keys.openAIBaseURL)
+        }
+    }
+
+    @Published var aiProvider: AIProvider = .openAI {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
         }
     }
 
@@ -250,29 +360,44 @@ final class SettingsStore: ObservableObject {
     }
 
     var apiKeyStorageDescription: String {
-        storageDescription(
-            for: apiKeyPersistenceState,
-            empty: "BugNarrator never ships with an OpenAI API key. Paste your own key to enable transcription."
-        )
+        if aiProvider.requiresAPIKey {
+            return storageDescription(
+                for: apiKeyPersistenceState,
+                empty: "BugNarrator never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
+            )
+        }
+
+        switch apiKeyPersistenceState {
+        case .empty:
+            return "Optional for local-compatible providers. Leave it blank if your endpoint does not require authentication."
+        default:
+            return storageDescription(
+                for: apiKeyPersistenceState,
+                empty: "Optional for local-compatible providers."
+            )
+        }
     }
 
     var openAIBaseURLValue: URL {
-        Self.normalizedOpenAIBaseURL(from: openAIBaseURL)
+        Self.normalizedOpenAIBaseURL(from: openAIBaseURL, provider: aiProvider)
     }
 
-    static func normalizedOpenAIBaseURL(from rawValue: String) -> URL {
+    static func normalizedOpenAIBaseURL(
+        from rawValue: String,
+        provider: AIProvider = .openAI
+    ) -> URL {
         let trimmedValue = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         guard !trimmedValue.isEmpty else {
-            return URL(string: "https://api.openai.com")!
+            return URL(string: provider.baseURLPlaceholder)!
         }
 
         let candidate = trimmedValue.contains("://") ? trimmedValue : "https://\(trimmedValue)"
         guard var components = URLComponents(string: candidate),
               components.host?.isEmpty == false else {
-            return URL(string: "https://api.openai.com")!
+            return URL(string: provider.baseURLPlaceholder)!
         }
 
         if components.scheme?.isEmpty != false {
@@ -283,7 +408,7 @@ final class SettingsStore: ObservableObject {
             components.path = ""
         }
 
-        return components.url ?? URL(string: "https://api.openai.com")!
+        return components.url ?? URL(string: provider.baseURLPlaceholder)!
     }
 
     var preferredModelValue: String {
@@ -309,6 +434,50 @@ final class SettingsStore: ObservableObject {
             value: trimmedAPIKey,
             persistenceState: apiKeyPersistenceState
         )
+    }
+
+    var hasUsableAIProviderCredential: Bool {
+        aiProvider.requiresAPIKey ? hasAPIKey : true
+    }
+
+    var aiProviderCompatibilityIssue: String? {
+        let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch aiProvider {
+        case .openAI:
+            return nil
+        case .openAICompatible:
+            if trimmedBaseURL.isEmpty {
+                return "Choose a non-default API base URL for the OpenAI-Compatible provider."
+            }
+            return nil
+        case .localCompatible:
+            if trimmedBaseURL.isEmpty {
+                return "Choose your local-compatible base URL before validating or transcribing."
+            }
+            if preferredModelValue == "whisper-1" {
+                return "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
+            }
+            if issueExtractionModelValue == "gpt-4.1-mini" {
+                return "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider."
+            }
+            return nil
+        }
+    }
+
+    func aiProviderCredentialForUserInitiatedAccess() -> String? {
+        let resolvedKey = openAIAPIKeyForUserInitiatedAccess()
+        let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if aiProvider.requiresAPIKey {
+            return resolvedKey
+        }
+
+        guard !trimmedBaseURL.isEmpty else {
+            return nil
+        }
+
+        return resolvedKey ?? ""
     }
 
     var trimmedGitHubToken: String {
@@ -606,6 +775,7 @@ final class SettingsStore: ObservableObject {
         )
 
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
+        aiProvider = AIProvider(rawValue: stringValue(forKey: Keys.aiProvider) ?? "") ?? .openAI
         openAIBaseURL = stringValue(forKey: Keys.openAIBaseURL) ?? ""
         languageHint = stringValue(forKey: Keys.languageHint) ?? ""
         transcriptionPrompt = stringValue(forKey: Keys.transcriptionPrompt) ?? ""
@@ -1333,8 +1503,9 @@ private enum SecretSlot: Hashable, CaseIterable {
     }
 }
 
-private enum Keys {
-    static let preferredModel = "settings.preferredModel"
+    private enum Keys {
+        static let aiProvider = "settings.aiProvider"
+        static let preferredModel = "settings.preferredModel"
     static let openAIBaseURL = "settings.openAIBaseURL"
     static let languageHint = "settings.languageHint"
     static let transcriptionPrompt = "settings.transcriptionPrompt"

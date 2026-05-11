@@ -23,7 +23,9 @@ final class TranscriptStoreTests: XCTestCase {
                 .appendingPathExtension("json")
         )
 
-        XCTAssertEqual(secondStore.sessions, [session])
+        XCTAssertTrue(secondStore.sessions.isEmpty)
+        XCTAssertEqual(secondStore.libraryEntries.map(\.id), [session.id])
+        XCTAssertEqual(secondStore.session(with: session.id), session)
         XCTAssertNil(sessionData.range(of: Data("Transcript 1".utf8)))
         XCTAssertTrue(FileManager.default.fileExists(atPath: rootDirectoryURL.appendingPathComponent("sessions.index.json").path))
         XCTAssertTrue(
@@ -69,7 +71,8 @@ final class TranscriptStoreTests: XCTestCase {
         let reloadedStore = TranscriptStore(storageURL: storageURL)
 
         XCTAssertEqual(removedSessions, [firstSession])
-        XCTAssertEqual(reloadedStore.sessions, [secondSession])
+        XCTAssertEqual(reloadedStore.libraryEntries.map(\.id), [secondSession.id])
+        XCTAssertEqual(reloadedStore.session(with: secondSession.id), secondSession)
         XCTAssertFalse(
             FileManager.default.fileExists(
                 atPath: rootDirectoryURL
@@ -92,7 +95,9 @@ final class TranscriptStoreTests: XCTestCase {
 
         let store = TranscriptStore(storageURL: storageURL)
 
-        XCTAssertEqual(store.sessions, [session])
+        XCTAssertTrue(store.sessions.isEmpty)
+        XCTAssertEqual(store.libraryEntries.map(\.id), [session.id])
+        XCTAssertEqual(store.session(with: session.id), session)
         XCTAssertTrue(FileManager.default.fileExists(atPath: rootDirectoryURL.appendingPathComponent("sessions.index.json").path))
     }
 
@@ -135,7 +140,9 @@ final class TranscriptStoreTests: XCTestCase {
 
         let recoveredStore = TranscriptStore(storageURL: storageURL)
 
-        XCTAssertEqual(recoveredStore.sessions, [session])
+        XCTAssertTrue(recoveredStore.sessions.isEmpty)
+        XCTAssertEqual(recoveredStore.libraryEntries.map(\.id), [session.id])
+        XCTAssertEqual(recoveredStore.session(with: session.id), session)
         XCTAssertEqual(
             recoveredStore.lastLoadRecoveryEvent,
             TranscriptStoreRecoveryEvent(source: .backup, recoveredSessionCount: 1)
@@ -205,7 +212,7 @@ final class TranscriptStoreTests: XCTestCase {
         try store.add(session)
 
         let reloadedStore = TranscriptStore(storageURL: storageURL)
-        let reloadedSession = try XCTUnwrap(reloadedStore.sessions.first)
+        let reloadedSession = try XCTUnwrap(reloadedStore.session(with: session.id))
 
         XCTAssertEqual(reloadedSession.pendingTranscription?.audioFileName, "recording.m4a")
         XCTAssertEqual(reloadedStore.libraryEntries.first?.isPendingTranscription, true)

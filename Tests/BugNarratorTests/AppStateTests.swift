@@ -99,7 +99,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .recording)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "Recording in progress. Add your OpenAI API key in Settings before stopping to transcribe this session."
+            "Recording in progress. Finish the AI provider setup in Settings before stopping to transcribe this session."
         )
         XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
         XCTAssertFalse(didOpenSettings)
@@ -492,7 +492,7 @@ final class AppStateTests: XCTestCase {
         await harness.appState.startSession()
         await harness.appState.captureScreenshot()
 
-        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.json")
+        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.index.json")
         try? FileManager.default.removeItem(at: storageURL)
         try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
 
@@ -1990,7 +1990,7 @@ final class AppStateTests: XCTestCase {
         try harness.transcriptStore.add(session)
         harness.appState.selectedTranscriptID = session.id
 
-        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.json")
+        let storageURL = harness.rootDirectoryURL.appendingPathComponent("sessions.index.json")
         try FileManager.default.removeItem(at: storageURL)
         try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
 

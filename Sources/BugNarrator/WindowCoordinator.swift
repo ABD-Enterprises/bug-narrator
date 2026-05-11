@@ -3,26 +3,33 @@ import SwiftUI
 
 @MainActor
 final class WindowCoordinator {
+    enum SceneID {
+        static let transcript = "transcript"
+        static let settings = "settings"
+        static let about = "about"
+        static let changelog = "changelog"
+        static let support = "support"
+    }
+
     private let appState: AppState
     private let transcriptStore: TranscriptStore
-    private let settingsStore: SettingsStore
 
-    private var transcriptWindowController: NSWindowController?
-    private var settingsWindowController: NSWindowController?
-    private var aboutWindowController: NSWindowController?
-    private var changelogWindowController: NSWindowController?
-    private var supportWindowController: NSWindowController?
     private var recordingControlWindowController: NSWindowController?
     private nonisolated(unsafe) var singleInstanceActivationObserver: NSObjectProtocol?
     private var shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
+    private var pendingSceneIDs: Set<String> = []
+    private var showTranscriptSceneAction: (() -> Void)?
+    private var showSettingsSceneAction: (() -> Void)?
+    private var showAboutSceneAction: (() -> Void)?
+    private var showChangelogSceneAction: (() -> Void)?
+    private var showSupportSceneAction: (() -> Void)?
 
     private let recordingControlSize = NSSize(width: 336, height: 220)
     private let recordingControlAutosaveName = "BugNarratorRecordingControlsWindow"
 
-    init(appState: AppState, transcriptStore: TranscriptStore, settingsStore: SettingsStore) {
+    init(appState: AppState, transcriptStore: TranscriptStore, settingsStore _: SettingsStore) {
         self.appState = appState
         self.transcriptStore = transcriptStore
-        self.settingsStore = settingsStore
 
         singleInstanceActivationObserver = DistributedNotificationCenter.default().addObserver(
             forName: SingleInstanceController.activationNotificationName,
@@ -41,103 +48,44 @@ final class WindowCoordinator {
         }
     }
 
-    func showTranscriptWindow() {
-        if let transcriptWindowController {
-            present(transcriptWindowController)
-            return
+    func configureSceneActions(
+        showTranscript: @escaping () -> Void,
+        showSettings: @escaping () -> Void,
+        showAbout: @escaping () -> Void,
+        showChangelog: @escaping () -> Void,
+        showSupport: @escaping () -> Void
+    ) {
+        showTranscriptSceneAction = showTranscript
+        showSettingsSceneAction = showSettings
+        showAboutSceneAction = showAbout
+        showChangelogSceneAction = showChangelog
+        showSupportSceneAction = showSupport
+
+        let pendingSceneIDs = self.pendingSceneIDs
+        self.pendingSceneIDs.removeAll()
+        for sceneID in pendingSceneIDs {
+            openScene(id: sceneID)
         }
+    }
 
-        let rootView = TranscriptView(
-            appState: appState,
-            recordingTimer: appState.recordingTimer,
-            transcriptStore: transcriptStore
-        )
-        let windowController = NSWindowController(
-            window: makeWindow(
-                title: "BugNarrator Sessions",
-                size: NSSize(width: 1120, height: 720),
-                rootView: rootView
-            )
-        )
-
-        transcriptWindowController = windowController
-        present(windowController)
+    func showTranscriptWindow() {
+        openScene(id: SceneID.transcript)
     }
 
     func showSettingsWindow() {
-        if let settingsWindowController {
-            present(settingsWindowController)
-            return
-        }
-
-        let rootView = SettingsView(appState: appState, settingsStore: settingsStore)
-        let windowController = NSWindowController(
-            window: makeWindow(
-                title: "BugNarrator Settings",
-                size: NSSize(width: 760, height: 900),
-                rootView: rootView
-            )
-        )
-
-        settingsWindowController = windowController
-        present(windowController)
+        openScene(id: SceneID.settings)
     }
 
     func showAboutWindow() {
-        if let aboutWindowController {
-            present(aboutWindowController)
-            return
-        }
-
-        let rootView = AboutBugNarratorView(appState: appState)
-        let windowController = NSWindowController(
-            window: makeWindow(
-                title: "About BugNarrator",
-                size: NSSize(width: 620, height: 720),
-                rootView: rootView
-            )
-        )
-
-        aboutWindowController = windowController
-        present(windowController)
+        openScene(id: SceneID.about)
     }
 
     func showChangelogWindow() {
-        if let changelogWindowController {
-            present(changelogWindowController)
-            return
-        }
-
-        let rootView = ChangelogView(appState: appState)
-        let windowController = NSWindowController(
-            window: makeWindow(
-                title: "What’s New",
-                size: NSSize(width: 760, height: 760),
-                rootView: rootView
-            )
-        )
-
-        changelogWindowController = windowController
-        present(windowController)
+        openScene(id: SceneID.changelog)
     }
 
     func showSupportWindow() {
-        if let supportWindowController {
-            present(supportWindowController)
-            return
-        }
-
-        let rootView = SupportView(appState: appState)
-        let windowController = NSWindowController(
-            window: makeWindow(
-                title: "Support BugNarrator",
-                size: NSSize(width: 520, height: 460),
-                rootView: rootView
-            )
-        )
-
-        supportWindowController = windowController
-        present(windowController)
+        openScene(id: SceneID.support)
     }
 
     func showRecordingControlWindow() {
@@ -163,18 +111,7 @@ final class WindowCoordinator {
             return
         }
 
-        if let visibleWindowController = [
-            transcriptWindowController,
-            settingsWindowController,
-            aboutWindowController,
-            changelogWindowController,
-            supportWindowController
-        ].compactMap({ $0 }).first(where: { $0.window?.isVisible == true }) {
-            present(visibleWindowController)
-            return
-        }
-
-        if !transcriptStore.sessions.isEmpty || appState.currentTranscript != nil {
+        if !transcriptStore.libraryEntries.isEmpty || appState.currentTranscript != nil {
             showTranscriptWindow()
         } else {
             showSettingsWindow()
@@ -256,6 +193,31 @@ final class WindowCoordinator {
 
         shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
         window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func openScene(id: String) {
+        let action: (() -> Void)? = switch id {
+        case SceneID.transcript:
+            showTranscriptSceneAction
+        case SceneID.settings:
+            showSettingsSceneAction
+        case SceneID.about:
+            showAboutSceneAction
+        case SceneID.changelog:
+            showChangelogSceneAction
+        case SceneID.support:
+            showSupportSceneAction
+        default:
+            nil
+        }
+
+        guard let action else {
+            pendingSceneIDs.insert(id)
+            return
+        }
+
+        action()
         NSApp.activate(ignoringOtherApps: true)
     }
 
