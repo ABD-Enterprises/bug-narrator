@@ -5,6 +5,19 @@ struct TranscriptionRequest: Sendable {
     let model: String
     let languageHint: String?
     let prompt: String?
+    let apiBaseURL: URL
+
+    init(
+        model: String,
+        languageHint: String?,
+        prompt: String?,
+        apiBaseURL: URL = URL(string: "https://api.openai.com")!
+    ) {
+        self.model = model
+        self.languageHint = languageHint
+        self.prompt = prompt
+        self.apiBaseURL = apiBaseURL
+    }
 }
 
 struct TranscriptionResult: Sendable {
@@ -30,8 +43,6 @@ struct TranscriptionSegment: Decodable, Sendable {
 }
 
 actor TranscriptionClient: TranscriptionServing {
-    private let endpoint = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
-    private let validationEndpoint = URL(string: "https://api.openai.com/v1/models")!
     private let session: URLSession
     private let fileManager: FileManager
     private let transcriptionChunker: any TranscriptionChunking
@@ -291,8 +302,8 @@ actor TranscriptionClient: TranscriptionServing {
         }
     }
 
-    func validateAPIKey(_ apiKey: String) async throws {
-        let request = makeValidationRequest(apiKey: apiKey)
+    func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws {
+        let request = makeValidationRequest(apiKey: apiKey, apiBaseURL: apiBaseURL)
         logger.info("openai_key_validation_requested", "Validating the OpenAI API key.")
 
         do {
@@ -325,8 +336,12 @@ actor TranscriptionClient: TranscriptionServing {
         }
     }
 
-    func makeValidationRequest(apiKey: String) -> URLRequest {
-        var request = URLRequest(url: validationEndpoint)
+    func validateAPIKey(_ apiKey: String) async throws {
+        try await validateAPIKey(apiKey, apiBaseURL: URL(string: "https://api.openai.com")!)
+    }
+
+    func makeValidationRequest(apiKey: String, apiBaseURL: URL = URL(string: "https://api.openai.com")!) -> URLRequest {
+        var request = URLRequest(url: endpoint(for: "v1/models", baseURL: apiBaseURL))
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         return request
@@ -336,7 +351,7 @@ actor TranscriptionClient: TranscriptionServing {
         _ = try validateAudioFile(at: fileURL)
 
         let boundary = "Boundary-\(UUID().uuidString)"
-        var urlRequest = URLRequest(url: endpoint)
+        var urlRequest = URLRequest(url: endpoint(for: "v1/audio/transcriptions", baseURL: request.apiBaseURL))
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -465,6 +480,14 @@ actor TranscriptionClient: TranscriptionServing {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
         body.append("\(value)\r\n".data(using: .utf8)!)
+    }
+
+    private func endpoint(for path: String, baseURL: URL) -> URL {
+        path
+            .split(separator: "/")
+            .reduce(baseURL) { url, component in
+                url.appendingPathComponent(String(component))
+            }
     }
 
     private func mimeType(for fileURL: URL) -> String {

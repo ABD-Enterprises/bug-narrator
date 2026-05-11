@@ -81,7 +81,8 @@ final class SettingsStoreTests: XCTestCase {
             launchAtLoginService: launchAtLoginService
         )
 
-        XCTAssertEqual(secondStore.apiKey, "persisted-api-key")
+        XCTAssertEqual(secondStore.apiKey, "")
+        XCTAssertEqual(secondStore.openAIAPIKeyForUserInitiatedAccess(), "persisted-api-key")
         XCTAssertEqual(secondStore.preferredModel, "whisper-1")
         XCTAssertEqual(secondStore.languageHint, "en")
         XCTAssertEqual(secondStore.transcriptionPrompt, "Focus on bugs.")
@@ -191,6 +192,17 @@ final class SettingsStoreTests: XCTestCase {
         store.apiKey = "fixture-openai-key-1234"
 
         XCTAssertEqual(store.maskedAPIKey, "••••••••1234")
+    }
+
+    func testOpenAIBaseURLNormalizesEnterpriseEndpoint() {
+        XCTAssertEqual(
+            SettingsStore.normalizedOpenAIBaseURL(from: "proxy.example.com/openai/").absoluteString,
+            "https://proxy.example.com/openai"
+        )
+        XCTAssertEqual(
+            SettingsStore.normalizedOpenAIBaseURL(from: "").absoluteString,
+            "https://api.openai.com"
+        )
     }
 
     func testSettingsLoadFromLegacyDefaultsDomain() throws {
@@ -437,7 +449,8 @@ final class SettingsStoreTests: XCTestCase {
 
         let store = SettingsStore(defaults: defaults, keychainService: keychain)
 
-        XCTAssertEqual(store.apiKey, "legacy-api-key")
+        XCTAssertEqual(store.apiKey, "")
+        XCTAssertEqual(store.openAIAPIKeyForUserInitiatedAccess(), "legacy-api-key")
         XCTAssertEqual(
             keychain.values["BugNarrator.OpenAI::openai-api-key"],
             "legacy-api-key"
@@ -493,9 +506,10 @@ final class SettingsStoreTests: XCTestCase {
         )
         XCTAssertNil(keychain.values["BugNarrator.OpenAI::openai-api-key"])
 
-        store.refreshOpenAISecretForUserInitiatedAccess()
+        let resolvedAPIKey = store.openAIAPIKeyForUserInitiatedAccess()
 
-        XCTAssertEqual(store.apiKey, "legacy-api-key")
+        XCTAssertEqual(resolvedAPIKey, "legacy-api-key")
+        XCTAssertEqual(store.apiKey, "")
         XCTAssertTrue(
             keychain.readRequests.contains {
                 $0.service == "SessionMic.OpenAI" && $0.allowInteraction

@@ -40,10 +40,17 @@ struct SettingsView: View {
                         labeledField(title: "OpenAI API Key") {
                             CredentialTokenField(
                                 placeholder: "sk-...",
-                                text: $settingsStore.apiKey,
+                                text: apiKeyBinding,
                                 isDisabled: secureControlsDisabled,
                                 accessibilityLabel: "OpenAI API Key"
                             )
+                        }
+
+                        labeledField(title: "API Base URL") {
+                            TextField("https://api.openai.com", text: $settingsStore.openAIBaseURL)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(secureControlsDisabled)
+                                .accessibilityLabel("OpenAI API base URL")
                         }
 
                         HStack(spacing: 12) {
@@ -492,6 +499,23 @@ struct SettingsView: View {
                     }
                 }
 
+                GroupBox("Privacy") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Export or remove local session data without exposing stored credentials.")
+
+                        HStack(spacing: 12) {
+                            Button("Export Data") {
+                                appState.exportPrivacyData()
+                            }
+                            .disabled(secureControlsDisabled)
+
+                            Text("Creates a local JSON export of BugNarrator sessions. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 if secureControlsDisabled {
                     Text("Credential changes are disabled while recording, transcription, extraction, or export is in progress.")
                         .font(.footnote)
@@ -591,6 +615,13 @@ struct SettingsView: View {
 
     private var secureControlsDisabled: Bool {
         appState.status.phase == .recording || appState.status.phase == .transcribing
+    }
+
+    private var apiKeyBinding: Binding<String> {
+        Binding(
+            get: { settingsStore.apiKey },
+            set: { settingsStore.apiKey = $0 }
+        )
     }
 
     private var openAIReadiness: SettingsReadinessStatus {

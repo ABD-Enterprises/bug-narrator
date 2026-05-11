@@ -47,7 +47,11 @@ final class WindowCoordinator {
             return
         }
 
-        let rootView = TranscriptView(appState: appState, transcriptStore: transcriptStore)
+        let rootView = TranscriptView(
+            appState: appState,
+            recordingTimer: appState.recordingTimer,
+            transcriptStore: transcriptStore
+        )
         let windowController = NSWindowController(
             window: makeWindow(
                 title: "BugNarrator Sessions",
@@ -180,6 +184,7 @@ final class WindowCoordinator {
     private func makeRecordingControlWindowController() -> NSWindowController {
         let rootView = RecordingControlPanelView(
             appState: appState,
+            recordingTimer: appState.recordingTimer,
             onStartSession: { [weak self] in
                 self?.handleRecordingControlStart()
             },

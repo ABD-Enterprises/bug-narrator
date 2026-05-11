@@ -13,6 +13,7 @@ func normalizedOptionalIssueText(_ value: String) -> String? {
 
 struct TranscriptView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var recordingTimer: RecordingTimerViewModel
     @ObservedObject var transcriptStore: TranscriptStore
 
     @State private var exportErrorMessage: String?
@@ -738,7 +739,7 @@ struct TranscriptView: View {
                     Label("Recording is active", systemImage: "record.circle.fill")
                         .foregroundStyle(.red)
 
-                    Text(appState.elapsedTimeString)
+                    Text(recordingTimer.elapsedTimeString)
                         .font(.system(.footnote, design: .monospaced))
                         .fontWeight(.semibold)
                         .foregroundStyle(.secondary)

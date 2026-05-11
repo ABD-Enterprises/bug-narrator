@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RecordingControlPanelView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var recordingTimer: RecordingTimerViewModel
 
     let onStartSession: () -> Void
     let onStopSession: () -> Void
@@ -80,7 +81,7 @@ struct RecordingControlPanelView: View {
                 Spacer()
 
                 if appState.status.phase == .recording {
-                    Text(appState.elapsedTimeString)
+                    Text(recordingTimer.elapsedTimeString)
                         .font(.system(.body, design: .monospaced))
                         .fontWeight(.semibold)
                 }
@@ -340,7 +341,7 @@ struct RecordingControlPanelView: View {
         var components = [statusHeadline]
 
         if appState.status.phase == .recording {
-            components.append("Elapsed time \(appState.elapsedTimeString)")
+            components.append("Elapsed time \(recordingTimer.elapsedTimeString)")
         }
 
         components.append(statusMessage)

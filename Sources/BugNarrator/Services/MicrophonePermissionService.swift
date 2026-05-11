@@ -149,7 +149,11 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
     private let permissionAccess: any MicrophonePermissionAccessing
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
 
-    init(permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess()) {
+    init() {
+        self.permissionAccess = SystemMicrophonePermissionAccess()
+    }
+
+    init(permissionAccess: any MicrophonePermissionAccessing) {
         self.permissionAccess = permissionAccess
     }
 

@@ -8,14 +8,33 @@ final class TranscriptStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
 
         let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
-        let firstStore = TranscriptStore(storageURL: storageURL)
+        let keychain = MockKeychainService()
+        let protector = KeychainSessionDataProtector(keychainService: keychain)
+        let firstStore = TranscriptStore(storageURL: storageURL, sessionDataProtector: protector)
         let session = makeSampleTranscriptSession(index: 1)
 
         try firstStore.add(session)
 
-        let secondStore = TranscriptStore(storageURL: storageURL)
+        let secondStore = TranscriptStore(storageURL: storageURL, sessionDataProtector: protector)
+        let sessionData = try Data(
+            contentsOf: rootDirectoryURL
+                .appendingPathComponent("Sessions", isDirectory: true)
+                .appendingPathComponent(session.id.uuidString)
+                .appendingPathExtension("json")
+        )
 
         XCTAssertEqual(secondStore.sessions, [session])
+        XCTAssertNil(sessionData.range(of: Data("Transcript 1".utf8)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: rootDirectoryURL.appendingPathComponent("sessions.index.json").path))
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: rootDirectoryURL
+                    .appendingPathComponent("Sessions", isDirectory: true)
+                    .appendingPathComponent(session.id.uuidString)
+                    .appendingPathExtension("json")
+                    .path
+            )
+        )
     }
 
     func testTranscriptStoreKeepsMostRecentFiveHundredSessions() throws {
@@ -51,41 +70,56 @@ final class TranscriptStoreTests: XCTestCase {
 
         XCTAssertEqual(removedSessions, [firstSession])
         XCTAssertEqual(reloadedStore.sessions, [secondSession])
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: rootDirectoryURL
+                    .appendingPathComponent("Sessions", isDirectory: true)
+                    .appendingPathComponent(firstSession.id.uuidString)
+                    .appendingPathExtension("json")
+                    .path
+            )
+        )
     }
 
-    func testTranscriptStoreRollsBackInMemoryAddWhenPersistFails() throws {
+    func testTranscriptStoreMigratesLegacyMonolithicSessionsOnLoad() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        let data = try JSONEncoder().encode([session])
+        try data.write(to: storageURL, options: [.atomic])
+
+        let store = TranscriptStore(storageURL: storageURL)
+
+        XCTAssertEqual(store.sessions, [session])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: rootDirectoryURL.appendingPathComponent("sessions.index.json").path))
+    }
+
+    func testTranscriptStoreReportsFailedRecoveryWhenPartitionedIndexIsCorrupt() throws {
         let rootDirectoryURL = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
 
         let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
         let store = TranscriptStore(storageURL: storageURL)
-        let firstSession = makeSampleTranscriptSession(index: 1)
-        let secondSession = makeSampleTranscriptSession(index: 2)
+        try store.add(makeSampleTranscriptSession(index: 1))
 
-        try store.add(firstSession)
-        try FileManager.default.removeItem(at: storageURL)
-        try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+        try Data("not-json".utf8).write(
+            to: rootDirectoryURL.appendingPathComponent("sessions.index.json"),
+            options: [.atomic]
+        )
+        try Data("not-json".utf8).write(
+            to: rootDirectoryURL.appendingPathComponent("sessions.index.backup.json"),
+            options: [.atomic]
+        )
 
-        XCTAssertThrowsError(try store.add(secondSession))
-        XCTAssertEqual(store.sessions, [firstSession])
-    }
+        let reloadedStore = TranscriptStore(storageURL: storageURL)
 
-    func testTranscriptStoreRollsBackRemovalWhenPersistFails() throws {
-        let rootDirectoryURL = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
-
-        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
-        let store = TranscriptStore(storageURL: storageURL)
-        let firstSession = makeSampleTranscriptSession(index: 1)
-        let secondSession = makeSampleTranscriptSession(index: 2)
-
-        try store.add(firstSession)
-        try store.add(secondSession)
-        try FileManager.default.removeItem(at: storageURL)
-        try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
-
-        XCTAssertThrowsError(try store.removeSessions(withIDs: [firstSession.id]))
-        XCTAssertEqual(store.sessions, [secondSession, firstSession])
+        XCTAssertTrue(reloadedStore.sessions.isEmpty)
+        XCTAssertEqual(
+            reloadedStore.lastLoadRecoveryEvent,
+            TranscriptStoreRecoveryEvent(source: .failed, recoveredSessionCount: 0)
+        )
     }
 
     func testTranscriptStoreRecoversFromBackupWhenPrimaryFileIsCorrupt() throws {
@@ -93,11 +127,11 @@ final class TranscriptStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
 
         let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
-        let store = TranscriptStore(storageURL: storageURL)
+        let backupURL = storageURL.deletingPathExtension().appendingPathExtension("backup.json")
         let session = makeSampleTranscriptSession(index: 1)
 
-        try store.add(session)
         try Data("not-json".utf8).write(to: storageURL, options: [.atomic])
+        try JSONEncoder().encode([session]).write(to: backupURL, options: [.atomic])
 
         let recoveredStore = TranscriptStore(storageURL: storageURL)
 

@@ -3,7 +3,6 @@ import Foundation
 actor IssueExtractionService: IssueExtracting {
     static let defaultTimeoutDuration: Duration = .seconds(10)
 
-    private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let session: URLSession
     private let timeoutDuration: Duration
     private let logger = DiagnosticsLogger(category: .transcription)
@@ -23,7 +22,8 @@ actor IssueExtractionService: IssueExtracting {
     func extractIssues(
         from reviewSession: TranscriptSession,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL = URL(string: "https://api.openai.com")!
     ) async throws -> IssueExtractionResult {
         logger.info(
             "issue_extraction_request_started",
@@ -37,7 +37,7 @@ actor IssueExtractionService: IssueExtracting {
         )
         do {
             let request = try Self.makeRequest(
-                endpoint: endpoint,
+                endpoint: Self.endpoint(for: "v1/chat/completions", baseURL: apiBaseURL),
                 reviewSession: reviewSession,
                 apiKey: apiKey,
                 model: model
@@ -197,6 +197,14 @@ actor IssueExtractionService: IssueExtracting {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         return request
+    }
+
+    private static func endpoint(for path: String, baseURL: URL) -> URL {
+        path
+            .split(separator: "/")
+            .reduce(baseURL) { url, component in
+                url.appendingPathComponent(String(component))
+            }
     }
 
     private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {

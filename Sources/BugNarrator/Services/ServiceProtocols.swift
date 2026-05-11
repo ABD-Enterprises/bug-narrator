@@ -128,7 +128,7 @@ protocol ScreenCapturePermissionServicing {
 
 protocol TranscriptionServing: Sendable {
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult
-    func validateAPIKey(_ apiKey: String) async throws
+    func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws
 }
 
 protocol HotkeyManaging: AnyObject {
@@ -154,7 +154,8 @@ protocol IssueExtracting: Sendable {
     func extractIssues(
         from reviewSession: TranscriptSession,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExtractionResult
 }
 
@@ -186,7 +187,8 @@ protocol IssueExporting: Sendable {
         session: TranscriptSession,
         configuration: GitHubExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview
 
     func prepareJiraExportReview(
@@ -194,7 +196,8 @@ protocol IssueExporting: Sendable {
         session: TranscriptSession,
         configuration: JiraExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview
 
     func exportToGitHub(

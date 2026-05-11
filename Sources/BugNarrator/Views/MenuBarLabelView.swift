@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MenuBarLabelView: View {
     let status: AppStatus
-    let elapsedTime: String
+    @ObservedObject var recordingTimer: RecordingTimerViewModel
 
     var body: some View {
         HStack(spacing: 6) {
@@ -34,7 +34,7 @@ struct MenuBarLabelView: View {
             }
 
             if status.phase == .recording {
-                Text(elapsedTime)
+                Text(recordingTimer.elapsedTimeString)
                     .monospacedDigit()
             }
         }
@@ -61,7 +61,7 @@ struct MenuBarLabelView: View {
         case .idle:
             return "BugNarrator idle"
         case .recording:
-            return "BugNarrator recording, elapsed time \(elapsedTime)"
+            return "BugNarrator recording, elapsed time \(recordingTimer.elapsedTimeString)"
         case .transcribing:
             return "BugNarrator transcribing"
         case .success:

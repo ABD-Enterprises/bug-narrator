@@ -4,6 +4,7 @@ struct MenuBarView: View {
     @Environment(\.dismiss) private var dismiss
 
     @ObservedObject var appState: AppState
+    @ObservedObject var recordingTimer: RecordingTimerViewModel
     @ObservedObject var transcriptStore: TranscriptStore
 
     @State private var isOptionKeyPressed = false
@@ -93,7 +94,7 @@ struct MenuBarView: View {
 
                         Spacer()
 
-                        Text(appState.elapsedTimeString)
+                        Text(recordingTimer.elapsedTimeString)
                             .font(.system(.body, design: .monospaced))
                             .fontWeight(.semibold)
                     }

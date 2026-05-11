@@ -104,6 +104,7 @@ enum UITestRuntimeSupport {
             artifactsService: SessionArtifactsService(rootDirectoryURL: artifactsRootURL),
             clipboardService: UITestClipboardService(),
             urlHandler: UITestURLHandler(),
+            recordingTimer: RecordingTimerViewModel(),
             runtimeEnvironment: runtimeEnvironment
         )
     }
@@ -315,7 +316,7 @@ private actor UITestTranscriptionClient: TranscriptionServing {
         )
     }
 
-    func validateAPIKey(_ apiKey: String) async throws {}
+    func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws {}
 }
 
 private final class UITestHotkeyManager: HotkeyManaging {
@@ -354,7 +355,8 @@ private actor UITestIssueExtractionService: IssueExtracting {
     func extractIssues(
         from reviewSession: TranscriptSession,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExtractionResult {
         IssueExtractionResult(
             summary: "UI test extraction completed.",
@@ -419,7 +421,8 @@ private actor UITestIssueExportService: IssueExporting {
         session: TranscriptSession,
         configuration: GitHubExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview {
         IssueExportReview(
             destination: .github,
@@ -433,7 +436,8 @@ private actor UITestIssueExportService: IssueExporting {
         session: TranscriptSession,
         configuration: JiraExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview {
         IssueExportReview(
             destination: .jira,

@@ -122,9 +122,16 @@ struct BugNarratorApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(appState: appState, transcriptStore: transcriptStore)
+            MenuBarView(
+                appState: appState,
+                recordingTimer: appState.recordingTimer,
+                transcriptStore: transcriptStore
+            )
         } label: {
-            MenuBarLabelView(status: appState.status, elapsedTime: appState.elapsedTimeString)
+            MenuBarLabelView(
+                status: appState.status,
+                recordingTimer: appState.recordingTimer
+            )
         }
         .menuBarExtraStyle(.window)
     }

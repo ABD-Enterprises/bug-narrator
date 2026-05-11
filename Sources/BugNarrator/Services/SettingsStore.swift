@@ -8,7 +8,11 @@ final class SettingsStore: ObservableObject {
 
     private let logger = DiagnosticsLogger(category: .settings)
 
-    @Published var apiKey: String = "" {
+    var apiKey: String = "" {
+        willSet {
+            guard hasLoaded, apiKey != newValue else { return }
+            objectWillChange.send()
+        }
         didSet {
             guard hasLoaded else { return }
             secretDidChange(.openAI)
@@ -16,6 +20,13 @@ final class SettingsStore: ObservableObject {
     }
 
     @Published private(set) var jiraEmailPersistenceState: APIKeyPersistenceState = .empty
+
+    @Published var openAIBaseURL: String = "" {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(openAIBaseURL, forKey: Keys.openAIBaseURL)
+        }
+    }
 
     @Published var preferredModel: String = "whisper-1" {
         didSet {
@@ -245,6 +256,36 @@ final class SettingsStore: ObservableObject {
         )
     }
 
+    var openAIBaseURLValue: URL {
+        Self.normalizedOpenAIBaseURL(from: openAIBaseURL)
+    }
+
+    static func normalizedOpenAIBaseURL(from rawValue: String) -> URL {
+        let trimmedValue = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        guard !trimmedValue.isEmpty else {
+            return URL(string: "https://api.openai.com")!
+        }
+
+        let candidate = trimmedValue.contains("://") ? trimmedValue : "https://\(trimmedValue)"
+        guard var components = URLComponents(string: candidate),
+              components.host?.isEmpty == false else {
+            return URL(string: "https://api.openai.com")!
+        }
+
+        if components.scheme?.isEmpty != false {
+            components.scheme = "https"
+        }
+
+        if components.path == "/" {
+            components.path = ""
+        }
+
+        return components.url ?? URL(string: "https://api.openai.com")!
+    }
+
     var preferredModelValue: String {
         let value = preferredModel.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? "whisper-1" : value
@@ -264,7 +305,10 @@ final class SettingsStore: ObservableObject {
     }
 
     var hasAPIKey: Bool {
-        !trimmedAPIKey.isEmpty
+        credentialIsAvailableForUserAction(
+            value: trimmedAPIKey,
+            persistenceState: apiKeyPersistenceState
+        )
     }
 
     var trimmedGitHubToken: String {
@@ -508,6 +552,25 @@ final class SettingsStore: ObservableObject {
         prepareSecretsForUserInitiatedAccess(slots: [.openAI], includeLegacyServices: true)
     }
 
+    func openAIAPIKeyForUserInitiatedAccess() -> String? {
+        let pendingValue = hasPendingSecretChanges(for: .openAI) ? trimmedAPIKey : ""
+        prepareSecretsForUserInitiatedAccess(slots: [.openAI], includeLegacyServices: true)
+
+        if !pendingValue.isEmpty {
+            apiKey = ""
+            return pendingValue
+        }
+
+        let secret = loadSecret(
+            for: .openAI,
+            allowInteraction: true,
+            includeLegacyServices: true
+        )
+        setPersistenceState(secret.state, for: .openAI)
+
+        return secret.value.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
     func refreshExportSecretsForUserInitiatedAccess() {
         logger.debug("refresh_export_secrets", "Refreshing export credentials after a user-initiated action.")
         prepareSecretsForUserInitiatedAccess(
@@ -543,6 +606,7 @@ final class SettingsStore: ObservableObject {
         )
 
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
+        openAIBaseURL = stringValue(forKey: Keys.openAIBaseURL) ?? ""
         languageHint = stringValue(forKey: Keys.languageHint) ?? ""
         transcriptionPrompt = stringValue(forKey: Keys.transcriptionPrompt) ?? ""
         issueExtractionModel = stringValue(
@@ -618,7 +682,7 @@ final class SettingsStore: ObservableObject {
 
             switch slot {
             case .openAI:
-                apiKey = secret.value
+                apiKey = secret.state == .sessionOnly ? secret.value : ""
                 setPersistenceState(secret.state, for: slot)
             case .github:
                 githubToken = secret.value
@@ -631,7 +695,7 @@ final class SettingsStore: ObservableObject {
                 setPersistenceState(secret.state, for: slot)
             }
 
-            committedSecrets[slot] = secret.value
+            committedSecrets[slot] = slot == .openAI && secret.state == .keychain ? "" : secret.value
             committedSecretStates[slot] = secret.state
         }
 
@@ -881,7 +945,7 @@ final class SettingsStore: ObservableObject {
                 "A secure value was saved to Keychain.",
                 metadata: ["slot": slot.redactionSafeName]
             )
-            committedSecrets[slot] = trimmedValue
+            committedSecrets[slot] = slot == .openAI ? "" : trimmedValue
             committedSecretStates[slot] = .keychain
             return .keychain
         } catch {
@@ -1016,7 +1080,14 @@ final class SettingsStore: ObservableObject {
         lockedPlaceholder: String
     ) -> String {
         guard !secret.isEmpty else {
-            return persistenceState == .keychainLocked ? lockedPlaceholder : emptyPlaceholder
+            switch persistenceState {
+            case .keychain:
+                return "Saved key"
+            case .keychainLocked:
+                return lockedPlaceholder
+            default:
+                return emptyPlaceholder
+            }
         }
 
         let suffixCount = min(4, secret.count)
@@ -1030,7 +1101,11 @@ final class SettingsStore: ObservableObject {
     ) {
         let pendingSlots = slots.filter(hasPendingSecretChanges)
         for slot in pendingSlots {
-            setPersistenceState(persistSecret(currentSecretValue(for: slot), for: slot), for: slot)
+            let state = persistSecret(currentSecretValue(for: slot), for: slot)
+            setPersistenceState(state, for: slot)
+            if slot == .openAI, state == .keychain {
+                apiKey = ""
+            }
         }
 
         let reloadableSlots = slots.filter {
@@ -1260,6 +1335,7 @@ private enum SecretSlot: Hashable, CaseIterable {
 
 private enum Keys {
     static let preferredModel = "settings.preferredModel"
+    static let openAIBaseURL = "settings.openAIBaseURL"
     static let languageHint = "settings.languageHint"
     static let transcriptionPrompt = "settings.transcriptionPrompt"
     static let issueExtractionModel = "settings.issueExtractionModel"

@@ -7,7 +7,6 @@ final class AppState: ObservableObject {
     @Published private(set) var status: AppStatus = .idle()
     @Published private(set) var currentError: AppError?
     @Published private(set) var transientToast: TransientToast?
-    @Published private(set) var elapsedDuration: TimeInterval = 0
     @Published var showDiscardConfirmation = false
     @Published var currentTranscript: TranscriptSession?
     @Published var selectedTranscriptID: UUID?
@@ -23,6 +22,7 @@ final class AppState: ObservableObject {
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
     let trackerIntegration: TrackerIntegrationController
+    let recordingTimer: RecordingTimerViewModel
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -48,6 +48,8 @@ final class AppState: ObservableObject {
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
     private let debugBundleExporter = DebugBundleExporter()
+    private let privacyDataExporter = PrivacyDataExporter()
+    private let telemetryRecorder = OperationalTelemetryRecorder()
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
@@ -57,7 +59,6 @@ final class AppState: ObservableObject {
     private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    private var timerTask: Task<Void, Never>?
     private var processActivity: NSObjectProtocol?
     private var pendingRecordedAudio: RecordedAudio?
     private var cancellables = Set<AnyCancellable>()
@@ -108,26 +109,68 @@ final class AppState: ObservableObject {
         trackerIntegration.jiraIssueTypeMetadataIsStale
     }
 
+    convenience init(
+        settingsStore: SettingsStore,
+        transcriptStore: TranscriptStore,
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
+    ) {
+        self.init(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            services: .production(),
+            runtimeEnvironment: runtimeEnvironment
+        )
+    }
+
+    convenience init(
+        settingsStore: SettingsStore,
+        transcriptStore: TranscriptStore,
+        services: AppServiceContainer,
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
+    ) {
+        self.init(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            audioRecorder: services.audioRecorder,
+            microphonePermissionService: services.microphonePermissionService,
+            screenCapturePermissionService: services.screenCapturePermissionService,
+            transcriptionClient: services.transcriptionClient,
+            hotkeyManager: services.hotkeyManager,
+            screenshotCaptureService: services.screenshotCaptureService,
+            screenshotSelectionService: services.screenshotSelectionService,
+            issueExtractionService: services.issueExtractionService,
+            exportService: services.exportService,
+            recoveredRecordingImporter: services.recoveredRecordingImporter,
+            artifactsService: services.artifactsService,
+            clipboardService: services.clipboardService,
+            urlHandler: services.urlHandler,
+            recordingTimer: services.recordingTimer,
+            runtimeEnvironment: runtimeEnvironment
+        )
+    }
+
     init(
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
-        audioRecorder: AudioRecording = AudioRecorder(),
-        microphonePermissionService: any MicrophonePermissionServicing = MicrophonePermissionService(),
-        screenCapturePermissionService: any ScreenCapturePermissionServicing = ScreenCapturePermissionService(),
-        transcriptionClient: any TranscriptionServing = TranscriptionClient(),
-        hotkeyManager: any HotkeyManaging = HotkeyManager(),
-        screenshotCaptureService: any ScreenshotCapturing = ScreenshotCaptureService(),
-        screenshotSelectionService: any ScreenshotSelecting = ScreenshotSelectionService(),
-        issueExtractionService: any IssueExtracting = IssueExtractionService(),
-        exportService: any IssueExporting = ExportService(),
-        recoveredRecordingImporter: any RecoveredRecordingImporting = RecoveredRecordingImporter(),
-        artifactsService: any SessionArtifactsManaging = SessionArtifactsService(),
-        clipboardService: any ClipboardWriting = SystemClipboardService(),
-        urlHandler: any URLOpening = WorkspaceURLHandler(),
+        audioRecorder: AudioRecording,
+        microphonePermissionService: any MicrophonePermissionServicing,
+        screenCapturePermissionService: any ScreenCapturePermissionServicing,
+        transcriptionClient: any TranscriptionServing,
+        hotkeyManager: any HotkeyManaging,
+        screenshotCaptureService: any ScreenshotCapturing,
+        screenshotSelectionService: any ScreenshotSelecting,
+        issueExtractionService: any IssueExtracting,
+        exportService: any IssueExporting,
+        recoveredRecordingImporter: any RecoveredRecordingImporting,
+        artifactsService: any SessionArtifactsManaging,
+        clipboardService: any ClipboardWriting,
+        urlHandler: any URLOpening,
+        recordingTimer: RecordingTimerViewModel,
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
     ) {
         self.settingsStore = settingsStore
         self.transcriptStore = transcriptStore
+        self.recordingTimer = recordingTimer
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
@@ -187,13 +230,6 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        settingsStore.$apiKey
-            .removeDuplicates()
-            .sink { [weak self] _ in
-                self?.apiKeyValidationState = .idle
-            }
-            .store(in: &cancellables)
-
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
                 self?.refreshPermissionRecoveryState()
@@ -227,7 +263,11 @@ final class AppState: ObservableObject {
     }
 
     var elapsedTimeString: String {
-        ElapsedTimeFormatter.string(from: elapsedDuration)
+        recordingTimer.elapsedTimeString
+    }
+
+    var elapsedDuration: TimeInterval {
+        recordingTimer.elapsedDuration
     }
 
     var activeTimelineMomentCount: Int {
@@ -491,7 +531,7 @@ final class AppState: ObservableObject {
             do {
                 try await audioRecorder.startRecording()
                 pendingRecordedAudio = nil
-                elapsedDuration = 0
+                recordingTimer.stop(resetElapsed: true)
                 activeRecordingSession = RecordingSessionDraft(
                     sessionID: sessionID,
                     artifactsDirectoryURL: artifactsDirectoryURL
@@ -507,6 +547,10 @@ final class AppState: ObservableObject {
                         "session_id": sessionID.uuidString,
                         "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no"
                     ]
+                )
+                telemetryRecorder.record(
+                    "recording_started",
+                    metadata: ["has_openai_key": settingsStore.hasAPIKey ? "yes" : "no"]
                 )
             } catch {
                 artifactsService.removeArtifactsDirectory(at: artifactsDirectoryURL)
@@ -557,7 +601,7 @@ final class AppState: ObservableObject {
             let recordedAudio = try await audioRecorder.stopRecording()
             pendingRecordedAudio = recordedAudio
 
-            guard settingsStore.hasAPIKey else {
+            guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
                 preserveRetryableSession(
                     from: recordingSession,
                     recordedAudio: recordedAudio,
@@ -572,7 +616,7 @@ final class AppState: ObservableObject {
 
             let transcriptionResult = try await transcriptionClient.transcribe(
                 fileURL: recordedAudio.fileURL,
-                apiKey: settingsStore.trimmedAPIKey,
+                apiKey: apiKey,
                 request: request
             )
 
@@ -605,6 +649,14 @@ final class AppState: ObservableObject {
                     "session_id": session.id.uuidString,
                     "marker_count": "\(session.markerCount)",
                     "screenshot_count": "\(session.screenshotCount)"
+                ]
+            )
+            telemetryRecorder.record(
+                "transcription_completed",
+                metadata: [
+                    "marker_count": "\(session.markerCount)",
+                    "screenshot_count": "\(session.screenshotCount)",
+                    "model": request.model
                 ]
             )
 
@@ -644,8 +696,9 @@ final class AppState: ObservableObject {
                 do {
                     let extraction = try await issueExtractionService.extractIssues(
                         from: session,
-                        apiKey: settingsStore.trimmedAPIKey,
-                        model: settingsStore.issueExtractionModelValue
+                        apiKey: apiKey,
+                        model: settingsStore.issueExtractionModelValue,
+                        apiBaseURL: settingsStore.openAIBaseURLValue
                     )
                     session.issueExtraction = extraction
                     try persistUpdatedSession(session)
@@ -881,14 +934,35 @@ final class AppState: ObservableObject {
         }
     }
 
+    func exportPrivacyData() {
+        do {
+            guard let bundleURL = try privacyDataExporter.export(sessions: transcriptStore.sessions) else {
+                return
+            }
+
+            sessionLibraryLogger.info(
+                "privacy_data_exported",
+                "Exported a local privacy data bundle.",
+                metadata: ["session_count": "\(transcriptStore.sessions.count)"]
+            )
+            telemetryRecorder.record(
+                "privacy_data_exported",
+                metadata: ["session_count": "\(transcriptStore.sessions.count)"]
+            )
+            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
+            setStatus(.success("Data export created. API keys and tracker credentials were not included."))
+        } catch {
+            let appError = (error as? AppError) ?? .exportFailure("BugNarrator could not create the data export.")
+            presentError(appError)
+        }
+    }
+
     func validateAPIKey() async {
         guard !isValidatingAPIKey else {
             return
         }
 
-        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
-
-        guard settingsStore.hasAPIKey else {
+        guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
             settingsLogger.warning("validate_openai_key_rejected", "OpenAI key validation was requested without a saved key.")
             apiKeyValidationState = .failure(AppError.missingAPIKey.userMessage)
             showSettingsWindow?()
@@ -900,7 +974,10 @@ final class AppState: ObservableObject {
         defer { isValidatingAPIKey = false }
 
         do {
-            try await transcriptionClient.validateAPIKey(settingsStore.trimmedAPIKey)
+            try await transcriptionClient.validateAPIKey(
+                apiKey,
+                apiBaseURL: settingsStore.openAIBaseURLValue
+            )
             apiKeyValidationState = .success("OpenAI accepted this key.")
             settingsLogger.info("validate_openai_key_succeeded", "The OpenAI API key validation flow succeeded.")
         } catch {
@@ -1021,9 +1098,13 @@ final class AppState: ObservableObject {
         )
 
         do {
+            guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+                throw AppError.missingAPIKey
+            }
+
             let result = try await transcriptionClient.transcribe(
                 fileURL: audioFileURL,
-                apiKey: settingsStore.trimmedAPIKey,
+                apiKey: apiKey,
                 request: request
             )
 
@@ -1067,8 +1148,9 @@ final class AppState: ObservableObject {
                 do {
                     let extraction = try await issueExtractionService.extractIssues(
                         from: updatedSession,
-                        apiKey: settingsStore.trimmedAPIKey,
-                        model: settingsStore.issueExtractionModelValue
+                        apiKey: apiKey,
+                        model: settingsStore.issueExtractionModelValue,
+                        apiBaseURL: settingsStore.openAIBaseURLValue
                     )
                     updatedSession.issueExtraction = extraction
                     try persistUpdatedSession(updatedSession)
@@ -1293,8 +1375,6 @@ final class AppState: ObservableObject {
             return
         }
 
-        settingsStore.refreshOpenAISecretForUserInitiatedAccess()
-
         guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
             issueExtractionSessionID = transcriptSession.id
             setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
@@ -1306,10 +1386,15 @@ final class AppState: ObservableObject {
             )
 
             do {
+                guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
+                    throw AppError.missingAPIKey
+                }
+
                 let extraction = try await issueExtractionService.extractIssues(
                     from: transcriptSession,
-                    apiKey: settingsStore.trimmedAPIKey,
-                    model: settingsStore.issueExtractionModelValue
+                    apiKey: apiKey,
+                    model: settingsStore.issueExtractionModelValue,
+                    apiBaseURL: settingsStore.openAIBaseURLValue
                 )
 
                 var updatedSession = transcriptSession
@@ -1432,7 +1517,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard settingsStore.hasAPIKey else {
+        guard let apiKey = settingsStore.openAIAPIKeyForUserInitiatedAccess() else {
             presentError(AppError.missingAPIKey)
             return
         }
@@ -1464,8 +1549,9 @@ final class AppState: ObservableObject {
                         issues: group.issues,
                         session: currentSession,
                         configuration: group.configuration,
-                        apiKey: settingsStore.trimmedAPIKey,
-                        model: settingsStore.issueExtractionModelValue
+                        apiKey: apiKey,
+                        model: settingsStore.issueExtractionModelValue,
+                        apiBaseURL: settingsStore.openAIBaseURLValue
                     )
                     items.append(contentsOf: groupReview.items)
                 }
@@ -1481,8 +1567,9 @@ final class AppState: ObservableObject {
                         issues: group.issues,
                         session: currentSession,
                         configuration: group.configuration,
-                        apiKey: settingsStore.trimmedAPIKey,
-                        model: settingsStore.issueExtractionModelValue
+                        apiKey: apiKey,
+                        model: settingsStore.issueExtractionModelValue,
+                        apiBaseURL: settingsStore.openAIBaseURLValue
                     )
                     items.append(contentsOf: groupReview.items)
                 }
@@ -1673,24 +1760,11 @@ final class AppState: ObservableObject {
     }
 
     private func startTimer() {
-        timerTask?.cancel()
-        let startDate = Date()
-
-        timerTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                self?.elapsedDuration = Date().timeIntervalSince(startDate)
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
+        recordingTimer.start()
     }
 
     private func stopTimer(resetElapsed: Bool) {
-        timerTask?.cancel()
-        timerTask = nil
-
-        if resetElapsed {
-            elapsedDuration = 0
-        }
+        recordingTimer.stop(resetElapsed: resetElapsed)
     }
 
     private func beginActivity(reason: String) {
@@ -1804,7 +1878,8 @@ final class AppState: ObservableObject {
         TranscriptionRequest(
             model: settingsStore.preferredModelValue,
             languageHint: settingsStore.normalizedLanguageHint,
-            prompt: settingsStore.normalizedPrompt
+            prompt: settingsStore.normalizedPrompt,
+            apiBaseURL: settingsStore.openAIBaseURLValue
         )
     }
 

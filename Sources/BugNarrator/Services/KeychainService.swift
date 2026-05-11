@@ -33,6 +33,20 @@ final class KeychainService: KeychainServicing {
         return query
     }
 
+    static func makeWriteQuery(
+        forService service: String,
+        account: String,
+        data: Data
+    ) -> [CFString: Any] {
+        [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecValueData: data
+        ]
+    }
+
     func string(forService service: String, account: String, allowInteraction: Bool) throws -> String? {
         if Self.shouldBypassSystemKeychain() {
             return nil
@@ -84,8 +98,11 @@ final class KeychainService: KeychainServicing {
         case errSecSuccess:
             return
         case errSecItemNotFound:
-            var addQuery = query
-            addQuery[kSecValueData] = data
+            let addQuery = Self.makeWriteQuery(
+                forService: service,
+                account: account,
+                data: data
+            )
 
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else {

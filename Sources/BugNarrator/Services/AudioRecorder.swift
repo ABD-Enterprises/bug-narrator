@@ -21,7 +21,15 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     private var isCancelling = false
 
     init(
-        permissionAccess: any MicrophonePermissionAccessing = SystemMicrophonePermissionAccess(),
+        recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+    ) {
+        self.permissionAccess = SystemMicrophonePermissionAccess()
+        self.recoveryDirectoryURL = recoveryDirectoryURL
+    }
+
+    init(
+        permissionAccess: any MicrophonePermissionAccessing,
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
             .appendingPathComponent("RecoveredRecordings", isDirectory: true)
     ) {

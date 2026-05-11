@@ -60,7 +60,11 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
     private let permissionAccess: any ScreenCapturePermissionAccessing
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
 
-    init(permissionAccess: any ScreenCapturePermissionAccessing = SystemScreenCapturePermissionAccess()) {
+    init() {
+        self.permissionAccess = SystemScreenCapturePermissionAccess()
+    }
+
+    init(permissionAccess: any ScreenCapturePermissionAccessing) {
         self.permissionAccess = permissionAccess
     }
 

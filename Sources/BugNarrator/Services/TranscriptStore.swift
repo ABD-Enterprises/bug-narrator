@@ -27,10 +27,19 @@ final class TranscriptStore: ObservableObject {
     private let decoder = JSONDecoder()
     private let storageURL: URL
     private let backupStorageURL: URL
+    private let indexURL: URL
+    private let backupIndexURL: URL
+    private let sessionsDirectoryURL: URL
+    private let sessionDataProtector: any SessionDataProtecting
     private var sessionLookup: [UUID: TranscriptSession] = [:]
 
-    init(fileManager: FileManager = .default, storageURL: URL? = nil) {
+    init(
+        fileManager: FileManager = .default,
+        storageURL: URL? = nil,
+        sessionDataProtector: (any SessionDataProtecting)? = nil
+    ) {
         self.fileManager = fileManager
+        self.sessionDataProtector = sessionDataProtector ?? SessionDataProtectorFactory.automatic()
 
         if let storageURL {
             self.storageURL = storageURL
@@ -39,6 +48,9 @@ final class TranscriptStore: ObservableObject {
             self.storageURL = appSupportDirectory.appendingPathComponent("sessions.json")
         }
         self.backupStorageURL = Self.makeBackupURL(for: self.storageURL)
+        self.indexURL = self.storageURL.deletingLastPathComponent().appendingPathComponent("sessions.index.json")
+        self.backupIndexURL = self.storageURL.deletingLastPathComponent().appendingPathComponent("sessions.index.backup.json")
+        self.sessionsDirectoryURL = self.storageURL.deletingLastPathComponent().appendingPathComponent("Sessions", isDirectory: true)
 
         load()
     }
@@ -106,12 +118,41 @@ final class TranscriptStore: ObservableObject {
     }
 
     private func load() {
-        if let storedSessions = loadSessions(from: storageURL) {
+        if let storedSessions = loadPartitionedSessions(from: indexURL) {
             replaceState(with: normalizedSessions(storedSessions))
             lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
-                "Loaded session history from primary storage.",
+                "Loaded partitioned session history from primary storage.",
+                metadata: ["session_count": "\(sessions.count)"]
+            )
+            return
+        }
+
+        if let backupSessions = loadPartitionedSessions(from: backupIndexURL) {
+            let normalizedBackupSessions = normalizedSessions(backupSessions)
+            replaceState(with: normalizedBackupSessions)
+            try? persist(normalizedBackupSessions)
+            lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
+                source: .backup,
+                recoveredSessionCount: normalizedBackupSessions.count
+            )
+            logger.warning(
+                "session_store_recovered_from_backup",
+                "Recovered partitioned session history from the backup index after the primary index failed to load.",
+                metadata: ["session_count": "\(sessions.count)"]
+            )
+            return
+        }
+
+        if let storedSessions = loadSessions(from: storageURL) {
+            let normalizedStoredSessions = normalizedSessions(storedSessions)
+            replaceState(with: normalizedStoredSessions)
+            try? persist(normalizedStoredSessions)
+            lastLoadRecoveryEvent = nil
+            logger.info(
+                "session_store_loaded",
+                "Loaded legacy session history from primary storage and migrated it to partitioned storage.",
                 metadata: ["session_count": "\(sessions.count)"]
             )
             return
@@ -143,14 +184,37 @@ final class TranscriptStore: ObservableObject {
     }
 
     private func persist(_ sessions: [TranscriptSession]) throws {
-        let parentDirectoryURL = storageURL.deletingLastPathComponent()
+        let parentDirectoryURL = indexURL.deletingLastPathComponent()
         if !fileManager.fileExists(atPath: parentDirectoryURL.path) {
             try fileManager.createDirectory(at: parentDirectoryURL, withIntermediateDirectories: true)
         }
+        if !fileManager.fileExists(atPath: sessionsDirectoryURL.path) {
+            try fileManager.createDirectory(at: sessionsDirectoryURL, withIntermediateDirectories: true)
+        }
 
-        let data = try encoder.encode(sessions)
-        try data.write(to: storageURL, options: [.atomic])
-        try? data.write(to: backupStorageURL, options: [.atomic])
+        let normalizedIDs = Set(sessions.map(\.id))
+        for session in sessions {
+            let data = try sessionDataProtector.protect(encoder.encode(session))
+            try data.write(to: sessionFileURL(for: session.id), options: [.atomic])
+        }
+
+        let index = TranscriptStoreIndex(sessionIDs: sessions.map(\.id))
+        let indexData = try encoder.encode(index)
+        try indexData.write(to: indexURL, options: [.atomic])
+        try? indexData.write(to: backupIndexURL, options: [.atomic])
+
+        if let fileURLs = try? fileManager.contentsOfDirectory(
+            at: sessionsDirectoryURL,
+            includingPropertiesForKeys: nil
+        ) {
+            for fileURL in fileURLs where fileURL.pathExtension == "json" {
+                let rawID = fileURL.deletingPathExtension().lastPathComponent
+                guard let id = UUID(uuidString: rawID), !normalizedIDs.contains(id) else {
+                    continue
+                }
+                try? fileManager.removeItem(at: fileURL)
+            }
+        }
     }
 
     private func loadSessions(from url: URL) -> [TranscriptSession]? {
@@ -166,6 +230,30 @@ final class TranscriptStore: ObservableObject {
                 "session_store_decode_failed",
                 "Session history could not be decoded from disk.",
                 metadata: ["file": url.lastPathComponent]
+            )
+            return nil
+        }
+    }
+
+    private func loadPartitionedSessions(from indexURL: URL) -> [TranscriptSession]? {
+        guard fileManager.fileExists(atPath: indexURL.path) else {
+            return nil
+        }
+
+        do {
+            let indexData = try Data(contentsOf: indexURL)
+            let index = try decoder.decode(TranscriptStoreIndex.self, from: indexData)
+            let sessions = try index.sessionIDs.map { id in
+                let data = try Data(contentsOf: sessionFileURL(for: id))
+                let unprotectedData = try sessionDataProtector.unprotect(data)
+                return try decoder.decode(TranscriptSession.self, from: unprotectedData)
+            }
+            return sessions
+        } catch {
+            logger.warning(
+                "session_store_partitioned_decode_failed",
+                "Partitioned session history could not be decoded from disk.",
+                metadata: ["file": indexURL.lastPathComponent]
             )
             return nil
         }
@@ -197,6 +285,20 @@ final class TranscriptStore: ObservableObject {
 
     private static func makeBackupURL(for storageURL: URL) -> URL {
         storageURL.deletingPathExtension().appendingPathExtension("backup.json")
+    }
+
+    private func sessionFileURL(for id: UUID) -> URL {
+        sessionsDirectoryURL.appendingPathComponent(id.uuidString).appendingPathExtension("json")
+    }
+}
+
+private struct TranscriptStoreIndex: Codable {
+    let version: Int
+    let sessionIDs: [UUID]
+
+    init(version: Int = 1, sessionIDs: [UUID]) {
+        self.version = version
+        self.sessionIDs = sessionIDs
     }
 }
 

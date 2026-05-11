@@ -168,6 +168,25 @@ final class TranscriptionClientTests: XCTestCase {
         try await client.validateAPIKey("fixture-openai-key")
     }
 
+    func testCustomAPIBaseURLIsUsedForRequests() async throws {
+        let fileURL = try makeAudioFile(named: "custom-base-url", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+        let request = try await client.makeURLRequest(
+            fileURL: fileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(
+                model: "whisper-1",
+                languageHint: nil,
+                prompt: nil,
+                apiBaseURL: URL(string: "https://proxy.example.com/openai")!
+            )
+        )
+
+        XCTAssertEqual(request.url?.absoluteString, "https://proxy.example.com/openai/v1/audio/transcriptions")
+    }
+
     func testValidateAPIKeyMapsRevokedKeyResponse() async throws {
         MockURLProtocol.requestHandler = { request in
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 401, httpVersion: nil, headerFields: nil)!

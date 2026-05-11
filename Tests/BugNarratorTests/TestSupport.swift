@@ -138,7 +138,7 @@ actor MockTranscriptionClient: TranscriptionServing {
         return try queuedResults.removeFirst().get()
     }
 
-    func validateAPIKey(_ apiKey: String) async throws {
+    func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws {
         validationCallCount += 1
 
         if validationResults.isEmpty {
@@ -241,7 +241,8 @@ actor MockIssueExtractionService: IssueExtracting {
     func extractIssues(
         from reviewSession: TranscriptSession,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExtractionResult {
         result
     }
@@ -436,7 +437,8 @@ actor MockExportService: IssueExporting {
         session: TranscriptSession,
         configuration: GitHubExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview {
         gitHubReviewCallCount += 1
         gitHubReviewConfigurations.append(configuration)
@@ -457,7 +459,8 @@ actor MockExportService: IssueExporting {
         session: TranscriptSession,
         configuration: JiraExportConfiguration,
         apiKey: String,
-        model: String
+        model: String,
+        apiBaseURL: URL
     ) async throws -> IssueExportReview {
         jiraReviewCallCount += 1
         jiraReviewConfigurations.append(configuration)
@@ -774,6 +777,7 @@ struct AppStateHarness {
             artifactsService: artifactsService,
             clipboardService: clipboardService,
             urlHandler: urlHandler,
+            recordingTimer: RecordingTimerViewModel(),
             runtimeEnvironment: runtimeEnvironment
         )
     }

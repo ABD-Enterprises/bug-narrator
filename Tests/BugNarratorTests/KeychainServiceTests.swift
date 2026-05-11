@@ -37,4 +37,18 @@ final class KeychainServiceTests: XCTestCase {
         XCTAssertNil(query[kSecUseAuthenticationContext])
         XCTAssertNil(query[kSecUseAuthenticationUI])
     }
+
+    func testWriteQueryRestrictsSecretToUnlockedLocalDevice() {
+        let data = Data("fixture-key".utf8)
+        let query = KeychainService.makeWriteQuery(
+            forService: "BugNarrator.OpenAI",
+            account: "openai-api-key",
+            data: data
+        )
+
+        XCTAssertEqual(query[kSecAttrService] as? String, "BugNarrator.OpenAI")
+        XCTAssertEqual(query[kSecAttrAccount] as? String, "openai-api-key")
+        XCTAssertEqual(query[kSecAttrAccessible] as? String, kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+        XCTAssertEqual(query[kSecValueData] as? Data, data)
+    }
 }
