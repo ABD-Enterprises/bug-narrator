@@ -175,7 +175,10 @@ final class TranscriptStore: ObservableObject {
         }
 
         replaceState(with: [])
-        if fileManager.fileExists(atPath: storageURL.path) {
+        if fileManager.fileExists(atPath: storageURL.path) ||
+            fileManager.fileExists(atPath: indexURL.path) ||
+            fileManager.fileExists(atPath: backupStorageURL.path) ||
+            fileManager.fileExists(atPath: backupIndexURL.path) {
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(source: .failed, recoveredSessionCount: 0)
         } else {
             lastLoadRecoveryEvent = nil
