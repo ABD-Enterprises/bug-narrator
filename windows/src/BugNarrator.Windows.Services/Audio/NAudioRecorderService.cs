@@ -16,7 +16,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
         CleanupRecorder();
     }
 
-    public Task StartAsync(string audioFilePath, CancellationToken cancellationToken = default)
+    public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -32,7 +32,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
             waveInEvent = new WaveInEvent
             {
                 BufferMilliseconds = 125,
-                DeviceNumber = 0,
+                DeviceNumber = deviceNumber,
                 WaveFormat = new WaveFormat(16000, 16, 1),
             };
             waveInEvent.DataAvailable += OnDataAvailable;

@@ -14,6 +14,7 @@ namespace BugNarrator.Windows.Shell;
 
 public sealed class WindowCoordinator
 {
+    private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ICompletedSessionStore completedSessionStore;
     private readonly WindowsDiagnostics diagnostics;
     private readonly IRecordingLifecycleService recordingLifecycleService;
@@ -36,8 +37,10 @@ public sealed class WindowCoordinator
         IWindowsAppSettingsStore settingsStore,
         IWindowsGlobalHotkeyService hotkeyService,
         ISecretStore secretStore,
-        ITranscriptionClient transcriptionClient)
+        ITranscriptionClient transcriptionClient,
+        IAudioInputDeviceCatalog audioInputDeviceCatalog)
     {
+        this.audioInputDeviceCatalog = audioInputDeviceCatalog;
         this.diagnostics = diagnostics;
         this.recordingLifecycleService = recordingLifecycleService;
         this.completedSessionStore = completedSessionStore;
@@ -105,6 +108,18 @@ public sealed class WindowCoordinator
         ShowAndActivate(recordingControlsWindow);
     }
 
+    public void ToggleRecordingControls()
+    {
+        if (recordingControlsWindow is { IsLoaded: true, IsVisible: true } && recordingControlsWindow.IsActive)
+        {
+            recordingControlsWindow.Hide();
+            diagnostics.Info("windows", "recording controls window hidden from tray");
+            return;
+        }
+
+        ShowRecordingControls();
+    }
+
     public void ShowSessionLibrary()
     {
         if (sessionLibraryWindow is null || !sessionLibraryWindow.IsLoaded)
@@ -133,7 +148,8 @@ public sealed class WindowCoordinator
                 secretStore,
                 transcriptionClient,
                 hotkeyService,
-                diagnostics);
+                diagnostics,
+                audioInputDeviceCatalog);
             settingsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "settings window closed");

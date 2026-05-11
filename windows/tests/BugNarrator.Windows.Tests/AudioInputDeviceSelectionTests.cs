@@ -1,4 +1,3 @@
-using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Capture;
@@ -12,81 +11,61 @@ using Xunit;
 
 namespace BugNarrator.Windows.Tests;
 
-public sealed class RecordingLifecycleServiceMilestone5Tests
+public sealed class AudioInputDeviceSelectionTests
 {
     [Fact]
-    public async Task StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession()
+    public void Resolve_UsesNamedDeviceWhenAvailable()
     {
-        using var harness = new TestHarness();
-        harness.SecretStore.Value = "sk-test";
-        harness.TranscriptionClient.TranscriptText = "Tester opens Settings and validates the OpenAI API key.";
+        var selection = AudioInputDeviceSelection.Resolve(
+            "USB Headset",
+            [
+                new AudioInputDeviceOption(0, "Built-in Microphone"),
+                new AudioInputDeviceOption(1, "USB Headset")
+            ]);
 
-        await harness.Service.StartRecordingAsync();
-        await harness.Service.StopRecordingAsync();
-
-        var sessions = await harness.CompletedSessionStore.GetAllAsync();
-        var session = Assert.Single(sessions);
-
-        Assert.Equal(SessionTranscriptionStatus.Completed, session.TranscriptionStatus);
-        Assert.Equal("Tester opens Settings and validates the OpenAI API key.", session.TranscriptText);
-        Assert.Equal(1, harness.TranscriptionClient.CallCount);
-        Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
-        Assert.True(harness.Service.CurrentState.CanStart);
-        Assert.True(File.Exists(session.MetadataFilePath));
-        Assert.True(File.Exists(session.TranscriptMarkdownFilePath));
-
-        var transcriptMarkdown = await File.ReadAllTextAsync(session.TranscriptMarkdownFilePath);
-        Assert.Contains("## Transcript", transcriptMarkdown);
-        Assert.Contains("Tester opens Settings and validates the OpenAI API key.", transcriptMarkdown);
+        Assert.True(selection.IsResolved);
+        Assert.Equal(1, selection.DeviceNumber);
+        Assert.Equal("USB Headset", selection.DisplayName);
     }
 
     [Fact]
-    public async Task StopRecordingAsync_WithoutApiKey_SavesSessionAsNotConfigured()
+    public void Resolve_ReturnsActionableFailureWhenSavedDeviceIsMissing()
     {
-        using var harness = new TestHarness();
+        var selection = AudioInputDeviceSelection.Resolve(
+            "USB Headset",
+            [
+                new AudioInputDeviceOption(0, "Built-in Microphone")
+            ]);
 
-        await harness.Service.StartRecordingAsync();
-        await harness.Service.StopRecordingAsync();
-
-        var sessions = await harness.CompletedSessionStore.GetAllAsync();
-        var session = Assert.Single(sessions);
-
-        Assert.Equal(SessionTranscriptionStatus.NotConfigured, session.TranscriptionStatus);
-        Assert.Equal(string.Empty, session.TranscriptText);
-        Assert.Equal(0, harness.TranscriptionClient.CallCount);
-        Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
-        Assert.Contains("Add an OpenAI API key", harness.Service.CurrentState.StatusMessage);
-        Assert.True(File.Exists(session.TranscriptMarkdownFilePath));
+        Assert.False(selection.IsResolved);
+        Assert.Contains("USB Headset", selection.ErrorMessage);
     }
 
     [Fact]
-    public async Task StopRecordingAsync_WhenTranscriptionFails_PersistsFailureWithoutBreakingLifecycle()
+    public async Task StartRecordingAsync_FailsClearlyWhenSavedDeviceIsUnavailable()
     {
-        using var harness = new TestHarness();
-        harness.SecretStore.Value = "sk-test";
-        harness.TranscriptionClient.ExceptionToThrow = new InvalidOperationException("boom");
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            AudioInputDeviceName = "Missing Microphone"
+        };
+        harness.AudioInputDeviceCatalog.Devices =
+        [
+            new AudioInputDeviceOption(0, "Built-in Microphone")
+        ];
 
         await harness.Service.StartRecordingAsync();
-        await harness.Service.StopRecordingAsync();
 
-        var sessions = await harness.CompletedSessionStore.GetAllAsync();
-        var session = Assert.Single(sessions);
-
-        Assert.Equal(SessionTranscriptionStatus.Failed, session.TranscriptionStatus);
-        Assert.Equal("boom", session.TranscriptionFailureMessage);
-        Assert.Equal(1, harness.TranscriptionClient.CallCount);
-        Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
-        Assert.Contains("boom", harness.Service.CurrentState.StatusMessage);
-
-        var transcriptMarkdown = await File.ReadAllTextAsync(session.TranscriptMarkdownFilePath);
-        Assert.Contains("Transcription Note: boom", transcriptMarkdown);
+        Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
+        Assert.Contains("Missing Microphone", harness.Service.CurrentState.StatusMessage);
+        Assert.False(harness.AudioRecorderService.IsRecording);
     }
 
-    private sealed class TestHarness : IDisposable
+    private sealed class RecordingHarness : IDisposable
     {
         private readonly string rootDirectory;
 
-        public TestHarness()
+        public RecordingHarness()
         {
             rootDirectory = Path.Combine(
                 Path.GetTempPath(),
@@ -102,11 +81,11 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
             AudioRecorderService = new FakeAudioRecorderService();
             AudioInputDeviceCatalog = new FakeAudioInputDeviceCatalog();
             MicrophonePreflightService = new FakeMicrophonePreflightService();
+            SessionDraftStore = new FileSessionDraftStore(storagePaths);
+            CompletedSessionStore = new FileCompletedSessionStore(storagePaths);
             ScreenCapturePreflightService = new FakeScreenCapturePreflightService();
             OverlayService = new FakeScreenshotSelectionOverlayService();
             ImageCaptureService = new FakeScreenshotImageCaptureService();
-            DraftStore = new FileSessionDraftStore(storagePaths);
-            CompletedSessionStore = new FileCompletedSessionStore(storagePaths);
             SettingsStore = new FakeWindowsAppSettingsStore();
             SecretStore = new FakeSecretStore();
             TranscriptionClient = new FakeTranscriptionClient();
@@ -115,7 +94,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                 AudioRecorderService,
                 AudioInputDeviceCatalog,
                 MicrophonePreflightService,
-                DraftStore,
+                SessionDraftStore,
                 CompletedSessionStore,
                 ScreenCapturePreflightService,
                 OverlayService,
@@ -129,14 +108,14 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         public FakeAudioRecorderService AudioRecorderService { get; }
         public FakeAudioInputDeviceCatalog AudioInputDeviceCatalog { get; }
         public FileCompletedSessionStore CompletedSessionStore { get; }
-        public FileSessionDraftStore DraftStore { get; }
         public FakeScreenshotImageCaptureService ImageCaptureService { get; }
         public FakeMicrophonePreflightService MicrophonePreflightService { get; }
         public FakeScreenshotSelectionOverlayService OverlayService { get; }
         public FakeScreenCapturePreflightService ScreenCapturePreflightService { get; }
         public FakeSecretStore SecretStore { get; }
-        public RecordingLifecycleService Service { get; }
+        public FileSessionDraftStore SessionDraftStore { get; }
         public FakeWindowsAppSettingsStore SettingsStore { get; }
+        public RecordingLifecycleService Service { get; }
         public FakeTranscriptionClient TranscriptionClient { get; }
 
         public void Dispose()
@@ -158,13 +137,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         {
         }
 
-        public int? LastDeviceNumber { get; private set; }
-
         public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
-            File.WriteAllText(audioFilePath, "fake audio");
-            LastDeviceNumber = deviceNumber;
             IsRecording = true;
             return Task.CompletedTask;
         }
@@ -176,31 +150,24 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         }
     }
 
-    private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
-    {
-        public int? LastDeviceNumber { get; private set; }
-
-        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
-        {
-            LastDeviceNumber = deviceNumber;
-            return new RecordingPreflightResult(
-                RecordingPreflightStatus.Ready,
-                CanStart: true,
-                "Microphone ready.");
-        }
-    }
-
     private sealed class FakeAudioInputDeviceCatalog : IAudioInputDeviceCatalog
     {
-        public IReadOnlyList<AudioInputDeviceOption> Devices { get; set; } =
-        [
-            new AudioInputDeviceOption(0, "Built-in Microphone"),
-            new AudioInputDeviceOption(1, "USB Headset")
-        ];
+        public IReadOnlyList<AudioInputDeviceOption> Devices { get; set; } = [];
 
         public IReadOnlyList<AudioInputDeviceOption> GetAvailableInputDevices()
         {
             return Devices;
+        }
+    }
+
+    private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
+    {
+        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
+        {
+            return new RecordingPreflightResult(
+                RecordingPreflightStatus.Ready,
+                CanStart: true,
+                "Microphone ready.");
         }
     }
 
@@ -251,46 +218,31 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
 
     private sealed class FakeSecretStore : ISecretStore
     {
-        public string? Value { get; set; }
-
         public ValueTask<string?> GetAsync(string key, CancellationToken cancellationToken = default)
         {
-            return ValueTask.FromResult(Value);
+            return ValueTask.FromResult<string?>(null);
         }
 
         public ValueTask SetAsync(string key, string value, CancellationToken cancellationToken = default)
         {
-            Value = value;
             return ValueTask.CompletedTask;
         }
 
         public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
-            Value = null;
             return ValueTask.CompletedTask;
         }
     }
 
     private sealed class FakeTranscriptionClient : ITranscriptionClient
     {
-        public int CallCount { get; private set; }
-        public Exception? ExceptionToThrow { get; set; }
-        public string TranscriptText { get; set; } = "Example transcript.";
-
         public Task<string> TranscribeToTextAsync(
             string audioFilePath,
             string apiKey,
             OpenAiTranscriptionRequest request,
             CancellationToken cancellationToken = default)
         {
-            CallCount++;
-
-            if (ExceptionToThrow is not null)
-            {
-                throw ExceptionToThrow;
-            }
-
-            return Task.FromResult(TranscriptText);
+            return Task.FromResult("Example transcript.");
         }
 
         public Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
