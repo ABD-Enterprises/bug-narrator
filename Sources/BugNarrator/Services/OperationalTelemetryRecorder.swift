@@ -31,7 +31,10 @@ struct OperationalTelemetryRecorder {
                 try fileManager.createDirectory(at: parentDirectoryURL, withIntermediateDirectories: true)
             }
 
-            let event = OperationalTelemetryEvent(name: name, metadata: metadata)
+            let event = OperationalTelemetryEvent(
+                name: DiagnosticsRedactor.sanitizeFreeformText(name),
+                metadata: DiagnosticsRedactor.sanitizeMetadata(metadata)
+            )
             var line = try encoder.encode(event)
             line.append(0x0A)
 
@@ -50,5 +53,35 @@ struct OperationalTelemetryRecorder {
                 metadata: ["event": name]
             )
         }
+    }
+
+    func recentEvents(limit: Int = 200) -> [OperationalTelemetryEvent] {
+        guard fileManager.fileExists(atPath: storageURL.path),
+              let text = try? String(contentsOf: storageURL, encoding: .utf8) else {
+            return []
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let events = text
+            .split(whereSeparator: \.isNewline)
+            .compactMap { line -> OperationalTelemetryEvent? in
+                guard let data = line.data(using: .utf8) else {
+                    return nil
+                }
+
+                return try? decoder.decode(OperationalTelemetryEvent.self, from: data)
+            }
+
+        return Array(events.suffix(limit))
+    }
+
+    func clear() throws {
+        guard fileManager.fileExists(atPath: storageURL.path) else {
+            return
+        }
+
+        try fileManager.removeItem(at: storageURL)
     }
 }

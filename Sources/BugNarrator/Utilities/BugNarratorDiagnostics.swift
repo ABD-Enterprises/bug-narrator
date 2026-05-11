@@ -305,7 +305,7 @@ private final class DiagnosticsConfiguration: @unchecked Sendable {
     }
 }
 
-private enum DiagnosticsRedactor {
+enum DiagnosticsRedactor {
     private static let explicitSensitiveKeys: Set<String> = [
         "apiKey",
         "api_key",

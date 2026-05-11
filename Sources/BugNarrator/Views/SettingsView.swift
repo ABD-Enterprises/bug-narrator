@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var settingsStore: SettingsStore
+    @State private var showDeleteAllLocalDataConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -505,11 +506,24 @@ struct SettingsView: View {
 
                         HStack(spacing: 12) {
                             Button("Export Data") {
-                                appState.exportPrivacyData()
+                                Task {
+                                    await appState.exportPrivacyData()
+                                }
                             }
                             .disabled(secureControlsDisabled)
 
-                            Text("Creates a local JSON export of BugNarrator sessions. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded.")
+                            Text("Creates a local JSON export of BugNarrator sessions, settings metadata, and diagnostics context. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack(spacing: 12) {
+                            Button("Delete All Local Data", role: .destructive) {
+                                showDeleteAllLocalDataConfirmation = true
+                            }
+                            .disabled(secureControlsDisabled)
+
+                            Text("Removes locally stored sessions, recovered recordings, export history, and diagnostics files. Saved credentials in the macOS Keychain are not deleted.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -525,6 +539,17 @@ struct SettingsView: View {
             .padding(24)
         }
         .accessibilityLabel("Settings scroll area")
+        .alert("Delete all local BugNarrator data?", isPresented: $showDeleteAllLocalDataConfirmation) {
+            Button("Delete All Data", role: .destructive) {
+                Task {
+                    await appState.deleteAllLocalData()
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes local sessions, local diagnostics, and local export history from this Mac. Keychain credentials remain stored until you remove them separately.")
+        }
     }
 
     private var statusSummary: some View {

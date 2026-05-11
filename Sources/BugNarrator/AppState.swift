@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
     private let debugBundleExporter = DebugBundleExporter()
     private let privacyDataExporter = PrivacyDataExporter()
     private let telemetryRecorder = OperationalTelemetryRecorder()
+    private let localPrivacyDataManager = LocalPrivacyDataManager()
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
@@ -934,9 +935,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    func exportPrivacyData() {
+    func exportPrivacyData() async {
         do {
-            guard let bundleURL = try privacyDataExporter.export(sessions: transcriptStore.sessions) else {
+            let diagnostics = await makePrivacyDataExportDiagnosticsSnapshot()
+            guard let bundleURL = try privacyDataExporter.export(
+                sessions: transcriptStore.sessions,
+                settings: makePrivacyDataExportSettingsSnapshot(),
+                diagnostics: diagnostics
+            ) else {
                 return
             }
 
@@ -955,6 +961,34 @@ final class AppState: ObservableObject {
             let appError = (error as? AppError) ?? .exportFailure("BugNarrator could not create the data export.")
             presentError(appError)
         }
+    }
+
+    func deleteAllLocalData() async {
+        guard status.phase != .recording, status.phase != .transcribing else {
+            setStatus(.error("Stop recording or transcription before deleting local data."))
+            return
+        }
+
+        let idsToDelete = Set(transcriptStore.sessions.map(\.id))
+            .union(currentTranscript.map { [$0.id] } ?? [])
+        let deletedSessionCount = idsToDelete.count
+
+        if !idsToDelete.isEmpty {
+            deleteSessions(withIDs: idsToDelete)
+        }
+
+        await clearLocalPrivacyArtifacts()
+
+        let message: String
+        if deletedSessionCount == 0 {
+            message = "Cleared local diagnostics and export history."
+        } else if deletedSessionCount == 1 {
+            message = "Deleted 1 local session and cleared local diagnostics."
+        } else {
+            message = "Deleted \(deletedSessionCount) local sessions and cleared local diagnostics."
+        }
+
+        setStatus(.success(message))
     }
 
     func validateAPIKey() async {
@@ -2226,6 +2260,35 @@ final class AppState: ObservableObject {
         directories.forEach { directoryURL in
             artifactsService.removeArtifactsDirectory(at: directoryURL)
         }
+    }
+
+    private func makePrivacyDataExportSettingsSnapshot() -> PrivacyDataExportSettingsSnapshot {
+        PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore)
+    }
+
+    private func makePrivacyDataExportDiagnosticsSnapshot() async -> PrivacyDataExportDiagnosticsSnapshot {
+        let debugInfo = debugInfoSnapshot
+        let recentLogText = await BugNarratorDiagnostics.store.recentLogText(limit: 200)
+        let receipts = (try? await exportService.exportHistory()) ?? exportHistory
+
+        return PrivacyDataExportDiagnosticsSnapshot(
+            appName: debugInfo.appName,
+            versionDescription: debugInfo.versionDescription,
+            macOSVersion: debugInfo.macOSVersion,
+            architecture: debugInfo.architecture,
+            activeTranscriptionModel: debugInfo.activeTranscriptionModel,
+            issueExtractionModel: debugInfo.issueExtractionModel,
+            logLevel: debugInfo.logLevel,
+            debugModeEnabled: debugInfo.debugModeEnabled,
+            recentTelemetryEvents: telemetryRecorder.recentEvents(limit: 200),
+            recentDiagnosticsLog: recentLogText,
+            exportHistory: receipts
+        )
+    }
+
+    private func clearLocalPrivacyArtifacts() async {
+        await localPrivacyDataManager.clearLocalSupportArtifacts()
+        await refreshExportHistory()
     }
 
     private func performScreenshotCapture(
