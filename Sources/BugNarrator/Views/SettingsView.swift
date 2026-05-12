@@ -121,6 +121,48 @@ struct SettingsView: View {
                     }
                 }
 
+                GroupBox("Recording Audio") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionIntro("Choose what audio BugNarrator records when a session starts.")
+
+                        Toggle("System audio capture modes (experimental)", isOn: $settingsStore.systemAudioCaptureEnabled)
+                            .disabled(secureControlsDisabled)
+
+                        labeledField(title: "Audio Source") {
+                            Picker("Audio Source", selection: $settingsStore.recordingAudioSource) {
+                                ForEach(availableRecordingAudioSources) { source in
+                                    Text(source.title)
+                                        .tag(source)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .disabled(secureControlsDisabled)
+                            .accessibilityLabel("Recording audio source")
+                        }
+
+                        if settingsStore.recordingAudioSource.usesSystemAudio {
+                            Toggle(
+                                "I understand system audio can include meeting audio and other people's voices",
+                                isOn: $settingsStore.hasAcceptedSystemAudioRecordingConsent
+                            )
+                            .disabled(secureControlsDisabled)
+
+                            Text("Get consent before recording system audio. BugNarrator stores finished sessions locally and sends recorded audio to OpenAI only when transcription runs.")
+                                .font(.footnote)
+                                .foregroundStyle(
+                                    settingsStore.hasAcceptedSystemAudioRecordingConsent
+                                        ? Color.secondary
+                                        : Color.orange
+                                )
+                        } else if settingsStore.systemAudioCaptureEnabled {
+                            Text("System audio modes require a separate macOS permission prompt the first time capture starts.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 GroupBox("Transcription Defaults") {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionIntro("Choose the default transcription model and optional hints BugNarrator sends to the selected provider.")
@@ -209,6 +251,9 @@ struct SettingsView: View {
                         sectionIntro("BugNarrator only asks for the permissions it needs for recording and screenshots.")
 
                         Text("BugNarrator asks for microphone access only when you start recording.")
+                            .foregroundStyle(.secondary)
+
+                        Text("BugNarrator asks for Screen & System Audio Recording access only when a system audio mode starts.")
                             .foregroundStyle(.secondary)
 
                         Text("BugNarrator asks for Screen Recording access only when you capture a screenshot. Recording can continue without screenshots if you skip this permission.")
@@ -668,6 +713,12 @@ struct SettingsView: View {
             get: { settingsStore.apiKey },
             set: { settingsStore.apiKey = $0 }
         )
+    }
+
+    private var availableRecordingAudioSources: [RecordingAudioSource] {
+        settingsStore.systemAudioCaptureEnabled
+            ? RecordingAudioSource.allCases
+            : [.microphone]
     }
 
     private var openAIReadiness: SettingsReadinessStatus {

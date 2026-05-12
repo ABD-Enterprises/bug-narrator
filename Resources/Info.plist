@@ -30,5 +30,7 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>BugNarrator records microphone audio so you can narrate software testing sessions while working in other apps.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>BugNarrator can record system audio only when you choose a system audio mode for a session.</string>
 </dict>
 </plist>

@@ -221,6 +221,14 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
             "Running microphone permission and recorder preflight before starting a session."
         )
 
+        guard audioRecorder.requiresMicrophonePermission else {
+            permissionsLogger.info(
+                "microphone_preflight_skipped",
+                "The selected audio source does not require microphone permission."
+            )
+            return await grantedPermissionResult(audioRecorder: audioRecorder)
+        }
+
         let permissionStatus = status(from: await permissionAccess.requestPermissionIfNeeded())
 
         switch permissionStatus {

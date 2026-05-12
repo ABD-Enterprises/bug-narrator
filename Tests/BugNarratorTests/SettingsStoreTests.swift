@@ -23,6 +23,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.screenshotHotkeyShortcut, .disabled)
         XCTAssertEqual(store.jiraIssueType, "")
+        XCTAssertFalse(store.systemAudioCaptureEnabled)
+        XCTAssertEqual(store.recordingAudioSource, .microphone)
+        XCTAssertFalse(store.hasAcceptedSystemAudioRecordingConsent)
     }
 
     func testSettingsPersistAcrossReloads() {
@@ -48,6 +51,9 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.autoCopyTranscript = false
         firstStore.autoSaveTranscript = false
         firstStore.autoExtractIssues = true
+        firstStore.systemAudioCaptureEnabled = true
+        firstStore.recordingAudioSource = .microphoneAndSystemAudio
+        firstStore.hasAcceptedSystemAudioRecordingConsent = true
         firstStore.openAtStartup = true
         firstStore.debugMode = true
         firstStore.startRecordingHotkeyShortcut = HotkeyShortcut(
@@ -94,6 +100,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(secondStore.autoCopyTranscript)
         XCTAssertFalse(secondStore.autoSaveTranscript)
         XCTAssertTrue(secondStore.autoExtractIssues)
+        XCTAssertTrue(secondStore.systemAudioCaptureEnabled)
+        XCTAssertEqual(secondStore.recordingAudioSource, .microphoneAndSystemAudio)
+        XCTAssertTrue(secondStore.hasAcceptedSystemAudioRecordingConsent)
         XCTAssertTrue(secondStore.openAtStartup)
         XCTAssertTrue(secondStore.debugMode)
         XCTAssertEqual(secondStore.startRecordingHotkeyShortcut.keyCode, 1)
@@ -345,6 +354,35 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.jiraTokenPersistenceState, .keychain)
         XCTAssertEqual(keychain.values["BugNarrator.OpenAI::openai-api-key"], "draft-openai-key")
         XCTAssertEqual(keychain.values["BugNarrator.Jira::jira-api-token"], "draft-jira-token")
+    }
+
+    func testInvalidRecordingAudioSourceFallsBackToMicrophone() {
+        let suiteName = "BugNarrator-RecordingAudioSourceInvalidTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "settings.systemAudioCaptureEnabled")
+        defaults.set("not-a-source", forKey: "settings.recordingAudioSource")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(store.recordingAudioSource, .microphone)
+    }
+
+    func testSystemAudioSourceResetsWhenFeatureFlagIsDisabled() {
+        let suiteName = "BugNarrator-RecordingAudioSourceFlagTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(false, forKey: "settings.systemAudioCaptureEnabled")
+        defaults.set(RecordingAudioSource.systemAudio.rawValue, forKey: "settings.recordingAudioSource")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(store.recordingAudioSource, .microphone)
+        XCTAssertEqual(defaults.string(forKey: "settings.recordingAudioSource"), RecordingAudioSource.microphone.rawValue)
     }
 
     func testTrackerSetupReadinessDoesNotRequireLoadedPickerSelections() {

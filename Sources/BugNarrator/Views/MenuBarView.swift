@@ -181,6 +181,8 @@ struct MenuBarView: View {
             microphoneRecoverySection
         case .screenRecording:
             screenRecordingRecoverySection
+        case .systemAudio:
+            systemAudioRecoverySection
         case .openAI:
             openAIKeyRecoverySection
         case .exportConfiguration:
@@ -206,6 +208,35 @@ struct MenuBarView: View {
             .controlSize(.small)
             .accessibilityLabel("Open Screen Recording privacy settings")
             .accessibilityHint("Opens the macOS privacy settings for screen recording access")
+        }
+    }
+
+    private var systemAudioRecoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if appState.currentError?.suggestsSystemAudioSettings == true {
+                Text("Open Settings to enable system audio capture modes and acknowledge the recording notice.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("Open Settings") {
+                    appState.openSettings()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            } else {
+                Text("System audio capture uses macOS Screen & System Audio Recording permission. Enable BugNarrator there, then try again.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("Open Screen & System Audio Settings") {
+                    appState.openSystemAudioPrivacySettings()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityLabel("Open Screen and System Audio Recording privacy settings")
+            }
         }
     }
 

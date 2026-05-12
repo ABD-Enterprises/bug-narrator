@@ -4,6 +4,7 @@ enum MenuBarStatusRecoveryAction: Equatable {
     case none
     case microphone
     case screenRecording
+    case systemAudio
     case openAI
     case exportConfiguration
     case storage
@@ -24,6 +25,8 @@ struct MenuBarStatusPresentation: Equatable {
             return .microphone
         case .screenRecordingPermissionDenied:
             return .screenRecording
+        case .systemAudioFeatureDisabled, .systemAudioConsentRequired, .systemAudioUnavailable:
+            return .systemAudio
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
             return .openAI
         case .exportConfigurationMissing:
