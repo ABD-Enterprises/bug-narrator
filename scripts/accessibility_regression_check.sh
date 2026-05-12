@@ -77,8 +77,8 @@ check_literal \
   'session detail scroll area label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
-  'accessibilityLabel: "OpenAI API Key"' \
-  'settings API key label'
+  'accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle' \
+  'settings AI provider credential label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
   '.accessibilityLabel("Settings scroll area")' \
@@ -89,8 +89,8 @@ check_literal \
   'settings Jira issue type label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
-  'OpenAI status:' \
-  'settings OpenAI status row label'
+  'AI provider status:' \
+  'settings AI provider status row label'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
   'GitHub export status:' \

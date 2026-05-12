@@ -78,6 +78,18 @@ Scope completed:
 - updated maintainer, roadmap, release, security, testing, and Windows-planning docs to reference the canonical product spec directly
 - removed the last repo-level references that treated an implied spec or the current macOS implementation as the product contract
 
+### RR-005 Assistive-Technology And Published Docs Accessibility Validation
+
+Completed on `2026-05-12`
+
+Scope completed:
+
+- ran runtime macOS Accessibility API snapshots against current Settings, Recording Controls, and Session Library app surfaces
+- validated the published Docusaurus docs site with Lighthouse accessibility checks
+- fixed the published-site contrast defect found in the breadcrumb link color by darkening the site primary color tokens
+- reran the fixed docs site locally and recorded a Lighthouse accessibility score of 100 with no failed audits
+- updated the lightweight accessibility regression tripwire to match the current AI-provider settings labels
+
 ### OPS-003 Recovery Surface Polish
 
 Completed on `2026-03-23`

@@ -66,13 +66,21 @@ RR-003 established a baseline accessibility hardening pass across the live macOS
 - explicit labeling for previously title-only settings fields and hotkey assignment controls
 - transient toast announcements posted through macOS accessibility notifications
 
-Validation in this phase remained a mix of build-verified code review and static checklist review. Residual manual validation is still required for:
+Validation in this phase remained a mix of build-verified code review and static checklist review.
 
-- a real VoiceOver pass across the live macOS app
+RR-005 completed the next runtime and hosted-site validation pass on `2026-05-12`. Coverage in that phase included:
+
+- runtime macOS Accessibility API snapshots for Settings, Recording Controls, and Session Library surfaces, with required labels and status text passing
+- published Docusaurus docs-site Lighthouse accessibility validation
+- a docs-site contrast fix for the breadcrumb link color, followed by a local post-fix Lighthouse accessibility score of 100 with no failed audits
+- refresh of `./scripts/accessibility_regression_check.sh` so it tracks the current AI-provider settings labels
+
+Residual manual validation is still required for:
+
+- hands-on VoiceOver spoken-output review across non-sampled release-candidate flows
 - keyboard-only traversal of the latest release candidate
-- the unpublished Docusaurus docs site once it is actually hosted
 
-OPS-004 adds `./scripts/accessibility_regression_check.sh` as a lightweight regression tripwire. It does not replace a real VoiceOver or hosted-site accessibility pass; it only catches obvious code-level regressions in the most accessibility-sensitive surfaces.
+OPS-004 adds `./scripts/accessibility_regression_check.sh` as a lightweight regression tripwire. It does not replace runtime assistive-technology validation or hands-on release-candidate review; it only catches obvious code-level regressions in the most accessibility-sensitive surfaces.
 
 ## Failure Handling
 

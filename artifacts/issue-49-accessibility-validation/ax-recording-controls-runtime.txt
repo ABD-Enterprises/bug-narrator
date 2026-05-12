@@ -1,0 +1,21 @@
+AX trusted: true
+windows result: 0
+window_count: 1
+role=AXWindow title=BugNarrator Controls desc= value= help= enabled=
+    role=AXGroup title= desc=Recording controls dialog value= help= enabled=true
+      role=AXStaticText title= desc= value=BugNarrator Controls help= enabled=true
+      role=AXStaticText title= desc= value=Recording actions live here. help= enabled=true
+      role=AXStaticText title= desc= value=Idle help= enabled=true
+      role=AXStaticText title= desc=Recording status value=Ready for the next feedback session.. Start a feedback session when you are ready to narrate the current walkthrough. help= enabled=true
+      role=AXButton title= desc=Start Recording value= help=Available from the recording controls window. enabled=true
+      role=AXButton title= desc=Stop Recording value= help=Currently unavailable. enabled=false
+      role=AXButton title= desc=Capture Screenshot value= help=Currently unavailable. enabled=false
+      role=AXStaticText title= desc= value=The controls stay open until you close them. help= enabled=true
+      role=AXButton title= desc=Close value= help=Closes the recording controls window. enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXStaticText title= desc= value=BugNarrator Controls help= enabled=true
+CHECK Recording controls dialog: pass
+CHECK Recording status: pass
+CHECK Start Recording: pass
+CHECK Capture Screenshot: pass
+CHECK Close: pass

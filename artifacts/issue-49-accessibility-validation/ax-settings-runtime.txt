@@ -1,0 +1,170 @@
+AX trusted: true
+windows result: 0
+window_count: 1
+role=AXWindow title=BugNarrator Settings desc= value= help= enabled=
+    role=AXScrollArea title= desc=Settings scroll area value= help= enabled=
+      role=AXStaticText title= desc= value=BugNarrator Settings help= enabled=true
+      role=AXStaticText title= desc= value=Set up your AI provider, review workflow defaults, export destinations, and local diagnostics in one place. help= enabled=true
+      role=AXStaticText title= desc= value=Setup Status help= enabled=true
+      role=AXUnknown title= desc=AI provider status: Needs setup value= help= enabled=true
+      role=AXUnknown title= desc=GitHub export status: Needs setup value= help= enabled=true
+      role=AXUnknown title= desc=Jira export status: Needs setup value= help= enabled=true
+        role=AXHeading title= desc=Before You Start value= help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator requires your own AI provider configuration. help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction. help= enabled=true
+        role=AXStaticText title= desc= value=Transcription and issue extraction use the selected provider and may incur charges on that provider account. help= enabled=true
+        role=AXHeading title= desc=AI Provider Setup value= help= enabled=true
+        role=AXStaticText title= desc= value=Use OpenAI-hosted transcription and issue extraction with your own API key. help= enabled=true
+        role=AXStaticText title= desc= value=AI Provider help= enabled=true
+        role=AXStaticText title= desc= value=AI provider help= enabled=true
+        role=AXPopUpButton title= desc=AI provider value=OpenAI help= enabled=true
+        role=AXStaticText title= desc= value=OpenAI API Key help= enabled=true
+        role=AXTextField title= desc=OpenAI API Key value= help= enabled=true
+        role=AXStaticText title= desc= value=API Base URL help= enabled=true
+        role=AXTextField title= desc=AI provider base URL value= help= enabled=true
+        role=AXStaticText title= desc= value=Leave blank to use the default OpenAI API endpoint. help= enabled=true
+        role=AXStaticText title= desc= value=No key saved help= enabled=true
+        role=AXButton title= desc=Validate Key value= help= enabled=false
+        role=AXButton title= desc=Remove Key value= help= enabled=false
+        role=AXStaticText title= desc= value=BugNarrator never ships with an API key. Paste your own OpenAI credential to enable transcription. help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code. help= enabled=true
+        role=AXHeading title= desc=Recording Audio value= help= enabled=true
+        role=AXStaticText title= desc= value=Choose what audio BugNarrator records when a session starts. help= enabled=true
+        role=AXCheckBox title= desc=System audio capture modes (experimental) value=0 help= enabled=true
+        role=AXStaticText title= desc= value=Audio Source help= enabled=true
+        role=AXRadioGroup title= desc=Audio Source, Recording audio source value=<AXUIElement 0x9f825ac40> {pid=36275} help= enabled=true
+          role=AXRadioButton title= desc=Mic only value=1 help= enabled=true
+        role=AXHeading title= desc=Transcription Defaults value= help= enabled=true
+        role=AXStaticText title= desc= value=Choose the default transcription model and optional hints BugNarrator sends to the selected provider. help= enabled=true
+        role=AXStaticText title= desc= value=Model help= enabled=true
+        role=AXTextField title= desc=Transcription model value=whisper-1 help= enabled=true
+        role=AXStaticText title= desc= value=Language Hint help= enabled=true
+        role=AXTextField title= desc=Transcription language hint value= help= enabled=true
+        role=AXStaticText title= desc= value=Prompt help= enabled=true
+          role=AXTextArea title= desc=Transcription prompt value= help= enabled=
+          role=AXScrollBar title= desc= value=0 help= enabled=false
+        role=AXStaticText title= desc= value=Transcription uses the selected provider endpoint. Keep prompt guidance short and use the language hint only when it improves recognition. help= enabled=true
+        role=AXHeading title= desc=Issue Extraction value= help= enabled=true
+        role=AXStaticText title= desc= value=Configure how BugNarrator turns finished transcripts into reviewable draft issues. help= enabled=true
+        role=AXStaticText title= desc= value=Extraction Model help= enabled=true
+        role=AXTextField title= desc=Issue extraction model value=gpt-4.1-mini help= enabled=true
+        role=AXCheckBox title= desc=Run issue extraction automatically after transcription value=0 help= enabled=true
+        role=AXStaticText title= desc= value=Issue extraction creates draft bugs, UX issues, enhancements, and follow-ups from the transcript. Review the results before exporting them. help= enabled=true
+        role=AXHeading title= desc=Workflow Defaults value= help= enabled=true
+        role=AXStaticText title= desc= value=Control what BugNarrator does automatically after recording, transcription, and support workflows. help= enabled=true
+        role=AXCheckBox title= desc=Auto-copy transcript to clipboard value=1 help= enabled=true
+        role=AXCheckBox title= desc=Open BugNarrator at startup value=0 help= enabled=true
+        role=AXCheckBox title= desc=Debug mode enables verbose local diagnostics value=0 help= enabled=true
+        role=AXStaticText title= desc= value=Screenshot capture prompts for Screen Recording permission the first time you use it if macOS requires access. help= enabled=true
+        role=AXStaticText title= desc= value=Completed recordings are always saved to the local session library as soon as you stop. BugNarrator keeps the session even if the app quits before you review it. help= enabled=true
+        role=AXStaticText title= desc= value=When debug mode is on, BugNarrator records extra local diagnostics, keeps successful temp audio files, and adds more validation notes to exported debug bundles. help= enabled=true
+        role=AXHeading title= desc=Permissions value= help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator only asks for the permissions it needs for recording and screenshots. help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator asks for microphone access only when you start recording. help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator asks for Screen & System Audio Recording access only when a system audio mode starts. help= enabled=true
+        role=AXStaticText title= desc= value=BugNarrator asks for Screen Recording access only when you capture a screenshot. Recording can continue without screenshots if you skip this permission. help= enabled=true
+        role=AXStaticText title= desc= value=If you deny a permission, BugNarrator shows recovery buttons in the menu bar window so you can reopen the right System Settings pane. help= enabled=true
+        role=AXHeading title= desc=Global Hotkeys value= help= enabled=true
+        role=AXStaticText title= desc= value=Hotkeys are optional. BugNarrator starts with every shortcut unassigned, so choose only the ones you want to use. help= enabled=true
+          role=AXStaticText title= desc= value=Start Recording help= enabled=true
+            role=AXStaticText title= desc= value=Not Set help= enabled=true
+            role=AXButton title= desc=Assign shortcut for Start Recording value= help=Opens shortcut capture for Start Recording. enabled=true
+            role=AXButton title= desc=Clear shortcut for Start Recording value= help=Removes the assigned shortcut for Start Recording. enabled=false
+            role=AXStaticText title= desc= value=No shortcut assigned. help= enabled=true
+          role=AXStaticText title= desc= value=Stop Recording help= enabled=true
+            role=AXStaticText title= desc= value=Not Set help= enabled=true
+            role=AXButton title= desc=Assign shortcut for Stop Recording value= help=Opens shortcut capture for Stop Recording. enabled=true
+            role=AXButton title= desc=Clear shortcut for Stop Recording value= help=Removes the assigned shortcut for Stop Recording. enabled=false
+            role=AXStaticText title= desc= value=No shortcut assigned. help= enabled=true
+          role=AXStaticText title= desc= value=Capture Screenshot help= enabled=true
+            role=AXStaticText title= desc= value=Not Set help= enabled=true
+            role=AXButton title= desc=Assign shortcut for Capture Screenshot value= help=Opens shortcut capture for Capture Screenshot. enabled=true
+            role=AXButton title= desc=Clear shortcut for Capture Screenshot value= help=Removes the assigned shortcut for Capture Screenshot. enabled=false
+            role=AXStaticText title= desc= value=No shortcut assigned. help= enabled=true
+        role=AXStaticText title= desc= value=Hotkeys use Carbon and do not require Accessibility access. Screenshot hotkeys only work while a session is recording. If you choose a shortcut that is already assigned to another BugNarrator action, the new assignment is rejected until you clear or change the conflicting shortcut. help= enabled=true
+        role=AXHeading title= desc=GitHub Export (Experimental) value= help= enabled=true
+        role=AXStaticText title= desc= value=Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues. This integration is still experimental. help= enabled=true
+        role=AXStaticText title= desc= value=Personal Access Token help= enabled=true
+        role=AXTextField title= desc=GitHub personal access token value= help= enabled=true
+        role=AXStaticText title= desc= value=GitHub export prerequisites help= enabled=true
+        role=AXUnknown title= desc=Token prerequisite: Needs setup value= help= enabled=true
+        role=AXUnknown title= desc=Repository prerequisite: Needs setup value= help= enabled=true
+        role=AXStaticText title= desc= value=No token saved help= enabled=true
+        role=AXButton title= desc=Load GitHub Repos value= help= enabled=false
+        role=AXButton title= desc=Validate GitHub Setup value= help= enabled=false
+        role=AXButton title= desc=Remove GitHub Token value= help= enabled=false
+        role=AXStaticText title= desc= value=Repository help= enabled=true
+        role=AXStaticText title= desc= value=Paste a token, then load repositories help= enabled=true
+        role=AXStaticText title= desc= value=Repository Owner help= enabled=true
+        role=AXTextField title= desc=GitHub repository owner value= help= enabled=true
+        role=AXStaticText title= desc= value=Repository Name help= enabled=true
+        role=AXTextField title= desc=GitHub repository name value= help= enabled=true
+        role=AXStaticText title= desc= value=Default Labels help= enabled=true
+        role=AXTextField title= desc=GitHub default labels value= help= enabled=true
+        role=AXStaticText title= desc= value=Add a GitHub personal access token if you want to try the experimental GitHub Issues export. help= enabled=true
+        role=AXStaticText title= desc= value=Use Export to GitHub from Session Library > Extracted Issues after you extract issues from a transcript. help= enabled=true
+        role=AXStaticText title= desc= value=GitHub export is experimental. It creates Issues in the configured repository using the selected extracted issues. Screenshot filenames are referenced in the issue body for manual attachment. help= enabled=true
+        role=AXHeading title= desc=Jira Export (Experimental) value= help= enabled=true
+        role=AXStaticText title= desc= value=Configure the Jira Cloud project BugNarrator should use when exporting selected extracted issues. This integration is still experimental. help= enabled=true
+        role=AXStaticText title= desc= value=Jira Cloud URL help= enabled=true
+        role=AXTextField title= desc=Jira Cloud URL value= help= enabled=true
+        role=AXStaticText title= desc= value=Email help= enabled=true
+        role=AXTextField title= desc=Jira email value= help= enabled=true
+        role=AXStaticText title= desc= value=API Token help= enabled=true
+        role=AXTextField title= desc=Jira API token value= help= enabled=true
+        role=AXStaticText title= desc= value=Jira export prerequisites help= enabled=true
+        role=AXUnknown title= desc=Credentials prerequisite: Needs setup value= help= enabled=true
+        role=AXUnknown title= desc=Project prerequisite: Needs setup value= help= enabled=true
+        role=AXUnknown title= desc=Issue Type prerequisite: Needs setup value= help= enabled=true
+        role=AXStaticText title= desc= value=No token saved help= enabled=true
+        role=AXButton title= desc=Load Jira Projects value= help= enabled=false
+        role=AXButton title= desc=Remove Jira Token value= help= enabled=false
+        role=AXStaticText title= desc= value=Project help= enabled=true
+        role=AXStaticText title= desc= value=Jira project key help= enabled=true
+        role=AXStaticText title= desc= value=Issue Type help= enabled=true
+        role=AXStaticText title= desc= value=Jira issue type help= enabled=true
+        role=AXStaticText title= desc= value=Add Jira Cloud credentials if you want to try the experimental Jira export. help= enabled=true
+        role=AXStaticText title= desc= value=Use Load Jira Projects here first. Then use Export to Jira from Session Library > Extracted Issues after you extract issues from a transcript. help= enabled=true
+        role=AXStaticText title= desc= value=Jira export is experimental. It creates issues in Jira Cloud using the selected extracted issues. Screenshot filenames are referenced in the description for manual attachment. help= enabled=true
+        role=AXHeading title= desc=Diagnostics & Support value= help= enabled=true
+        role=AXStaticText title= desc= value=Use these details when filing GitHub issues or sharing a debug bundle with support. help= enabled=true
+        role=AXStaticText title= desc= value=App Version help= enabled=true
+        role=AXStaticText title= desc= value=Version 1.0.33 (34) help= enabled=true
+        role=AXStaticText title= desc= value=macOS help= enabled=true
+        role=AXStaticText title= desc= value=Version 26.4.1 (Build 25E253) help= enabled=true
+        role=AXStaticText title= desc= value=Architecture help= enabled=true
+        role=AXStaticText title= desc= value=arm64 help= enabled=true
+        role=AXStaticText title= desc= value=Transcription help= enabled=true
+        role=AXStaticText title= desc= value=whisper-1 help= enabled=true
+        role=AXStaticText title= desc= value=Issue Extraction help= enabled=true
+        role=AXStaticText title= desc= value=gpt-4.1-mini help= enabled=true
+        role=AXStaticText title= desc= value=Log Level help= enabled=true
+        role=AXStaticText title= desc= value=INFO help= enabled=true
+        role=AXStaticText title= desc= value=Session ID help= enabled=true
+        role=AXStaticText title= desc= value=No active or selected session help= enabled=true
+        role=AXStaticText title= desc= value=Attach the debug bundle and, if relevant, an exported session bundle when reporting an issue. BugNarrator never includes OpenAI, GitHub, or Jira credentials in the debug bundle. help= enabled=true
+        role=AXHeading title= desc=Privacy value= help= enabled=true
+        role=AXStaticText title= desc= value=Export or remove local session data without exposing stored credentials. help= enabled=true
+        role=AXButton title= desc=Export Data value= help= enabled=true
+        role=AXStaticText title= desc= value=Creates a local JSON export of BugNarrator sessions, settings metadata, and diagnostics context. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded. help= enabled=true
+        role=AXButton title= desc=Delete All Local Data value= help= enabled=true
+        role=AXStaticText title= desc= value=Removes locally stored sessions, recovered recordings, export history, and diagnostics files. Saved credentials in the macOS Keychain are not deleted. help= enabled=true
+      role=AXScrollBar title= desc= value=0 help= enabled=true
+        role=AXValueIndicator title= desc= value=0 help= enabled=
+        role=AXButton title= desc= value= help= enabled=
+        role=AXButton title= desc= value= help= enabled=
+        role=AXButton title= desc= value= help= enabled=
+        role=AXButton title= desc= value= help= enabled=
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXStaticText title= desc= value=BugNarrator Settings help= enabled=true
+CHECK BugNarrator Settings: pass
+CHECK AI provider: pass
+CHECK OpenAI API Key: pass
+CHECK AI provider base URL: pass
+CHECK Recording audio source: pass
+CHECK Settings scroll area: pass
+CHECK AI provider status: pass
+CHECK GitHub export status: pass
+CHECK Jira export status: pass
