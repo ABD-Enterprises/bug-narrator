@@ -42,19 +42,20 @@ It helps you:
 - macOS 14 or later
 - microphone permission for recording
 - Screen Recording permission if you want screenshot capture
-- your own OpenAI API key for transcription and issue extraction
+- your own AI provider configuration for transcription and issue extraction
 
 ## First Run
 
 1. Launch BugNarrator and confirm the menu bar icon appears.
 2. Open `Settings`.
-3. Paste your own `OpenAI API Key`.
-4. Optionally click `Validate Key`.
-5. Optionally assign global hotkeys for `Start Recording`, `Stop Recording`, and `Capture Screenshot`. They begin as `Not Set` until you choose them.
-6. Click `Show Recording Controls`.
-6. Start a session with `Start Recording`.
+3. Choose an AI provider.
+4. Enter the required API key or base URL for that provider.
+5. Optionally click `Validate Key` or `Validate Connection`.
+6. Optionally assign global hotkeys for `Start Recording`, `Stop Recording`, and `Capture Screenshot`. They begin as `Not Set` until you choose them.
+7. Click `Show Recording Controls`.
+8. Start a session with `Start Recording`.
 
-BugNarrator does not ship with a built-in OpenAI API key. Transcription and issue extraction use your own OpenAI account and may incur charges under OpenAI pricing.
+BugNarrator does not ship with built-in AI access or credits. OpenAI is the default provider. You can also select an OpenAI-compatible enterprise gateway or a local-compatible endpoint when that endpoint exposes the OpenAI-compatible transcription and chat APIs BugNarrator needs. Hosted provider usage may incur charges on that provider account.
 
 ## Core Workflow
 
@@ -72,9 +73,9 @@ You can keep using global hotkeys if you assign them in Settings, but the record
 
 ### Stop A Session
 
-When you finish, stop the session from the control window or a stop hotkey you explicitly assigned. BugNarrator then preserves the finished audio inside the session artifacts and, when your OpenAI API key is available, uploads the recorded audio to OpenAI and waits for the transcript result.
+When you finish, stop the session from the control window or a stop hotkey you explicitly assigned. BugNarrator then preserves the finished audio inside the session artifacts and, when your AI provider configuration is available, uploads the recorded audio to the configured provider and waits for the transcript result.
 
-If the key is missing, invalid, or revoked at stop time, the session still stays in the library as a retryable item. Restore or replace the key in `Settings`, then open the session again and retry transcription from the preserved session.
+If the provider configuration is missing, invalid, or revoked at stop time, the session still stays in the library as a retryable item. Restore or replace the configuration in `Settings`, then open the session again and retry transcription from the preserved session.
 
 ### Review The Session
 
@@ -242,7 +243,7 @@ Deleting a session removes it from the library immediately and also removes loca
 
 ## Support Development
 
-BugNarrator is free to use. Donations are optional and separate from any OpenAI costs.
+BugNarrator is free to use. Donations are optional and separate from any hosted AI-provider costs.
 
 - [Open the PayPal support page](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
@@ -261,7 +262,7 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 
 ### No Transcript Generated
 
-- confirm your OpenAI API key is configured in `Settings`
+- confirm your AI provider configuration is valid in `Settings`
 - validate the key if needed
 - confirm the Mac has network access
 - retry with a short test recording to rule out an empty or corrupt audio file
@@ -283,20 +284,20 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - if you try to launch a second copy, the existing instance should become active and the new copy should exit
 - if you see two BugNarrator menu bar items at once, quit both copies and relaunch the copy in `Applications`
 
-### API Key Missing
+### Provider Credential Missing
 
 - open `Settings`
-- paste your own OpenAI API key
-- click `Validate Key` if you want to check it before transcription or issue extraction
-- BugNarrator stores the key in macOS Keychain when available
-- if a completed session could not be transcribed because the key was missing at stop time, keep the session and retry after adding the key back
+- choose an AI provider and enter your own provider credential or base URL
+- click `Validate Key` or `Validate Connection` if you want to check it before transcription or issue extraction
+- BugNarrator stores provider credentials in macOS Keychain when available
+- if a completed session could not be transcribed because the provider configuration was missing at stop time, keep the session and retry after restoring the configuration
 
-### API Key Rejected Or Revoked
+### Provider Credential Rejected Or Revoked
 
 - open `Settings`
-- replace the key or remove it and paste a new one
-- click `Validate Key`
-- try the preserved session again after OpenAI accepts the new key
+- replace the provider credential or fix the configured endpoint/model
+- click `Validate Key` or `Validate Connection`
+- try the preserved session again after the provider accepts the new configuration
 
 ### Screenshots Not Appearing
 
@@ -326,7 +327,7 @@ What stays local on your Mac:
 - extracted issue drafts
 - exported session bundles
 
-What is sent to OpenAI:
+What is sent to the configured AI provider:
 
 - recorded audio after you stop a session and request transcription
 - transcript context used for review summary or issue extraction

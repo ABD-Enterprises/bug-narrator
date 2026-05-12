@@ -15,11 +15,12 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 - Launch BugNarrator a second time while it is already running and confirm the existing instance becomes active instead of creating a second menu bar item.
 - Confirm a double-launch attempt does not produce duplicate recording state, duplicate export work, or duplicate menu bar icons.
 - Confirm the first launch does not trigger an unexpected Keychain or admin-style credential prompt before you open Settings or start a key-dependent action.
-- Confirm the menu bar explains that the app requires the user's own OpenAI API key.
-- Open Settings and verify the onboarding copy explains that OpenAI usage may incur charges.
-- Verify the OpenAI API key can be entered, remains masked, and shows a secure-storage note.
-- Verify `Validate Key` reports success for a working key and a clear error for a bad key.
-- Verify `Remove Key` clears the stored OpenAI key.
+- Confirm the menu bar explains that the app requires the user's own AI provider configuration.
+- Open Settings and verify the onboarding copy explains that hosted AI-provider usage may incur charges.
+- Verify the default OpenAI API key can be entered, remains masked, and shows a secure-storage note.
+- Verify OpenAI-Compatible and Local-Compatible provider choices expose provider-specific base URL and credential guidance.
+- Verify `Validate Key` or `Validate Connection` reports success for a working configuration and a clear error for a bad one.
+- Verify `Remove Key` clears the stored AI provider credential.
 - Verify GitHub and Jira tokens remain masked and can be removed.
 - Verify `Export Debug Bundle` is hidden by default in the menu bar and appears only while the `Option` key is held down.
 - Verify `Export Debug Bundle` writes a local bundle containing `system-info.json`, `app-version.txt`, `macos-version.txt`, `recent-log.txt`, and `session-metadata.json`.
@@ -188,10 +189,10 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 
 ## Failure Cases
 
-- Remove the OpenAI API key and attempt to start a session.
-  Expected: recording can still start after microphone permission is granted, but the app explains that transcription will require the user's own OpenAI API key before the session can be finished with OpenAI features.
-- Start recording, remove the OpenAI API key from Settings, then stop the session.
-  Expected: the app preserves the finished session and audio, explains that the key is missing, keeps the session available in the library, and allows transcription to be retried after the key is restored.
+- Remove the AI provider credential and attempt to start a session.
+  Expected: recording can still start after microphone permission is granted, but the app explains that transcription will require valid AI provider setup before the session can be finished with AI features.
+- Start recording, remove or invalidate the AI provider configuration in Settings, then stop the session.
+  Expected: the app preserves the finished session and audio, explains that provider setup is missing or invalid, keeps the session available in the library, and allows transcription to be retried after the configuration is restored.
 - Deny microphone permission and attempt to start a session.
   Expected: recording does not start, the error explains how to re-enable access in System Settings, and `Open Microphone Settings` opens the expected privacy pane or a safe fallback.
 - Force or simulate a restricted microphone state if practical.
@@ -212,8 +213,8 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
   Expected: BugNarrator explains that the local screenshot file is no longer available instead of failing silently.
 - Disconnect networking or force a timeout during transcription.
   Expected: transcription ends in a clear timeout or API error state and the app returns to a usable state.
-- Use an invalid OpenAI API key.
-  Expected: transcription or issue extraction ends in a clear invalid-key error, Settings opens, and the preserved session remains available so transcription can be retried after the key is replaced.
+- Use an invalid hosted-provider API key or unsupported local-compatible model combination.
+  Expected: transcription or issue extraction ends in clear provider setup guidance, Settings opens when useful, and the preserved session remains available so transcription can be retried after the configuration is fixed.
 - Simulate a local history write failure after a successful transcription if practical.
   Expected: the transcript window still opens, the completed session remains available as an unsaved session, screenshots remain accessible, and `Save to History` can be retried later after storage is fixed.
 - Cancel an active recording.

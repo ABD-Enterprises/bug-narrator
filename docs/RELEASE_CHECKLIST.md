@@ -20,7 +20,7 @@ Use this checklist before cutting a public test build or release candidate.
 
 ## Core Product Workflow
 
-- Add or validate an OpenAI API key in Settings.
+- Add or validate the intended AI provider configuration in Settings.
 - Start a recording session and confirm the app enters `Recording`.
 - Capture at least one screenshot during the session and confirm it creates a visible timeline moment in review.
 - Stop the session and confirm transcription succeeds.
@@ -48,7 +48,7 @@ Use this checklist before cutting a public test build or release candidate.
 
 - Quit and relaunch the app and confirm existing sessions reload correctly.
 - If local history storage fails after a successful transcription, confirm the transcript still opens as an unsaved session and can be saved later after storage is restored.
-- If transcription cannot start because the OpenAI key is missing, invalid, or revoked after recording finishes, confirm the finished audio stays preserved in the session artifacts and the session remains retryable after the key is restored.
+- If transcription cannot start because the AI provider configuration is missing, invalid, or revoked after recording finishes, confirm the finished audio stays preserved in the session artifacts and the session remains retryable after the configuration is restored.
 - Delete a session with screenshots and verify the local managed screenshot folder is removed.
 - Confirm exported bundles outside the app remain untouched after deletion.
 - In non-debug mode, verify temporary audio files are cleaned up after success, failure, and cancellation, except for preserved retryable sessions where the finished audio is intentionally retained until transcription succeeds or the session is deleted.
