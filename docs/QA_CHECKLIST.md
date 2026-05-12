@@ -57,6 +57,9 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 
 ## Accessibility
 
+- Run `./scripts/accessibility_regression_check.sh` before a release candidate.
+- Capture runtime assistive-technology evidence for the menu bar, recording controls, settings, and session library surfaces using the macOS Accessibility API or VoiceOver.
+- Run a Lighthouse accessibility pass against the hosted docs site after documentation deployment.
 - Navigate the menu bar window, recording controls window, settings window, and session library using only the keyboard.
 - Verify focus order feels logical and no core action requires the mouse.
 - Verify the default action in the recording controls window follows the enabled primary action and `Esc` closes the window.

@@ -1,0 +1,99 @@
+AX trusted: true
+windows result: 0
+window_count: 1
+role=AXWindow title=BugNarrator Sessions desc= value= help= enabled=
+        role=AXScrollArea title= desc=Session filters value= help= enabled=
+          role=AXStaticText title= desc= value=Session Library help= enabled=true
+          role=AXStaticText title= desc= value=A durable archive for recorded feedback sessions, summaries, screenshots, and extracted issues. help= enabled=true
+          role=AXUnknown title= desc=Today value= help=Current session filter. enabled=true
+          role=AXUnknown title= desc=Yesterday value= help=Filters the session list. enabled=true
+          role=AXUnknown title= desc=Last 7 Days value= help=Filters the session list. enabled=true
+          role=AXUnknown title= desc=Last 30 Days value= help=Filters the session list. enabled=true
+          role=AXUnknown title= desc=Retry Needed value= help=Filters the session list. enabled=true
+          role=AXUnknown title= desc=All Sessions value= help=Filters the session list. enabled=true
+          role=AXUnknown title= desc=Custom Date Range value= help=Filters the session list. enabled=true
+      role=AXSplitter title= desc= value=240 help= enabled=false
+        role=AXStaticText title= desc= value=Today help= enabled=true
+        role=AXStaticText title= desc= value=Sort help= enabled=true
+        role=AXStaticText title= desc= value=1 session help= enabled=true
+        role=AXMenuButton title= desc=Sort sessions value=Newest First help= enabled=true
+        role=AXTextField title= desc=Search sessions value= help= enabled=true
+        role=AXButton title= desc=Delete value= help= enabled=true
+          role=AXOutline title= desc=Session list value= help= enabled=true
+                role=AXUnknown title= desc=This is a UI smoke transcript for BugNarrator session library export… value= help=Selects this session and updates the detail pane. enabled=true
+      role=AXSplitter title= desc= value=360 help= enabled=false
+        role=AXScrollArea title= desc=Session detail value= help= enabled=
+          role=AXStaticText title= desc= value=This is a UI smoke transcript for BugNarrator session library export… help= enabled=true
+          role=AXStaticText title= desc= value=May 12, 2026 at 12:04 PM • 00:12 • whisper-1 help= enabled=true
+          role=AXButton title= desc=Extract Issues value= help= enabled=true
+          role=AXButton title= desc=Copy Transcript value= help= enabled=true
+          role=AXMenuButton title=Export desc= value= help= enabled=true
+          role=AXHeading title= desc=Review Summary value= help= enabled=true
+          role=AXStaticText title= desc= value=Bugs help= enabled=true
+          role=AXStaticText title= desc= value=– Settings export smoke issue help= enabled=true
+          role=AXHeading title= desc=Extracted Issues value= help= enabled=true
+          role=AXStaticText title= desc= value=Extracted issues are draft suggestions and should be reviewed before export. help= enabled=true
+            role=AXCheckBox title= desc=Select issue Settings export smoke issue for export value=1 help=Controls whether this extracted issue is included in GitHub or Jira export. enabled=true
+            role=AXPopUpButton title= desc=Issue category for Settings export smoke issue value=Bug help= enabled=true
+            role=AXPopUpButton title= desc=Issue severity for Settings export smoke issue value=Medium help= enabled=true
+            role=AXTextField title= desc=Issue title for Settings export smoke issue value=Settings export smoke issue help= enabled=true
+            role=AXStaticText title= desc= value=Needs review help=AI confidence is low or the evidence is thin; review this issue before sending it. enabled=true
+            role=AXStaticText title= desc= value=Component help= enabled=true
+            role=AXTextField title= desc=Suggested component for Settings export smoke issue value=Session Library help= enabled=true
+            role=AXGroup title= desc=Export targets for Settings export smoke issue value= help= enabled=true
+              role=AXStaticText title= desc= value=Export Targets help= enabled=true
+              role=AXStaticText title= desc= value=GitHub help= enabled=true
+              role=AXStaticText title= desc= value=deffenda/bug-narrator help= enabled=true
+              role=AXButton title= desc=Load Repos value= help= enabled=true
+              role=AXTextField title= desc=GitHub repository owner for Settings export smoke issue value=deffenda help= enabled=true
+              role=AXTextField title= desc=GitHub repository name for Settings export smoke issue value=bug-narrator help= enabled=true
+              role=AXTextField title= desc=GitHub labels for Settings export smoke issue value=bug, ui-test help= enabled=true
+              role=AXStaticText title= desc= value=Jira help= enabled=true
+              role=AXStaticText title= desc= value=UCAP / Task help= enabled=true
+              role=AXButton title= desc=Load Projects value= help= enabled=true
+              role=AXTextField title= desc=Jira project key for Settings export smoke issue value=UCAP help= enabled=true
+              role=AXTextField title= desc=Jira issue type for Settings export smoke issue value=Task help= enabled=true
+              role=AXButton title= desc=Load Types value= help= enabled=false
+            role=AXStaticText title= desc= value=Timestamp: 00:04 help= enabled=true
+            role=AXStaticText title= desc= value=Evidence: "The selected extracted issue can be routed to Jira or GitHub." help= enabled=true
+            role=AXStaticText title= desc= value=Section: UI Test help= enabled=true
+            role=AXStaticText title= desc= value=Summary: Export controls should stay available when tracker settings are configured. help= enabled=true
+            role=AXStaticText title= desc= value=Dedup Hint help= enabled=true
+            role=AXTextField title= desc=Deduplication hint for Settings export smoke issue value=settings-export-smoke-issue help= enabled=true
+            role=AXStaticText title= desc= value=Reproduction Steps help= enabled=true
+            role=AXStaticText title= desc= value=Step 1 help= enabled=true
+            role=AXStaticText title= desc= value=00:04 help= enabled=true
+            role=AXStaticText title= desc= value=capture-ui-test-001.png help= enabled=true
+            role=AXStaticText title= desc= value=Action help= enabled=true
+              role=AXTextArea title= desc=Action value=Open a captured session with extracted issues. help= enabled=
+              role=AXScrollBar title= desc= value=0 help= enabled=false
+            role=AXStaticText title= desc= value=Expected help= enabled=true
+              role=AXTextArea title= desc=Expected value=Per-issue GitHub and Jira targets are editable. help= enabled=
+              role=AXScrollBar title= desc= value=0 help= enabled=false
+            role=AXStaticText title= desc= value=Actual help= enabled=true
+              role=AXTextArea title= desc=Actual value=The UI test fixture keeps both export paths configured. help= enabled=
+              role=AXScrollBar title= desc= value=0 help= enabled=false
+            role=AXLink title= desc=Open referenced screenshot capture-ui-test-001.png for step 1 value= help= enabled=true
+            role=AXStaticText title= desc= value=Screenshots: help= enabled=true
+            role=AXLink title= desc=Open related screenshot capture-ui-test-001.png value= help= enabled=true
+          role=AXStaticText title= desc= value=1 issue selected help= enabled=true
+          role=AXButton title= desc=Send to GitHub value= help=Send the selected extracted issues to GitHub. enabled=true
+          role=AXButton title= desc=Send to Jira value= help=Send the selected extracted issues to Jira. enabled=true
+          role=AXHeading title= desc=Transcript Timeline value= help= enabled=true
+          role=AXScrollBar title= desc= value=0 help= enabled=true
+            role=AXValueIndicator title= desc= value=0 help= enabled=
+            role=AXButton title= desc= value= help= enabled=
+            role=AXButton title= desc= value= help= enabled=
+            role=AXButton title= desc= value= help= enabled=
+            role=AXButton title= desc= value= help= enabled=
+    role=AXButton title= desc=Hide Sidebar value= help= enabled=true
+    role=AXButton title= desc=Delete Session value= help= enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXButton title= desc= value= help= enabled=true
+  role=AXStaticText title= desc= value=BugNarrator Sessions help= enabled=true
+CHECK Session filters: pass
+CHECK Session list: pass
+CHECK Session detail: pass
+CHECK Search sessions: pass
+CHECK All Sessions: pass

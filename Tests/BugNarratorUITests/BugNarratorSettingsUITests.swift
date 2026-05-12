@@ -29,7 +29,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
-        XCTAssertTrue(app.descendants(matching: .any)["OpenAI status: Needs setup"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["AI provider status: Needs setup"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["GitHub export status: Needs setup"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["Jira export status: Needs setup"].waitForExistence(timeout: 5))
     }
