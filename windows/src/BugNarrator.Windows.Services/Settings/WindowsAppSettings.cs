@@ -1,4 +1,5 @@
 using BugNarrator.Core.Models;
+using BugNarrator.Windows.Services.Http;
 using BugNarrator.Windows.Services.Hotkeys;
 
 namespace BugNarrator.Windows.Services.Settings;
@@ -8,6 +9,7 @@ public sealed record WindowsAppSettings(
     string LanguageHint,
     string TranscriptionPrompt,
     string IssueExtractionModel,
+    string AiProviderBaseUrl,
     string AudioInputDeviceName,
     string GitHubRepositoryOwner,
     string GitHubRepositoryName,
@@ -24,6 +26,7 @@ public sealed record WindowsAppSettings(
         LanguageHint: string.Empty,
         TranscriptionPrompt: string.Empty,
         IssueExtractionModel: "gpt-4.1-mini",
+        AiProviderBaseUrl: string.Empty,
         AudioInputDeviceName: string.Empty,
         GitHubRepositoryOwner: string.Empty,
         GitHubRepositoryName: string.Empty,
@@ -54,6 +57,11 @@ public sealed record WindowsAppSettings(
         string.IsNullOrWhiteSpace(IssueExtractionModel)
             ? Default.IssueExtractionModel
             : IssueExtractionModel.Trim();
+
+    public string? EffectiveAiProviderBaseUrl =>
+        string.IsNullOrWhiteSpace(AiProviderBaseUrl)
+            ? null
+            : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
 
     public string? EffectiveAudioInputDeviceName =>
         string.IsNullOrWhiteSpace(AudioInputDeviceName)

@@ -82,7 +82,7 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
             diagnostics,
             new HttpClient(handler));
 
-        var result = await service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini");
+        var result = await service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini", providerBaseUrl: null);
 
         Assert.NotNull(capturedRequest);
         Assert.Equal("https://api.openai.com/v1/chat/completions", capturedRequest!.RequestUri!.AbsoluteUri);
@@ -99,6 +99,49 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ExtractAsync_WithProviderBaseUrl_UsesConfiguredEndpoint()
+    {
+        var diagnostics = new WindowsDiagnostics(storagePaths);
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new TestHttpMessageHandler((request, _) =>
+        {
+            capturedRequest = request;
+            var body =
+                """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\"summary\":\"No issues\",\"issues\":[]}"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            });
+        });
+
+        var service = new OpenAiIssueExtractionService(
+            diagnostics,
+            new HttpClient(handler));
+
+        await service.ExtractAsync(
+            session,
+            "fixture-openai-key",
+            "gpt-4.1-mini",
+            "https://ai.example.test/v1");
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal("https://ai.example.test/v1/chat/completions", capturedRequest!.RequestUri!.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task ExtractAsync_WhenNetworkFails_ReturnsFriendlyConnectivityMessage()
     {
         var diagnostics = new WindowsDiagnostics(storagePaths);
@@ -109,7 +152,7 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
                 throw new HttpRequestException("No route to host"))));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini"));
+            service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini", providerBaseUrl: null));
 
         Assert.Contains("could not reach OpenAI issue extraction", exception.Message, StringComparison.OrdinalIgnoreCase);
     }

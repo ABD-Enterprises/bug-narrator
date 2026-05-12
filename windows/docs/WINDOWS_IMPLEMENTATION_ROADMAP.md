@@ -509,11 +509,68 @@ Current implementation findings:
 
 ## Current macOS Parity Review
 
-As of March 18, 2026, the current Windows branch is in strong parity with the current macOS app for the core `record -> review -> refine -> export` workflow:
+As of May 12, 2026, the current Windows branch is in strong parity with the current macOS app for the core `record -> review -> refine -> export` workflow:
 
 - tray shell, recording controls, optional global hotkeys, microphone recording, screenshot capture, transcription, session review, issue extraction, bundle export, debug bundle export, and experimental GitHub/Jira export are all implemented on Windows
 - the post-MVP hardening and hotkey milestones improved the reliability and reach of the existing workflow without reopening already-complete review surfaces
-- the remaining work is mostly real-desktop validation and Windows-specific polish around reserved shortcuts, keyboard layouts, DPI, multi-monitor behavior, and third-party integration credentials rather than a missing core workflow phase
+- `WIN-005` and `WIN-006` are closed as completed against current `main`; remaining runtime confidence stays tracked in `RR-002`
+- the remaining high-value parity work is now Windows-specific validation and newer macOS surface parity rather than the older missing review/export milestones
+
+### WIN-007: Windows AI Provider Setup Parity
+
+Goal:
+
+- align Windows with the current macOS AI provider model instead of keeping the Windows flow OpenAI-specific
+
+Deliverables:
+
+- provider selection with OpenAI as the default
+- configurable OpenAI-compatible base URL for enterprise and local-compatible endpoints
+- credential validation and compatibility feedback before transcription or issue extraction where practical
+- transcription and issue-extraction clients that build endpoints from provider settings
+- preserved-session retry behavior when provider configuration is missing, invalid, or revoked
+- redaction coverage for provider credentials and endpoint-sensitive diagnostics
+
+Tracking:
+
+- GitHub issue #73
+
+### WIN-008: Windows System Audio And Mixed Audio Recording Parity
+
+Goal:
+
+- align Windows recording-source options with the current macOS microphone, system audio, and microphone plus system audio model
+
+Deliverables:
+
+- recording source setting for microphone, system audio, and microphone plus system audio
+- Windows system audio capture, likely through WASAPI loopback via NAudio
+- mixed microphone plus system audio capture, or a documented follow-up if muxing requires a split implementation
+- consent and privacy messaging for system audio capture
+- recording-source preflight, diagnostics, and user-facing recovery states
+- validation that generated artifacts remain transcribable and compatible with the existing session persistence model
+
+Tracking:
+
+- GitHub issue #74
+
+### WIN-009: Signed Windows Tester Release
+
+Goal:
+
+- move Windows from internal zip validation to a signed tester-ready release artifact
+
+Deliverables:
+
+- decide signed zip versus installer versus MSIX for the first tester artifact
+- provision a Windows code-signing certificate outside the repo
+- sign the executable and any distributable artifact
+- validate the signed artifact on a clean Windows machine
+- publish release notes and validation evidence
+
+Tracking:
+
+- GitHub issue #75
 
 ## Suggested Repo Skeleton
 

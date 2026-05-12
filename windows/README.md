@@ -61,6 +61,13 @@ Current Windows milestone status:
 - stopping a recording now saves the session even when no OpenAI API key is configured and preserves a clear failure state if transcription fails
 - automated coverage currently includes `9` core tests and `29` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
-- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, checks packaged-file hash parity against the publish output, then launches the packaged app in a headless smoke mode that writes a structured report and exits cleanly
+- `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, checks packaged-file hash parity against the publish output, then writes a structured package smoke report for CI/release evidence
 - CI now uploads `bugnarrator-windows-package` and `bugnarrator-windows-validation` artifacts from the Windows runner
 - manual validation is still required for live OpenAI transcription, live issue extraction, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop
+
+Current follow-up parity tickets:
+
+- `RR-002` / #44 remains the real Windows desktop validation gate.
+- `WIN-007` / #73 tracks Windows AI provider setup parity with the current macOS provider model.
+- `WIN-008` / #74 tracks Windows system audio and mixed audio recording parity.
+- `WIN-009` / #75 tracks the signed Windows tester release path.

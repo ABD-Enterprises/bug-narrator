@@ -293,7 +293,10 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
             return Task.FromResult(TranscriptText);
         }
 
-        public Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+        public Task ValidateApiKeyAsync(
+            string apiKey,
+            string? providerBaseUrl = null,
+            CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }

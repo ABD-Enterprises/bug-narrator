@@ -77,6 +77,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
             session,
             apiKey,
             settings.EffectiveIssueExtractionModel,
+            settings.EffectiveAiProviderBaseUrl,
             cancellationToken);
 
         var updatedSession = session with

@@ -6,9 +6,6 @@ namespace BugNarrator.Windows.Services.Transcription;
 
 public sealed class OpenAiTranscriptionClient : ITranscriptionClient
 {
-    private static readonly Uri TranscriptionsEndpoint = new("https://api.openai.com/v1/audio/transcriptions");
-    private static readonly Uri ModelsEndpoint = new("https://api.openai.com/v1/models");
-
     private readonly HttpClient httpClient;
 
     public OpenAiTranscriptionClient(HttpClient? httpClient = null)
@@ -56,7 +53,9 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             content.Add(new StringContent(request.Prompt), "prompt");
         }
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, TranscriptionsEndpoint)
+        using var message = new HttpRequestMessage(
+            HttpMethod.Post,
+            OpenAiCompatibleEndpoint.Build(request.ProviderBaseUrl, "audio/transcriptions"))
         {
             Content = content,
         };
@@ -88,9 +87,14 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
         return transcript;
     }
 
-    public async Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+    public async Task ValidateApiKeyAsync(
+        string apiKey,
+        string? providerBaseUrl = null,
+        CancellationToken cancellationToken = default)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Get, ModelsEndpoint);
+        using var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            OpenAiCompatibleEndpoint.Build(providerBaseUrl, "models"));
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
 
         using var response = await RemoteServiceRequestGuard.SendAsync(

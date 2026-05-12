@@ -25,24 +25,26 @@ public partial class App : Application
     private WindowsAppShell? appShell;
     private WindowsDiagnostics? diagnostics;
 
-    protected override void OnStartup(StartupEventArgs e)
+    public App()
     {
-        base.OnStartup(e);
-
         try
         {
-            if (WindowsSmokeProbe.TryWriteReport(e.Args, out var smokeExitCode))
+            var commandLineArgs = Environment.GetCommandLineArgs().Skip(1).ToArray();
+            if (WindowsSmokeProbe.TryWriteReport(commandLineArgs, out var smokeExitCode))
             {
-                Shutdown(smokeExitCode);
-                return;
+                Environment.Exit(smokeExitCode);
             }
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"BugNarrator Windows smoke probe failed: {exception.Message}");
-            Shutdown(1);
-            return;
+            Environment.Exit(1);
         }
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 

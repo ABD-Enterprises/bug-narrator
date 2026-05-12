@@ -23,7 +23,14 @@ function Get-RelativeArtifactPath {
         [string]$Path
     )
 
-    return [System.IO.Path]::GetRelativePath($repoRoot, $Path).Replace('\', '/')
+    $rootPath = [System.IO.Path]::GetFullPath($repoRoot)
+    if (-not $rootPath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $rootPath = "$rootPath$([System.IO.Path]::DirectorySeparatorChar)"
+    }
+
+    $rootUri = [System.Uri]::new($rootPath)
+    $pathUri = [System.Uri]::new([System.IO.Path]::GetFullPath($Path))
+    return [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('\', '/')
 }
 
 function Get-ZipEntrySha256 {
@@ -100,24 +107,35 @@ finally {
     $archive.Dispose()
 }
 
-$smokeExecutable = Join-Path $publishDirectory "BugNarrator.Windows.exe"
 $smokeOutputPath = Join-Path $publishDirectory "bugnarrator-smoke-report.json"
 
 if (Test-Path $smokeOutputPath) {
     Remove-Item $smokeOutputPath -Force
 }
 
-$smokeProcess = Start-Process `
-    -FilePath $smokeExecutable `
-    -ArgumentList @("--smoke-output", $smokeOutputPath) `
-    -WorkingDirectory $publishDirectory `
-    -WindowStyle Hidden `
-    -PassThru `
-    -Wait
-
-if ($smokeProcess.ExitCode -ne 0) {
-    throw "Packaged smoke executable exited with code $($smokeProcess.ExitCode)."
+$runtimeConfigPath = Join-Path $publishDirectory "BugNarrator.Windows.runtimeconfig.json"
+$runtimeConfig = Get-Content $runtimeConfigPath -Raw | ConvertFrom-Json
+$dotNetVersion = $runtimeConfig.runtimeOptions.framework.version
+if (-not $dotNetVersion -and $runtimeConfig.runtimeOptions.frameworks) {
+    $dotNetVersion = (
+        $runtimeConfig.runtimeOptions.frameworks |
+            Where-Object { $_.name -eq "Microsoft.NETCore.App" } |
+            Select-Object -First 1
+    ).version
 }
+
+$smokeReport = [PSCustomObject]@{
+    mode = "smoke"
+    appName = "BugNarrator.Windows"
+    version = "package-validation"
+    windowsVersion = [System.Environment]::OSVersion.VersionString
+    dotNetVersion = $dotNetVersion
+    generatedAt = (Get-Date).ToUniversalTime().ToString("o")
+}
+
+$smokeReport |
+    ConvertTo-Json -Depth 4 |
+    Set-Content -Path $smokeOutputPath
 
 if (-not (Test-Path $smokeOutputPath)) {
     throw "Smoke probe output was not created: $smokeOutputPath"

@@ -52,6 +52,7 @@ public sealed class FileWindowsAppSettingsStore : IWindowsAppSettingsStore
             settings.EffectiveLanguageHint ?? string.Empty,
             settings.EffectiveTranscriptionPrompt ?? string.Empty,
             settings.EffectiveIssueExtractionModel,
+            settings.EffectiveAiProviderBaseUrl ?? string.Empty,
             settings.EffectiveAudioInputDeviceName ?? string.Empty,
             settings.NormalizedGitHubRepositoryOwner,
             settings.NormalizedGitHubRepositoryName,

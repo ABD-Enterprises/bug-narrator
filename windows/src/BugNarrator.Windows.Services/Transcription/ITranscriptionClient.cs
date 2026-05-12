@@ -8,5 +8,8 @@ public interface ITranscriptionClient
         OpenAiTranscriptionRequest request,
         CancellationToken cancellationToken = default);
 
-    Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default);
+    Task ValidateApiKeyAsync(
+        string apiKey,
+        string? providerBaseUrl = null,
+        CancellationToken cancellationToken = default);
 }

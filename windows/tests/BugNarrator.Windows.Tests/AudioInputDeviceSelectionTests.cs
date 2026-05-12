@@ -245,7 +245,10 @@ public sealed class AudioInputDeviceSelectionTests
             return Task.FromResult("Example transcript.");
         }
 
-        public Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+        public Task ValidateApiKeyAsync(
+            string apiKey,
+            string? providerBaseUrl = null,
+            CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
