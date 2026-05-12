@@ -74,6 +74,20 @@ final class MicrophonePermissionServiceTests: XCTestCase {
         XCTAssertEqual(recorder.activationProbeCallCount, 0)
     }
 
+    func testPreflightSkipsMicrophonePermissionWhenRecorderDoesNotRequireIt() async {
+        let recorder = MockAudioRecorder()
+        recorder.requiresMicrophonePermission = false
+        recorder.permissionState = .denied
+        recorder.activationProbeBehavior = .success
+        let service = MicrophonePermissionService(permissionAccess: recorder)
+
+        let result = await service.preflightForRecordingStart(audioRecorder: recorder)
+
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(recorder.permissionRequestCallCount, 0)
+        XCTAssertEqual(recorder.activationProbeCallCount, 1)
+    }
+
     func testCurrentStatusReturnsGrantedWhenPermissionIsAuthorized() {
         let recorder = MockAudioRecorder()
         recorder.permissionState = .authorized

@@ -7,6 +7,9 @@ enum AppError: LocalizedError, Equatable {
     case microphonePermissionDenied
     case microphonePermissionRestricted
     case microphoneUnavailable(String)
+    case systemAudioFeatureDisabled
+    case systemAudioConsentRequired
+    case systemAudioUnavailable(String)
     case screenRecordingPermissionDenied
     case noActiveSession(String)
     case recordingFailure(String)
@@ -37,6 +40,12 @@ enum AppError: LocalizedError, Equatable {
             return "Microphone access is restricted on this Mac. Check System Settings > Privacy & Security > Microphone and any device-management or parental-control restrictions, then try again."
         case .microphoneUnavailable(let message):
             return "BugNarrator could not start audio capture. \(message)"
+        case .systemAudioFeatureDisabled:
+            return "System audio capture is behind an experimental flag. Enable it in Settings before choosing a system audio mode."
+        case .systemAudioConsentRequired:
+            return "System audio capture can include meeting audio and other people's voices. Open Settings and acknowledge the recording notice before starting."
+        case .systemAudioUnavailable(let message):
+            return "BugNarrator could not start system audio capture. \(message)"
         case .screenRecordingPermissionDenied:
             return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again."
         case .noActiveSession(let message):
@@ -85,6 +94,12 @@ enum AppError: LocalizedError, Equatable {
             return "Microphone Access Restricted"
         case .microphoneUnavailable:
             return "Microphone Unavailable"
+        case .systemAudioFeatureDisabled:
+            return "System Audio Disabled"
+        case .systemAudioConsentRequired:
+            return "System Audio Notice Needed"
+        case .systemAudioUnavailable:
+            return "System Audio Unavailable"
         case .screenRecordingPermissionDenied:
             return "Screen Recording Access Needed"
         case .recordingFailure:
@@ -118,6 +133,12 @@ enum AppError: LocalizedError, Equatable {
             return "Microphone access is restricted."
         case .microphoneUnavailable:
             return "Audio capture is unavailable."
+        case .systemAudioFeatureDisabled:
+            return "Enable system audio capture before continuing."
+        case .systemAudioConsentRequired:
+            return "Acknowledge the system audio recording notice before continuing."
+        case .systemAudioUnavailable:
+            return "System audio capture is unavailable."
         case .screenRecordingPermissionDenied:
             return "Screen recording access is blocked."
         case .missingAPIKey:
@@ -151,6 +172,24 @@ enum AppError: LocalizedError, Equatable {
     var suggestsMicrophoneSettings: Bool {
         switch self {
         case .microphonePermissionDenied, .microphonePermissionRestricted:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var suggestsSystemAudioSettings: Bool {
+        switch self {
+        case .systemAudioFeatureDisabled, .systemAudioConsentRequired:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var suggestsSystemAudioPrivacySettings: Bool {
+        switch self {
+        case .systemAudioUnavailable:
             return true
         default:
             return false

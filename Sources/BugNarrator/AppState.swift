@@ -198,7 +198,7 @@ final class AppState: ObservableObject {
         self.init(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
-            services: .production(),
+            services: .production(settingsStore: settingsStore),
             runtimeEnvironment: runtimeEnvironment
         )
     }
@@ -233,7 +233,7 @@ final class AppState: ObservableObject {
     init(
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
-        audioRecorder: AudioRecording,
+        audioRecorder: any AudioRecording,
         microphonePermissionService: any MicrophonePermissionServicing,
         screenCapturePermissionService: any ScreenCapturePermissionServicing,
         transcriptionClient: any TranscriptionServing,
@@ -347,6 +347,7 @@ final class AppState: ObservableObject {
             metadata: [
                 "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no",
                 "ai_provider": settingsStore.aiProvider.rawValue,
+                "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
                 "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
             ]
         )
@@ -605,7 +606,7 @@ final class AppState: ObservableObject {
                 metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
             )
             setStatus(.recording(recordingDetailMessage()))
-            beginActivity(reason: "Recording a spoken feedback session")
+            beginActivity(reason: recordingActivityReason())
             startTimer()
             return
         }
@@ -634,13 +635,14 @@ final class AppState: ObservableObject {
                 )
 
                 setStatus(.recording(recordingDetailMessage()))
-                beginActivity(reason: "Recording a spoken feedback session")
+                beginActivity(reason: recordingActivityReason())
                 startTimer()
                 recordingLogger.info(
                     "session_started",
                     "A feedback session started successfully.",
                     metadata: [
                         "session_id": sessionID.uuidString,
+                        "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
                         "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
                         "ai_provider": settingsStore.aiProvider.rawValue
                     ]
@@ -648,6 +650,7 @@ final class AppState: ObservableObject {
                 telemetryRecorder.record(
                     "recording_started",
                     metadata: [
+                        "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
                         "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
                         "ai_provider": settingsStore.aiProvider.rawValue
                     ]
@@ -662,15 +665,36 @@ final class AppState: ObservableObject {
     }
 
     private func recordingDetailMessage() -> String {
+        let prefix: String
+        switch settingsStore.recordingAudioSource {
+        case .microphone:
+            prefix = "Recording in progress."
+        case .systemAudio:
+            prefix = "Recording system audio."
+        case .microphoneAndSystemAudio:
+            prefix = "Recording microphone and system audio."
+        }
+
         if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
-            return "Recording in progress."
+            return prefix
         }
 
         if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            return "Recording in progress. \(compatibilityIssue)"
+            return "\(prefix) \(compatibilityIssue)"
         }
 
-        return "Recording in progress. Finish the AI provider setup in Settings before stopping to transcribe this session."
+        return "\(prefix) Finish the AI provider setup in Settings before stopping to transcribe this session."
+    }
+
+    private func recordingActivityReason() -> String {
+        switch settingsStore.recordingAudioSource {
+        case .microphone:
+            return "Recording a spoken feedback session"
+        case .systemAudio:
+            return "Recording system audio for a feedback session"
+        case .microphoneAndSystemAudio:
+            return "Recording microphone and system audio for a feedback session"
+        }
     }
 
     func stopSession() async {
@@ -991,6 +1015,20 @@ final class AppState: ObservableObject {
         }
 
         presentUtilityActionFailure("BugNarrator could not open Screen Recording settings automatically.")
+    }
+
+    func openSystemAudioPrivacySettings() {
+        let candidateURLs = [
+            BugNarratorLinks.screenRecordingPrivacySettings,
+            BugNarratorLinks.securityPrivacySettings,
+            BugNarratorLinks.systemSettingsApp
+        ]
+
+        for url in candidateURLs where urlHandler.open(url) {
+            return
+        }
+
+        presentUtilityActionFailure("BugNarrator could not open Screen & System Audio Recording settings automatically.")
     }
 
     func checkForUpdates() {
@@ -2467,7 +2505,13 @@ final class AppState: ObservableObject {
         telemetryRecorder.record("app_error", metadata: metadata)
 
         switch error {
-        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable, .screenRecordingPermissionDenied:
+        case .microphonePermissionDenied,
+             .microphonePermissionRestricted,
+             .microphoneUnavailable,
+             .systemAudioFeatureDisabled,
+             .systemAudioConsentRequired,
+             .systemAudioUnavailable,
+             .screenRecordingPermissionDenied:
             permissionsLogger.warning("app_error", error.userMessage, metadata: metadata)
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
             settingsLogger.warning("app_error", error.userMessage, metadata: metadata)
@@ -2496,6 +2540,12 @@ final class AppState: ObservableObject {
             return "microphone_permission_restricted"
         case .microphoneUnavailable:
             return "microphone_unavailable"
+        case .systemAudioFeatureDisabled:
+            return "system_audio_feature_disabled"
+        case .systemAudioConsentRequired:
+            return "system_audio_consent_required"
+        case .systemAudioUnavailable:
+            return "system_audio_unavailable"
         case .screenRecordingPermissionDenied:
             return "screen_recording_permission_denied"
         case .missingAPIKey:

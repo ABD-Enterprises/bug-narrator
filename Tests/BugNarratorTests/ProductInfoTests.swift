@@ -30,10 +30,10 @@ final class ProductInfoTests: XCTestCase {
     }
 
     func testProjectLinksUseExpectedPublicURLs() {
-        XCTAssertEqual(BugNarratorLinks.repository.absoluteString, "https://github.com/deffenda/bugnarrator")
-        XCTAssertEqual(BugNarratorLinks.documentation.absoluteString, "https://github.com/deffenda/bugnarrator/blob/main/docs/UserGuide.md")
-        XCTAssertEqual(BugNarratorLinks.issues.absoluteString, "https://github.com/deffenda/bugnarrator/issues/new")
-        XCTAssertEqual(BugNarratorLinks.releases.absoluteString, "https://github.com/deffenda/bugnarrator/releases")
+        XCTAssertEqual(BugNarratorLinks.repository.absoluteString, "https://github.com/deffenda/bug-narrator")
+        XCTAssertEqual(BugNarratorLinks.documentation.absoluteString, "https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md")
+        XCTAssertEqual(BugNarratorLinks.issues.absoluteString, "https://github.com/deffenda/bug-narrator/issues/new")
+        XCTAssertEqual(BugNarratorLinks.releases.absoluteString, "https://github.com/deffenda/bug-narrator/releases")
         XCTAssertEqual(BugNarratorLinks.supportDevelopment.absoluteString, "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8")
     }
 
