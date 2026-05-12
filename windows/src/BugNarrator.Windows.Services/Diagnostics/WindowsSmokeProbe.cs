@@ -4,6 +4,7 @@ namespace BugNarrator.Windows.Services.Diagnostics;
 
 public static class WindowsSmokeProbe
 {
+    public const string SmokeOutputEnvironmentVariable = "BUGNARRATOR_SMOKE_OUTPUT";
     public const string SmokeOutputArgument = "--smoke-output";
 
     public static bool TryWriteReport(IReadOnlyList<string> args, out int exitCode)
@@ -59,7 +60,10 @@ public static class WindowsSmokeProbe
             return index + 1 < args.Count ? args[index + 1] : string.Empty;
         }
 
-        return null;
+        var environmentOutputPath = Environment.GetEnvironmentVariable(SmokeOutputEnvironmentVariable);
+        return string.IsNullOrWhiteSpace(environmentOutputPath)
+            ? null
+            : environmentOutputPath;
     }
 
     public sealed record WindowsSmokeReport(

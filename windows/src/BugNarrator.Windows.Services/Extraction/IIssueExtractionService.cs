@@ -8,5 +8,6 @@ public interface IIssueExtractionService
         CompletedSession session,
         string apiKey,
         string model,
+        string? providerBaseUrl,
         CancellationToken cancellationToken = default);
 }

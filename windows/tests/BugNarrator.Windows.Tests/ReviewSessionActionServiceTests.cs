@@ -112,6 +112,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             CompletedSession session,
             string apiKey,
             string model,
+            string? providerBaseUrl,
             CancellationToken cancellationToken = default)
         {
             LastApiKey = apiKey;
@@ -206,6 +207,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
                 LanguageHint: string.Empty,
                 TranscriptionPrompt: string.Empty,
                 IssueExtractionModel: "gpt-4.1-mini",
+                AiProviderBaseUrl: string.Empty,
                 AudioInputDeviceName: string.Empty,
                 GitHubRepositoryOwner: "acme",
                 GitHubRepositoryName: "bugnarrator",

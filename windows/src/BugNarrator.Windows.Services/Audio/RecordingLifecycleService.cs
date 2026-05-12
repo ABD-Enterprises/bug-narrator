@@ -407,7 +407,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         var request = new OpenAiTranscriptionRequest(
             settings.EffectiveTranscriptionModel,
             settings.EffectiveLanguageHint,
-            settings.EffectiveTranscriptionPrompt);
+            settings.EffectiveTranscriptionPrompt,
+            settings.EffectiveAiProviderBaseUrl);
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -431,7 +432,9 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 "Transcribing session with OpenAI...",
                 draft));
 
-            diagnostics.Info("transcription", $"transcription requested using model {request.Model}");
+            diagnostics.Info(
+                "transcription",
+                $"transcription requested using model {request.Model} and configured provider endpoint");
             var transcriptText = await transcriptionClient.TranscribeToTextAsync(
                 draft.AudioFilePath,
                 apiKey,

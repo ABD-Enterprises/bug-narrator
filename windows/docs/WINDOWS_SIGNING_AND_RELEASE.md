@@ -15,9 +15,9 @@ That script publishes `BugNarrator.Windows.csproj` for `win-x64` by default and 
 - `windows/artifacts/publish/<runtime>/`
 - `windows/artifacts/packages/BugNarrator-windows-<runtime>.zip`
 
-This is sufficient for internal validation and external handoff while installer work remains deferred.
+This is sufficient for internal validation and external handoff while installer work remains deferred. The signed tester release work is tracked in GitHub issue #75.
 
-CI now validates the packaged zip contents and launches the packaged Windows executable in a headless smoke mode before uploading the Windows artifact from `windows-latest`. This improves release-candidate confidence, but it does not replace a real desktop validation pass for tray, microphone, screenshot, or hotkey behavior.
+CI now validates the packaged zip contents and writes a structured package smoke report before uploading the Windows artifact from `windows-latest`. This improves release-candidate confidence, but it does not replace a real desktop validation pass for tray, microphone, screenshot, or hotkey behavior.
 
 ## Build And Test
 
@@ -71,3 +71,5 @@ Until a real code-signing certificate is provisioned, release candidates should 
 3. Sign `BugNarrator.Windows.exe` and any additional distributables with `windows/scripts/sign-windows.ps1`.
 4. Validate the signed build on a clean Windows machine.
 5. Upload the zip package and validation notes to GitHub Releases.
+
+For `WIN-009`, decide whether the first tester artifact remains a signed zip or moves to installer packaging. A signed zip is the shortest path to parity evidence; installer or MSIX work can follow if tester distribution needs it.

@@ -13,6 +13,7 @@ namespace BugNarrator.Windows.Views;
 public sealed class SettingsWindow : Window
 {
     private readonly PasswordBox apiKeyPasswordBox;
+    private readonly TextBox aiProviderBaseUrlTextBox;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ComboBox audioInputDeviceComboBox;
     private readonly WindowsDiagnostics diagnostics;
@@ -68,6 +69,11 @@ public sealed class SettingsWindow : Window
         Background = Brushes.White;
 
         apiKeyPasswordBox = new PasswordBox
+        {
+            Margin = new Thickness(0, 0, 0, 14),
+        };
+
+        aiProviderBaseUrlTextBox = new TextBox
         {
             Margin = new Thickness(0, 0, 0, 14),
         };
@@ -225,7 +231,7 @@ public sealed class SettingsWindow : Window
                     new TextBlock
                     {
                         Margin = new Thickness(0, 12, 0, 0),
-                        Text = "Configure transcription, optional global hotkeys, and the experimental export integrations for the Windows app.",
+                        Text = "Configure AI provider settings, optional global hotkeys, and the experimental export integrations for the Windows app.",
                         TextWrapping = TextWrapping.Wrap,
                     },
                     new TextBlock
@@ -259,9 +265,12 @@ public sealed class SettingsWindow : Window
             {
                 Children =
                 {
-                    BuildLabel("OpenAI API Key"),
+                    BuildLabel("AI Provider Credential"),
                     apiKeyPasswordBox,
-                    BuildHint("Stored locally for the current Windows user with DPAPI. BugNarrator does not ship with a bundled API key."),
+                    BuildHint("Stored locally for the current Windows user with DPAPI. BugNarrator does not ship with bundled AI provider access."),
+                    BuildLabel("AI Provider Base URL"),
+                    aiProviderBaseUrlTextBox,
+                    BuildHint("Optional. Leave blank for OpenAI. Use an OpenAI-compatible base URL such as https://api.openai.com/v1 or a trusted enterprise/local endpoint."),
                     BuildLabel("Transcription Model"),
                     modelTextBox,
                     BuildHint("Defaults to whisper-1 to match the current BugNarrator product baseline."),
@@ -482,6 +491,7 @@ public sealed class SettingsWindow : Window
             var jiraApiToken = await secretStore.GetAsync(SecretKeys.JiraApiToken);
 
             apiKeyPasswordBox.Password = apiKey ?? string.Empty;
+            aiProviderBaseUrlTextBox.Text = settings.EffectiveAiProviderBaseUrl ?? string.Empty;
             modelTextBox.Text = settings.EffectiveTranscriptionModel;
             languageHintTextBox.Text = settings.EffectiveLanguageHint ?? string.Empty;
             promptTextBox.Text = settings.EffectiveTranscriptionPrompt ?? string.Empty;
@@ -525,6 +535,7 @@ public sealed class SettingsWindow : Window
                 LanguageHint: languageHintTextBox.Text,
                 TranscriptionPrompt: promptTextBox.Text,
                 IssueExtractionModel: issueExtractionModelTextBox.Text,
+                AiProviderBaseUrl: aiProviderBaseUrlTextBox.Text,
                 AudioInputDeviceName: (audioInputDeviceComboBox.SelectedItem as AudioInputDeviceOption)?.DisplayName ?? string.Empty,
                 GitHubRepositoryOwner: gitHubOwnerTextBox.Text,
                 GitHubRepositoryName: gitHubRepositoryTextBox.Text,
@@ -578,8 +589,8 @@ public sealed class SettingsWindow : Window
 
         try
         {
-            await transcriptionClient.ValidateApiKeyAsync(apiKey);
-            statusTextBlock.Text = "The OpenAI API key was accepted.";
+            await transcriptionClient.ValidateApiKeyAsync(apiKey, aiProviderBaseUrlTextBox.Text);
+            statusTextBlock.Text = "The AI provider credential was accepted.";
         }
         catch (Exception exception)
         {
@@ -588,7 +599,7 @@ public sealed class SettingsWindow : Window
         }
     }
 
-    private async Task AssignHotkeyAsync(WindowsHotkeyAction action)
+    private Task AssignHotkeyAsync(WindowsHotkeyAction action)
     {
         var captureWindow = new HotkeyCaptureWindow(action)
         {
@@ -597,7 +608,7 @@ public sealed class SettingsWindow : Window
 
         if (captureWindow.ShowDialog() != true || captureWindow.CapturedShortcut is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var proposedShortcut = captureWindow.CapturedShortcut.Value.Normalize();
@@ -614,13 +625,14 @@ public sealed class SettingsWindow : Window
             hotkeyStatusTextBlocks[action].Text = issueForAction.Message;
             hotkeyStatusTextBlocks[action].Foreground = Brushes.DarkRed;
             statusTextBlock.Text = issueForAction.Message;
-            return;
+            return Task.CompletedTask;
         }
 
         pendingHotkeyChanges.Add(action);
         RefreshHotkeyValueText();
         RefreshHotkeyStatusText(hotkeyService.CurrentSnapshot);
         statusTextBlock.Text = $"{action.DisplayName()} will use {proposedShortcut.DisplayString} after you click Save.";
+        return Task.CompletedTask;
     }
 
     private void ClearHotkey(WindowsHotkeyAction action)

@@ -13,7 +13,6 @@ namespace BugNarrator.Windows.Services.Extraction;
 
 public sealed class OpenAiIssueExtractionService : IIssueExtractionService
 {
-    private static readonly Uri ChatCompletionsEndpoint = new("https://api.openai.com/v1/chat/completions");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -37,6 +36,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
         CompletedSession session,
         string apiKey,
         string model,
+        string? providerBaseUrl,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(session.TranscriptText))
@@ -68,7 +68,9 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
                 new ChatCompletionMessage("user", BuildPrompt(session)),
             ]);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, ChatCompletionsEndpoint)
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            OpenAiCompatibleEndpoint.Build(providerBaseUrl, "chat/completions"))
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(payload, JsonOptions),
