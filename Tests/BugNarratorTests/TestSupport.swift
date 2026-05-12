@@ -11,6 +11,7 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     }
 
     var currentDuration: TimeInterval = 0
+    var requiresMicrophonePermission = true
     var startCallCount = 0
     var stopCallCount = 0
     var cancelPreserveArguments: [Bool] = []

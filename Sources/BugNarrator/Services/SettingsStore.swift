@@ -187,6 +187,33 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var systemAudioCaptureEnabled: Bool = false {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(systemAudioCaptureEnabled, forKey: Keys.systemAudioCaptureEnabled)
+            if !systemAudioCaptureEnabled, recordingAudioSource.usesSystemAudio {
+                recordingAudioSource = .microphone
+            }
+        }
+    }
+
+    @Published var recordingAudioSource: RecordingAudioSource = .microphone {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(recordingAudioSource.rawValue, forKey: Keys.recordingAudioSource)
+        }
+    }
+
+    @Published var hasAcceptedSystemAudioRecordingConsent: Bool = false {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(
+                hasAcceptedSystemAudioRecordingConsent,
+                forKey: Keys.hasAcceptedSystemAudioRecordingConsent
+            )
+        }
+    }
+
     @Published var openAtStartup: Bool = false {
         didSet {
             guard hasLoaded, !isSynchronizingLaunchAtLogin else { return }
@@ -788,6 +815,18 @@ final class SettingsStore: ObservableObject {
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
+        systemAudioCaptureEnabled = boolValue(forKey: Keys.systemAudioCaptureEnabled) ?? false
+        let storedAudioSource = stringValue(forKey: Keys.recordingAudioSource)
+        recordingAudioSource = storedAudioSource
+            .flatMap(RecordingAudioSource.init(rawValue:))
+            ?? .microphone
+        if !systemAudioCaptureEnabled, recordingAudioSource.usesSystemAudio {
+            recordingAudioSource = .microphone
+            defaults.set(recordingAudioSource.rawValue, forKey: Keys.recordingAudioSource)
+        }
+        hasAcceptedSystemAudioRecordingConsent = boolValue(
+            forKey: Keys.hasAcceptedSystemAudioRecordingConsent
+        ) ?? false
         syncLaunchAtLoginState(launchAtLoginService.currentStatus())
 
         startRecordingHotkeyShortcut = loadHotkey(
@@ -825,6 +864,8 @@ final class SettingsStore: ObservableObject {
             "Settings finished loading.",
             metadata: [
                 "debug_mode": debugMode ? "enabled" : "disabled",
+                "recording_audio_source": recordingAudioSource.diagnosticsValue,
+                "system_audio_capture": systemAudioCaptureEnabled ? "enabled" : "disabled",
                 "has_openai_key": hasAPIKey ? "yes" : "no",
                 "has_github_token": hasGitHubToken ? "yes" : "no",
                 "has_jira_token": hasJiraAPIToken ? "yes" : "no",
@@ -1514,6 +1555,9 @@ private enum SecretSlot: Hashable, CaseIterable {
     static let autoCopyTranscript = "settings.autoCopyTranscript"
     static let autoSaveTranscript = "settings.autoSaveTranscript"
     static let autoExtractIssues = "settings.autoExtractIssues"
+    static let systemAudioCaptureEnabled = "settings.systemAudioCaptureEnabled"
+    static let recordingAudioSource = "settings.recordingAudioSource"
+    static let hasAcceptedSystemAudioRecordingConsent = "settings.hasAcceptedSystemAudioRecordingConsent"
     static let startRecordingHotkeyShortcut = "settings.startRecordingHotkeyShortcut"
     static let legacyRecordingHotkeyShortcut = "settings.hotkeyShortcut"
     static let legacyStartRecordingHotkeyShortcut = "settings.recordingHotkeyShortcut"

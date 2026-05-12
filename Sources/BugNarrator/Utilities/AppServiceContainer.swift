@@ -17,9 +17,9 @@ struct AppServiceContainer {
     let urlHandler: any URLOpening
     let recordingTimer: RecordingTimerViewModel
 
-    static func production() -> AppServiceContainer {
+    static func production(settingsStore: SettingsStore) -> AppServiceContainer {
         AppServiceContainer(
-            audioRecorder: AudioRecorder(),
+            audioRecorder: RoutingAudioRecorder(settingsStore: settingsStore),
             microphonePermissionService: MicrophonePermissionService(),
             screenCapturePermissionService: ScreenCapturePermissionService(),
             transcriptionClient: TranscriptionClient(),

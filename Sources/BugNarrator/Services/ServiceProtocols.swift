@@ -84,11 +84,18 @@ enum ScreenshotSelectionResult: Equatable {
 @MainActor
 protocol AudioRecording: AnyObject {
     var currentDuration: TimeInterval { get }
+    var requiresMicrophonePermission: Bool { get }
     func validateRecordingPrerequisites() async -> AppError?
     func validateRecordingActivation() async -> AppError?
     func startRecording() async throws
     func stopRecording() async throws -> RecordedAudio
     func cancelRecording(preserveFile: Bool) async
+}
+
+extension AudioRecording {
+    var requiresMicrophonePermission: Bool {
+        true
+    }
 }
 
 @MainActor
