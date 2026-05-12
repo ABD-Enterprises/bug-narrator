@@ -8,7 +8,7 @@ This page mirrors the canonical onboarding guidance in the repository and points
 
 1. Download the latest DMG from [GitHub Releases](https://github.com/deffenda/bug-narrator/releases).
 2. Install `BugNarrator.app` into `Applications`.
-3. Open BugNarrator and add your OpenAI API key in `Settings`.
+3. Open BugNarrator and configure your AI provider in `Settings`.
 4. Open `Show Recording Controls` and start a narrated session.
 5. Follow the [Tester Narration Guide](https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md#tester-narration-guide) during real testing passes.
 

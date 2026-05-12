@@ -21,7 +21,7 @@ BugNarrator is a macOS menu bar app for narrated software testing sessions. It h
 You need:
 
 - a macOS 14 or later Mac
-- your own OpenAI API key for transcription and issue extraction
+- your own AI provider configuration for transcription and issue extraction
 - microphone permission for recording
 - Screen Recording permission if you want screenshots
 
@@ -36,10 +36,11 @@ You need:
 
 1. Open the menu bar item.
 2. Open `Settings`.
-3. Paste your OpenAI API key.
-4. Optionally validate the key.
+3. Choose an AI provider.
+4. Enter the required API key or base URL.
+5. Optionally validate the key or connection.
 
-BugNarrator does not ship with a built-in OpenAI key.
+BugNarrator does not ship with built-in AI access or credits. OpenAI remains the default provider, and OpenAI-compatible enterprise or local-compatible endpoints can be configured when they expose the transcription and chat APIs BugNarrator needs.
 
 ## Recording Workflow
 
@@ -51,7 +52,7 @@ BugNarrator does not ship with a built-in OpenAI key.
 
 The recording controls window stays open until you close it.
 
-If the OpenAI key is missing, invalid, or revoked when the recording finishes, BugNarrator preserves the finished session in the library so you can restore the key and retry transcription later.
+If the AI provider configuration is missing, invalid, or revoked when the recording finishes, BugNarrator preserves the finished session in the library so you can restore the configuration and retry transcription later.
 
 Sessions waiting for transcription retry are also surfaced in the menu bar window and at the top of the session-library list, so the recovery flow stays visible after relaunch.
 
@@ -89,7 +90,7 @@ Common fixes:
 
 - microphone blocked: use `Open Microphone Settings`
 - screenshot blocked: use `Open Screen Recording Settings`
-- invalid OpenAI key: open `Settings`, replace the key, and retry
+- invalid AI provider setup: open `Settings`, replace the credential or fix the endpoint/model, and retry
 
 For support, hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
 

@@ -165,7 +165,7 @@ If issue extraction returns no draft issues, the review flow must fall back to `
 
 Settings owns:
 
-- OpenAI credential setup
+- AI provider credential and endpoint setup
 - transcription defaults
 - issue-extraction defaults
 - workflow defaults
@@ -203,11 +203,13 @@ The app must:
 
 BugNarrator generates transcripts after recording ends.
 
-It does not continuously stream live audio to OpenAI while the user is still recording.
+It does not continuously stream live audio to the configured AI provider while the user is still recording.
+
+OpenAI remains the default provider. OpenAI-compatible enterprise gateways and local-compatible endpoints are supported when they expose the transcription and chat APIs BugNarrator needs. Unsupported provider/model combinations must fail before transcription or issue extraction starts with clear setup guidance.
 
 ### Recovery
 
-If the OpenAI key is missing, invalid, or revoked when a session finishes recording:
+If the AI provider configuration is missing, invalid, or revoked when a session finishes recording:
 
 - the completed session must remain preserved locally
 - the library must expose that the session needs transcription retry
@@ -297,7 +299,7 @@ It may include:
 
 It must not include:
 
-- raw OpenAI keys
+- raw AI provider credentials
 - raw GitHub tokens
 - raw Jira tokens
 - other raw credentials
@@ -306,11 +308,11 @@ It must not include:
 
 ### Credentials
 
-BugNarrator does not ship with a built-in OpenAI API key.
+BugNarrator does not ship with built-in AI access or credits.
 
 Users must provide their own credentials for:
 
-- OpenAI transcription and issue extraction
+- AI-provider transcription and issue extraction
 - GitHub export
 - Jira export
 
@@ -336,7 +338,7 @@ Current product behavior:
 Data that remains local unless the user explicitly exports it:
 
 - session history
-- transcript results returned from OpenAI
+- transcript results returned from the configured AI provider
 - screenshots and screenshot metadata
 - extracted issue drafts
 - debug bundles
@@ -344,7 +346,7 @@ Data that remains local unless the user explicitly exports it:
 
 Data sent off-device only when the user invokes the relevant workflow:
 
-- recorded audio for OpenAI transcription
+- recorded audio for configured-provider transcription
 - transcript context for summary or issue extraction
 - selected issue payloads for GitHub or Jira export
 

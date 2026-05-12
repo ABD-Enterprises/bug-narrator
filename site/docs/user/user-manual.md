@@ -11,20 +11,22 @@ This site page mirrors the canonical user manual in the repository and stays foc
 You need:
 
 - a macOS 14 or later Mac
-- your own OpenAI API key for transcription and issue extraction
+- your own AI provider configuration for transcription and issue extraction
 - microphone permission for recording
 - Screen Recording permission if you want screenshots
 
 ## Recording Workflow
 
 1. Open the menu bar item.
-2. Open `Settings` and add your OpenAI API key.
+2. Open `Settings` and configure your AI provider.
 3. Click `Show Recording Controls`.
 4. Click `Start Recording`.
 5. Narrate what you are doing and capture screenshots when important evidence appears.
 6. Click `Stop Recording`.
 
-If the OpenAI key is missing, invalid, or revoked when recording stops, BugNarrator preserves the finished session so you can restore the key and retry transcription later.
+OpenAI remains the default provider. OpenAI-compatible enterprise or local-compatible endpoints can be configured when they expose the transcription and chat APIs BugNarrator needs.
+
+If the AI provider configuration is missing, invalid, or revoked when recording stops, BugNarrator preserves the finished session so you can restore the configuration and retry transcription later.
 
 ## Review Workflow
 

@@ -47,7 +47,7 @@ The product is organized around one durable workflow:
 It can:
 
 - record a narrated session from the menu bar
-- transcribe the finished recording with the OpenAI API
+- transcribe the finished recording with the configured AI provider
 - capture screenshots during a live review and turn them into timeline markers automatically
 - generate a review summary
 - extract draft bugs, UX issues, enhancements, and follow-up questions
@@ -56,19 +56,21 @@ It can:
 - keep a searchable session library with date filters and deletion
 - stay responsive with larger local histories by caching session-library metadata for faster filtering, search, and selection changes
 
-## Bring Your Own OpenAI API Key
+## Bring Your Own AI Provider
 
-BugNarrator does not ship with a built-in OpenAI API key.
+BugNarrator does not ship with built-in AI access or credits.
 
-Every user must provide their own key in `Settings` before transcription or issue extraction will work.
+OpenAI is the default provider. In `Settings`, you can also choose an OpenAI-compatible enterprise gateway or a local-compatible endpoint when that endpoint exposes the OpenAI-compatible APIs BugNarrator needs.
 
 Important:
 
-- transcription uses the OpenAI API, not a local Whisper model
-- issue extraction also uses the OpenAI API
-- OpenAI usage may cost money on your account
-- the app stores your key in macOS Keychain when available
-- the key is not bundled into the source code or compiled app
+- transcription requires a provider endpoint compatible with `/v1/audio/transcriptions`
+- issue extraction requires a provider endpoint compatible with `/v1/chat/completions`
+- local-compatible providers can leave the API key blank if the local endpoint does not require authentication
+- unsupported local/default model combinations show clear setup guidance in Settings instead of starting a broken transcription
+- provider usage may cost money on your account when you use a hosted provider
+- the app stores your provider credential in macOS Keychain when available
+- credentials are not bundled into the source code or compiled app
 - global hotkeys are optional and start unassigned until you assign them
 
 ## Install On macOS
@@ -78,7 +80,7 @@ Important:
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
 5. If Gatekeeper warns about the app, open `Applications`, Control-click `BugNarrator.app`, choose `Open`, then confirm once.
-6. On first run, expect OpenAI API key setup. Microphone permission is requested the first time you try to start recording.
+6. On first run, expect AI provider setup. Microphone permission is requested the first time you try to start recording.
 7. If you use screenshot capture, expect Screen Recording permission on first use.
 8. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
 9. If you try to launch BugNarrator a second time, macOS should bring the existing BugNarrator instance forward instead of opening another menu bar copy.
@@ -87,8 +89,8 @@ Important:
 
 1. Launch BugNarrator and open the menu bar item.
 2. Open `Settings`.
-3. Paste your own `OpenAI API Key`.
-4. Optionally click `Validate Key`.
+3. Choose an AI provider and enter the required key or base URL.
+4. Optionally click `Validate Key` or `Validate Connection`.
 5. Click `Show Recording Controls`.
 6. Click `Start Recording`.
 7. Speak while you continue reviewing the target app. For better transcripts and bug reports, follow the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide).
@@ -188,13 +190,13 @@ BugNarrator does not require Accessibility permission for its core workflow beca
 Data that stays local on your Mac:
 
 - session history
-- transcripts after they return from OpenAI
+- transcripts after they return from the configured AI provider
 - screenshot-driven timeline markers and older marker data from existing sessions
 - screenshots and screenshot metadata
 - extracted issue drafts
 - exported bundles you explicitly create
 
-Data sent to OpenAI:
+Data sent to the configured AI provider:
 
 - recorded audio when you stop a session and request transcription
 - transcript context used for issue extraction or summary generation
