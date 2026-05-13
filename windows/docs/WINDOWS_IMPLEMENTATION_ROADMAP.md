@@ -20,7 +20,7 @@ Build a Windows desktop version of BugNarrator that allows a tester to:
 - open a small recording controls window
 - record microphone audio while continuing to use other apps
 - capture selected screenshot regions during a session
-- transcribe finished sessions with the user's own OpenAI API key
+- transcribe finished sessions with the user's own AI provider configuration
 - review transcript, screenshots, summary, and extracted issues
 - browse saved sessions with flexible date filters and delete local sessions when they are no longer needed
 - export a local session bundle
@@ -210,7 +210,7 @@ GitHub and Jira export should remain explicitly experimental.
 
 1. stop capture cleanly
 2. persist draft artifacts
-3. send audio to OpenAI transcription
+3. send audio to the configured AI provider for transcription
 4. build transcript and session metadata
 5. save completed session locally
 6. focus the session library
@@ -218,7 +218,7 @@ GitHub and Jira export should remain explicitly experimental.
 ### Issue Extraction Flow
 
 1. user requests issue extraction from the selected session
-2. send transcript context to OpenAI
+2. send transcript context to the configured AI provider
 3. parse extraction output into structured draft issues
 4. keep results editable before export
 5. if no issues are found, keep the workspace in a valid fallback state
@@ -350,13 +350,13 @@ Outcomes:
 
 Current implementation findings:
 
-- the active Windows branch now stores transcription settings in `settings.json` under `%LocalAppData%\BugNarrator` and encrypts the OpenAI API key per Windows user with DPAPI-backed local secret storage
-- stopping a recording now saves the draft, optionally sends audio to OpenAI transcription, then persists a completed `session.json` plus `transcript.md` in the same session folder before focusing the session library
+- the active Windows branch now stores transcription and AI provider settings in `settings.json` under `%LocalAppData%\BugNarrator` and encrypts the provider credential per Windows user with DPAPI-backed local secret storage
+- stopping a recording now saves the draft, optionally sends audio to the configured AI provider for transcription, then persists a completed `session.json` plus `transcript.md` in the same session folder before focusing the session library
 - the stop-recording flow survives both missing-key and transcription-failure paths by saving a completed review session with a clear fallback status instead of crashing or discarding the recording
 - the WPF session library now supports list browsing, search, newest/oldest sorting, Today/Yesterday/Last 7 Days/Last 30 Days/All Sessions/Custom Date Range filtering, transcript review, screenshot preview, a summary tab, and an extracted-issues tab that is ready for editable/selectable Milestone 6 draft issues
 - the current Windows branch now supports permanent local session deletion from the session library, including deleting the session folder and its locally stored screenshots after confirmation
 - automated coverage now includes core tests for session-library query logic and transcript markdown shaping plus Windows tests for completed-session persistence across success, missing-key, and transcription-failure paths
-- manual validation is still required on a real Windows desktop for live OpenAI requests, long recordings, screenshot preview fidelity across DPI and multi-monitor setups, and review-window ergonomics
+- manual validation is still required on a real Windows desktop for live AI provider requests, long recordings, screenshot preview fidelity across DPI and multi-monitor setups, and review-window ergonomics
 - OpenAI-generated summaries remain out of scope for the current Windows MVP and are not implemented on this branch
 
 ### Milestone 6: Issue Extraction, Exports, And Diagnostics
@@ -382,7 +382,7 @@ Outcomes:
 
 Current implementation findings:
 
-- the active Windows branch now includes a Windows issue extraction client that sends completed session transcript context to OpenAI chat completions, requests structured JSON output, and parses that response into `IssueExtractionResult` plus `ExtractedIssue` records in `BugNarrator.Core`
+- the active Windows branch now includes a Windows issue extraction client that sends completed session transcript context to the configured OpenAI-compatible chat completions endpoint, requests structured JSON output, and parses that response into `IssueExtractionResult` plus `ExtractedIssue` records in `BugNarrator.Core`
 - completed sessions now persist extracted issue results, searchable issue text, and extracted-issue markdown output through the same `session.json` plus `transcript.md` storage model used by earlier milestones
 - the WPF session library now allows draft issues to be edited and selected before export, then saves those edits back into the completed session metadata
 - local `Export Session Bundle` now writes `transcript.md` plus a copied `screenshots/` directory under `%LocalAppData%\BugNarrator\Exports\SessionBundles\`
@@ -391,13 +391,13 @@ Current implementation findings:
 - Jira export is implemented as an explicitly experimental direct API integration that creates Jira issues from the selected draft issues using locally stored base URL, email, API token, project key, and issue type settings
 - DPAPI-backed secret storage now covers OpenAI, GitHub, and Jira credentials for the current Windows user without storing raw secrets in `settings.json`
 - packaging/release scaffolding now exists via `windows/scripts/build-windows.ps1`, `windows/scripts/test-windows.ps1`, `windows/scripts/package-windows.ps1`, `windows/scripts/sign-windows.ps1`, and `windows/docs/WINDOWS_SIGNING_AND_RELEASE.md`
-- automated coverage now includes `9` core tests and `18` Windows tests, including structured issue parsing, OpenAI extraction client behavior, GitHub/Jira export request behavior, session bundle export, debug bundle export, review-action orchestration, and session-library parity coverage
+- automated coverage now includes `9` core tests and `18` Windows tests, including structured issue parsing, OpenAI-compatible extraction client behavior, GitHub/Jira export request behavior, session bundle export, debug bundle export, review-action orchestration, and session-library parity coverage
 - validation completed on this branch includes:
   - `powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug`
   - `powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug`
   - `powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release`
   - a smoke launch of `windows/artifacts/publish/win-x64/BugNarrator.Windows.exe`
-- manual validation is still required on a real Windows desktop for live OpenAI issue extraction, real GitHub/Jira credentials, overlay behavior under mixed DPI and multi-monitor layouts, and overall review-workspace ergonomics
+- manual validation is still required on a real Windows desktop for live AI provider issue extraction, real GitHub/Jira credentials, overlay behavior under mixed DPI and multi-monitor layouts, and overall review-workspace ergonomics
 
 ### Post-MVP Hardening Milestone: Reliability, Defensive Coding, And Security
 
@@ -427,7 +427,7 @@ Current implementation findings:
 - completed-session loading now normalizes session-local audio, transcript, metadata, and screenshot paths before the rest of the app consumes them, which means tampered metadata no longer causes bundle export or library review to touch arbitrary local files
 - DPAPI secret reads now tolerate corrupt or oversized secret blobs by returning a safe null result instead of breaking settings load for the whole window
 - diagnostics and debug bundles now redact common authorization headers and token patterns before writing or exporting log lines
-- OpenAI transcription, OpenAI issue extraction, GitHub export, and Jira export now map timeout and connectivity failures to clearer user-facing messages
+- AI provider transcription, AI provider issue extraction, GitHub export, and Jira export now map timeout and connectivity failures to clearer user-facing messages
 - screenshot preview loading in the WPF session library now fails closed with a warning message instead of throwing when a local image file is missing or invalid
 - automated coverage now includes `9` core tests and `22` Windows tests, with the new Windows coverage focused on corrupted secret handling, safe session-path normalization, debug-log redaction, safer bundle export behavior, and network-failure messaging
 
@@ -534,6 +534,15 @@ Deliverables:
 Tracking:
 
 - GitHub issue #73
+
+Current implementation findings:
+
+- the Windows Settings window now exposes explicit provider selection for `OpenAI`, `OpenAI-Compatible`, and `Local-Compatible`, with OpenAI remaining the default
+- provider credentials remain in DPAPI-backed secret storage, while `settings.json` stores only non-secret provider choice, base URL, and model settings
+- transcription and issue extraction use the configured OpenAI-compatible endpoint, and local-compatible providers can run without a credential when the endpoint does not require authentication
+- Windows now blocks unsupported provider/model combinations before transcription or issue extraction, including missing compatible-provider base URLs and local providers left on hosted OpenAI defaults
+- missing or invalid provider setup still preserves completed sessions with a retryable fallback state instead of discarding recordings
+- automated coverage now includes `9` core tests and `44` Windows tests, including provider selection defaults, compatibility guidance, endpoint construction, local-compatible no-key transcription, and network-failure messaging
 
 ### WIN-008: Windows System Audio And Mixed Audio Recording Parity
 

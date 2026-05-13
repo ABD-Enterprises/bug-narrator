@@ -54,21 +54,21 @@ powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-single
 Current Windows milestone status:
 
 - Milestone 4 screenshot capture is implemented, including screenshot preflight, drag-select overlay, deterministic screenshot naming, screenshot metadata persistence, and screenshot-linked timeline moments
-- Milestone 5 transcription and review is implemented, including DPAPI-backed OpenAI API key storage, local transcription settings, completed `session.json` plus `transcript.md` persistence, and a WPF session library with transcript, screenshot, summary, and extracted-issue review tabs
-- Milestone 6 is implemented, including OpenAI issue extraction, editable/selectable draft issues, local session bundle export, local debug bundle export, experimental GitHub export, experimental Jira export, packaging scripts, and Windows signing/release documentation
+- Milestone 5 transcription and review is implemented, including DPAPI-backed AI provider credential storage, local provider/transcription settings, completed `session.json` plus `transcript.md` persistence, and a WPF session library with transcript, screenshot, summary, and extracted-issue review tabs
+- Milestone 6 is implemented, including AI provider issue extraction, editable/selectable draft issues, local session bundle export, local debug bundle export, experimental GitHub export, experimental Jira export, packaging scripts, and Windows signing/release documentation
 - the post-MVP macOS parity milestone for the session library is implemented, including `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `All Sessions`, and `Custom Date Range` filters plus permanent local session deletion
 - the post-MVP Windows global hotkey parity milestone is implemented, including optional `Start Recording`, `Stop Recording`, and `Capture Screenshot` shortcuts that start as `Not Set`, save locally, register on app startup, and surface clear conflict/unavailable status in Settings
 - the post-MVP hardening milestone is implemented, including shared atomic file writes, root-bound session path validation, corrupted-secret tolerance, diagnostic redaction, safer export/session loading, friendlier network failure messages, and defensive screenshot preview handling
-- stopping a recording now saves the session even when no OpenAI API key is configured and preserves a clear failure state if transcription fails
-- automated coverage currently includes `9` core tests and `29` Windows tests
+- stopping a recording now saves the session even when required AI provider setup is missing and preserves a clear failure state if transcription fails
+- Windows AI provider setup parity is implemented, including provider selection for OpenAI, OpenAI-compatible hosted endpoints, and local-compatible endpoints, plus compatibility guidance for unsupported provider/model combinations
+- automated coverage currently includes `9` core tests and `44` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped self-contained `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
 - `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, checks packaged-file hash parity against the publish output, then writes a structured package smoke report for CI/release evidence
 - CI now uploads `bugnarrator-windows-package` and `bugnarrator-windows-validation` artifacts from the Windows runner
-- manual validation is still required for live OpenAI transcription, live issue extraction, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop
+- manual validation is still required for live AI provider transcription, live issue extraction, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop
 
 Current follow-up parity tickets:
 
 - `RR-002` / #44 remains the real Windows desktop validation gate.
-- `WIN-007` / #73 tracks Windows AI provider setup parity with the current macOS provider model.
 - `WIN-008` / #74 tracks Windows system audio and mixed audio recording parity.
 - `WIN-009` / #75 tracks the signed Windows tester release path.

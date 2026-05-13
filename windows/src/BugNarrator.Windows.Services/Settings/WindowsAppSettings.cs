@@ -19,7 +19,8 @@ public sealed record WindowsAppSettings(
     string JiraIssueType,
     WindowsHotkeyShortcut StartRecordingHotkey = default,
     WindowsHotkeyShortcut StopRecordingHotkey = default,
-    WindowsHotkeyShortcut ScreenshotHotkey = default)
+    WindowsHotkeyShortcut ScreenshotHotkey = default,
+    string AiProvider = "openAI")
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -36,7 +37,14 @@ public sealed record WindowsAppSettings(
         JiraIssueType: "Task",
         StartRecordingHotkey: WindowsHotkeyShortcut.NotSet,
         StopRecordingHotkey: WindowsHotkeyShortcut.NotSet,
-        ScreenshotHotkey: WindowsHotkeyShortcut.NotSet);
+        ScreenshotHotkey: WindowsHotkeyShortcut.NotSet,
+        AiProvider: WindowsAiProviderProfile.Default.StorageValue);
+
+    public WindowsAiProviderProfile EffectiveAiProviderProfile =>
+        WindowsAiProviderProfile.FromStorageValue(AiProvider);
+
+    public string NormalizedAiProvider =>
+        EffectiveAiProviderProfile.StorageValue;
 
     public string EffectiveTranscriptionModel =>
         string.IsNullOrWhiteSpace(TranscriptionModel)
@@ -62,6 +70,45 @@ public sealed record WindowsAppSettings(
         string.IsNullOrWhiteSpace(AiProviderBaseUrl)
             ? null
             : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
+
+    public string? AiProviderCompatibilityIssue
+    {
+        get
+        {
+            var profile = EffectiveAiProviderProfile;
+            var hasBaseUrl = !string.IsNullOrWhiteSpace(AiProviderBaseUrl);
+
+            return profile.Provider switch
+            {
+                WindowsAiProvider.OpenAI => null,
+                WindowsAiProvider.OpenAICompatible when !hasBaseUrl =>
+                    "Choose a non-default API base URL for the OpenAI-Compatible provider.",
+                WindowsAiProvider.LocalCompatible when !hasBaseUrl =>
+                    "Choose your local-compatible base URL before validating or transcribing.",
+                WindowsAiProvider.LocalCompatible when EffectiveTranscriptionModel == Default.TranscriptionModel =>
+                    "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider.",
+                WindowsAiProvider.LocalCompatible when EffectiveIssueExtractionModel == Default.IssueExtractionModel =>
+                    "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider.",
+                _ => null,
+            };
+        }
+    }
+
+    public string? AiProviderCredentialForWorkflow(string? credential)
+    {
+        if (AiProviderCompatibilityIssue is not null)
+        {
+            return null;
+        }
+
+        var trimmedCredential = credential?.Trim();
+        if (EffectiveAiProviderProfile.RequiresCredential)
+        {
+            return string.IsNullOrWhiteSpace(trimmedCredential) ? null : trimmedCredential;
+        }
+
+        return trimmedCredential ?? string.Empty;
+    }
 
     public string? EffectiveAudioInputDeviceName =>
         string.IsNullOrWhiteSpace(AudioInputDeviceName)
