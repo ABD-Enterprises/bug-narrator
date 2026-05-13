@@ -123,6 +123,13 @@ if (-not $dotNetVersion -and $runtimeConfig.runtimeOptions.frameworks) {
             Select-Object -First 1
     ).version
 }
+if (-not $dotNetVersion -and $runtimeConfig.runtimeOptions.includedFrameworks) {
+    $dotNetVersion = (
+        $runtimeConfig.runtimeOptions.includedFrameworks |
+            Where-Object { $_.name -eq "Microsoft.NETCore.App" } |
+            Select-Object -First 1
+    ).version
+}
 
 $smokeReport = [PSCustomObject]@{
     mode = "smoke"

@@ -31,6 +31,7 @@ powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Conf
 powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
 powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64
+powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-single-instance.ps1 -Runtime win-x64
 ```
 
 Optional run command:

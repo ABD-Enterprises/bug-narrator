@@ -25,6 +25,8 @@ public partial class App : Application
     private WindowsAppShell? appShell;
     private WindowsDiagnostics? diagnostics;
 
+    internal SingleInstanceService? PrimarySingleInstanceService { private get; set; }
+
     public App()
     {
         try
@@ -52,7 +54,7 @@ public partial class App : Application
         diagnostics = new WindowsDiagnostics(storagePaths);
         diagnostics.Info("app", "starting Windows shell bootstrap");
 
-        var singleInstanceService = new SingleInstanceService("ABDEnterprises.BugNarrator.Windows");
+        var singleInstanceService = PrimarySingleInstanceService ?? new SingleInstanceService(Program.ApplicationId);
         var audioInputDeviceCatalog = new NAudioInputDeviceCatalog();
         var microphonePreflightService = new MicrophonePreflightService();
         var screenCapturePreflightService = new ScreenCapturePreflightService();
@@ -120,7 +122,9 @@ public partial class App : Application
 
         if (!appShell.Initialize())
         {
-            Shutdown();
+            appShell.Dispose();
+            appShell = null;
+            Environment.Exit(0);
         }
     }
 

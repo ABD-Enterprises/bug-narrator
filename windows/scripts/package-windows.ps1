@@ -24,7 +24,7 @@ try {
     dotnet publish "windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj" `
         -c $Configuration `
         -r $Runtime `
-        --self-contained false `
+        --self-contained true `
         -o $publishDirectory
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed."
@@ -34,7 +34,12 @@ try {
         Remove-Item $packagePath -Force
     }
 
-    Compress-Archive -Path (Join-Path $publishDirectory "*") -DestinationPath $packagePath
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $publishDirectory,
+        $packagePath,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false)
     Write-Host "Package created at $packagePath"
 }
 finally {
