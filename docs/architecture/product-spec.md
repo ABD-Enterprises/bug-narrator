@@ -76,7 +76,7 @@ Current scope boundaries:
 - no backend or cloud sync
 - no live dictation into the frontmost app
 - no automatic telemetry or remote log collection
-- no system audio capture
+- no hidden/background system audio capture without explicit user selection and consent
 - no requirement for Accessibility permission in the core workflow
 
 ## Core Workflow And Canonical Terminology

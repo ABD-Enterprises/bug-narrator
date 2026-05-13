@@ -33,7 +33,7 @@ Build a Windows desktop version of BugNarrator that allows a tester to:
 - no cloud sync
 - no accessibility automation
 - no live dictation into other apps
-- no system audio capture unless explicitly added later
+- no hidden/background system audio capture without explicit user selection and consent
 - no attempt to share the macOS UI layer directly
 
 ## Product Principles
@@ -562,6 +562,15 @@ Deliverables:
 Tracking:
 
 - GitHub issue #74
+
+Current implementation findings:
+
+- Windows Settings now exposes a `Recording Audio Source` choice for `Microphone`, `System Audio`, and `Microphone + System Audio`
+- microphone recording remains the default and continues to use the selected Windows microphone input device
+- system audio recording is implemented with NAudio WASAPI loopback against the default Windows render/output device and writes the captured stream into the existing session WAV artifact path
+- system-audio capture requires an explicit Settings consent checkbox explaining that audio from other apps on the PC may be recorded
+- `Microphone + System Audio` is intentionally surfaced as a clear limitation for this build instead of silently producing an incomplete artifact; true mixed-source muxing remains a follow-up after tester distribution unless prioritized earlier
+- automated coverage now includes `9` core tests and `47` Windows tests, including recording-source routing, system-audio consent blocking, and the mixed-capture limitation state
 
 ### WIN-009: Signed Windows Tester Release
 

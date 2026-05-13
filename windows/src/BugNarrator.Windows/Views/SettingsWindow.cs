@@ -17,6 +17,7 @@ public sealed class SettingsWindow : Window
     private readonly ComboBox aiProviderComboBox;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ComboBox audioInputDeviceComboBox;
+    private readonly ComboBox audioRecordingSourceComboBox;
     private readonly WindowsDiagnostics diagnostics;
     private readonly Dictionary<WindowsHotkeyAction, WindowsHotkeyShortcut> draftHotkeys = [];
     private readonly TextBox gitHubDefaultLabelsTextBox;
@@ -39,6 +40,7 @@ public sealed class SettingsWindow : Window
     private readonly ISecretStore secretStore;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly TextBlock statusTextBlock;
+    private readonly CheckBox systemAudioConsentCheckBox;
     private readonly ITranscriptionClient transcriptionClient;
 
     public SettingsWindow(
@@ -114,6 +116,19 @@ public sealed class SettingsWindow : Window
         {
             Margin = new Thickness(0, 0, 0, 14),
             DisplayMemberPath = nameof(AudioInputDeviceOption.DisplayName),
+        };
+
+        audioRecordingSourceComboBox = new ComboBox
+        {
+            Margin = new Thickness(0, 0, 0, 14),
+            DisplayMemberPath = nameof(AudioRecordingSourceProfile.DisplayName),
+            ItemsSource = AudioRecordingSourceProfile.All,
+        };
+
+        systemAudioConsentCheckBox = new CheckBox
+        {
+            Margin = new Thickness(0, -4, 0, 14),
+            Content = "I understand system audio recording captures audio playing from other apps on this PC.",
         };
 
         gitHubTokenPasswordBox = new PasswordBox
@@ -294,9 +309,13 @@ public sealed class SettingsWindow : Window
                     BuildLabel("Issue Extraction Model"),
                     issueExtractionModelTextBox,
                     BuildHint("Defaults to gpt-4.1-mini for structured draft issue extraction after transcription."),
+                    BuildLabel("Recording Audio Source"),
+                    audioRecordingSourceComboBox,
+                    BuildHint("Choose Microphone for normal narration, System Audio for app/computer playback, or Microphone + System Audio to see the currently tracked mixed-capture limitation."),
+                    systemAudioConsentCheckBox,
                     BuildLabel("Microphone Input Device"),
                     audioInputDeviceComboBox,
-                    BuildHint("Choose a specific Windows microphone if you use more than one. If the saved device disappears, BugNarrator will ask you to choose another instead of silently using the wrong microphone."),
+                    BuildHint("Choose a specific Windows microphone when recording from the microphone. If the saved device disappears, BugNarrator will ask you to choose another instead of silently using the wrong microphone."),
                     statusTextBlock,
                 },
             },
@@ -508,6 +527,8 @@ public sealed class SettingsWindow : Window
             languageHintTextBox.Text = settings.EffectiveLanguageHint ?? string.Empty;
             promptTextBox.Text = settings.EffectiveTranscriptionPrompt ?? string.Empty;
             issueExtractionModelTextBox.Text = settings.EffectiveIssueExtractionModel;
+            audioRecordingSourceComboBox.SelectedItem = settings.EffectiveRecordingAudioSourceProfile;
+            systemAudioConsentCheckBox.IsChecked = settings.HasAcceptedSystemAudioRecordingConsent;
             PopulateAudioInputDevices(settings.EffectiveAudioInputDeviceName);
             gitHubTokenPasswordBox.Password = gitHubToken ?? string.Empty;
             gitHubOwnerTextBox.Text = settings.NormalizedGitHubRepositoryOwner;
@@ -558,7 +579,9 @@ public sealed class SettingsWindow : Window
                 StartRecordingHotkey: draftHotkeys[WindowsHotkeyAction.StartRecording],
                 StopRecordingHotkey: draftHotkeys[WindowsHotkeyAction.StopRecording],
                 ScreenshotHotkey: draftHotkeys[WindowsHotkeyAction.CaptureScreenshot],
-                AiProvider: GetSelectedAiProviderProfile().StorageValue);
+                AiProvider: GetSelectedAiProviderProfile().StorageValue,
+                RecordingAudioSource: GetSelectedRecordingAudioSourceProfile().StorageValue,
+                HasAcceptedSystemAudioRecordingConsent: systemAudioConsentCheckBox.IsChecked == true);
 
             if (settings.AiProviderCompatibilityIssue is { } aiProviderIssue)
             {
@@ -816,5 +839,11 @@ public sealed class SettingsWindow : Window
     {
         return aiProviderComboBox.SelectedItem as WindowsAiProviderProfile
             ?? WindowsAiProviderProfile.Default;
+    }
+
+    private AudioRecordingSourceProfile GetSelectedRecordingAudioSourceProfile()
+    {
+        return audioRecordingSourceComboBox.SelectedItem as AudioRecordingSourceProfile
+            ?? AudioRecordingSourceProfile.Default;
     }
 }

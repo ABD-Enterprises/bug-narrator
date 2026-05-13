@@ -184,13 +184,13 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         {
         }
 
-        public int? LastDeviceNumber { get; private set; }
+        public AudioRecordingRequest? LastRequest { get; private set; }
 
-        public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
+        public Task StartAsync(string audioFilePath, AudioRecordingRequest request, CancellationToken cancellationToken = default)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
             File.WriteAllText(audioFilePath, "fake audio");
-            LastDeviceNumber = deviceNumber;
+            LastRequest = request;
             IsRecording = true;
             return Task.CompletedTask;
         }

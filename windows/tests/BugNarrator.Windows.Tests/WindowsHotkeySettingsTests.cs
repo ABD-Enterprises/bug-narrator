@@ -65,7 +65,7 @@ public sealed class WindowsHotkeySettingsTests : IDisposable
     }
 
     [Fact]
-    public async Task FileWindowsAppSettingsStore_RoundTripsHotkeyAssignments()
+    public async Task FileWindowsAppSettingsStore_RoundTripsWorkflowSettings()
     {
         var store = new FileWindowsAppSettingsStore(storagePaths);
         var settings = WindowsAppSettings.Default with
@@ -73,6 +73,8 @@ public sealed class WindowsHotkeySettingsTests : IDisposable
             StartRecordingHotkey = new WindowsHotkeyShortcut(0x46, WindowsHotkeyModifiers.Control | WindowsHotkeyModifiers.Alt),
             StopRecordingHotkey = new WindowsHotkeyShortcut(0x47, WindowsHotkeyModifiers.Control | WindowsHotkeyModifiers.Shift),
             ScreenshotHotkey = new WindowsHotkeyShortcut(0x53, WindowsHotkeyModifiers.Control | WindowsHotkeyModifiers.Shift),
+            RecordingAudioSource = "systemAudio",
+            HasAcceptedSystemAudioRecordingConsent = true,
         };
 
         await store.SaveAsync(settings);
@@ -81,6 +83,8 @@ public sealed class WindowsHotkeySettingsTests : IDisposable
         Assert.Equal(settings.StartRecordingHotkey.Normalize(), loaded.EffectiveStartRecordingHotkey);
         Assert.Equal(settings.StopRecordingHotkey.Normalize(), loaded.EffectiveStopRecordingHotkey);
         Assert.Equal(settings.ScreenshotHotkey.Normalize(), loaded.EffectiveScreenshotHotkey);
+        Assert.Equal("systemAudio", loaded.NormalizedRecordingAudioSource);
+        Assert.True(loaded.HasAcceptedSystemAudioRecordingConsent);
     }
 
     [Fact]
