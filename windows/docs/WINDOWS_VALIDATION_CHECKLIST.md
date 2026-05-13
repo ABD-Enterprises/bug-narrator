@@ -42,10 +42,10 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
-- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
+- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, AI provider settings, OpenAI-compatible issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
 - CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, writes a structured package smoke report, and uploads package and validation artifacts from the Windows runner.
-- Current passing automated coverage on this branch is `9` core tests and `35` Windows tests when run on Windows.
-- Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live OpenAI transcription, live OpenAI issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
+- Current passing automated coverage on this branch is `9` core tests and `44` Windows tests when run on Windows.
+- Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live AI provider transcription, live AI provider issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
 ## Milestone 2: Tray Shell And Single Instance
 - Launch BugNarrator.
@@ -90,8 +90,8 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## Milestone 5: Transcription, Review, And Session Library
 - Open `Settings`.
-- Confirm the window loads the transcription model, language hint, prompt, and saved OpenAI API key state.
-- Save a valid OpenAI API key and confirm the status message reflects the save.
+- Confirm the window loads the AI provider, transcription model, language hint, prompt, and saved provider credential state.
+- Save a valid OpenAI API key or compatible-provider credential and confirm the status message reflects the save.
 - Click `Validate Key` and confirm the app reports success or a clear failure.
 - Start and stop a recording with an API key configured.
 - Confirm the status passes through a saving/transcribing step and then opens the session library.
@@ -154,7 +154,7 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 ## Milestone 6: Issue Extraction, Exports, And Diagnostics
 - Open `Settings`.
 - Confirm the issue extraction model, GitHub settings, and Jira settings all load and save.
-- Save an OpenAI API key, GitHub token, and Jira credentials if you have real test credentials available.
+- Save an AI provider credential, GitHub token, and Jira credentials if you have real test credentials available.
 - Open a completed session with transcript text.
 - Click `Extract Issues`.
 - Confirm the app reports progress and then renders editable draft issues in the `Extracted Issues` tab.
@@ -176,7 +176,11 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## WIN-007: AI Provider Setup Parity
 - Confirm OpenAI remains the default provider.
+- Confirm Settings offers OpenAI, OpenAI-Compatible, and Local-Compatible provider choices.
 - Configure an OpenAI-compatible enterprise or local endpoint when available.
+- Confirm OpenAI-Compatible requires a non-default base URL before validation, transcription, or issue extraction.
+- Confirm Local-Compatible requires a base URL plus local transcription and issue extraction model choices before validation, transcription, or issue extraction.
+- Confirm Local-Compatible can validate and run without a credential when the endpoint does not require authentication.
 - Validate that transcription and issue extraction use the configured provider endpoint.
 - Confirm unsupported provider/model combinations fail with clear setup guidance.
 - Confirm provider credentials are stored through Windows secret storage and do not appear in settings JSON, logs, or debug bundles.
@@ -234,7 +238,7 @@ For Milestone 6 completion paths, confirm:
 - exported session bundles contain `transcript.md`
 - exported session bundles contain a `screenshots\` directory and copy any existing screenshot files without leaking secrets
 - exported debug bundles contain `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, and `session-metadata.json`
-- exported debug bundles do not contain OpenAI, GitHub, or Jira secrets
+- exported debug bundles do not contain AI provider, GitHub, or Jira secrets
 - the package script outputs `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
 - the package validation script outputs `windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json`
 
@@ -282,10 +286,10 @@ Confirm the log file includes useful entries for:
 - screenshot capture with no active session
 - screenshot selection cancel via `Esc`
 - tiny accidental screenshot drag region
-- stop recording with no OpenAI API key configured
-- invalid OpenAI API key
-- OpenAI network or service failure during transcription
-- OpenAI network or service failure during issue extraction
+- stop recording with no required AI provider credential configured
+- invalid AI provider credential
+- AI provider network or service failure during transcription
+- AI provider network or service failure during issue extraction
 - GitHub token rejected or repository not found
 - Jira credentials rejected or issue type invalid
 - corrupted `session.json` screenshot paths
@@ -324,6 +328,6 @@ Capture these details for each failure:
 - Windows version
 - whether microphone hardware was available
 - whether the screenshot overlay appeared
-- whether an OpenAI API key was configured
+- whether an AI provider credential was configured
 - exact user-facing error text
 - whether logs and session draft artifacts were written

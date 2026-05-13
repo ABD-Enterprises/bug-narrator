@@ -14,6 +14,7 @@ public sealed class SettingsWindow : Window
 {
     private readonly PasswordBox apiKeyPasswordBox;
     private readonly TextBox aiProviderBaseUrlTextBox;
+    private readonly ComboBox aiProviderComboBox;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ComboBox audioInputDeviceComboBox;
     private readonly WindowsDiagnostics diagnostics;
@@ -76,6 +77,13 @@ public sealed class SettingsWindow : Window
         aiProviderBaseUrlTextBox = new TextBox
         {
             Margin = new Thickness(0, 0, 0, 14),
+        };
+
+        aiProviderComboBox = new ComboBox
+        {
+            Margin = new Thickness(0, 0, 0, 14),
+            DisplayMemberPath = nameof(WindowsAiProviderProfile.DisplayName),
+            ItemsSource = WindowsAiProviderProfile.All,
         };
 
         modelTextBox = new TextBox
@@ -265,9 +273,12 @@ public sealed class SettingsWindow : Window
             {
                 Children =
                 {
+                    BuildLabel("AI Provider"),
+                    aiProviderComboBox,
+                    BuildHint("Choose OpenAI, an OpenAI-compatible hosted endpoint, or a local-compatible endpoint."),
                     BuildLabel("AI Provider Credential"),
                     apiKeyPasswordBox,
-                    BuildHint("Stored locally for the current Windows user with DPAPI. BugNarrator does not ship with bundled AI provider access."),
+                    BuildHint("Stored locally for the current Windows user with DPAPI. Required for OpenAI and OpenAI-compatible providers; optional for local-compatible providers."),
                     BuildLabel("AI Provider Base URL"),
                     aiProviderBaseUrlTextBox,
                     BuildHint("Optional. Leave blank for OpenAI. Use an OpenAI-compatible base URL such as https://api.openai.com/v1 or a trusted enterprise/local endpoint."),
@@ -491,6 +502,7 @@ public sealed class SettingsWindow : Window
             var jiraApiToken = await secretStore.GetAsync(SecretKeys.JiraApiToken);
 
             apiKeyPasswordBox.Password = apiKey ?? string.Empty;
+            aiProviderComboBox.SelectedItem = settings.EffectiveAiProviderProfile;
             aiProviderBaseUrlTextBox.Text = settings.EffectiveAiProviderBaseUrl ?? string.Empty;
             modelTextBox.Text = settings.EffectiveTranscriptionModel;
             languageHintTextBox.Text = settings.EffectiveLanguageHint ?? string.Empty;
@@ -516,7 +528,7 @@ public sealed class SettingsWindow : Window
             RefreshHotkeyStatusText(hotkeyService.CurrentSnapshot);
 
             statusTextBlock.Text = string.IsNullOrWhiteSpace(apiKey)
-                ? "No OpenAI API key is saved yet. Global hotkeys remain optional and start as Not Set."
+                ? "No AI provider credential is saved yet. Global hotkeys remain optional and start as Not Set."
                 : BuildLoadStatusMessage(hotkeyService.CurrentSnapshot);
         }
         catch (Exception exception)
@@ -545,7 +557,14 @@ public sealed class SettingsWindow : Window
                 JiraIssueType: jiraIssueTypeTextBox.Text,
                 StartRecordingHotkey: draftHotkeys[WindowsHotkeyAction.StartRecording],
                 StopRecordingHotkey: draftHotkeys[WindowsHotkeyAction.StopRecording],
-                ScreenshotHotkey: draftHotkeys[WindowsHotkeyAction.CaptureScreenshot]);
+                ScreenshotHotkey: draftHotkeys[WindowsHotkeyAction.CaptureScreenshot],
+                AiProvider: GetSelectedAiProviderProfile().StorageValue);
+
+            if (settings.AiProviderCompatibilityIssue is { } aiProviderIssue)
+            {
+                statusTextBlock.Text = aiProviderIssue;
+                return;
+            }
 
             var validationIssues = WindowsHotkeySettingsValidator.Validate(settings);
             if (validationIssues.Count > 0)
@@ -579,23 +598,38 @@ public sealed class SettingsWindow : Window
     private async Task ValidateApiKeyAsync()
     {
         var apiKey = apiKeyPasswordBox.Password.Trim();
-        if (apiKey.Length == 0)
+        var providerProfile = GetSelectedAiProviderProfile();
+        var validationSettings = WindowsAppSettings.Default with
         {
-            statusTextBlock.Text = "Enter an OpenAI API key before running validation.";
+            AiProvider = providerProfile.StorageValue,
+            AiProviderBaseUrl = aiProviderBaseUrlTextBox.Text,
+            TranscriptionModel = modelTextBox.Text,
+            IssueExtractionModel = issueExtractionModelTextBox.Text,
+        };
+
+        if (validationSettings.AiProviderCompatibilityIssue is { } aiProviderIssue)
+        {
+            statusTextBlock.Text = aiProviderIssue;
             return;
         }
 
-        statusTextBlock.Text = "Validating the OpenAI API key...";
+        if (providerProfile.RequiresCredential && apiKey.Length == 0)
+        {
+            statusTextBlock.Text = $"Enter a {providerProfile.DisplayName} credential before running validation.";
+            return;
+        }
+
+        statusTextBlock.Text = $"Validating the {providerProfile.DisplayName} connection...";
 
         try
         {
             await transcriptionClient.ValidateApiKeyAsync(apiKey, aiProviderBaseUrlTextBox.Text);
-            statusTextBlock.Text = "The AI provider credential was accepted.";
+            statusTextBlock.Text = providerProfile.SuccessMessage;
         }
         catch (Exception exception)
         {
             diagnostics.Error("settings", "api key validation failed", exception);
-            statusTextBlock.Text = $"OpenAI key validation failed: {exception.Message}";
+            statusTextBlock.Text = $"AI provider validation failed: {exception.Message}";
         }
     }
 
@@ -733,7 +767,7 @@ public sealed class SettingsWindow : Window
     {
         return snapshot.HasProblems
             ? "Settings loaded. Some saved global hotkeys need attention in the optional hotkey section."
-            : "OpenAI, issue extraction, experimental export settings, and optional global hotkeys are loaded for this Windows user.";
+            : "AI provider, issue extraction, experimental export settings, and optional global hotkeys are loaded for this Windows user.";
     }
 
     private static string BuildSavedStatusMessage(WindowsHotkeyRuntimeSnapshot snapshot)
@@ -776,5 +810,11 @@ public sealed class SettingsWindow : Window
             FontWeight = FontWeights.SemiBold,
             Text = text,
         };
+    }
+
+    private WindowsAiProviderProfile GetSelectedAiProviderProfile()
+    {
+        return aiProviderComboBox.SelectedItem as WindowsAiProviderProfile
+            ?? WindowsAiProviderProfile.Default;
     }
 }

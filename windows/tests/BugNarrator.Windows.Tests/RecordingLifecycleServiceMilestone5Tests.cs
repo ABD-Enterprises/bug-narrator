@@ -55,8 +55,34 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Equal(string.Empty, session.TranscriptText);
         Assert.Equal(0, harness.TranscriptionClient.CallCount);
         Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
-        Assert.Contains("Add an OpenAI API key", harness.Service.CurrentState.StatusMessage);
+        Assert.Contains("Finish AI provider setup", harness.Service.CurrentState.StatusMessage);
         Assert.True(File.Exists(session.TranscriptMarkdownFilePath));
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithLocalCompatibleProviderAndNoApiKey_Transcribes()
+    {
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            AiProvider = "localCompatible",
+            AiProviderBaseUrl = "http://localhost:1234/v1",
+            TranscriptionModel = "whisper-large-v3",
+            IssueExtractionModel = "local-qwen",
+        };
+        harness.TranscriptionClient.TranscriptText = "Local provider transcribed this session.";
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        var sessions = await harness.CompletedSessionStore.GetAllAsync();
+        var session = Assert.Single(sessions);
+
+        Assert.Equal(SessionTranscriptionStatus.Completed, session.TranscriptionStatus);
+        Assert.Equal("Local provider transcribed this session.", session.TranscriptText);
+        Assert.Equal(1, harness.TranscriptionClient.CallCount);
+        Assert.Equal(string.Empty, harness.TranscriptionClient.LastApiKey);
+        Assert.Equal("http://localhost:1234/v1", harness.TranscriptionClient.LastRequest?.ProviderBaseUrl);
     }
 
     [Fact]
@@ -275,6 +301,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     {
         public int CallCount { get; private set; }
         public Exception? ExceptionToThrow { get; set; }
+        public string? LastApiKey { get; private set; }
+        public OpenAiTranscriptionRequest? LastRequest { get; private set; }
         public string TranscriptText { get; set; } = "Example transcript.";
 
         public Task<string> TranscribeToTextAsync(
@@ -284,6 +312,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
             CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastApiKey = apiKey;
+            LastRequest = request;
 
             if (ExceptionToThrow is not null)
             {

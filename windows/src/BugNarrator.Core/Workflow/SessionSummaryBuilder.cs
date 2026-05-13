@@ -25,7 +25,7 @@ public static class SessionSummaryBuilder
         return transcriptionStatus switch
         {
             SessionTranscriptionStatus.NotConfigured =>
-                $"Recording saved locally for {SessionTimeFormatter.FormatDuration(duration)} with {screenshotCount} screenshot artifacts. Add an OpenAI API key in Settings to transcribe future sessions.",
+                $"Recording saved locally for {SessionTimeFormatter.FormatDuration(duration)} with {screenshotCount} screenshot artifacts. Finish AI provider setup in Settings to transcribe future sessions.",
             SessionTranscriptionStatus.Failed =>
                 $"Recording saved locally for {SessionTimeFormatter.FormatDuration(duration)}, but transcription failed. {transcriptionFailureMessage ?? "Review the saved audio and logs for details."}",
             _ =>

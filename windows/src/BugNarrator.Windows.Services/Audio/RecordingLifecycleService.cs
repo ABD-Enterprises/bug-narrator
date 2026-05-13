@@ -410,10 +410,11 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             settings.EffectiveTranscriptionPrompt,
             settings.EffectiveAiProviderBaseUrl);
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (providerCredential is null)
         {
-            diagnostics.Warning("transcription", "transcription skipped because the OpenAI API key is not configured");
+            diagnostics.Warning("transcription", "transcription skipped because the AI provider is not configured");
             return CreateCompletedSession(
                 draft,
                 request,
@@ -429,7 +430,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStart: false,
                 CanStop: false,
                 CanCaptureScreenshot: false,
-                "Transcribing session with OpenAI...",
+                $"Transcribing session with {settings.EffectiveAiProviderProfile.DisplayName}...",
                 draft));
 
             diagnostics.Info(
@@ -437,7 +438,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 $"transcription requested using model {request.Model} and configured provider endpoint");
             var transcriptText = await transcriptionClient.TranscribeToTextAsync(
                 draft.AudioFilePath,
-                apiKey,
+                providerCredential,
                 request,
                 cancellationToken);
 
@@ -507,7 +508,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             SessionTranscriptionStatus.Completed =>
                 $"Recording transcribed and saved to {session.SessionDirectory}",
             SessionTranscriptionStatus.NotConfigured =>
-                $"Recording saved to {session.SessionDirectory}. Add an OpenAI API key in Settings to enable transcription.",
+                $"Recording saved to {session.SessionDirectory}. Finish AI provider setup in Settings to enable transcription.",
             SessionTranscriptionStatus.Failed =>
                 $"Recording saved to {session.SessionDirectory}, but transcription failed: {session.TranscriptionFailureMessage}",
             _ => $"Recording saved to {session.SessionDirectory}",

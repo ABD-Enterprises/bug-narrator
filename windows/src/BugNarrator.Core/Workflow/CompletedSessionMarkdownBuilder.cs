@@ -127,7 +127,7 @@ public static class CompletedSessionMarkdownBuilder
         return status switch
         {
             SessionTranscriptionStatus.Completed => "Completed",
-            SessionTranscriptionStatus.NotConfigured => "OpenAI Key Not Configured",
+            SessionTranscriptionStatus.NotConfigured => "AI Provider Not Configured",
             SessionTranscriptionStatus.Failed => "Failed",
             _ => status.ToString(),
         };

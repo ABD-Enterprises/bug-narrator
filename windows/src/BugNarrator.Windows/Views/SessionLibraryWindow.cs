@@ -202,7 +202,7 @@ public sealed class SessionLibraryWindow : Window
 
         extractIssuesButton = BuildActionButton("Extract Issues");
         extractIssuesButton.Click += async (_, _) => await RunReviewActionAsync(
-            "Extracting draft issues with OpenAI...",
+            "Extracting draft issues with the configured AI provider...",
             ExtractIssuesAsync);
 
         saveReviewButton = BuildActionButton("Save Review");
@@ -838,7 +838,7 @@ public sealed class SessionLibraryWindow : Window
         if (session.IssueExtraction.Issues.Count == 0)
         {
             issuesEmptyStateTextBlock.Text =
-                "OpenAI returned no draft issues for this session. You can still export the session bundle or debug bundle.";
+                "The AI provider returned no draft issues for this session. You can still export the session bundle or debug bundle.";
             return;
         }
 
@@ -1148,7 +1148,7 @@ public sealed class SessionLibraryWindow : Window
         return session.TranscriptionStatus switch
         {
             SessionTranscriptionStatus.NotConfigured =>
-                "This recording was saved without a transcript because an OpenAI API key was not configured in Settings.",
+                "This recording was saved without a transcript because AI provider setup was not completed in Settings.",
             SessionTranscriptionStatus.Failed =>
                 $"Transcription failed for this session. {session.TranscriptionFailureMessage ?? "Check the Windows log for more detail."}",
             _ => "No transcript text was saved for this session.",

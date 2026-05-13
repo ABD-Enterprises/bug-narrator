@@ -154,7 +154,7 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini", providerBaseUrl: null));
 
-        Assert.Contains("could not reach OpenAI issue extraction", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("could not reach AI provider issue extraction", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()

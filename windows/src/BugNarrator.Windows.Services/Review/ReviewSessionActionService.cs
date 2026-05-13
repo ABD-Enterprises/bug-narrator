@@ -65,17 +65,19 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
             throw new InvalidOperationException("Issue extraction requires a completed transcript.");
         }
 
+        var settings = await settingsStore.LoadAsync(cancellationToken);
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        if (string.IsNullOrWhiteSpace(apiKey))
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        if (providerCredential is null)
         {
             throw new InvalidOperationException(
-                "Add an OpenAI API key in Settings before running issue extraction.");
+                settings.AiProviderCompatibilityIssue
+                ?? "Finish AI provider setup in Settings before running issue extraction.");
         }
 
-        var settings = await settingsStore.LoadAsync(cancellationToken);
         var extraction = await issueExtractionService.ExtractAsync(
             session,
-            apiKey,
+            providerCredential,
             settings.EffectiveIssueExtractionModel,
             settings.EffectiveAiProviderBaseUrl,
             cancellationToken);

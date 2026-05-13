@@ -77,12 +77,15 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
                 Encoding.UTF8,
                 "application/json"),
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        }
 
         using var response = await RemoteServiceRequestGuard.SendAsync(
             httpClient,
             request,
-            "OpenAI issue extraction",
+            "AI provider issue extraction",
             cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -97,7 +100,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
         if (string.IsNullOrWhiteSpace(content))
         {
             diagnostics.Warning("issue-extraction", "issue extraction response was empty");
-            throw new InvalidOperationException("OpenAI returned an empty issue extraction response.");
+            throw new InvalidOperationException("The AI provider returned an empty issue extraction response.");
         }
 
         try
@@ -122,7 +125,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
         {
             diagnostics.Error("issue-extraction", "issue extraction response parsing failed", exception);
             throw new InvalidOperationException(
-                "OpenAI returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings.");
+                "The AI provider returned issue data in an unexpected format. Try again, or switch the issue extraction model in Settings.");
         }
     }
 
@@ -188,9 +191,9 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
 
         return statusCode switch
         {
-            HttpStatusCode.Unauthorized => "The OpenAI API key was rejected for issue extraction.",
-            HttpStatusCode.Forbidden => "The OpenAI issue extraction request was forbidden.",
-            _ => $"OpenAI issue extraction failed with HTTP {(int)statusCode}.",
+            HttpStatusCode.Unauthorized => "The AI provider credential was rejected for issue extraction.",
+            HttpStatusCode.Forbidden => "The AI provider issue extraction request was forbidden.",
+            _ => $"AI provider issue extraction failed with HTTP {(int)statusCode}.",
         };
     }
 
@@ -225,7 +228,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
             || choicesElement.ValueKind != JsonValueKind.Array
             || choicesElement.GetArrayLength() == 0)
         {
-            throw new InvalidOperationException("OpenAI returned an invalid issue extraction response.");
+            throw new InvalidOperationException("The AI provider returned an invalid issue extraction response.");
         }
 
         var messageElement = choicesElement[0].GetProperty("message");
