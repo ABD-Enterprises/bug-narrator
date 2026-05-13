@@ -6,7 +6,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
 {
     private readonly object syncRoot = new();
     private TaskCompletionSource? stopCompletionSource;
-    private WaveInEvent? waveInEvent;
+    private IWaveIn? activeCapture;
     private WaveFileWriter? waveWriter;
 
     public bool IsRecording { get; private set; }
@@ -16,7 +16,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
         CleanupRecorder();
     }
 
-    public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
+    public Task StartAsync(string audioFilePath, AudioRecordingRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -29,21 +29,16 @@ public sealed class NAudioRecorderService : IAudioRecorderService
 
             Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
 
-            waveInEvent = new WaveInEvent
-            {
-                BufferMilliseconds = 125,
-                DeviceNumber = deviceNumber,
-                WaveFormat = new WaveFormat(16000, 16, 1),
-            };
-            waveInEvent.DataAvailable += OnDataAvailable;
-            waveInEvent.RecordingStopped += OnRecordingStopped;
+            activeCapture = CreateCapture(request);
+            activeCapture.DataAvailable += OnDataAvailable;
+            activeCapture.RecordingStopped += OnRecordingStopped;
 
-            waveWriter = new WaveFileWriter(audioFilePath, waveInEvent.WaveFormat);
+            waveWriter = new WaveFileWriter(audioFilePath, activeCapture.WaveFormat);
             stopCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             try
             {
-                waveInEvent.StartRecording();
+                activeCapture.StartRecording();
                 IsRecording = true;
             }
             catch
@@ -62,26 +57,54 @@ public sealed class NAudioRecorderService : IAudioRecorderService
 
         lock (syncRoot)
         {
-            if (!IsRecording || waveInEvent is null)
+            if (!IsRecording || activeCapture is null)
             {
                 return Task.CompletedTask;
             }
 
-            waveInEvent.StopRecording();
+            activeCapture.StopRecording();
             return stopCompletionSource?.Task ?? Task.CompletedTask;
         }
+    }
+
+    private static IWaveIn CreateCapture(AudioRecordingRequest request)
+    {
+        return request.Source switch
+        {
+            AudioRecordingSource.Microphone => CreateMicrophoneCapture(request),
+            AudioRecordingSource.SystemAudio => new WasapiLoopbackCapture(),
+            AudioRecordingSource.MicrophoneAndSystemAudio =>
+                throw new NotSupportedException(
+                    "Microphone plus system audio recording is not implemented yet. Choose Microphone or System Audio for this build."),
+            _ => throw new InvalidOperationException("Unsupported recording source."),
+        };
+    }
+
+    private static WaveInEvent CreateMicrophoneCapture(AudioRecordingRequest request)
+    {
+        if (request.MicrophoneDeviceNumber is null)
+        {
+            throw new InvalidOperationException("A microphone device is required for microphone recording.");
+        }
+
+        return new WaveInEvent
+        {
+            BufferMilliseconds = 125,
+            DeviceNumber = request.MicrophoneDeviceNumber.Value,
+            WaveFormat = new WaveFormat(16000, 16, 1),
+        };
     }
 
     private void CleanupRecorder()
     {
         lock (syncRoot)
         {
-            if (waveInEvent is not null)
+            if (activeCapture is not null)
             {
-                waveInEvent.DataAvailable -= OnDataAvailable;
-                waveInEvent.RecordingStopped -= OnRecordingStopped;
-                waveInEvent.Dispose();
-                waveInEvent = null;
+                activeCapture.DataAvailable -= OnDataAvailable;
+                activeCapture.RecordingStopped -= OnRecordingStopped;
+                activeCapture.Dispose();
+                activeCapture = null;
             }
 
             waveWriter?.Dispose();

@@ -42,10 +42,10 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
-- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, AI provider settings, OpenAI-compatible issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
+- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, AI provider settings, audio recording-source routing, OpenAI-compatible issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
 - CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, writes a structured package smoke report, and uploads package and validation artifacts from the Windows runner.
-- Current passing automated coverage on this branch is `9` core tests and `44` Windows tests when run on Windows.
-- Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live AI provider transcription, live AI provider issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
+- Current passing automated coverage on this branch is `9` core tests and `47` Windows tests when run on Windows.
+- Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live AI provider transcription, live AI provider issue extraction, representative system-audio output devices, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
 ## Milestone 2: Tray Shell And Single Instance
 - Launch BugNarrator.
@@ -188,10 +188,12 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## WIN-008: System Audio And Mixed Audio Parity
 - Confirm microphone-only recording still works.
+- Confirm `Microphone` remains the default recording source in Settings.
+- Confirm the system-audio consent checkbox appears near the recording-source setting.
 - Select system audio recording when a loopback-capable output device exists.
 - Confirm system audio recording produces a non-empty artifact that can be transcribed.
-- Select microphone plus system audio recording when supported.
-- Confirm the resulting artifact contains both sources or records an explicit unsupported/follow-up limitation.
+- Select microphone plus system audio recording.
+- Confirm the app records an explicit unsupported/follow-up limitation instead of creating an incomplete mixed artifact.
 - Confirm system audio consent and privacy messaging appears before capture.
 - Probe silent output, Bluetooth/headset output, device changes, and unavailable loopback devices.
 

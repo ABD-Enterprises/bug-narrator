@@ -98,35 +98,63 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         }
 
         var settings = await settingsStore.LoadAsync(cancellationToken);
-        var deviceSelection = AudioInputDeviceSelection.Resolve(
-            settings.EffectiveAudioInputDeviceName,
-            audioInputDeviceCatalog.GetAvailableInputDevices());
-
-        if (!deviceSelection.IsResolved)
+        var recordingSource = settings.EffectiveRecordingAudioSourceProfile;
+        if (settings.RecordingAudioSourceCompatibilityIssue is { } sourceIssue)
         {
             PublishState(new RecordingControlState(
                 RecordingWorkflowState.Failed,
                 CanStart: true,
                 CanStop: false,
                 CanCaptureScreenshot: false,
-                deviceSelection.ErrorMessage ?? "No microphone device is available.",
+                sourceIssue,
                 ActiveSession: null));
             return;
         }
 
-        var preflightResult = microphonePreflightService.CheckReadyToRecord(
-            audioRecorderService.IsRecording,
-            deviceSelection.DeviceNumber);
-        diagnostics.Info("recording", $"microphone preflight result: {preflightResult.Status}");
+        AudioInputDeviceSelection? deviceSelection = null;
+        if (recordingSource.UsesMicrophone)
+        {
+            deviceSelection = AudioInputDeviceSelection.Resolve(
+                settings.EffectiveAudioInputDeviceName,
+                audioInputDeviceCatalog.GetAvailableInputDevices());
 
-        if (!preflightResult.CanStart)
+            if (!deviceSelection.IsResolved)
+            {
+                PublishState(new RecordingControlState(
+                    RecordingWorkflowState.Failed,
+                    CanStart: true,
+                    CanStop: false,
+                    CanCaptureScreenshot: false,
+                    deviceSelection.ErrorMessage ?? "No microphone device is available.",
+                    ActiveSession: null));
+                return;
+            }
+
+            var preflightResult = microphonePreflightService.CheckReadyToRecord(
+                audioRecorderService.IsRecording,
+                deviceSelection.DeviceNumber);
+            diagnostics.Info("recording", $"microphone preflight result: {preflightResult.Status}");
+
+            if (!preflightResult.CanStart)
+            {
+                PublishState(new RecordingControlState(
+                    RecordingWorkflowState.Failed,
+                    CanStart: true,
+                    CanStop: false,
+                    CanCaptureScreenshot: false,
+                    preflightResult.Message,
+                    ActiveSession: null));
+                return;
+            }
+        }
+        else if (audioRecorderService.IsRecording)
         {
             PublishState(new RecordingControlState(
                 RecordingWorkflowState.Failed,
                 CanStart: true,
                 CanStop: false,
                 CanCaptureScreenshot: false,
-                preflightResult.Message,
+                "A recording session is already active.",
                 ActiveSession: null));
             return;
         }
@@ -139,7 +167,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             createdDraft = await sessionDraftStore.CreateDraftAsync(startedAt, cancellationToken);
             activeSession = createdDraft;
 
-            await audioRecorderService.StartAsync(createdDraft.AudioFilePath, deviceSelection.DeviceNumber, cancellationToken);
+            var recordingRequest = new AudioRecordingRequest(
+                recordingSource.Source,
+                deviceSelection?.DeviceNumber);
+            await audioRecorderService.StartAsync(createdDraft.AudioFilePath, recordingRequest, cancellationToken);
 
             var recordingDraft = createdDraft with
             {
@@ -148,13 +179,13 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             activeSession = recordingDraft;
             await sessionDraftStore.SaveAsync(recordingDraft, cancellationToken);
 
-            diagnostics.Info("recording", "recording started");
+            diagnostics.Info("recording", $"recording started with source {recordingSource.StorageValue}");
             PublishState(new RecordingControlState(
                 RecordingWorkflowState.Recording,
                 CanStart: false,
                 CanStop: true,
                 CanCaptureScreenshot: true,
-                $"Recording started. Draft folder: {recordingDraft.SessionDirectory}",
+                $"{recordingSource.DisplayName} recording started. Draft folder: {recordingDraft.SessionDirectory}",
                 recordingDraft));
         }
         catch (Exception exception)

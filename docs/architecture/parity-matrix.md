@@ -25,7 +25,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 | Debug Bundle support export | Shipped | In Progress | Must remain aligned | Implemented on Windows with redaction/hardening coverage; real support-bundle validation remains in #44. |
 | Missing or invalid AI provider recovery | Shipped | In Progress | Must remain identical | Windows preserves completed sessions on missing, incompatible, or failed AI provider setup; real-provider validation remains in #44. |
 | Configurable AI provider setup | Shipped | In Progress | Must remain aligned | Windows supports OpenAI, OpenAI-compatible hosted endpoints, and local-compatible endpoints; real-provider validation remains in #44. |
-| Recording audio source selection | Shipped | Planned in `WIN-008` | Platform-native capture allowed | macOS supports microphone, system audio, and mic plus system audio; Windows follow-up is tracked in #74. |
+| Recording audio source selection | Shipped | In Progress | Platform-native capture allowed | Windows supports microphone and WASAPI loopback system audio. Mixed mic plus system audio is surfaced as an explicit tracked limitation until muxing is implemented. |
 | Experimental GitHub and Jira export | Shipped as experimental | In Progress | Experimental on both platforms | Windows implementation exists; real credential validation remains in #44. |
 | Keyboard-first accessibility | Shipped baseline, validated in RR-005 | In Progress | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. |
 | Public release packaging | Shipped as signed, notarized DMG | Planned in `WIN-009` | Platform-native packaging allowed | Windows zip packaging exists; signed tester release work is tracked in #75. |
@@ -34,7 +34,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 
 - macOS is the only production platform today.
 - Windows implements the core `record -> review -> refine -> export` path, including session library, review workspace, extraction, export, hotkeys, and hardening coverage, but it still needs real Windows runtime validation in `RR-002` / #44.
-- macOS currently has newer audio-source surfaces; Windows follow-up parity is tracked in #74.
+- macOS currently has mixed microphone plus system audio capture beyond Windows; Windows surfaces the limitation explicitly while system-audio loopback support is available.
 - Windows public tester distribution is still blocked on signing/release packaging decisions tracked in #75.
 
 ## Update Rules

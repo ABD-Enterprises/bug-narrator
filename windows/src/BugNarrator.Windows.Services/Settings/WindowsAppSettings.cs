@@ -1,4 +1,5 @@
 using BugNarrator.Core.Models;
+using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Http;
 using BugNarrator.Windows.Services.Hotkeys;
 
@@ -20,7 +21,9 @@ public sealed record WindowsAppSettings(
     WindowsHotkeyShortcut StartRecordingHotkey = default,
     WindowsHotkeyShortcut StopRecordingHotkey = default,
     WindowsHotkeyShortcut ScreenshotHotkey = default,
-    string AiProvider = "openAI")
+    string AiProvider = "openAI",
+    string RecordingAudioSource = "microphone",
+    bool HasAcceptedSystemAudioRecordingConsent = false)
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -38,13 +41,42 @@ public sealed record WindowsAppSettings(
         StartRecordingHotkey: WindowsHotkeyShortcut.NotSet,
         StopRecordingHotkey: WindowsHotkeyShortcut.NotSet,
         ScreenshotHotkey: WindowsHotkeyShortcut.NotSet,
-        AiProvider: WindowsAiProviderProfile.Default.StorageValue);
+        AiProvider: WindowsAiProviderProfile.Default.StorageValue,
+        RecordingAudioSource: AudioRecordingSourceProfile.Default.StorageValue,
+        HasAcceptedSystemAudioRecordingConsent: false);
 
     public WindowsAiProviderProfile EffectiveAiProviderProfile =>
         WindowsAiProviderProfile.FromStorageValue(AiProvider);
 
     public string NormalizedAiProvider =>
         EffectiveAiProviderProfile.StorageValue;
+
+    public AudioRecordingSourceProfile EffectiveRecordingAudioSourceProfile =>
+        AudioRecordingSourceProfile.FromStorageValue(RecordingAudioSource);
+
+    public string NormalizedRecordingAudioSource =>
+        EffectiveRecordingAudioSourceProfile.StorageValue;
+
+    public string? RecordingAudioSourceCompatibilityIssue
+    {
+        get
+        {
+            var source = EffectiveRecordingAudioSourceProfile.Source;
+
+            if (source == AudioRecordingSource.MicrophoneAndSystemAudio)
+            {
+                return "Microphone plus system audio recording is not implemented yet. Choose Microphone or System Audio for this build.";
+            }
+
+            if (EffectiveRecordingAudioSourceProfile.UsesSystemAudio
+                && !HasAcceptedSystemAudioRecordingConsent)
+            {
+                return "Accept the system audio recording notice in Settings before recording system audio.";
+            }
+
+            return null;
+        }
+    }
 
     public string EffectiveTranscriptionModel =>
         string.IsNullOrWhiteSpace(TranscriptionModel)

@@ -61,6 +61,60 @@ public sealed class AudioInputDeviceSelectionTests
         Assert.False(harness.AudioRecorderService.IsRecording);
     }
 
+    [Fact]
+    public async Task StartRecordingAsync_WithSystemAudioAndConsent_StartsLoopbackWithoutMicrophone()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = "systemAudio",
+            HasAcceptedSystemAudioRecordingConsent = true,
+        };
+        harness.AudioInputDeviceCatalog.Devices = [];
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.True(harness.AudioRecorderService.IsRecording);
+        Assert.Equal(AudioRecordingSource.SystemAudio, harness.AudioRecorderService.LastRequest?.Source);
+        Assert.Null(harness.AudioRecorderService.LastRequest?.MicrophoneDeviceNumber);
+        Assert.Equal(0, harness.MicrophonePreflightService.CallCount);
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithSystemAudioWithoutConsent_FailsBeforeCapture()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = "systemAudio",
+            HasAcceptedSystemAudioRecordingConsent = false,
+        };
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
+        Assert.Contains("Accept the system audio recording notice", harness.Service.CurrentState.StatusMessage);
+        Assert.False(harness.AudioRecorderService.IsRecording);
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithMixedAudio_ReportsTrackedLimitation()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = "microphoneAndSystemAudio",
+            HasAcceptedSystemAudioRecordingConsent = true,
+        };
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
+        Assert.Contains("Microphone plus system audio recording is not implemented yet", harness.Service.CurrentState.StatusMessage);
+        Assert.False(harness.AudioRecorderService.IsRecording);
+    }
+
     private sealed class RecordingHarness : IDisposable
     {
         private readonly string rootDirectory;
@@ -137,8 +191,11 @@ public sealed class AudioInputDeviceSelectionTests
         {
         }
 
-        public Task StartAsync(string audioFilePath, int deviceNumber, CancellationToken cancellationToken = default)
+        public AudioRecordingRequest? LastRequest { get; private set; }
+
+        public Task StartAsync(string audioFilePath, AudioRecordingRequest request, CancellationToken cancellationToken = default)
         {
+            LastRequest = request;
             IsRecording = true;
             return Task.CompletedTask;
         }
@@ -162,8 +219,11 @@ public sealed class AudioInputDeviceSelectionTests
 
     private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
     {
+        public int CallCount { get; private set; }
+
         public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
         {
+            CallCount++;
             return new RecordingPreflightResult(
                 RecordingPreflightStatus.Ready,
                 CanStart: true,
