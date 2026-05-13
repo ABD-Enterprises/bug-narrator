@@ -26,7 +26,7 @@ public static class IssueExtractionResponseParser
         }
 
         throw new InvalidOperationException(
-            $"OpenAI returned issue data in an unexpected format. {string.Join(" | ", errors)}");
+            $"The AI provider returned issue data in an unexpected format. {string.Join(" | ", errors)}");
     }
 
     private static IssueExtractionResult ParseCandidate(

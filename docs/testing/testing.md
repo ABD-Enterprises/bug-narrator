@@ -41,7 +41,7 @@ Automated coverage currently focuses on:
 - secure settings persistence
 - transcript export and debug bundle export
 - Windows core and service-layer compilation plus core tests
-- Windows service-layer tests plus packaged zip validation and packaged-app smoke execution on Windows CI
+- Windows service-layer tests, including AI provider compatibility coverage, plus packaged zip validation and packaged-app smoke execution on Windows CI
 
 ## Manual Validation Still Required
 
@@ -49,8 +49,8 @@ Manual validation remains necessary for:
 
 - live microphone permission prompts
 - live Screen Recording prompts
-- real OpenAI transcription and issue extraction
-- retrying a preserved session after restoring a rejected OpenAI key in Settings
+- real AI provider transcription and issue extraction
+- retrying a preserved session after restoring a rejected AI provider credential in Settings
 - real GitHub and Jira export
 - DMG install/Gatekeeper validation
 - multi-display screenshot behavior

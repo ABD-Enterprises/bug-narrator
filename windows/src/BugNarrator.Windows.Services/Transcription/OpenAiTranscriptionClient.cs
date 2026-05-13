@@ -59,12 +59,15 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
         {
             Content = content,
         };
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        }
 
         using var response = await RemoteServiceRequestGuard.SendAsync(
             httpClient,
             message,
-            "OpenAI transcription",
+            "AI provider transcription",
             cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -75,13 +78,13 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
         using var document = JsonDocument.Parse(responseBody);
         if (!document.RootElement.TryGetProperty("text", out var textElement))
         {
-            throw new InvalidOperationException("OpenAI returned an invalid transcription response.");
+            throw new InvalidOperationException("The AI provider returned an invalid transcription response.");
         }
 
         var transcript = textElement.GetString()?.Trim();
         if (string.IsNullOrWhiteSpace(transcript))
         {
-            throw new InvalidOperationException("OpenAI returned an empty transcript.");
+            throw new InvalidOperationException("The AI provider returned an empty transcript.");
         }
 
         return transcript;
@@ -95,12 +98,15 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
         using var message = new HttpRequestMessage(
             HttpMethod.Get,
             OpenAiCompatibleEndpoint.Build(providerBaseUrl, "models"));
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        }
 
         using var response = await RemoteServiceRequestGuard.SendAsync(
             httpClient,
             message,
-            "OpenAI API validation",
+            "AI provider validation",
             cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -134,9 +140,9 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
 
         return statusCode switch
         {
-            System.Net.HttpStatusCode.Unauthorized => "The OpenAI API key was rejected.",
-            System.Net.HttpStatusCode.Forbidden => "The OpenAI API request was forbidden.",
-            _ => $"OpenAI request failed with HTTP {(int)statusCode}.",
+            System.Net.HttpStatusCode.Unauthorized => "The AI provider credential was rejected.",
+            System.Net.HttpStatusCode.Forbidden => "The AI provider request was forbidden.",
+            _ => $"AI provider request failed with HTTP {(int)statusCode}.",
         };
     }
 

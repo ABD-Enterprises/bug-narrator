@@ -62,7 +62,8 @@ public sealed class FileWindowsAppSettingsStore : IWindowsAppSettingsStore
             settings.EffectiveJiraIssueType,
             settings.EffectiveStartRecordingHotkey.Normalize(),
             settings.EffectiveStopRecordingHotkey.Normalize(),
-            settings.EffectiveScreenshotHotkey.Normalize());
+            settings.EffectiveScreenshotHotkey.Normalize(),
+            settings.NormalizedAiProvider);
 
         var json = JsonSerializer.Serialize(normalizedSettings, JsonOptions);
         await AtomicFileOperations.WriteAllTextAsync(settingsFilePath, json, cancellationToken);
