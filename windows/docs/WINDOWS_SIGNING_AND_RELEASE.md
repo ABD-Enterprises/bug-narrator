@@ -6,7 +6,7 @@ This document describes the current Windows packaging, signing, and release work
 
 ## Current Packaging Format
 
-The current branch packages BugNarrator as a zipped `dotnet publish` output using:
+The current branch packages BugNarrator as a zipped self-contained `dotnet publish` output using:
 
 - `windows/scripts/package-windows.ps1`
 
@@ -15,7 +15,7 @@ That script publishes `BugNarrator.Windows.csproj` for `win-x64` by default and 
 - `windows/artifacts/publish/<runtime>/`
 - `windows/artifacts/packages/BugNarrator-windows-<runtime>.zip`
 
-This is sufficient for internal validation and external handoff while installer work remains deferred. The signed tester release work is tracked in GitHub issue #75.
+This is sufficient for internal validation and external handoff while installer work remains deferred. The package includes the .NET runtime for the target runtime identifier so tester machines do not need a matching desktop runtime installed first. The signed tester release work is tracked in GitHub issue #75.
 
 CI now validates the packaged zip contents and writes a structured package smoke report before uploading the Windows artifact from `windows-latest`. This improves release-candidate confidence, but it does not replace a real desktop validation pass for tray, microphone, screenshot, or hotkey behavior.
 

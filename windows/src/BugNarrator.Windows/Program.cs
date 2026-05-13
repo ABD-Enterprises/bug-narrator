@@ -1,10 +1,13 @@
 using BugNarrator.Windows.Services.Diagnostics;
+using BugNarrator.Windows.Shell;
 using System.Runtime.CompilerServices;
 
 namespace BugNarrator.Windows;
 
 internal static class Program
 {
+    public const string ApplicationId = "ABDEnterprises.BugNarrator.Windows";
+
     [ModuleInitializer]
     internal static void InitializeSmokeProbe()
     {
@@ -21,7 +24,14 @@ internal static class Program
     {
         RunSmokeProbe(args);
 
+        using var singleInstanceGuard = new EarlySingleInstanceGuard(ApplicationId);
+        if (!singleInstanceGuard.TryAcquire())
+        {
+            Environment.Exit(0);
+        }
+
         var app = new App();
+        app.PrimarySingleInstanceService = singleInstanceGuard.TransferOwnership();
         app.InitializeComponent();
         app.Run();
     }
