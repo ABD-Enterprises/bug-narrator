@@ -581,6 +581,76 @@ final class MockClipboardService: ClipboardWriting {
     }
 }
 
+@MainActor
+final class MockDebugBundleExporter: DebugBundleExporting {
+    var exportResult: Result<URL?, Error> = .success(nil)
+    private(set) var exportedSnapshots: [DebugBundleSnapshot] = []
+
+    func export(snapshot: DebugBundleSnapshot) throws -> URL? {
+        exportedSnapshots.append(snapshot)
+        return try exportResult.get()
+    }
+}
+
+@MainActor
+final class MockPrivacyDataExporter: PrivacyDataExporting {
+    struct ExportRequest {
+        let sessions: [TranscriptSession]
+        let settings: PrivacyDataExportSettingsSnapshot
+        let diagnostics: PrivacyDataExportDiagnosticsSnapshot
+    }
+
+    var exportResult: Result<URL?, Error> = .success(nil)
+    private(set) var exportRequests: [ExportRequest] = []
+
+    func export(
+        sessions: [TranscriptSession],
+        settings: PrivacyDataExportSettingsSnapshot,
+        diagnostics: PrivacyDataExportDiagnosticsSnapshot
+    ) throws -> URL? {
+        exportRequests.append(
+            ExportRequest(
+                sessions: sessions,
+                settings: settings,
+                diagnostics: diagnostics
+            )
+        )
+        return try exportResult.get()
+    }
+}
+
+final class MockOperationalTelemetryRecorder: OperationalTelemetryRecording {
+    private(set) var recordedEvents: [(name: String, metadata: [String: String])] = []
+    var recentEventsResult: [OperationalTelemetryEvent] = []
+    private(set) var recentEventsLimits: [Int] = []
+    private(set) var clearCallCount = 0
+    var clearError: Error?
+
+    func record(_ name: String, metadata: [String: String] = [:]) {
+        recordedEvents.append((name: name, metadata: metadata))
+    }
+
+    func recentEvents(limit: Int) -> [OperationalTelemetryEvent] {
+        recentEventsLimits.append(limit)
+        return Array(recentEventsResult.suffix(limit))
+    }
+
+    func clear() throws {
+        clearCallCount += 1
+        if let clearError {
+            throw clearError
+        }
+    }
+}
+
+final class MockLocalPrivacyDataManager: LocalPrivacyDataManaging {
+    private(set) var clearCallCount = 0
+
+    func clearLocalSupportArtifacts() async {
+        clearCallCount += 1
+    }
+}
+
 final class MockURLHandler: URLOpening {
     private(set) var openedURLs: [URL] = []
     var shouldSucceed = true
@@ -688,6 +758,10 @@ struct AppStateHarness {
     let artifactsService: MockArtifactsService
     let clipboardService: MockClipboardService
     let urlHandler: MockURLHandler
+    let debugBundleExporter: MockDebugBundleExporter
+    let privacyDataExporter: MockPrivacyDataExporter
+    let telemetryRecorder: MockOperationalTelemetryRecorder
+    let localPrivacyDataManager: MockLocalPrivacyDataManager
     let issueExtractionService: MockIssueExtractionService
     let exportService: MockExportService
     let recoveredRecordingImporter: MockRecoveredRecordingImporter
@@ -704,6 +778,10 @@ struct AppStateHarness {
         launchAtLoginStatus: LaunchAtLoginStatus = .disabled,
         screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
         screenshotSelectionService: MockScreenshotSelectionService = MockScreenshotSelectionService(),
+        debugBundleExporter: MockDebugBundleExporter = MockDebugBundleExporter(),
+        privacyDataExporter: MockPrivacyDataExporter = MockPrivacyDataExporter(),
+        telemetryRecorder: MockOperationalTelemetryRecorder = MockOperationalTelemetryRecorder(),
+        localPrivacyDataManager: MockLocalPrivacyDataManager = MockLocalPrivacyDataManager(),
         recoveredImportResult: Result<Int, Error> = .success(0),
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
     ) {
@@ -757,6 +835,10 @@ struct AppStateHarness {
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
+        self.debugBundleExporter = debugBundleExporter
+        self.privacyDataExporter = privacyDataExporter
+        self.telemetryRecorder = telemetryRecorder
+        self.localPrivacyDataManager = localPrivacyDataManager
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
         self.recoveredRecordingImporter = recoveredRecordingImporter
@@ -778,6 +860,10 @@ struct AppStateHarness {
             artifactsService: artifactsService,
             clipboardService: clipboardService,
             urlHandler: urlHandler,
+            debugBundleExporter: debugBundleExporter,
+            privacyDataExporter: privacyDataExporter,
+            telemetryRecorder: telemetryRecorder,
+            localPrivacyDataManager: localPrivacyDataManager,
             recordingTimer: RecordingTimerViewModel(),
             runtimeEnvironment: runtimeEnvironment
         )

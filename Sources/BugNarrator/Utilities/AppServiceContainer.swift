@@ -15,6 +15,10 @@ struct AppServiceContainer {
     let artifactsService: any SessionArtifactsManaging
     let clipboardService: any ClipboardWriting
     let urlHandler: any URLOpening
+    let debugBundleExporter: any DebugBundleExporting
+    let privacyDataExporter: any PrivacyDataExporting
+    let telemetryRecorder: any OperationalTelemetryRecording
+    let localPrivacyDataManager: any LocalPrivacyDataManaging
     let recordingTimer: RecordingTimerViewModel
 
     static func production(settingsStore: SettingsStore) -> AppServiceContainer {
@@ -32,6 +36,10 @@ struct AppServiceContainer {
             artifactsService: SessionArtifactsService(),
             clipboardService: SystemClipboardService(),
             urlHandler: WorkspaceURLHandler(),
+            debugBundleExporter: DebugBundleExporter(),
+            privacyDataExporter: PrivacyDataExporter(),
+            telemetryRecorder: OperationalTelemetryRecorder(),
+            localPrivacyDataManager: LocalPrivacyDataManager(),
             recordingTimer: RecordingTimerViewModel()
         )
     }
