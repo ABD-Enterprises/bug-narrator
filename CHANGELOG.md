@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.34 - 2026-05-19
+
+- Split the remaining `AppState` execution paths into dedicated recording, screenshot, transcription recovery, and session-library controllers so the release build is easier to reason about and maintain.
+- Centralized `AppState` error normalization and typed event names so diagnostics and UI state transitions stay consistent across recording, recovery, and export flows.
+- Added release-signing hardening carried forward from the local packaging pipeline so the shipped DMG remains notarized, stapled, and aligned with the current source version.
+
 ## 1.0.33 - 2026-05-06
 
 - Added concurrent retry guard to prevent duplicate transcription retry attempts from compounding failures.
