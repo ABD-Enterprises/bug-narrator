@@ -74,6 +74,36 @@ final class AppState: ObservableObject {
         case cancelling
     }
 
+    private enum PostTranscriptionPipelineMode: Equatable {
+        case finishedRecording
+        case retry
+
+        var savingAction: String {
+            switch self {
+            case .finishedRecording:
+                return "Saving the finished session locally..."
+            case .retry:
+                return "Saving the recovered session locally..."
+            }
+        }
+
+        var recordsCompletionTelemetry: Bool {
+            self == .finishedRecording
+        }
+    }
+
+    private enum PostTranscriptionPipelineResult {
+        case success(TranscriptSession)
+        case persistenceFailure(session: TranscriptSession, error: Error)
+        case postTranscriptionFailure(Error)
+    }
+
+    private struct PendingTranscriptionRetryContext {
+        var session: TranscriptSession
+        let pendingTranscription: PendingTranscription
+        let audioFileURL: URL
+    }
+
     var gitHubValidationState: APIKeyValidationState {
         trackerIntegration.gitHubValidationState
     }
@@ -638,22 +668,10 @@ final class AppState: ObservableObject {
     }
 
     func stopSession() async {
-        guard recordingTransition == .idle else {
-            recordingLogger.debug("session_stop_ignored", "The stop request was ignored because another recording transition is already in progress.")
+        guard let recordingSession = beginStoppingSession() else {
             return
         }
 
-        guard status.phase == .recording else {
-            recordingLogger.warning("session_stop_rejected", "The stop request was rejected because no recording session is active.")
-            return
-        }
-
-        guard let recordingSession = activeRecordingSession else {
-            presentError(AppError.recordingFailure("The recording session metadata was unavailable."))
-            return
-        }
-
-        recordingTransition = .stopping
         defer { recordingTransition = .idle }
 
         cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
@@ -661,11 +679,7 @@ final class AppState: ObservableObject {
         let request = makeTranscriptionRequest()
 
         do {
-            recordingLogger.info(
-                "session_stop_requested",
-                "Stopping the active feedback session.",
-                metadata: ["session_id": recordingSession.sessionID.uuidString]
-            )
+            logSessionStopRequested(recordingSession)
             let recordedAudio = try await audioRecorder.stopRecording()
             pendingRecordedAudio = recordedAudio
 
@@ -682,139 +696,25 @@ final class AppState: ObservableObject {
             setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
             swapActivity(reason: "Uploading audio for transcription")
 
-            let transcriptionResult = try await transcriptionClient.transcribe(
-                fileURL: recordedAudio.fileURL,
+            let transcriptionResult = try await transcribeAudio(
+                at: recordedAudio.fileURL,
+                request: request,
+                apiKey: apiKey
+            )
+            let session = makeTranscriptSession(
+                from: recordingSession,
+                recordedAudio: recordedAudio,
+                request: request,
+                result: transcriptionResult
+            )
+            let result = await completePostTranscriptionPipeline(
+                session: session,
                 apiKey: apiKey,
-                request: request
+                mode: .finishedRecording
             )
-
-            let sections = TranscriptSectionBuilder.buildSections(
-                transcript: transcriptionResult.text,
-                segments: transcriptionResult.segments,
-                markers: recordingSession.markers,
-                duration: recordedAudio.duration
-            )
-
-            var session = TranscriptSession(
-                id: recordingSession.sessionID,
-                createdAt: Date(),
-                transcript: transcriptionResult.text,
-                duration: recordedAudio.duration,
-                model: request.model,
-                languageHint: request.languageHint,
-                prompt: request.prompt,
-                markers: recordingSession.markers,
-                screenshots: recordingSession.screenshots,
-                sections: sections,
-                transcriptQualityFindings: transcriptionResult.qualityFindings,
-                artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-            )
-
-            transcriptionLogger.info(
-                "transcription_completed",
-                "BugNarrator finished transcription and created a transcript session.",
-                metadata: [
-                    "session_id": session.id.uuidString,
-                    "marker_count": "\(session.markerCount)",
-                    "screenshot_count": "\(session.screenshotCount)"
-                ]
-            )
-            telemetryRecorder.record(
-                "transcription_completed",
-                metadata: [
-                    "marker_count": "\(session.markerCount)",
-                    "screenshot_count": "\(session.screenshotCount)",
-                    "model": request.model
-                ]
-            )
-
-            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the finished session locally...")))
-
-            do {
-                try persistCompletedTranscript(session)
-            } catch {
-                currentTranscript = session
-                selectedTranscriptID = session.id
-                activeRecordingSession = nil
-                if settingsStore.autoCopyTranscript {
-                    clipboardService.copy(session.transcript)
-                }
-                cleanupPendingRecordedAudioIfNeeded()
-                endActivity()
-                let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
-                sessionLibraryLogger.error(
-                    "transcript_persist_failed",
-                    "Transcription succeeded, but saving the transcript locally failed.",
-                    metadata: ["session_id": session.id.uuidString]
-                )
-                setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
-                showTranscriptWindow?()
-                return
-            }
-
-            currentTranscript = session
-            activeRecordingSession = nil
-            showTranscriptWindow?()
-
-            if settingsStore.autoExtractIssues {
-                issueExtractionSessionID = session.id
-                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
-                swapActivity(reason: "Extracting review issues")
-
-                do {
-                    let extraction = try await issueExtractionService.extractIssues(
-                        from: session,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    session.issueExtraction = extraction
-                    try persistUpdatedSession(session)
-                    transcriptionLogger.info(
-                        "issue_extraction_completed_after_transcription",
-                        "Automatic issue extraction completed after transcription.",
-                        metadata: [
-                            "session_id": session.id.uuidString,
-                            "issue_count": "\(extraction.issues.count)"
-                        ]
-                    )
-                } catch {
-                    cleanupPendingRecordedAudioIfNeeded()
-                    endActivity()
-                    issueExtractionSessionID = nil
-                    presentPostTranscriptionError(error)
-                    return
-                }
-
-                issueExtractionSessionID = nil
-            }
-
-            cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
-            setStatus(.success(
-                settingsStore.autoExtractIssues
-                    ? "Session saved. Transcript and extracted issues are ready."
-                    : (settingsStore.autoCopyTranscript
-                        ? "Session saved. Transcript copied to the clipboard."
-                        : "Session saved locally and ready for review.")
-            ))
+            handleFinishedRecordingPostTranscriptionResult(result)
         } catch {
-            if let failureReason = recoverablePendingTranscriptionReason(for: error),
-               let recordedAudio = pendingRecordedAudio {
-                preserveRetryableSession(
-                    from: recordingSession,
-                    recordedAudio: recordedAudio,
-                    request: request,
-                    failureReason: failureReason
-                )
-                return
-            }
-
-            if !settingsStore.debugMode {
-                artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
-            }
-            activeRecordingSession = nil
-            presentError(error)
+            handleStopSessionFailure(error, recordingSession: recordingSession, request: request)
         }
     }
 
@@ -1131,174 +1031,54 @@ final class AppState: ObservableObject {
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
-        guard status.phase != .recording else {
-            presentError(AppError.recordingFailure("Stop the current recording before retrying transcription."))
-            return
-        }
-
-        guard retryingSessionID == nil else {
-            transcriptionLogger.warning(
-                "transcription_retry_already_in_progress",
-                "Ignoring duplicate retry request while a retry is already in progress.",
-                metadata: [
-                    "requested_session_id": sessionID.uuidString,
-                    "active_retry_session_id": retryingSessionID?.uuidString ?? "unknown"
-                ]
-            )
-            return
-        }
-
-        guard var session = sessionSnapshot(with: sessionID),
-              let pendingTranscription = session.pendingTranscription,
-              let audioFileURL = session.pendingTranscriptionAudioURL else {
-            presentError(AppError.transcriptionFailure("The saved retry session is unavailable."))
-            return
-        }
-
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            setStatus(.error(compatibilityIssue), error: .transcriptionFailure(compatibilityIssue))
-            showSettingsWindow?()
-            return
-        }
-
-        guard settingsStore.hasUsableAIProviderCredential else {
-            setStatus(.error(
-                session.transcriptionRecoveryMessage ?? AppError.missingAPIKey.userMessage
-            ), error: .missingAPIKey)
-            showSettingsWindow?()
-            return
-        }
-
-        guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
-            presentError(AppError.transcriptionFailure("The preserved audio file could not be found."))
+        guard let retryContext = pendingTranscriptionRetryContext(for: sessionID) else {
             return
         }
 
         let request = makeTranscriptionRequest()
         retryingSessionID = sessionID
-        selectedTranscriptID = session.id
-        currentTranscript = session
+        selectedTranscriptID = retryContext.session.id
+        currentTranscript = retryContext.session
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
-        transcriptionLogger.info(
-            "transcription_retry_requested",
-            "Retrying transcription from preserved audio.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "failure_reason": pendingTranscription.failureReason.rawValue,
-                "attempt_count": "\(pendingTranscription.attemptCount + 1)"
-            ]
-        )
+        logPendingTranscriptionRetryRequested(retryContext)
 
         do {
             guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 throw AppError.missingAPIKey
             }
 
-            let result = try await transcriptionClient.transcribe(
-                fileURL: audioFileURL,
+            let result = try await transcribeAudio(
+                at: retryContext.audioFileURL,
+                request: request,
+                apiKey: apiKey
+            )
+            let updatedSession = makeRecoveredTranscriptSession(
+                from: retryContext.session,
+                request: request,
+                result: result
+            )
+
+            switch await completePostTranscriptionPipeline(
+                session: updatedSession,
                 apiKey: apiKey,
-                request: request
-            )
-
-            let sections = TranscriptSectionBuilder.buildSections(
-                transcript: result.text,
-                segments: result.segments,
-                markers: session.markers,
-                duration: session.duration
-            )
-
-            var updatedSession = TranscriptSession(
-                id: session.id,
-                createdAt: session.createdAt,
-                transcript: result.text,
-                duration: session.duration,
-                model: request.model,
-                languageHint: request.languageHint,
-                prompt: request.prompt,
-                markers: session.markers,
-                screenshots: session.screenshots,
-                sections: sections,
-                issueExtraction: nil,
-                pendingTranscription: nil,
-                transcriptQualityFindings: result.qualityFindings,
-                updatedAt: Date(),
-                artifactsDirectoryPath: session.artifactsDirectoryPath
-            )
-
-            setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: "Saving the recovered session locally...")))
-            try persistUpdatedSession(updatedSession)
-
-            if settingsStore.autoCopyTranscript {
-                clipboardService.copy(updatedSession.transcript)
-            }
-
-            if settingsStore.autoExtractIssues {
-                issueExtractionSessionID = updatedSession.id
-                setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
-                swapActivity(reason: "Extracting review issues")
-
-                do {
-                    let extraction = try await issueExtractionService.extractIssues(
-                        from: updatedSession,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    updatedSession.issueExtraction = extraction
-                    try persistUpdatedSession(updatedSession)
-                } catch {
-                    cleanupPreservedRetryAudioIfNeeded(at: audioFileURL)
-                    retryingSessionID = nil
-                    endActivity()
-                    issueExtractionSessionID = nil
-                    presentPostTranscriptionError(error)
-                    return
-                }
-
-                issueExtractionSessionID = nil
-            }
-
-            cleanupPreservedRetryAudioIfNeeded(at: audioFileURL)
-            retryingSessionID = nil
-            showTranscriptWindow?()
-            endActivity()
-            setStatus(.success(
-                settingsStore.autoExtractIssues
-                    ? "Session saved. Transcript and extracted issues are ready."
-                    : (settingsStore.autoCopyTranscript
-                        ? "Session saved. Transcript copied to the clipboard."
-                        : "Session saved locally and ready for review.")
-            ))
-        } catch {
-            if let failureReason = recoverablePendingTranscriptionReason(for: error) {
-                session.pendingTranscription = PendingTranscription(
-                    audioFileName: pendingTranscription.audioFileName,
-                    failureReason: failureReason,
-                    preservedAt: pendingTranscription.preservedAt,
-                    attemptCount: pendingTranscription.attemptCount + 1
-                )
-
-                do {
-                    try persistUpdatedSession(session)
-                } catch {
-                    currentTranscript = session
-                    selectedTranscriptID = session.id
-                }
-
+                mode: .retry
+            ) {
+            case .success:
+                cleanupPreservedRetryAudioIfNeeded(at: retryContext.audioFileURL)
+                retryingSessionID = nil
+                finishSuccessfulTranscription(showTranscriptWindow: true)
+            case .persistenceFailure(_, let error):
+                retryingSessionID = nil
+                presentError(error)
+            case .postTranscriptionFailure(let error):
+                cleanupPreservedRetryAudioIfNeeded(at: retryContext.audioFileURL)
                 retryingSessionID = nil
                 endActivity()
-                let appError = failureReason.appError
-                logAppError(appError, context: "retry_pending_transcription")
-
-                let attemptMessage = pendingTranscription.attemptCount >= 2
-                    ? " This session has been retried \(pendingTranscription.attemptCount + 1) times."
-                    : ""
-                setStatus(.error(
-                    (session.transcriptionRecoveryMessage ?? appError.userMessage) + attemptMessage
-                ), error: appError)
-                showTranscriptWindow?()
-                showSettingsWindow?()
+                presentPostTranscriptionError(error)
+            }
+        } catch {
+            if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
                 return
             }
 
@@ -1974,6 +1754,412 @@ final class AppState: ObservableObject {
             prompt: settingsStore.normalizedPrompt,
             apiBaseURL: settingsStore.openAIBaseURLValue
         )
+    }
+
+    private func logSessionStopRequested(_ recordingSession: RecordingSessionDraft) {
+        recordingLogger.info(
+            "session_stop_requested",
+            "Stopping the active feedback session.",
+            metadata: ["session_id": recordingSession.sessionID.uuidString]
+        )
+    }
+
+    private func beginStoppingSession() -> RecordingSessionDraft? {
+        guard recordingTransition == .idle else {
+            recordingLogger.debug("session_stop_ignored", "The stop request was ignored because another recording transition is already in progress.")
+            return nil
+        }
+
+        guard status.phase == .recording else {
+            recordingLogger.warning("session_stop_rejected", "The stop request was rejected because no recording session is active.")
+            return nil
+        }
+
+        guard let recordingSession = activeRecordingSession else {
+            presentError(AppError.recordingFailure("The recording session metadata was unavailable."))
+            return nil
+        }
+
+        recordingTransition = .stopping
+        return recordingSession
+    }
+
+    private func transcribeAudio(
+        at fileURL: URL,
+        request: TranscriptionRequest,
+        apiKey: String
+    ) async throws -> TranscriptionResult {
+        try await transcriptionClient.transcribe(fileURL: fileURL, apiKey: apiKey, request: request)
+    }
+
+    private func makeTranscriptSession(
+        from recordingSession: RecordingSessionDraft,
+        recordedAudio: RecordedAudio,
+        request: TranscriptionRequest,
+        result: TranscriptionResult
+    ) -> TranscriptSession {
+        let sections = TranscriptSectionBuilder.buildSections(
+            transcript: result.text,
+            segments: result.segments,
+            markers: recordingSession.markers,
+            duration: recordedAudio.duration
+        )
+
+        return TranscriptSession(
+            id: recordingSession.sessionID,
+            createdAt: Date(),
+            transcript: result.text,
+            duration: recordedAudio.duration,
+            model: request.model,
+            languageHint: request.languageHint,
+            prompt: request.prompt,
+            markers: recordingSession.markers,
+            screenshots: recordingSession.screenshots,
+            sections: sections,
+            transcriptQualityFindings: result.qualityFindings,
+            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
+        )
+    }
+
+    private func makeRecoveredTranscriptSession(
+        from session: TranscriptSession,
+        request: TranscriptionRequest,
+        result: TranscriptionResult
+    ) -> TranscriptSession {
+        let sections = TranscriptSectionBuilder.buildSections(
+            transcript: result.text,
+            segments: result.segments,
+            markers: session.markers,
+            duration: session.duration
+        )
+
+        return TranscriptSession(
+            id: session.id,
+            createdAt: session.createdAt,
+            transcript: result.text,
+            duration: session.duration,
+            model: request.model,
+            languageHint: request.languageHint,
+            prompt: request.prompt,
+            markers: session.markers,
+            screenshots: session.screenshots,
+            sections: sections,
+            issueExtraction: nil,
+            pendingTranscription: nil,
+            transcriptQualityFindings: result.qualityFindings,
+            updatedAt: Date(),
+            artifactsDirectoryPath: session.artifactsDirectoryPath
+        )
+    }
+
+    private func completePostTranscriptionPipeline(
+        session: TranscriptSession,
+        apiKey: String,
+        mode: PostTranscriptionPipelineMode
+    ) async -> PostTranscriptionPipelineResult {
+        var session = session
+        recordCompletedTranscriptionIfNeeded(session, mode: mode)
+        setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: mode.savingAction)))
+
+        do {
+            try persistInitialPostTranscriptionSession(session, mode: mode)
+        } catch {
+            return .persistenceFailure(session: session, error: error)
+        }
+
+        finalizeInitialPostTranscriptionPersistence(session, mode: mode)
+
+        guard settingsStore.autoExtractIssues else {
+            return .success(session)
+        }
+
+        do {
+            session = try await extractIssuesAfterTranscription(for: session, apiKey: apiKey)
+            return .success(session)
+        } catch {
+            return .postTranscriptionFailure(error)
+        }
+    }
+
+    private func recordCompletedTranscriptionIfNeeded(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) {
+        guard mode.recordsCompletionTelemetry else {
+            return
+        }
+
+        transcriptionLogger.info(
+            "transcription_completed",
+            "BugNarrator finished transcription and created a transcript session.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "marker_count": "\(session.markerCount)",
+                "screenshot_count": "\(session.screenshotCount)"
+            ]
+        )
+        telemetryRecorder.record(
+            "transcription_completed",
+            metadata: [
+                "marker_count": "\(session.markerCount)",
+                "screenshot_count": "\(session.screenshotCount)",
+                "model": session.model
+            ]
+        )
+    }
+
+    private func persistInitialPostTranscriptionSession(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) throws {
+        switch mode {
+        case .finishedRecording:
+            try persistCompletedTranscript(session)
+        case .retry:
+            try persistUpdatedSession(session)
+            if settingsStore.autoCopyTranscript {
+                clipboardService.copy(session.transcript)
+            }
+        }
+    }
+
+    private func finalizeInitialPostTranscriptionPersistence(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) {
+        guard mode == .finishedRecording else {
+            return
+        }
+
+        currentTranscript = session
+        activeRecordingSession = nil
+        showTranscriptWindow?()
+    }
+
+    private func extractIssuesAfterTranscription(
+        for session: TranscriptSession,
+        apiKey: String
+    ) async throws -> TranscriptSession {
+        var session = session
+        issueExtractionSessionID = session.id
+        defer { issueExtractionSessionID = nil }
+
+        setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
+        swapActivity(reason: "Extracting review issues")
+
+        let extraction = try await issueExtractionService.extractIssues(
+            from: session,
+            apiKey: apiKey,
+            model: settingsStore.issueExtractionModelValue,
+            apiBaseURL: settingsStore.openAIBaseURLValue
+        )
+        session.issueExtraction = extraction
+        try persistUpdatedSession(session)
+        transcriptionLogger.info(
+            "issue_extraction_completed_after_transcription",
+            "Automatic issue extraction completed after transcription.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "issue_count": "\(extraction.issues.count)"
+            ]
+        )
+        return session
+    }
+
+    private func finishSuccessfulTranscription(showTranscriptWindow: Bool) {
+        if showTranscriptWindow {
+            self.showTranscriptWindow?()
+        }
+
+        endActivity()
+        setStatus(.success(transcriptionSuccessMessage()))
+    }
+
+    private func transcriptionSuccessMessage() -> String {
+        if settingsStore.autoExtractIssues {
+            return "Session saved. Transcript and extracted issues are ready."
+        }
+
+        if settingsStore.autoCopyTranscript {
+            return "Session saved. Transcript copied to the clipboard."
+        }
+
+        return "Session saved locally and ready for review."
+    }
+
+    private func handleCompletedTranscriptPersistenceFailure(
+        _ error: Error,
+        session: TranscriptSession
+    ) {
+        currentTranscript = session
+        selectedTranscriptID = session.id
+        activeRecordingSession = nil
+
+        if settingsStore.autoCopyTranscript {
+            clipboardService.copy(session.transcript)
+        }
+
+        cleanupPendingRecordedAudioIfNeeded()
+        endActivity()
+
+        let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+        sessionLibraryLogger.error(
+            "transcript_persist_failed",
+            "Transcription succeeded, but saving the transcript locally failed.",
+            metadata: ["session_id": session.id.uuidString]
+        )
+        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
+        showTranscriptWindow?()
+    }
+
+    private func handleFinishedRecordingPostTranscriptionResult(
+        _ result: PostTranscriptionPipelineResult
+    ) {
+        switch result {
+        case .success:
+            cleanupPendingRecordedAudioIfNeeded()
+            finishSuccessfulTranscription(showTranscriptWindow: false)
+        case .persistenceFailure(let session, let error):
+            handleCompletedTranscriptPersistenceFailure(error, session: session)
+        case .postTranscriptionFailure(let error):
+            cleanupPendingRecordedAudioIfNeeded()
+            endActivity()
+            presentPostTranscriptionError(error)
+        }
+    }
+
+    private func handleStopSessionFailure(
+        _ error: Error,
+        recordingSession: RecordingSessionDraft,
+        request: TranscriptionRequest
+    ) {
+        if let failureReason = recoverablePendingTranscriptionReason(for: error),
+           let recordedAudio = pendingRecordedAudio {
+            preserveRetryableSession(
+                from: recordingSession,
+                recordedAudio: recordedAudio,
+                request: request,
+                failureReason: failureReason
+            )
+            return
+        }
+
+        if !settingsStore.debugMode {
+            artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
+        }
+        activeRecordingSession = nil
+        presentError(error)
+    }
+
+    private func pendingTranscriptionRetryContext(
+        for sessionID: UUID
+    ) -> PendingTranscriptionRetryContext? {
+        guard status.phase != .recording else {
+            presentError(AppError.recordingFailure("Stop the current recording before retrying transcription."))
+            return nil
+        }
+
+        guard retryingSessionID == nil else {
+            logDuplicatePendingTranscriptionRetryRequest(for: sessionID)
+            return nil
+        }
+
+        guard let session = sessionSnapshot(with: sessionID),
+              let pendingTranscription = session.pendingTranscription,
+              let audioFileURL = session.pendingTranscriptionAudioURL else {
+            presentError(AppError.transcriptionFailure("The saved retry session is unavailable."))
+            return nil
+        }
+
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            setStatus(.error(compatibilityIssue), error: .transcriptionFailure(compatibilityIssue))
+            showSettingsWindow?()
+            return nil
+        }
+
+        guard settingsStore.hasUsableAIProviderCredential else {
+            setStatus(.error(
+                session.transcriptionRecoveryMessage ?? AppError.missingAPIKey.userMessage
+            ), error: .missingAPIKey)
+            showSettingsWindow?()
+            return nil
+        }
+
+        guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
+            presentError(AppError.transcriptionFailure("The preserved audio file could not be found."))
+            return nil
+        }
+
+        return PendingTranscriptionRetryContext(
+            session: session,
+            pendingTranscription: pendingTranscription,
+            audioFileURL: audioFileURL
+        )
+    }
+
+    private func logDuplicatePendingTranscriptionRetryRequest(for sessionID: UUID) {
+        transcriptionLogger.warning(
+            "transcription_retry_already_in_progress",
+            "Ignoring duplicate retry request while a retry is already in progress.",
+            metadata: [
+                "requested_session_id": sessionID.uuidString,
+                "active_retry_session_id": retryingSessionID?.uuidString ?? "unknown"
+            ]
+        )
+    }
+
+    private func logPendingTranscriptionRetryRequested(
+        _ context: PendingTranscriptionRetryContext
+    ) {
+        transcriptionLogger.info(
+            "transcription_retry_requested",
+            "Retrying transcription from preserved audio.",
+            metadata: [
+                "session_id": context.session.id.uuidString,
+                "failure_reason": context.pendingTranscription.failureReason.rawValue,
+                "attempt_count": "\(context.pendingTranscription.attemptCount + 1)"
+            ]
+        )
+    }
+
+    private func handlePendingTranscriptionRetryFailure(
+        _ error: Error,
+        context: PendingTranscriptionRetryContext
+    ) -> Bool {
+        guard let failureReason = recoverablePendingTranscriptionReason(for: error) else {
+            return false
+        }
+
+        var session = context.session
+        let pendingTranscription = context.pendingTranscription
+        session.pendingTranscription = PendingTranscription(
+            audioFileName: pendingTranscription.audioFileName,
+            failureReason: failureReason,
+            preservedAt: pendingTranscription.preservedAt,
+            attemptCount: pendingTranscription.attemptCount + 1
+        )
+
+        do {
+            try persistUpdatedSession(session)
+        } catch {
+            currentTranscript = session
+            selectedTranscriptID = session.id
+        }
+
+        retryingSessionID = nil
+        endActivity()
+
+        let appError = failureReason.appError
+        logAppError(appError, context: "retry_pending_transcription")
+        let attemptMessage = pendingTranscription.attemptCount >= 2
+            ? " This session has been retried \(pendingTranscription.attemptCount + 1) times."
+            : ""
+        setStatus(.error(
+            (session.transcriptionRecoveryMessage ?? appError.userMessage) + attemptMessage
+        ), error: appError)
+        showTranscriptWindow?()
+        showSettingsWindow?()
+        return true
     }
 
     private func recoverablePendingTranscriptionReason(for error: Error) -> PendingTranscriptionFailureReason? {
