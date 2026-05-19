@@ -11,7 +11,7 @@ final class DiagnosticsLoggerTests: XCTestCase {
         let logger = DiagnosticsLogger(category: .settings, store: store)
 
         logger.info(
-            "credential_event",
+            .validateAIProviderSucceeded,
             "Validation failed for fixture-openai-key and Bearer fixture-github-pat",
             metadata: [
                 "apiKey": "fixture-openai-key",
@@ -26,6 +26,7 @@ final class DiagnosticsLoggerTests: XCTestCase {
         XCTAssertEqual(entry?.metadata["apiKey"], "<redacted>")
         XCTAssertEqual(entry?.metadata["githubToken"], "<redacted>")
         XCTAssertEqual(entry?.metadata["note"], "<redacted>")
+        XCTAssertEqual(entry?.event, DiagnosticsEvent.validateAIProviderSucceeded.rawValue)
         XCTAssertFalse(entry?.message.contains("fixture-openai-key") ?? true)
         XCTAssertFalse(entry?.message.contains("fixture-github-pat") ?? true)
 
@@ -41,18 +42,18 @@ final class DiagnosticsLoggerTests: XCTestCase {
         let logger = DiagnosticsLogger(category: .settings, store: store)
 
         BugNarratorDiagnostics.setDebugModeEnabled(false)
-        logger.debug("suppressed_debug", "This should not be recorded.")
+        logger.debug(.sessionStartIgnored, "This should not be recorded.")
 
         try? await Task.sleep(nanoseconds: 50_000_000)
         let suppressedEntries = await store.recentEntries()
         XCTAssertTrue(suppressedEntries.isEmpty)
 
         BugNarratorDiagnostics.setDebugModeEnabled(true)
-        logger.debug("allowed_debug", "This should be recorded.")
+        logger.debug(.sessionStartIgnored, "This should be recorded.")
 
         try? await Task.sleep(nanoseconds: 100_000_000)
         let recordedEntries = await store.recentEntries()
-        XCTAssertEqual(recordedEntries.first?.event, "allowed_debug")
+        XCTAssertEqual(recordedEntries.first?.event, DiagnosticsEvent.sessionStartIgnored.rawValue)
 
         await store.clear()
         BugNarratorDiagnostics.setDebugModeEnabled(false)

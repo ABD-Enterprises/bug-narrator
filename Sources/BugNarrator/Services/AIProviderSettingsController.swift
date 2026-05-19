@@ -52,7 +52,7 @@ final class AIProviderSettingsController: ObservableObject {
             )
             apiKeyValidationState = .success(settingsStore.aiProvider.successMessage)
             logger.info(
-                "validate_ai_provider_succeeded",
+                .validateAIProviderSucceeded,
                 "The AI provider validation flow succeeded.",
                 metadata: ["provider": settingsStore.aiProvider.rawValue]
             )
@@ -60,7 +60,7 @@ final class AIProviderSettingsController: ObservableObject {
             let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
             apiKeyValidationState = .failure(appError.userMessage)
             logger.warning(
-                "validate_ai_provider_failed",
+                .validateAIProviderFailed,
                 appError.userMessage,
                 metadata: ["provider": settingsStore.aiProvider.rawValue]
             )
@@ -71,7 +71,7 @@ final class AIProviderSettingsController: ObservableObject {
         settingsStore.removeAPIKey()
         apiKeyValidationState = .idle
         logger.info(
-            "remove_ai_provider_credential",
+            .removeAIProviderCredential,
             "The AI provider credential was removed from local storage.",
             metadata: ["provider": settingsStore.aiProvider.rawValue]
         )

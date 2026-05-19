@@ -574,10 +574,10 @@ final class AppState: ObservableObject {
     }
 
     func startSession() async {
-        recordingLogger.info("session_start_requested", "A feedback session start was requested.")
+        recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
         guard recordingTransition == .idle else {
-            recordingLogger.debug("session_start_ignored", "The start request was ignored because another recording transition is already in progress.")
+            recordingLogger.debug(.sessionStartIgnored, "The start request was ignored because another recording transition is already in progress.")
             return
         }
 
@@ -585,7 +585,7 @@ final class AppState: ObservableObject {
         defer { recordingTransition = .idle }
 
         if status.phase == .recording || status.phase == .transcribing {
-            recordingLogger.warning("session_start_rejected", "The start request was rejected because BugNarrator is already busy.")
+            recordingLogger.warning(.sessionStartRejected, "The start request was rejected because BugNarrator is already busy.")
             return
         }
 
@@ -603,7 +603,7 @@ final class AppState: ObservableObject {
 
         let preflightResult = await preflightForSessionStart()
         if let preflightError = preflightResult.error {
-            permissionsLogger.warning("session_start_preflight_failed", preflightError.userMessage)
+            permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
             presentError(preflightError)
             return
         }
@@ -625,7 +625,7 @@ final class AppState: ObservableObject {
                 beginActivity(reason: recordingActivityReason())
                 startTimer()
                 recordingLogger.info(
-                    "session_started",
+                    .sessionStarted,
                     "A feedback session started successfully.",
                     metadata: [
                         "session_id": sessionID.uuidString,
@@ -635,7 +635,7 @@ final class AppState: ObservableObject {
                     ]
                 )
                 telemetryRecorder.record(
-                    "recording_started",
+                    .recordingStarted,
                     metadata: [
                         "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
                         "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
@@ -950,7 +950,7 @@ final class AppState: ObservableObject {
                 metadata: ["session_count": "\(transcriptStore.sessionCount)"]
             )
             telemetryRecorder.record(
-                "privacy_data_exported",
+                .privacyDataExported,
                 metadata: ["session_count": "\(transcriptStore.sessionCount)"]
             )
             NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
@@ -1774,7 +1774,7 @@ final class AppState: ObservableObject {
 
     private func logSessionStopRequested(_ recordingSession: RecordingSessionDraft) {
         recordingLogger.info(
-            "session_stop_requested",
+            .sessionStopRequested,
             "Stopping the active feedback session.",
             metadata: ["session_id": recordingSession.sessionID.uuidString]
         )
@@ -1782,12 +1782,12 @@ final class AppState: ObservableObject {
 
     private func beginStoppingSession() -> RecordingSessionDraft? {
         guard recordingTransition == .idle else {
-            recordingLogger.debug("session_stop_ignored", "The stop request was ignored because another recording transition is already in progress.")
+            recordingLogger.debug(.sessionStopIgnored, "The stop request was ignored because another recording transition is already in progress.")
             return nil
         }
 
         guard status.phase == .recording else {
-            recordingLogger.warning("session_stop_rejected", "The stop request was rejected because no recording session is active.")
+            recordingLogger.warning(.sessionStopRejected, "The stop request was rejected because no recording session is active.")
             return nil
         }
 
@@ -1906,7 +1906,7 @@ final class AppState: ObservableObject {
         }
 
         transcriptionLogger.info(
-            "transcription_completed",
+            .transcriptionCompleted,
             "BugNarrator finished transcription and created a transcript session.",
             metadata: [
                 "session_id": session.id.uuidString,
@@ -1915,7 +1915,7 @@ final class AppState: ObservableObject {
             ]
         )
         telemetryRecorder.record(
-            "transcription_completed",
+            .transcriptionCompleted,
             metadata: [
                 "marker_count": "\(session.markerCount)",
                 "screenshot_count": "\(session.screenshotCount)",
@@ -2644,7 +2644,7 @@ final class AppState: ObservableObject {
             "error_type": telemetryErrorType(for: error)
         ]
 
-        telemetryRecorder.record("app_error", metadata: metadata)
+        telemetryRecorder.record(.appError, metadata: metadata)
 
         switch error {
         case .microphonePermissionDenied,
@@ -2654,23 +2654,23 @@ final class AppState: ObservableObject {
              .systemAudioConsentRequired,
              .systemAudioUnavailable,
              .screenRecordingPermissionDenied:
-            permissionsLogger.warning("app_error", error.userMessage, metadata: metadata)
+            permissionsLogger.warning(.appError, error.userMessage, metadata: metadata)
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
-            settingsLogger.warning("app_error", error.userMessage, metadata: metadata)
+            settingsLogger.warning(.appError, error.userMessage, metadata: metadata)
         case .recordingFailure:
-            recordingLogger.error("app_error", error.userMessage, metadata: metadata)
+            recordingLogger.error(.appError, error.userMessage, metadata: metadata)
         case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited:
-            transcriptionLogger.error("app_error", error.userMessage, metadata: metadata)
+            transcriptionLogger.error(.appError, error.userMessage, metadata: metadata)
         case .screenshotCaptureFailure:
-            screenshotLogger.error("app_error", error.userMessage, metadata: metadata)
+            screenshotLogger.error(.appError, error.userMessage, metadata: metadata)
         case .exportConfigurationMissing, .exportFailure:
-            exportLogger.error("app_error", error.userMessage, metadata: metadata)
+            exportLogger.error(.appError, error.userMessage, metadata: metadata)
         case .storageFailure:
-            sessionLibraryLogger.error("app_error", error.userMessage, metadata: metadata)
+            sessionLibraryLogger.error(.appError, error.userMessage, metadata: metadata)
         case .noActiveSession:
-            recordingLogger.warning("app_error", error.userMessage, metadata: metadata)
+            recordingLogger.warning(.appError, error.userMessage, metadata: metadata)
         case .diagnosticsFailure:
-            settingsLogger.error("app_error", error.userMessage, metadata: metadata)
+            settingsLogger.error(.appError, error.userMessage, metadata: metadata)
         }
     }
 

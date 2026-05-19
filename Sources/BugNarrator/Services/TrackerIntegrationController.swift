@@ -68,7 +68,7 @@ final class TrackerIntegrationController: ObservableObject {
                 "GitHub accepted this token for \(configurationSnapshot.owner)/\(configurationSnapshot.repository)."
             )
             exportLogger.info(
-                "validate_github_configuration_succeeded",
+                .validateGitHubConfigurationSucceeded,
                 "GitHub export configuration validation succeeded.",
                 metadata: ["repository": "\(configurationSnapshot.owner)/\(configurationSnapshot.repository)"]
             )
@@ -81,7 +81,7 @@ final class TrackerIntegrationController: ObservableObject {
 
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             gitHubValidationState = .failure(appError.userMessage)
-            exportLogger.warning("validate_github_configuration_failed", appError.userMessage)
+            exportLogger.warning(.validateGitHubConfigurationFailed, appError.userMessage)
         }
     }
 
@@ -258,7 +258,7 @@ final class TrackerIntegrationController: ObservableObject {
                     projectCount: projects.count
                 )
                 self.exportLogger.info(
-                    "validate_jira_configuration_succeeded",
+                    .validateJiraConfigurationSucceeded,
                     "Jira export configuration validation succeeded.",
                     metadata: [
                         "project_count": "\(projects.count)",
@@ -283,7 +283,7 @@ final class TrackerIntegrationController: ObservableObject {
             jiraIssueTypeMetadataIsStale = !jiraIssueTypes.isEmpty
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             jiraValidationState = .failure(appError.userMessage)
-            exportLogger.warning("validate_jira_configuration_failed", appError.userMessage)
+            exportLogger.warning(.validateJiraConfigurationFailed, appError.userMessage)
         }
     }
 
