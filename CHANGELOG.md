@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.35 - 2026-05-19
+
+- Added local Parakeet transcription server for offline, zero-cost speech-to-text on Apple Silicon via MLX.
+- Added Local (Parakeet) AI provider in Settings that auto-configures to localhost:8422 with no API key required.
+- Added standalone binary builder so the transcription server runs without a Python installation.
+- Fixed Keychain access in debug builds to avoid a stuck modal dialog when the signing identity differs from production.
+
 ## 1.0.34 - 2026-05-19
 
 - Split the remaining `AppState` execution paths into dedicated recording, screenshot, transcription recovery, and session-library controllers so the release build is easier to reason about and maintain.
