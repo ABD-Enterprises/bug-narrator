@@ -9,7 +9,32 @@ final class KeychainService: KeychainServicing {
         environment["XCTestConfigurationFilePath"] != nil
             || environment["XCTestBundlePath"] != nil
             || environment["XCTestSessionIdentifier"] != nil
+            || !hasStableCodeSigningIdentity
     }
+
+    static let hasStableCodeSigningIdentity: Bool = {
+        var code: SecCode?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else {
+            return false
+        }
+
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else {
+            return false
+        }
+
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+              let dict = info as? [String: Any] else {
+            return false
+        }
+
+        guard let teamID = dict["teamid"] as? String, !teamID.isEmpty else {
+            return false
+        }
+
+        return true
+    }()
 
     static func makeReadQuery(
         forService service: String,
