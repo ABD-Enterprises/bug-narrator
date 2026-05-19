@@ -12,14 +12,14 @@ final class OperationalTelemetryRecorderTests: XCTestCase {
         let storageURL = rootDirectoryURL.appendingPathComponent("telemetry.jsonl")
         let recorder = OperationalTelemetryRecorder(storageURL: storageURL)
 
-        recorder.record("recording_started", metadata: ["has_openai_key": "yes"])
-        recorder.record("transcription_completed", metadata: ["model": "whisper-1"])
+        recorder.record(.recordingStarted, metadata: ["has_openai_key": "yes"])
+        recorder.record(.transcriptionCompleted, metadata: ["model": "whisper-1"])
 
         let lines = try String(contentsOf: storageURL, encoding: .utf8)
             .split(separator: "\n")
         XCTAssertEqual(lines.count, 2)
-        XCTAssertTrue(lines[0].contains("recording_started"))
-        XCTAssertTrue(lines[1].contains("transcription_completed"))
+        XCTAssertTrue(lines[0].contains(TelemetryEvent.recordingStarted.rawValue))
+        XCTAssertTrue(lines[1].contains(TelemetryEvent.transcriptionCompleted.rawValue))
     }
 
     func testRecorderRedactsSensitiveMetadataBeforePersisting() throws {
