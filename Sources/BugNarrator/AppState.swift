@@ -63,11 +63,16 @@ final class AppState: ObservableObject {
     private var processActivity: NSObjectProtocol?
     private var pendingRecordedAudio: RecordedAudio?
     private var cancellables = Set<AnyCancellable>()
-    private var isStartingSession = false
-    private var isStoppingSession = false
-    private var isCancellingSession = false
+    private var recordingTransition: RecordingTransition = .idle
     @Published private(set) var isScreenshotCaptureInProgress = false
     private var toastDismissTask: Task<Void, Never>?
+
+    private enum RecordingTransition {
+        case idle
+        case starting
+        case stopping
+        case cancelling
+    }
 
     var gitHubValidationState: APIKeyValidationState {
         trackerIntegration.gitHubValidationState
@@ -524,10 +529,13 @@ final class AppState: ObservableObject {
     func startSession() async {
         recordingLogger.info("session_start_requested", "A feedback session start was requested.")
 
-        guard !isStartingSession, !isStoppingSession, !isCancellingSession else {
+        guard recordingTransition == .idle else {
             recordingLogger.debug("session_start_ignored", "The start request was ignored because another recording transition is already in progress.")
             return
         }
+
+        recordingTransition = .starting
+        defer { recordingTransition = .idle }
 
         if status.phase == .recording || status.phase == .transcribing {
             recordingLogger.warning("session_start_rejected", "The start request was rejected because BugNarrator is already busy.")
@@ -552,9 +560,6 @@ final class AppState: ObservableObject {
             presentError(preflightError)
             return
         }
-
-        isStartingSession = true
-        defer { isStartingSession = false }
 
         do {
             let sessionID = UUID()
@@ -633,7 +638,7 @@ final class AppState: ObservableObject {
     }
 
     func stopSession() async {
-        guard !isStoppingSession, !isCancellingSession else {
+        guard recordingTransition == .idle else {
             recordingLogger.debug("session_stop_ignored", "The stop request was ignored because another recording transition is already in progress.")
             return
         }
@@ -648,8 +653,8 @@ final class AppState: ObservableObject {
             return
         }
 
-        isStoppingSession = true
-        defer { isStoppingSession = false }
+        recordingTransition = .stopping
+        defer { recordingTransition = .idle }
 
         cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
         stopTimer(resetElapsed: false)
@@ -822,13 +827,13 @@ final class AppState: ObservableObject {
     }
 
     func cancelSession() async {
-        guard !isCancellingSession, !isStoppingSession else {
+        guard recordingTransition == .idle else {
             recordingLogger.debug("session_cancel_ignored", "The cancel request was ignored because another recording transition is already in progress.")
             return
         }
 
-        isCancellingSession = true
-        defer { isCancellingSession = false }
+        recordingTransition = .cancelling
+        defer { recordingTransition = .idle }
 
         showDiscardConfirmation = false
         cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
