@@ -152,6 +152,9 @@ final class SettingsStore: ObservableObject {
         didSet {
             guard hasLoaded else { return }
             defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
+            if aiProvider == .parakeetLocal && (preferredModel.isEmpty || preferredModel == "whisper-1") {
+                preferredModel = "parakeet-tdt-0.6b-v3"
+            }
         }
     }
 
@@ -457,7 +460,10 @@ final class SettingsStore: ObservableObject {
 
     var preferredModelValue: String {
         let value = preferredModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? "whisper-1" : value
+        if value.isEmpty || (value == "whisper-1" && aiProvider == .parakeetLocal) {
+            return aiProvider == .parakeetLocal ? "parakeet-tdt-0.6b-v3" : "whisper-1"
+        }
+        return value
     }
 
     var normalizedLanguageHint: String? {
