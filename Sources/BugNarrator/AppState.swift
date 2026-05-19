@@ -5,8 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published var currentTranscript: TranscriptSession?
-    @Published var selectedTranscriptID: UUID?
     @Published private(set) var activeRecordingSession: RecordingSessionDraft?
     @Published private(set) var issueExtractionSessionID: UUID?
     @Published private(set) var exportDestinationInProgress: ExportDestination?
@@ -21,6 +19,7 @@ final class AppState: ObservableObject {
     let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
+    let sessionLibrary: SessionLibraryController
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -134,6 +133,16 @@ final class AppState: ObservableObject {
 
     var transientToast: TransientToast? {
         presentationState.transientToast
+    }
+
+    var currentTranscript: TranscriptSession? {
+        get { sessionLibrary.currentTranscript }
+        set { sessionLibrary.currentTranscript = newValue }
+    }
+
+    var selectedTranscriptID: UUID? {
+        get { sessionLibrary.selectedTranscriptID }
+        set { sessionLibrary.selectedTranscriptID = newValue }
     }
 
     var gitHubValidationState: APIKeyValidationState {
@@ -251,6 +260,11 @@ final class AppState: ObservableObject {
         self.transcriptStore = transcriptStore
         self.recordingTimer = recordingTimer
         self.presentationState = AppPresentationState()
+        self.sessionLibrary = SessionLibraryController(
+            transcriptStore: transcriptStore,
+            artifactsService: artifactsService,
+            clipboardService: clipboardService
+        )
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
@@ -277,7 +291,6 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             transcriptionClient: transcriptionClient
         )
-        self.selectedTranscriptID = transcriptStore.libraryEntries.first?.id
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
@@ -308,6 +321,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         presentationState.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        sessionLibrary.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -389,29 +408,11 @@ final class AppState: ObservableObject {
     }
 
     var displayedTranscript: TranscriptSession? {
-        if let selectedTranscriptID {
-            if currentTranscript?.id == selectedTranscriptID {
-                return currentTranscript
-            }
-
-            if let storedSession = transcriptStore.session(with: selectedTranscriptID) {
-                return storedSession
-            }
-        }
-
-        if let currentTranscript {
-            return currentTranscript
-        }
-
-        return transcriptStore.libraryEntries.first.flatMap { transcriptStore.session(with: $0.id) }
+        sessionLibrary.displayedTranscript
     }
 
     var currentTranscriptIsPersisted: Bool {
-        guard let currentTranscript else {
-            return false
-        }
-
-        return transcriptStore.session(with: currentTranscript.id) == currentTranscript
+        sessionLibrary.currentTranscriptIsPersisted
     }
 
     var needsAPIKeySetup: Bool {
@@ -1088,8 +1089,7 @@ final class AppState: ObservableObject {
 
         let request = makeTranscriptionRequest()
         retryingSessionID = sessionID
-        selectedTranscriptID = retryContext.session.id
-        currentTranscript = retryContext.session
+        sessionLibrary.stageCurrentTranscript(retryContext.session)
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
@@ -1139,73 +1139,34 @@ final class AppState: ObservableObject {
     }
 
     func saveCurrentTranscriptToHistory() {
-        guard let currentTranscript, !currentTranscriptIsPersisted else {
-            selectedTranscriptID = currentTranscript?.id
-            return
-        }
-
         do {
-            try transcriptStore.add(currentTranscript)
-            selectedTranscriptID = currentTranscript.id
-            sessionLibraryLogger.info(
-                "unsaved_transcript_persisted",
-                "Saved the in-memory transcript into local session history.",
-                metadata: ["session_id": currentTranscript.id.uuidString]
-            )
-            setStatus(.success("Transcript saved to session history."))
+            if try sessionLibrary.saveCurrentTranscriptToHistory() != nil {
+                setStatus(.success("Transcript saved to session history."))
+            }
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
     func deleteDisplayedTranscript() {
-        guard let displayedTranscript else {
-            return
+        do {
+            presentDeletedSessionStatus(try sessionLibrary.deleteDisplayedTranscript())
+        } catch {
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
-
-        deleteSessions(withIDs: [displayedTranscript.id])
     }
 
     func deleteSessions(withIDs ids: Set<UUID>) {
-        guard !ids.isEmpty else {
-            return
-        }
-
-        let wasSelectedTranscriptDeleted = selectedTranscriptID.map(ids.contains) ?? false
-        let deletingUnsavedCurrentTranscript = currentTranscript
-            .map { ids.contains($0.id) && transcriptStore.session(with: $0.id) == nil }
-            ?? false
-
         do {
-            let removedSessions = try transcriptStore.removeSessions(withIDs: ids)
-            var sessionsToCleanup = removedSessions
-            if let currentTranscript,
-               ids.contains(currentTranscript.id),
-               !removedSessions.contains(where: { $0.id == currentTranscript.id }),
-               transcriptStore.session(with: currentTranscript.id) == nil {
-                sessionsToCleanup.append(currentTranscript)
-            }
-            sessionsToCleanup.forEach(cleanupArtifactsForDeletedSession)
-
-            if currentTranscript.map({ ids.contains($0.id) }) == true {
-                currentTranscript = nil
-            }
-
-            if wasSelectedTranscriptDeleted || selectedTranscriptID == nil {
-                selectedTranscriptID = preferredTranscriptSelection()
-            }
-
-            let deletedCount = removedSessions.count + (deletingUnsavedCurrentTranscript ? 1 : 0)
-            if deletedCount > 0 {
-                sessionLibraryLogger.info(
-                    "sessions_deleted_from_library",
-                    "Deleted sessions from the library.",
-                    metadata: ["deleted_count": "\(deletedCount)"]
-                )
-                setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
-            }
+            presentDeletedSessionStatus(try sessionLibrary.deleteSessions(withIDs: ids))
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+        }
+    }
+
+    private func presentDeletedSessionStatus(_ deletedCount: Int) {
+        if deletedCount > 0 {
+            setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
         }
     }
 
@@ -2005,7 +1966,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        currentTranscript = session
+        sessionLibrary.setCurrentTranscript(session)
         activeRecordingSession = nil
         showTranscriptWindow?()
     }
@@ -2065,8 +2026,7 @@ final class AppState: ObservableObject {
         _ error: Error,
         session: TranscriptSession
     ) {
-        currentTranscript = session
-        selectedTranscriptID = session.id
+        sessionLibrary.stageCurrentTranscript(session)
         activeRecordingSession = nil
 
         if settingsStore.autoCopyTranscript {
@@ -2237,8 +2197,7 @@ final class AppState: ObservableObject {
         do {
             try persistUpdatedSession(session)
         } catch {
-            currentTranscript = session
-            selectedTranscriptID = session.id
+            sessionLibrary.stageCurrentTranscript(session)
         }
 
         retryingSessionID = nil
@@ -2301,10 +2260,9 @@ final class AppState: ObservableObject {
             )
 
             do {
-                try transcriptStore.add(retryableSession)
+                try sessionLibrary.persistRetryableSession(retryableSession)
             } catch {
-                currentTranscript = retryableSession
-                selectedTranscriptID = retryableSession.id
+                sessionLibrary.stageCurrentTranscript(retryableSession)
                 activeRecordingSession = nil
                 cleanupPendingRecordedAudioIfNeeded()
                 endActivity()
@@ -2334,8 +2292,6 @@ final class AppState: ObservableObject {
                 return
             }
 
-            currentTranscript = retryableSession
-            selectedTranscriptID = retryableSession.id
             activeRecordingSession = nil
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
@@ -2415,40 +2371,14 @@ final class AppState: ObservableObject {
     }
 
     private func persistCompletedTranscript(_ session: TranscriptSession) throws {
-        try transcriptStore.add(session)
-        selectedTranscriptID = session.id
-
-        if settingsStore.autoCopyTranscript {
-            clipboardService.copy(session.transcript)
-        }
-
-        sessionLibraryLogger.info(
-            "transcript_persisted",
-            "Persisted a completed transcript session.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "auto_saved": "required",
-                "auto_copied": settingsStore.autoCopyTranscript ? "yes" : "no"
-            ]
+        try sessionLibrary.persistCompletedTranscript(
+            session,
+            autoCopyTranscript: settingsStore.autoCopyTranscript
         )
     }
 
     private func persistUpdatedSession(_ session: TranscriptSession) throws {
-        var session = session
-        session.updatedAt = Date()
-
-        currentTranscript = session
-
-        if transcriptStore.session(with: session.id) != nil {
-            try transcriptStore.add(session)
-        }
-
-        selectedTranscriptID = session.id
-        sessionLibraryLogger.debug(
-            "session_updated",
-            "Updated a transcript session in memory or local storage.",
-            metadata: ["session_id": session.id.uuidString]
-        )
+        try sessionLibrary.persistUpdatedSession(session)
     }
 
     private func preflightForSessionStart() async -> RecordingStartPreflightResult {
@@ -2578,40 +2508,11 @@ final class AppState: ObservableObject {
     }
 
     private func editableSession(with sessionID: UUID) -> TranscriptSession? {
-        sessionSnapshot(with: sessionID)
-    }
-
-    private func preferredTranscriptSelection() -> UUID? {
-        if let currentTranscript, !currentTranscriptIsPersisted {
-            return currentTranscript.id
-        }
-
-        return transcriptStore.libraryEntries.first?.id
+        sessionLibrary.editableSession(with: sessionID)
     }
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
-        if currentTranscript?.id == sessionID {
-            return currentTranscript
-        }
-
-        return transcriptStore.session(with: sessionID)
-    }
-
-    private func cleanupArtifactsForDeletedSession(_ session: TranscriptSession) {
-        if let artifactsDirectoryURL = session.artifactsDirectoryURL {
-            artifactsService.removeArtifactsDirectory(at: artifactsDirectoryURL)
-            return
-        }
-
-        let directories = Set(
-            session.screenshots.map { screenshot in
-                screenshot.fileURL.deletingLastPathComponent()
-            }
-        )
-
-        directories.forEach { directoryURL in
-            artifactsService.removeArtifactsDirectory(at: directoryURL)
-        }
+        sessionLibrary.sessionSnapshot(with: sessionID)
     }
 
     private func makePrivacyDataExportSettingsSnapshot() -> PrivacyDataExportSettingsSnapshot {
@@ -2960,7 +2861,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            selectedTranscriptID = transcriptStore.latestPendingTranscriptionSession?.id
+            sessionLibrary.selectLatestPendingTranscriptionSession()
             sessionLibraryLogger.warning(
                 "recovered_recordings_imported",
                 "Imported recovered recordings as retryable transcript sessions.",
