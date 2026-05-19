@@ -47,10 +47,10 @@ final class AppState: ObservableObject {
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
-    private let debugBundleExporter = DebugBundleExporter()
-    private let privacyDataExporter = PrivacyDataExporter()
-    private let telemetryRecorder = OperationalTelemetryRecorder()
-    private let localPrivacyDataManager = LocalPrivacyDataManager()
+    private let debugBundleExporter: any DebugBundleExporting
+    private let privacyDataExporter: any PrivacyDataExporting
+    private let telemetryRecorder: any OperationalTelemetryRecording
+    private let localPrivacyDataManager: any LocalPrivacyDataManaging
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
@@ -148,6 +148,10 @@ final class AppState: ObservableObject {
             artifactsService: services.artifactsService,
             clipboardService: services.clipboardService,
             urlHandler: services.urlHandler,
+            debugBundleExporter: services.debugBundleExporter,
+            privacyDataExporter: services.privacyDataExporter,
+            telemetryRecorder: services.telemetryRecorder,
+            localPrivacyDataManager: services.localPrivacyDataManager,
             recordingTimer: services.recordingTimer,
             runtimeEnvironment: runtimeEnvironment
         )
@@ -169,6 +173,10 @@ final class AppState: ObservableObject {
         artifactsService: any SessionArtifactsManaging,
         clipboardService: any ClipboardWriting,
         urlHandler: any URLOpening,
+        debugBundleExporter: any DebugBundleExporting,
+        privacyDataExporter: any PrivacyDataExporting,
+        telemetryRecorder: any OperationalTelemetryRecording,
+        localPrivacyDataManager: any LocalPrivacyDataManaging,
         recordingTimer: RecordingTimerViewModel,
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
     ) {
@@ -189,6 +197,10 @@ final class AppState: ObservableObject {
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
+        self.debugBundleExporter = debugBundleExporter
+        self.privacyDataExporter = privacyDataExporter
+        self.telemetryRecorder = telemetryRecorder
+        self.localPrivacyDataManager = localPrivacyDataManager
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
             exportService: exportService

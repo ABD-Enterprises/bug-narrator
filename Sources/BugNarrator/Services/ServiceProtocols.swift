@@ -249,6 +249,31 @@ protocol ClipboardWriting {
     func copy(_ string: String)
 }
 
+@MainActor
+protocol DebugBundleExporting {
+    func export(snapshot: DebugBundleSnapshot) throws -> URL?
+}
+
+@MainActor
+protocol PrivacyDataExporting {
+    func export(
+        sessions: [TranscriptSession],
+        settings: PrivacyDataExportSettingsSnapshot,
+        diagnostics: PrivacyDataExportDiagnosticsSnapshot
+    ) throws -> URL?
+}
+
+protocol OperationalTelemetryRecording {
+    func record(_ name: String, metadata: [String: String])
+    func recentEvents(limit: Int) -> [OperationalTelemetryEvent]
+    func clear() throws
+}
+
+@MainActor
+protocol LocalPrivacyDataManaging {
+    func clearLocalSupportArtifacts() async
+}
+
 protocol KeychainServicing {
     func string(forService service: String, account: String, allowInteraction: Bool) throws -> String?
     func setString(_ value: String, service: String, account: String) throws

@@ -417,6 +417,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(copied.contains(harness.settingsStore.trimmedAPIKey))
     }
 
+    func testDeleteAllLocalDataUsesInjectedPrivacyDataManager() async {
+        let localPrivacyDataManager = MockLocalPrivacyDataManager()
+        let harness = AppStateHarness(localPrivacyDataManager: localPrivacyDataManager)
+        defer { harness.cleanup() }
+
+        await harness.appState.deleteAllLocalData()
+
+        XCTAssertEqual(localPrivacyDataManager.clearCallCount, 1)
+        XCTAssertEqual(harness.appState.status.phase, .success)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Cleared local diagnostics and export history."
+        )
+    }
+
     func testSuccessfulSessionSavesCopiesAndDeletesTemporaryAudioFile() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

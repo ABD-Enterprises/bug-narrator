@@ -150,6 +150,8 @@ struct PrivacyDataExporter {
     }
 }
 
+extension PrivacyDataExporter: PrivacyDataExporting {}
+
 struct LocalPrivacyDataManager: @unchecked Sendable {
     private let fileManager: FileManager
     private let appSupportURL: URL
@@ -182,3 +184,5 @@ struct LocalPrivacyDataManager: @unchecked Sendable {
         }
     }
 }
+
+extension LocalPrivacyDataManager: LocalPrivacyDataManaging {}

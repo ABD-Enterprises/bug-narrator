@@ -85,3 +85,5 @@ struct OperationalTelemetryRecorder {
         try fileManager.removeItem(at: storageURL)
     }
 }
+
+extension OperationalTelemetryRecorder: OperationalTelemetryRecording {}
