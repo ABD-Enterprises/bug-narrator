@@ -254,6 +254,8 @@ struct DebugBundleExporter {
     }
 }
 
+extension DebugBundleExporter: DebugBundleExporting {}
+
 enum SystemDiagnosticsInfo {
     static func currentArchitecture() -> String {
         var systemInfo = utsname()

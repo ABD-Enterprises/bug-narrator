@@ -104,6 +104,10 @@ enum UITestRuntimeSupport {
             artifactsService: SessionArtifactsService(rootDirectoryURL: artifactsRootURL),
             clipboardService: UITestClipboardService(),
             urlHandler: UITestURLHandler(),
+            debugBundleExporter: DebugBundleExporter(),
+            privacyDataExporter: PrivacyDataExporter(),
+            telemetryRecorder: OperationalTelemetryRecorder(),
+            localPrivacyDataManager: LocalPrivacyDataManager(),
             recordingTimer: RecordingTimerViewModel(),
             runtimeEnvironment: runtimeEnvironment
         )
