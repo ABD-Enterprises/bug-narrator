@@ -11,7 +11,6 @@ final class AppState: ObservableObject {
     @Published private(set) var pendingExportReview: IssueExportReview?
     @Published private(set) var exportHistory: [ExportReceipt] = []
     @Published private(set) var recoveredRecordingImportCount = 0
-    @Published private(set) var retryingSessionID: UUID?
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
@@ -20,6 +19,7 @@ final class AppState: ObservableObject {
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
     let sessionLibrary: SessionLibraryController
+    let transcriptionRecovery: TranscriptionRecoveryController
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -117,12 +117,6 @@ final class AppState: ObservableObject {
         case postTranscriptionFailure(Error)
     }
 
-    private struct PendingTranscriptionRetryContext {
-        var session: TranscriptSession
-        let pendingTranscription: PendingTranscription
-        let audioFileURL: URL
-    }
-
     var status: AppStatus {
         presentationState.status
     }
@@ -143,6 +137,10 @@ final class AppState: ObservableObject {
     var selectedTranscriptID: UUID? {
         get { sessionLibrary.selectedTranscriptID }
         set { sessionLibrary.selectedTranscriptID = newValue }
+    }
+
+    var retryingSessionID: UUID? {
+        transcriptionRecovery.retryingSessionID
     }
 
     var gitHubValidationState: APIKeyValidationState {
@@ -265,6 +263,10 @@ final class AppState: ObservableObject {
             artifactsService: artifactsService,
             clipboardService: clipboardService
         )
+        self.transcriptionRecovery = TranscriptionRecoveryController(
+            sessionLibrary: self.sessionLibrary,
+            artifactsService: artifactsService
+        )
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
@@ -327,6 +329,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         sessionLibrary.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        transcriptionRecovery.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -1083,12 +1091,34 @@ final class AppState: ObservableObject {
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
-        guard let retryContext = pendingTranscriptionRetryContext(for: sessionID) else {
+        let retryContext: PendingTranscriptionRetryContext
+        switch transcriptionRecovery.retryContext(
+            for: sessionID,
+            isRecording: status.phase == .recording,
+            hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+            aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
+        ) {
+        case .ready(let context):
+            retryContext = context
+        case .duplicate:
+            return
+        case .failure(let appError, let opensSettings, let statusMessage):
+            if let statusMessage {
+                setStatus(.error(statusMessage), error: appError)
+            } else {
+                presentError(appError, operation: .retryTranscription)
+            }
+            if opensSettings {
+                showSettingsWindow?()
+            }
+            return
+        }
+
+        guard transcriptionRecovery.beginRetry(for: sessionID) else {
             return
         }
 
         let request = makeTranscriptionRequest()
-        retryingSessionID = sessionID
         sessionLibrary.stageCurrentTranscript(retryContext.session)
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
@@ -1116,15 +1146,21 @@ final class AppState: ObservableObject {
                 mode: .retry
             ) {
             case .success:
-                cleanupPreservedRetryAudioIfNeeded(at: retryContext.audioFileURL)
-                retryingSessionID = nil
+                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
+                    at: retryContext.audioFileURL,
+                    debugMode: settingsStore.debugMode
+                )
+                transcriptionRecovery.finishRetry()
                 finishSuccessfulTranscription(showTranscriptWindow: true)
             case .persistenceFailure(_, let error):
-                retryingSessionID = nil
+                transcriptionRecovery.finishRetry()
                 presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
             case .postTranscriptionFailure(let error):
-                cleanupPreservedRetryAudioIfNeeded(at: retryContext.audioFileURL)
-                retryingSessionID = nil
+                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
+                    at: retryContext.audioFileURL,
+                    debugMode: settingsStore.debugMode
+                )
+                transcriptionRecovery.finishRetry()
                 endActivity()
                 presentPostTranscriptionError(error, operation: .retryTranscription)
             }
@@ -1133,7 +1169,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            retryingSessionID = nil
+            transcriptionRecovery.finishRetry()
             presentError(error, operation: .retryTranscription)
         }
     }
@@ -2075,7 +2111,7 @@ final class AppState: ObservableObject {
         recordingSession: RecordingSessionDraft,
         request: TranscriptionRequest
     ) {
-        if let failureReason = recoverablePendingTranscriptionReason(for: error),
+        if let failureReason = transcriptionRecovery.recoverablePendingTranscriptionReason(for: error),
            let recordedAudio = pendingRecordedAudio {
             preserveRetryableSession(
                 from: recordingSession,
@@ -2097,72 +2133,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func pendingTranscriptionRetryContext(
-        for sessionID: UUID
-    ) -> PendingTranscriptionRetryContext? {
-        guard status.phase != .recording else {
-            presentError(
-                AppError.recordingFailure("Stop the current recording before retrying transcription."),
-                operation: .retryTranscription
-            )
-            return nil
-        }
-
-        guard retryingSessionID == nil else {
-            logDuplicatePendingTranscriptionRetryRequest(for: sessionID)
-            return nil
-        }
-
-        guard let session = sessionSnapshot(with: sessionID),
-              let pendingTranscription = session.pendingTranscription,
-              let audioFileURL = session.pendingTranscriptionAudioURL else {
-            presentError(
-                AppError.transcriptionFailure("The saved retry session is unavailable."),
-                operation: .retryTranscription
-            )
-            return nil
-        }
-
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            setStatus(.error(compatibilityIssue), error: .transcriptionFailure(compatibilityIssue))
-            showSettingsWindow?()
-            return nil
-        }
-
-        guard settingsStore.hasUsableAIProviderCredential else {
-            setStatus(.error(
-                session.transcriptionRecoveryMessage ?? AppError.missingAPIKey.userMessage
-            ), error: .missingAPIKey)
-            showSettingsWindow?()
-            return nil
-        }
-
-        guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
-            presentError(
-                AppError.transcriptionFailure("The preserved audio file could not be found."),
-                operation: .retryTranscription
-            )
-            return nil
-        }
-
-        return PendingTranscriptionRetryContext(
-            session: session,
-            pendingTranscription: pendingTranscription,
-            audioFileURL: audioFileURL
-        )
-    }
-
-    private func logDuplicatePendingTranscriptionRetryRequest(for sessionID: UUID) {
-        transcriptionLogger.warning(
-            "transcription_retry_already_in_progress",
-            "Ignoring duplicate retry request while a retry is already in progress.",
-            metadata: [
-                "requested_session_id": sessionID.uuidString,
-                "active_retry_session_id": retryingSessionID?.uuidString ?? "unknown"
-            ]
-        )
-    }
-
     private func logPendingTranscriptionRetryRequested(
         _ context: PendingTranscriptionRetryContext
     ) {
@@ -2181,47 +2151,18 @@ final class AppState: ObservableObject {
         _ error: Error,
         context: PendingTranscriptionRetryContext
     ) -> Bool {
-        guard let failureReason = recoverablePendingTranscriptionReason(for: error) else {
+        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(error, context: context) else {
             return false
         }
 
-        var session = context.session
-        let pendingTranscription = context.pendingTranscription
-        session.pendingTranscription = PendingTranscription(
-            audioFileName: pendingTranscription.audioFileName,
-            failureReason: failureReason,
-            preservedAt: pendingTranscription.preservedAt,
-            attemptCount: pendingTranscription.attemptCount + 1
-        )
-
-        do {
-            try persistUpdatedSession(session)
-        } catch {
-            sessionLibrary.stageCurrentTranscript(session)
-        }
-
-        retryingSessionID = nil
         endActivity()
 
-        let appError = failureReason.appError
+        let appError = retryFailure.appError
         logAppError(appError, context: "retry_pending_transcription", operation: .retryTranscription)
-        let attemptMessage = pendingTranscription.attemptCount >= 2
-            ? " This session has been retried \(pendingTranscription.attemptCount + 1) times."
-            : ""
-        setStatus(.error(
-            (session.transcriptionRecoveryMessage ?? appError.userMessage) + attemptMessage
-        ), error: appError)
+        setStatus(.error(retryFailure.statusMessage), error: appError)
         showTranscriptWindow?()
         showSettingsWindow?()
         return true
-    }
-
-    private func recoverablePendingTranscriptionReason(for error: Error) -> PendingTranscriptionFailureReason? {
-        guard let appError = error as? AppError else {
-            return nil
-        }
-
-        return PendingTranscriptionFailureReason(appError: appError)
     }
 
     private func preserveRetryableSession(
@@ -2230,144 +2171,58 @@ final class AppState: ObservableObject {
         request: TranscriptionRequest,
         failureReason: PendingTranscriptionFailureReason
     ) {
-        let appError = failureReason.appError
-
-        do {
-            let preservedAudioURL = try preserveRecordedAudioForRetry(
-                recordedAudio,
-                in: recordingSession.artifactsDirectoryURL
-            )
-
-            let retryableSession = TranscriptSession(
-                id: recordingSession.sessionID,
-                createdAt: Date(),
-                transcript: "",
-                duration: recordedAudio.duration,
-                model: request.model,
-                languageHint: request.languageHint,
-                prompt: request.prompt,
-                markers: recordingSession.markers,
-                screenshots: recordingSession.screenshots,
-                sections: [],
-                issueExtraction: nil,
-                pendingTranscription: PendingTranscription(
-                    audioFileName: preservedAudioURL.lastPathComponent,
-                    failureReason: failureReason,
-                    preservedAt: Date()
-                ),
-                updatedAt: Date(),
-                artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-            )
-
-            do {
-                try sessionLibrary.persistRetryableSession(retryableSession)
-            } catch {
-                sessionLibrary.stageCurrentTranscript(retryableSession)
-                activeRecordingSession = nil
-                cleanupPendingRecordedAudioIfNeeded()
-                endActivity()
-
-                let normalizedError = normalizeError(
-                    error,
-                    operation: .sessionLibrary,
-                    fallback: { .storageFailure($0) }
-                )
-                let persistenceError = normalizedError.appError
-                logAppError(normalizedError, context: "retryable_session_persist_failed")
-                var metadata = appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
-                metadata["session_id"] = retryableSession.id.uuidString
-                sessionLibraryLogger.error(
-                    "retryable_session_persist_failed",
-                    "The preserved recording could not be saved into local session history.",
-                    metadata: metadata
-                )
-                setStatus(
-                    .error("Recording preserved, but \(persistenceError.userMessage)"),
-                    error: persistenceError
-                )
-                showTranscriptWindow?()
-                if appError.suggestsOpenAISettings {
-                    showSettingsWindow?()
-                }
-                return
-            }
-
+        switch transcriptionRecovery.preserveRetryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: request,
+            failureReason: failureReason
+        ) {
+        case .preserved(let retryableSession, let appError):
             activeRecordingSession = nil
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
-            transcriptionLogger.warning(
-                "transcription_deferred_for_retry",
-                "Recording finished and was preserved for a later transcription retry.",
-                metadata: [
-                    "session_id": retryableSession.id.uuidString,
-                    "failure_reason": failureReason.rawValue
-                ]
-            )
             logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
             setStatus(.error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage), error: appError)
             showTranscriptWindow?()
             if appError.suggestsOpenAISettings {
                 showSettingsWindow?()
             }
-        } catch {
+
+        case .persistenceFailure(let retryableSession, let error):
+            activeRecordingSession = nil
+            cleanupPendingRecordedAudioIfNeeded()
+            endActivity()
+
+            let normalizedError = normalizeError(
+                error,
+                operation: .sessionLibrary,
+                fallback: { .storageFailure($0) }
+            )
+            let persistenceError = normalizedError.appError
+            logAppError(normalizedError, context: "retryable_session_persist_failed")
+            var metadata = appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
+            metadata["session_id"] = retryableSession.id.uuidString
+            sessionLibraryLogger.error(
+                "retryable_session_persist_failed",
+                "The preserved recording could not be saved into local session history.",
+                metadata: metadata
+            )
+            setStatus(
+                .error("Recording preserved, but \(persistenceError.userMessage)"),
+                error: persistenceError
+            )
+            showTranscriptWindow?()
+            if failureReason.appError.suggestsOpenAISettings {
+                showSettingsWindow?()
+            }
+
+        case .preservationFailure(let error):
             if !settingsStore.debugMode {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
             }
             activeRecordingSession = nil
             presentError(error, operation: .recordingStop)
         }
-    }
-
-    private func preserveRecordedAudioForRetry(
-        _ recordedAudio: RecordedAudio,
-        in artifactsDirectoryURL: URL
-    ) throws -> URL {
-        let fileManager = FileManager.default
-        let preservedAudioURL = artifactsService.makeRecordedAudioURL(
-            in: artifactsDirectoryURL,
-            sourceFileURL: recordedAudio.fileURL
-        )
-
-        if fileManager.fileExists(atPath: preservedAudioURL.path) {
-            try fileManager.removeItem(at: preservedAudioURL)
-        }
-
-        if recordedAudio.fileURL.standardizedFileURL == preservedAudioURL.standardizedFileURL {
-            return preservedAudioURL
-        }
-
-        try fileManager.copyItem(at: recordedAudio.fileURL, to: preservedAudioURL)
-
-        let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
-        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard fileSize > 0 else {
-            throw AppError.recordingFailure("The preserved audio file was empty.")
-        }
-
-        recordingLogger.info(
-            "recorded_audio_preserved_for_retry",
-            "Preserved the finished recording for a later transcription retry.",
-            metadata: ["file_name": preservedAudioURL.lastPathComponent]
-        )
-        return preservedAudioURL
-    }
-
-    private func cleanupPreservedRetryAudioIfNeeded(at audioFileURL: URL) {
-        guard !settingsStore.debugMode else {
-            recordingLogger.debug(
-                "preserved_retry_audio_retained",
-                "Kept the preserved retry audio because debug mode is enabled.",
-                metadata: ["file_name": audioFileURL.lastPathComponent]
-            )
-            return
-        }
-
-        try? FileManager.default.removeItem(at: audioFileURL)
-        recordingLogger.debug(
-            "preserved_retry_audio_removed",
-            "Removed the preserved retry audio after transcription succeeded.",
-            metadata: ["file_name": audioFileURL.lastPathComponent]
-        )
     }
 
     private func persistCompletedTranscript(_ session: TranscriptSession) throws {
