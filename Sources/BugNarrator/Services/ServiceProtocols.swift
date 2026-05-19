@@ -269,6 +269,12 @@ protocol OperationalTelemetryRecording {
     func clear() throws
 }
 
+extension OperationalTelemetryRecording {
+    func record(_ event: TelemetryEventName, metadata: [String: String] = [:]) {
+        record(event.rawValue, metadata: metadata)
+    }
+}
+
 @MainActor
 protocol LocalPrivacyDataManaging {
     func clearLocalSupportArtifacts() async
