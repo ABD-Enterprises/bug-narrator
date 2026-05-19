@@ -20,6 +20,7 @@ final class AppState: ObservableObject {
     let presentationState: AppPresentationState
     let sessionLibrary: SessionLibraryController
     let transcriptionRecovery: TranscriptionRecoveryController
+    let screenshotCoordinator: ScreenshotCoordinator
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -36,8 +37,6 @@ final class AppState: ObservableObject {
     private let screenCapturePermissionService: any ScreenCapturePermissionServicing
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
-    private let screenshotCaptureService: any ScreenshotCapturing
-    private let screenshotSelectionService: any ScreenshotSelecting
     private let issueExtractionService: any IssueExtracting
     private let exportService: any IssueExporting
     private let recoveredRecordingImporter: any RecoveredRecordingImporting
@@ -61,7 +60,6 @@ final class AppState: ObservableObject {
     private var pendingRecordedAudio: RecordedAudio?
     private var cancellables = Set<AnyCancellable>()
     private var recordingTransition: RecordingTransition = .idle
-    @Published private(set) var isScreenshotCaptureInProgress = false
     private var toastDismissTask: Task<Void, Never>?
 
     private enum RecordingTransition {
@@ -267,14 +265,18 @@ final class AppState: ObservableObject {
             sessionLibrary: self.sessionLibrary,
             artifactsService: artifactsService
         )
+        self.screenshotCoordinator = ScreenshotCoordinator(
+            screenCapturePermissionService: screenCapturePermissionService,
+            screenshotCaptureService: screenshotCaptureService,
+            screenshotSelectionService: screenshotSelectionService,
+            artifactsService: artifactsService
+        )
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
         self.screenCapturePermissionService = screenCapturePermissionService
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
-        self.screenshotCaptureService = screenshotCaptureService
-        self.screenshotSelectionService = screenshotSelectionService
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
         self.recoveredRecordingImporter = recoveredRecordingImporter
@@ -335,6 +337,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         transcriptionRecovery.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        screenshotCoordinator.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -455,6 +463,10 @@ final class AppState: ObservableObject {
         transcriptStore.pendingTranscriptionSessions.contains {
             $0.pendingTranscription?.failureReason == .crashRecovery
         }
+    }
+
+    var isScreenshotCaptureInProgress: Bool {
+        screenshotCoordinator.isCaptureInProgress
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
@@ -1228,14 +1240,27 @@ final class AppState: ObservableObject {
         let markerTitle = "Screenshot \(screenshotIndex)"
 
         do {
-            let screenshot = try await performScreenshotCapture(
+            let captureResult = try await screenshotCoordinator.captureScreenshot(
                 in: recordingSession,
                 prefix: "capture",
                 index: screenshotIndex,
                 elapsedTime: elapsedTime,
-                associatedMarkerID: markerID
+                associatedMarkerID: markerID,
+                onSelectionWillBegin: { [weak self] in
+                    self?.setStatus(.recording("Drag to select a screenshot region. Press Esc to cancel."))
+                    self?.prepareForScreenshotSelection?()
+                },
+                onSelectionDidEnd: { [weak self] in
+                    self?.restoreAfterScreenshotSelection?()
+                },
+                isSessionActive: { [weak self] sessionID in
+                    guard let self else {
+                        return false
+                    }
+                    return status.phase == .recording && activeRecordingSession?.sessionID == sessionID
+                }
             )
-            guard let screenshot else {
+            guard case let .captured(screenshot) = captureResult else {
                 guard status.phase == .recording,
                       activeRecordingSession?.sessionID == recordingSession.sessionID else {
                     return
@@ -2399,73 +2424,8 @@ final class AppState: ObservableObject {
         await refreshExportHistory()
     }
 
-    private func performScreenshotCapture(
-        in recordingSession: RecordingSessionDraft,
-        prefix: String,
-        index: Int,
-        elapsedTime: TimeInterval,
-        associatedMarkerID: UUID?
-    ) async throws -> SessionScreenshot? {
-        guard !isScreenshotCaptureInProgress else {
-            throw AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
-        }
-
-        isScreenshotCaptureInProgress = true
-        defer { isScreenshotCaptureInProgress = false }
-
-        let preflightResult = await screenCapturePermissionService.preflightForScreenshotCapture(
-            screenshotCaptureService: screenshotCaptureService,
-            hasActiveRecordingSession: true
-        )
-        if let preflightError = preflightResult.error {
-            throw preflightError
-        }
-
-        setStatus(.recording("Drag to select a screenshot region. Press Esc to cancel."))
-        prepareForScreenshotSelection?()
-        defer {
-            restoreAfterScreenshotSelection?()
-        }
-
-        let selectionResult = try await screenshotSelectionService.selectRegion()
-        guard case let .selected(selectionRect) = selectionResult else {
-            return nil
-        }
-
-        let screenshotURL = artifactsService.makeScreenshotURL(
-            in: recordingSession.artifactsDirectoryURL,
-            prefix: prefix,
-            index: index,
-            elapsedTime: elapsedTime
-        )
-
-        do {
-            try await screenshotCaptureService.captureScreenshot(in: selectionRect, to: screenshotURL)
-        } catch {
-            try? FileManager.default.removeItem(at: screenshotURL)
-            throw error
-        }
-
-        guard status.phase == .recording,
-              activeRecordingSession?.sessionID == recordingSession.sessionID else {
-            try? FileManager.default.removeItem(at: screenshotURL)
-            throw AppError.screenshotCaptureFailure("The session ended before the screenshot finished saving.")
-        }
-
-        return SessionScreenshot(
-            elapsedTime: elapsedTime,
-            filePath: screenshotURL.path,
-            associatedMarkerID: associatedMarkerID
-        )
-    }
-
     private func cancelPendingScreenshotSelection(reason: String) {
-        guard isScreenshotCaptureInProgress else {
-            return
-        }
-
-        screenshotLogger.info("screenshot_selection_cancel_requested", reason)
-        screenshotSelectionService.cancelActiveSelection()
+        screenshotCoordinator.cancelPendingSelection(reason: reason)
     }
 
     private func showToast(_ message: String, style: TransientToastStyle = .success) {
