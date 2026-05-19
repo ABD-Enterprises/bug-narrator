@@ -5,6 +5,7 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
     case openAI
     case openAICompatible
     case localCompatible
+    case parakeetLocal
 
     var id: String { rawValue }
 
@@ -16,6 +17,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "OpenAI-Compatible"
         case .localCompatible:
             return "Local-Compatible"
+        case .parakeetLocal:
+            return "Local (Parakeet)"
         }
     }
 
@@ -27,6 +30,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "Use an enterprise proxy or hosted provider that exposes OpenAI-compatible endpoints."
         case .localCompatible:
             return "Use a local or self-hosted endpoint such as LM Studio or Ollama when it exposes OpenAI-compatible APIs."
+        case .parakeetLocal:
+            return "Transcribe locally on this Mac using Parakeet. No API key, no upload, fully offline after setup."
         }
     }
 
@@ -38,6 +43,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "https://gateway.example.com/openai"
         case .localCompatible:
             return "http://localhost:1234/v1"
+        case .parakeetLocal:
+            return "http://localhost:8422"
         }
     }
 
@@ -49,6 +56,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "Enter the enterprise or hosted OpenAI-compatible base URL."
         case .localCompatible:
             return "Enter the local-compatible base URL. BugNarrator will not assume api.openai.com for this provider."
+        case .parakeetLocal:
+            return "BugNarrator connects to the local Parakeet transcription server on this port."
         }
     }
 
@@ -60,6 +69,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "Provider API Key"
         case .localCompatible:
             return "Provider API Key (Optional)"
+        case .parakeetLocal:
+            return ""
         }
     }
 
@@ -69,6 +80,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "Validate Key"
         case .openAICompatible, .localCompatible:
             return "Validate Connection"
+        case .parakeetLocal:
+            return "Check Server"
         }
     }
 
@@ -80,6 +93,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "The OpenAI-compatible provider accepted this configuration."
         case .localCompatible:
             return "The local-compatible provider accepted this configuration."
+        case .parakeetLocal:
+            return "The local Parakeet transcription server is running."
         }
     }
 
@@ -87,7 +102,7 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .openAI, .openAICompatible:
             return true
-        case .localCompatible:
+        case .localCompatible, .parakeetLocal:
             return false
         }
     }
@@ -100,6 +115,8 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
             return "Compatible Provider"
         case .localCompatible:
             return "Local Provider"
+        case .parakeetLocal:
+            return "Local Parakeet"
         }
     }
 }
@@ -488,6 +505,8 @@ final class SettingsStore: ObservableObject {
             if issueExtractionModelValue == "gpt-4.1-mini" {
                 return "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider."
             }
+            return nil
+        case .parakeetLocal:
             return nil
         }
     }

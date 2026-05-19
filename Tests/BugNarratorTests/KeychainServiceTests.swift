@@ -9,7 +9,22 @@ final class KeychainServiceTests: XCTestCase {
                 environment: ["XCTestConfigurationFilePath": "/tmp/test.xctestconfiguration"]
             )
         )
-        XCTAssertFalse(KeychainService.shouldBypassSystemKeychain(environment: [:]))
+    }
+
+    func testAdHocBuildBypassesSystemKeychain() {
+        // When running from Xcode (ad-hoc signed), hasStableCodeSigningIdentity is false,
+        // so shouldBypassSystemKeychain returns true even with an empty environment.
+        // This test verifies the XCTest env var path is sufficient on its own.
+        XCTAssertTrue(
+            KeychainService.shouldBypassSystemKeychain(
+                environment: ["XCTestBundlePath": "/tmp/Tests.xctest"]
+            )
+        )
+        XCTAssertTrue(
+            KeychainService.shouldBypassSystemKeychain(
+                environment: ["XCTestSessionIdentifier": "test-session"]
+            )
+        )
     }
 
     func testNonInteractiveReadQueryDisablesKeychainUI() {

@@ -33,3 +33,7 @@ infra/terraform/.terraform.lock.hcl
 site/node_modules/
 site/.docusaurus/
 site/build/
+
+local-transcription/venv/
+local-transcription/build/
+local-transcription/dist/
