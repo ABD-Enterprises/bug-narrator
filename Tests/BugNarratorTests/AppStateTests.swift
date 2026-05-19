@@ -1,9 +1,30 @@
 import AppKit
+import Combine
 import XCTest
 @testable import BugNarrator
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testPresentationStateBacksAppStateStatusErrorAndToastFacade() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        var appStateChangeCount = 0
+        let cancellable = harness.appState.objectWillChange.sink {
+            appStateChangeCount += 1
+        }
+        defer { cancellable.cancel() }
+
+        harness.appState.presentationState.setStatus(.error("Needs attention"), error: .missingAPIKey)
+        harness.appState.presentationState.showToast(TransientToast(message: "Saved", style: .success))
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(harness.appState.status.detail, "Needs attention")
+        XCTAssertEqual(harness.appState.currentError, .missingAPIKey)
+        XCTAssertEqual(harness.appState.transientToast?.message, "Saved")
+        XCTAssertGreaterThanOrEqual(appStateChangeCount, 2)
+    }
+
     func testRecordingControlsStartFlowShowsPanelAndStartsSession() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
