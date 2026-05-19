@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var activeRecordingSession: RecordingSessionDraft?
     @Published private(set) var issueExtractionSessionID: UUID?
     @Published private(set) var exportDestinationInProgress: ExportDestination?
     @Published private(set) var pendingExportReview: IssueExportReview?
@@ -18,6 +17,7 @@ final class AppState: ObservableObject {
     let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
+    let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
@@ -32,7 +32,6 @@ final class AppState: ObservableObject {
     var prepareForScreenshotSelection: (() -> Void)?
     var restoreAfterScreenshotSelection: (() -> Void)?
 
-    private let audioRecorder: any AudioRecording
     private let microphonePermissionService: any MicrophonePermissionServicing
     private let screenCapturePermissionService: any ScreenCapturePermissionServicing
     private let transcriptionClient: any TranscriptionServing
@@ -56,18 +55,8 @@ final class AppState: ObservableObject {
     private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    private var processActivity: NSObjectProtocol?
-    private var pendingRecordedAudio: RecordedAudio?
     private var cancellables = Set<AnyCancellable>()
-    private var recordingTransition: RecordingTransition = .idle
     private var toastDismissTask: Task<Void, Never>?
-
-    private enum RecordingTransition {
-        case idle
-        case starting
-        case stopping
-        case cancelling
-    }
 
     private enum AppErrorOperation: String {
         case generic
@@ -256,6 +245,12 @@ final class AppState: ObservableObject {
         self.transcriptStore = transcriptStore
         self.recordingTimer = recordingTimer
         self.presentationState = AppPresentationState()
+        self.recordingSessionController = RecordingSessionController(
+            audioRecorder: audioRecorder,
+            microphonePermissionService: microphonePermissionService,
+            artifactsService: artifactsService,
+            recordingTimer: recordingTimer
+        )
         self.sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
             artifactsService: artifactsService,
@@ -272,7 +267,6 @@ final class AppState: ObservableObject {
             artifactsService: artifactsService
         )
         self.runtimeEnvironment = runtimeEnvironment
-        self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
         self.screenCapturePermissionService = screenCapturePermissionService
         self.transcriptionClient = transcriptionClient
@@ -325,6 +319,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         presentationState.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        recordingSessionController.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -463,6 +463,10 @@ final class AppState: ObservableObject {
         transcriptStore.pendingTranscriptionSessions.contains {
             $0.pendingTranscription?.failureReason == .crashRecovery
         }
+    }
+
+    var activeRecordingSession: RecordingSessionDraft? {
+        recordingSessionController.activeRecordingSession
     }
 
     var isScreenshotCaptureInProgress: Bool {
@@ -619,78 +623,57 @@ final class AppState: ObservableObject {
     func startSession() async {
         recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
-        guard recordingTransition == .idle else {
+        let outcome = await recordingSessionController.startSession(
+            statusPhase: status.phase,
+            activityReason: recordingActivityReason()
+        )
+
+        switch outcome {
+        case .transitionInProgress:
             recordingLogger.debug(.sessionStartIgnored, "The start request was ignored because another recording transition is already in progress.")
             return
-        }
 
-        recordingTransition = .starting
-        defer { recordingTransition = .idle }
-
-        if status.phase == .recording || status.phase == .transcribing {
+        case .busy:
             recordingLogger.warning(.sessionStartRejected, "The start request was rejected because BugNarrator is already busy.")
             return
-        }
 
-        if let activeRecordingSession {
+        case .restored(let recordingSession):
             recordingLogger.warning(
                 "session_start_reconciled_active_session",
                 "A start request arrived while a recording session draft was still active; restoring recording state instead of starting a duplicate recorder.",
-                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+                metadata: ["session_id": recordingSession.sessionID.uuidString]
             )
             setStatus(.recording(recordingDetailMessage()))
-            beginActivity(reason: recordingActivityReason())
-            startTimer()
             return
-        }
 
-        let preflightResult = await preflightForSessionStart()
-        if let preflightError = preflightResult.error {
+        case .preflightFailure(let preflightError):
             permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
             presentError(preflightError, operation: .recordingStart)
             return
-        }
 
-        do {
-            let sessionID = UUID()
-            let artifactsDirectoryURL = try artifactsService.createArtifactsDirectory(for: sessionID)
-
-            do {
-                try await audioRecorder.startRecording()
-                pendingRecordedAudio = nil
-                recordingTimer.stop(resetElapsed: true)
-                activeRecordingSession = RecordingSessionDraft(
-                    sessionID: sessionID,
-                    artifactsDirectoryURL: artifactsDirectoryURL
-                )
-
-                setStatus(.recording(recordingDetailMessage()))
-                beginActivity(reason: recordingActivityReason())
-                startTimer()
-                recordingLogger.info(
-                    .sessionStarted,
-                    "A feedback session started successfully.",
-                    metadata: [
-                        "session_id": sessionID.uuidString,
-                        "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                        "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                        "ai_provider": settingsStore.aiProvider.rawValue
-                    ]
-                )
-                telemetryRecorder.record(
-                    .recordingStarted,
-                    metadata: [
-                        "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                        "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                        "ai_provider": settingsStore.aiProvider.rawValue
-                    ]
-                )
-            } catch {
-                artifactsService.removeArtifactsDirectory(at: artifactsDirectoryURL)
-                throw error
-            }
-        } catch {
+        case .failure(let error):
             presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
+
+        case .started(let recordingSession):
+            setStatus(.recording(recordingDetailMessage()))
+            recordingLogger.info(
+                .sessionStarted,
+                "A feedback session started successfully.",
+                metadata: [
+                    "session_id": recordingSession.sessionID.uuidString,
+                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
+                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                    "ai_provider": settingsStore.aiProvider.rawValue
+                ]
+            )
+            telemetryRecorder.record(
+                .recordingStarted,
+                metadata: [
+                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
+                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                    "ai_provider": settingsStore.aiProvider.rawValue
+                ]
+            )
         }
     }
 
@@ -732,16 +715,15 @@ final class AppState: ObservableObject {
             return
         }
 
-        defer { recordingTransition = .idle }
+        defer { recordingSessionController.finishStoppingSession() }
 
         cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
-        stopTimer(resetElapsed: false)
+        recordingSessionController.prepareForStopSession()
         let request = makeTranscriptionRequest()
 
         do {
             logSessionStopRequested(recordingSession)
-            let recordedAudio = try await audioRecorder.stopRecording()
-            pendingRecordedAudio = recordedAudio
+            let recordedAudio = try await recordingSessionController.stopRecording()
 
             guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 preserveRetryableSession(
@@ -787,30 +769,29 @@ final class AppState: ObservableObject {
     }
 
     func cancelSession() async {
-        guard recordingTransition == .idle else {
+        let outcome = await recordingSessionController.cancelSession(
+            preserveFile: settingsStore.debugMode,
+            onCancelWillBegin: { [weak self] in
+                self?.showDiscardConfirmation = false
+                self?.cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
+            }
+        )
+
+        switch outcome {
+        case .transitionInProgress:
             recordingLogger.debug("session_cancel_ignored", "The cancel request was ignored because another recording transition is already in progress.")
             return
-        }
 
-        recordingTransition = .cancelling
-        defer { recordingTransition = .idle }
-
-        showDiscardConfirmation = false
-        cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
-        stopTimer(resetElapsed: true)
-        endActivity()
-        await audioRecorder.cancelRecording(preserveFile: settingsStore.debugMode)
-        if let activeRecordingSession {
-            artifactsService.removeArtifactsDirectory(at: activeRecordingSession.artifactsDirectoryURL)
-            self.activeRecordingSession = nil
-            recordingLogger.info(
-                "session_cancelled",
-                "The active feedback session was discarded.",
-                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-            )
+        case .cancelled(let activeRecordingSession):
+            if let activeRecordingSession {
+                recordingLogger.info(
+                    "session_cancelled",
+                    "The active feedback session was discarded.",
+                    metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+                )
+            }
+            setStatus(.idle("Session discarded."))
         }
-        pendingRecordedAudio = nil
-        setStatus(.idle("Session discarded."))
     }
 
     func openTranscriptHistory() {
@@ -1235,7 +1216,7 @@ final class AppState: ObservableObject {
 
         let screenshotIndex = recordingSession.screenshots.count + 1
         let markerIndex = recordingSession.markers.count + 1
-        let elapsedTime = max(audioRecorder.currentDuration, elapsedDuration)
+        let elapsedTime = max(recordingSessionController.currentDuration, elapsedDuration)
         let markerID = UUID()
         let markerTitle = "Screenshot \(screenshotIndex)"
 
@@ -1285,7 +1266,7 @@ final class AppState: ObservableObject {
                 )
             )
             latestRecordingSession.screenshots.append(screenshot)
-            activeRecordingSession = latestRecordingSession
+            recordingSessionController.updateActiveRecordingSession(latestRecordingSession)
             screenshotLogger.info(
                 "screenshot_captured",
                 "Captured a screenshot and inserted the automatic marker.",
@@ -1714,31 +1695,23 @@ final class AppState: ObservableObject {
     }
 
     private func startTimer() {
-        recordingTimer.start()
+        recordingSessionController.startTimer()
     }
 
     private func stopTimer(resetElapsed: Bool) {
-        recordingTimer.stop(resetElapsed: resetElapsed)
+        recordingSessionController.stopTimer(resetElapsed: resetElapsed)
     }
 
     private func beginActivity(reason: String) {
-        endActivity()
-        processActivity = ProcessInfo.processInfo.beginActivity(
-            options: [.userInitiated, .idleSystemSleepDisabled],
-            reason: reason
-        )
+        recordingSessionController.beginActivity(reason: reason)
     }
 
     private func swapActivity(reason: String) {
-        beginActivity(reason: reason)
+        recordingSessionController.swapActivity(reason: reason)
     }
 
     private func endActivity() {
-        if let processActivity {
-            ProcessInfo.processInfo.endActivity(processActivity)
-        }
-
-        processActivity = nil
+        recordingSessionController.endActivity()
     }
 
     private func prepareForApplicationTermination() {
@@ -1818,26 +1791,7 @@ final class AppState: ObservableObject {
     }
 
     private func cleanupPendingRecordedAudioIfNeeded() {
-        guard let pendingRecordedAudio else {
-            return
-        }
-
-        if !settingsStore.debugMode {
-            try? FileManager.default.removeItem(at: pendingRecordedAudio.fileURL)
-            recordingLogger.debug(
-                "temporary_audio_removed",
-                "Removed the temporary recorded audio file after use.",
-                metadata: ["file_name": pendingRecordedAudio.fileURL.lastPathComponent]
-            )
-        } else {
-            recordingLogger.debug(
-                "temporary_audio_preserved",
-                "Preserved the temporary recorded audio file because debug mode is enabled.",
-                metadata: ["file_name": pendingRecordedAudio.fileURL.lastPathComponent]
-            )
-        }
-
-        self.pendingRecordedAudio = nil
+        recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
     }
 
     private func makeTranscriptionRequest() -> TranscriptionRequest {
@@ -1858,26 +1812,25 @@ final class AppState: ObservableObject {
     }
 
     private func beginStoppingSession() -> RecordingSessionDraft? {
-        guard recordingTransition == .idle else {
+        switch recordingSessionController.beginStoppingSession(statusPhase: status.phase) {
+        case .transitionInProgress:
             recordingLogger.debug(.sessionStopIgnored, "The stop request was ignored because another recording transition is already in progress.")
             return nil
-        }
 
-        guard status.phase == .recording else {
+        case .noActiveRecording:
             recordingLogger.warning(.sessionStopRejected, "The stop request was rejected because no recording session is active.")
             return nil
-        }
 
-        guard let recordingSession = activeRecordingSession else {
+        case .missingSessionMetadata:
             presentError(
                 AppError.recordingFailure("The recording session metadata was unavailable."),
                 operation: .recordingStop
             )
             return nil
-        }
 
-        recordingTransition = .stopping
-        return recordingSession
+        case .ready(let recordingSession):
+            return recordingSession
+        }
     }
 
     private func transcribeAudio(
@@ -2028,7 +1981,7 @@ final class AppState: ObservableObject {
         }
 
         sessionLibrary.setCurrentTranscript(session)
-        activeRecordingSession = nil
+        recordingSessionController.clearActiveRecordingSession()
         showTranscriptWindow?()
     }
 
@@ -2088,7 +2041,7 @@ final class AppState: ObservableObject {
         session: TranscriptSession
     ) {
         sessionLibrary.stageCurrentTranscript(session)
-        activeRecordingSession = nil
+        recordingSessionController.clearActiveRecordingSession()
 
         if settingsStore.autoCopyTranscript {
             clipboardService.copy(session.transcript)
@@ -2137,7 +2090,7 @@ final class AppState: ObservableObject {
         request: TranscriptionRequest
     ) {
         if let failureReason = transcriptionRecovery.recoverablePendingTranscriptionReason(for: error),
-           let recordedAudio = pendingRecordedAudio {
+           let recordedAudio = recordingSessionController.pendingRecordedAudioSnapshot {
             preserveRetryableSession(
                 from: recordingSession,
                 recordedAudio: recordedAudio,
@@ -2150,8 +2103,8 @@ final class AppState: ObservableObject {
         if !settingsStore.debugMode {
             artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
         }
-        activeRecordingSession = nil
-        if pendingRecordedAudio == nil {
+        recordingSessionController.clearActiveRecordingSession()
+        if recordingSessionController.pendingRecordedAudioSnapshot == nil {
             presentError(error, operation: .recordingStop, fallback: { .recordingFailure($0) })
         } else {
             presentError(error, operation: .transcription)
@@ -2203,7 +2156,7 @@ final class AppState: ObservableObject {
             failureReason: failureReason
         ) {
         case .preserved(let retryableSession, let appError):
-            activeRecordingSession = nil
+            recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
             logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
@@ -2214,7 +2167,7 @@ final class AppState: ObservableObject {
             }
 
         case .persistenceFailure(let retryableSession, let error):
-            activeRecordingSession = nil
+            recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
 
@@ -2245,7 +2198,7 @@ final class AppState: ObservableObject {
             if !settingsStore.debugMode {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
             }
-            activeRecordingSession = nil
+            recordingSessionController.clearActiveRecordingSession()
             presentError(error, operation: .recordingStop)
         }
     }
@@ -2259,10 +2212,6 @@ final class AppState: ObservableObject {
 
     private func persistUpdatedSession(_ session: TranscriptSession) throws {
         try sessionLibrary.persistUpdatedSession(session)
-    }
-
-    private func preflightForSessionStart() async -> RecordingStartPreflightResult {
-        await microphonePermissionService.preflightForRecordingStart(audioRecorder: audioRecorder)
     }
 
     private func preflightForIssueExtraction(_ session: TranscriptSession) -> AppError? {
