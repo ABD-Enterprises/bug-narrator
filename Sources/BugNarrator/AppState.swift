@@ -72,6 +72,28 @@ final class AppState: ObservableObject {
         case cancelling
     }
 
+    private enum AppErrorOperation: String {
+        case generic
+        case recordingStart = "recording_start"
+        case recordingStop = "recording_stop"
+        case transcription
+        case retryTranscription = "retry_transcription"
+        case postTranscription = "post_transcription"
+        case screenshotCapture = "screenshot_capture"
+        case diagnosticsExport = "diagnostics_export"
+        case privacyExport = "privacy_export"
+        case export
+        case exportHistory = "export_history"
+        case sessionLibrary = "session_library"
+        case recoveredRecordingImport = "recovered_recording_import"
+    }
+
+    private struct AppErrorNormalization {
+        let appError: AppError
+        let operation: AppErrorOperation
+        let underlyingErrorDescription: String?
+    }
+
     private enum PostTranscriptionPipelineMode: Equatable {
         case finishedRecording
         case retry
@@ -604,7 +626,7 @@ final class AppState: ObservableObject {
         let preflightResult = await preflightForSessionStart()
         if let preflightError = preflightResult.error {
             permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
-            presentError(preflightError)
+            presentError(preflightError, operation: .recordingStart)
             return
         }
 
@@ -647,7 +669,7 @@ final class AppState: ObservableObject {
                 throw error
             }
         } catch {
-            presentError(error)
+            presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
         }
     }
 
@@ -928,8 +950,11 @@ final class AppState: ObservableObject {
                 )
             )
         } catch {
-            let appError = (error as? AppError) ?? .diagnosticsFailure("BugNarrator could not create the debug bundle.")
-            presentError(appError)
+            presentError(
+                error,
+                operation: .diagnosticsExport,
+                fallback: { _ in .diagnosticsFailure("BugNarrator could not create the debug bundle.") }
+            )
         }
     }
 
@@ -956,8 +981,11 @@ final class AppState: ObservableObject {
             NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
             setStatus(.success("Data export created. API keys and tracker credentials were not included."))
         } catch {
-            let appError = (error as? AppError) ?? .exportFailure("BugNarrator could not create the data export.")
-            presentError(appError)
+            presentError(
+                error,
+                operation: .privacyExport,
+                fallback: { _ in .exportFailure("BugNarrator could not create the data export.") }
+            )
         }
     }
 
@@ -1025,9 +1053,15 @@ final class AppState: ObservableObject {
         do {
             exportHistory = try await exportService.exportHistory()
         } catch {
+            let normalizedError = normalizeError(
+                error,
+                operation: .exportHistory,
+                fallback: { .exportFailure($0) }
+            )
             exportLogger.warning(
                 "export_history_refresh_failed",
-                (error as? AppError)?.userMessage ?? error.localizedDescription
+                normalizedError.appError.userMessage,
+                metadata: appErrorMetadata(for: normalizedError, context: "export_history_refresh_failed")
             )
             exportHistory = []
         }
@@ -1087,12 +1121,12 @@ final class AppState: ObservableObject {
                 finishSuccessfulTranscription(showTranscriptWindow: true)
             case .persistenceFailure(_, let error):
                 retryingSessionID = nil
-                presentError(error)
+                presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
             case .postTranscriptionFailure(let error):
                 cleanupPreservedRetryAudioIfNeeded(at: retryContext.audioFileURL)
                 retryingSessionID = nil
                 endActivity()
-                presentPostTranscriptionError(error)
+                presentPostTranscriptionError(error, operation: .retryTranscription)
             }
         } catch {
             if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
@@ -1100,7 +1134,7 @@ final class AppState: ObservableObject {
             }
 
             retryingSessionID = nil
-            presentError(error)
+            presentError(error, operation: .retryTranscription)
         }
     }
 
@@ -1120,7 +1154,7 @@ final class AppState: ObservableObject {
             )
             setStatus(.success("Transcript saved to session history."))
         } catch {
-            presentError(error)
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
@@ -1171,7 +1205,7 @@ final class AppState: ObservableObject {
                 setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
             }
         } catch {
-            presentError(error)
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
@@ -1242,14 +1276,22 @@ final class AppState: ObservableObject {
             setStatus(.recording("Captured \(markerTitle)."))
             showToast("Screenshot captured")
         } catch {
-            let appError = (error as? AppError) ?? .screenshotCaptureFailure(error.localizedDescription)
+            let normalizedError = normalizeError(
+                error,
+                operation: .screenshotCapture,
+                fallback: { .screenshotCaptureFailure($0) }
+            )
+            let appError = normalizedError.appError
             guard status.phase == .recording else {
                 return
             }
+            logAppError(normalizedError, context: "screenshot_capture_failed")
+            var metadata = appErrorMetadata(for: normalizedError, context: "screenshot_capture_failed")
+            metadata["session_id"] = recordingSession.sessionID.uuidString
             screenshotLogger.error(
                 "screenshot_capture_failed",
                 appError.userMessage,
-                metadata: ["session_id": recordingSession.sessionID.uuidString]
+                metadata: metadata
             )
             setStatus(.recording(appError.userMessage), error: appError)
         }
@@ -1305,7 +1347,7 @@ final class AppState: ObservableObject {
                 showTranscriptWindow?()
             } catch {
                 issueExtractionSessionID = nil
-                presentError(error)
+                presentError(error, operation: .postTranscription, fallback: { .issueExtractionFailure($0) })
             }
 
             return
@@ -1316,7 +1358,7 @@ final class AppState: ObservableObject {
             preflightError.userMessage,
             metadata: ["session_id": transcriptSession.id.uuidString]
         )
-        presentError(preflightError)
+        presentError(preflightError, operation: .postTranscription)
     }
 
     func updateExtractedIssue(_ updatedIssue: ExtractedIssue, in sessionID: UUID) {
@@ -1332,7 +1374,7 @@ final class AppState: ObservableObject {
         do {
             try persistUpdatedSession(session)
         } catch {
-            presentError(error)
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
@@ -1349,7 +1391,7 @@ final class AppState: ObservableObject {
         do {
             try persistUpdatedSession(session)
         } catch {
-            presentError(error)
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
@@ -1369,29 +1411,29 @@ final class AppState: ObservableObject {
         do {
             try persistUpdatedSession(session)
         } catch {
-            presentError(error)
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
     func exportSelectedIssues(from session: TranscriptSession, to destination: ExportDestination) async {
         guard status.phase != .recording, status.phase != .transcribing else {
-            presentError(AppError.exportFailure("Finish the current background work before exporting issues."))
+            presentError(AppError.exportFailure("Finish the current background work before exporting issues."), operation: .export)
             return
         }
 
         guard let currentSession = sessionSnapshot(with: session.id) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."))
+            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
             return
         }
 
         guard let extraction = currentSession.issueExtraction else {
-            presentError(AppError.exportFailure("Run issue extraction before exporting."))
+            presentError(AppError.exportFailure("Run issue extraction before exporting."), operation: .export)
             return
         }
 
         let selectedIssues = extraction.selectedIssues
         guard !selectedIssues.isEmpty else {
-            presentError(AppError.exportFailure("Select at least one extracted issue to export."))
+            presentError(AppError.exportFailure("Select at least one extracted issue to export."), operation: .export)
             return
         }
 
@@ -1400,7 +1442,7 @@ final class AppState: ObservableObject {
         do {
             try validateExportConfiguration(for: destination)
         } catch {
-            presentError(error)
+            presentError(error, operation: .export, fallback: { .exportFailure($0) })
             if case .exportConfigurationMissing = error as? AppError {
                 showSettingsWindow?()
             }
@@ -1408,7 +1450,7 @@ final class AppState: ObservableObject {
         }
 
         guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
-            presentError(AppError.missingAPIKey)
+            presentError(AppError.missingAPIKey, operation: .export)
             return
         }
 
@@ -1487,7 +1529,7 @@ final class AppState: ObservableObject {
         } catch {
             exportDestinationInProgress = nil
             endActivity()
-            presentError(error)
+            presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
     }
 
@@ -1525,7 +1567,7 @@ final class AppState: ObservableObject {
 
     private func finalizeIssueExport(using review: IssueExportReview) async {
         guard let currentSession = sessionSnapshot(with: review.sessionID) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."))
+            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
             pendingExportReview = nil
             return
         }
@@ -1591,7 +1633,7 @@ final class AppState: ObservableObject {
         } catch {
             exportDestinationInProgress = nil
             endActivity()
-            presentError(error)
+            presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
     }
 
@@ -1708,15 +1750,20 @@ final class AppState: ObservableObject {
         presentationState.setStatus(newStatus, error: error)
     }
 
-    private func presentError(_ error: Error) {
+    private func presentError(
+        _ error: Error,
+        operation: AppErrorOperation = .generic,
+        fallback: (String) -> AppError = { .transcriptionFailure($0) }
+    ) {
         stopTimer(resetElapsed: status.phase == .recording)
         endActivity()
         cleanupPendingRecordedAudioIfNeeded()
         issueExtractionSessionID = nil
         exportDestinationInProgress = nil
 
-        let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
-        logAppError(appError, context: "present_error")
+        let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
+        let appError = normalizedError.appError
+        logAppError(normalizedError, context: "present_error")
         setStatus(.error(appError.userMessage), error: appError)
 
         switch appError {
@@ -1727,9 +1774,17 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func presentPostTranscriptionError(_ error: Error) {
-        let appError = (error as? AppError) ?? .issueExtractionFailure(error.localizedDescription)
-        logAppError(appError, context: "present_post_transcription_error")
+    private func presentPostTranscriptionError(
+        _ error: Error,
+        operation: AppErrorOperation = .postTranscription
+    ) {
+        let normalizedError = normalizeError(
+            error,
+            operation: operation,
+            fallback: { .issueExtractionFailure($0) }
+        )
+        let appError = normalizedError.appError
+        logAppError(normalizedError, context: "present_post_transcription_error")
         setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
 
         switch appError {
@@ -1792,7 +1847,10 @@ final class AppState: ObservableObject {
         }
 
         guard let recordingSession = activeRecordingSession else {
-            presentError(AppError.recordingFailure("The recording session metadata was unavailable."))
+            presentError(
+                AppError.recordingFailure("The recording session metadata was unavailable."),
+                operation: .recordingStop
+            )
             return nil
         }
 
@@ -2018,11 +2076,19 @@ final class AppState: ObservableObject {
         cleanupPendingRecordedAudioIfNeeded()
         endActivity()
 
-        let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+        let normalizedError = normalizeError(
+            error,
+            operation: .sessionLibrary,
+            fallback: { .storageFailure($0) }
+        )
+        let appError = normalizedError.appError
+        logAppError(normalizedError, context: "transcript_persist_failed")
+        var metadata = appErrorMetadata(for: normalizedError, context: "transcript_persist_failed")
+        metadata["session_id"] = session.id.uuidString
         sessionLibraryLogger.error(
             "transcript_persist_failed",
             "Transcription succeeded, but saving the transcript locally failed.",
-            metadata: ["session_id": session.id.uuidString]
+            metadata: metadata
         )
         setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
         showTranscriptWindow?()
@@ -2040,7 +2106,7 @@ final class AppState: ObservableObject {
         case .postTranscriptionFailure(let error):
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
-            presentPostTranscriptionError(error)
+            presentPostTranscriptionError(error, operation: .postTranscription)
         }
     }
 
@@ -2064,14 +2130,21 @@ final class AppState: ObservableObject {
             artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
         }
         activeRecordingSession = nil
-        presentError(error)
+        if pendingRecordedAudio == nil {
+            presentError(error, operation: .recordingStop, fallback: { .recordingFailure($0) })
+        } else {
+            presentError(error, operation: .transcription)
+        }
     }
 
     private func pendingTranscriptionRetryContext(
         for sessionID: UUID
     ) -> PendingTranscriptionRetryContext? {
         guard status.phase != .recording else {
-            presentError(AppError.recordingFailure("Stop the current recording before retrying transcription."))
+            presentError(
+                AppError.recordingFailure("Stop the current recording before retrying transcription."),
+                operation: .retryTranscription
+            )
             return nil
         }
 
@@ -2083,7 +2156,10 @@ final class AppState: ObservableObject {
         guard let session = sessionSnapshot(with: sessionID),
               let pendingTranscription = session.pendingTranscription,
               let audioFileURL = session.pendingTranscriptionAudioURL else {
-            presentError(AppError.transcriptionFailure("The saved retry session is unavailable."))
+            presentError(
+                AppError.transcriptionFailure("The saved retry session is unavailable."),
+                operation: .retryTranscription
+            )
             return nil
         }
 
@@ -2102,7 +2178,10 @@ final class AppState: ObservableObject {
         }
 
         guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
-            presentError(AppError.transcriptionFailure("The preserved audio file could not be found."))
+            presentError(
+                AppError.transcriptionFailure("The preserved audio file could not be found."),
+                operation: .retryTranscription
+            )
             return nil
         }
 
@@ -2166,7 +2245,7 @@ final class AppState: ObservableObject {
         endActivity()
 
         let appError = failureReason.appError
-        logAppError(appError, context: "retry_pending_transcription")
+        logAppError(appError, context: "retry_pending_transcription", operation: .retryTranscription)
         let attemptMessage = pendingTranscription.attemptCount >= 2
             ? " This session has been retried \(pendingTranscription.attemptCount + 1) times."
             : ""
@@ -2230,11 +2309,19 @@ final class AppState: ObservableObject {
                 cleanupPendingRecordedAudioIfNeeded()
                 endActivity()
 
-                let persistenceError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
+                let normalizedError = normalizeError(
+                    error,
+                    operation: .sessionLibrary,
+                    fallback: { .storageFailure($0) }
+                )
+                let persistenceError = normalizedError.appError
+                logAppError(normalizedError, context: "retryable_session_persist_failed")
+                var metadata = appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
+                metadata["session_id"] = retryableSession.id.uuidString
                 sessionLibraryLogger.error(
                     "retryable_session_persist_failed",
                     "The preserved recording could not be saved into local session history.",
-                    metadata: ["session_id": retryableSession.id.uuidString]
+                    metadata: metadata
                 )
                 setStatus(
                     .error("Recording preserved, but \(persistenceError.userMessage)"),
@@ -2260,7 +2347,7 @@ final class AppState: ObservableObject {
                     "failure_reason": failureReason.rawValue
                 ]
             )
-            logAppError(appError, context: "preserve_retryable_session")
+            logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
             setStatus(.error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage), error: appError)
             showTranscriptWindow?()
             if appError.suggestsOpenAISettings {
@@ -2271,7 +2358,7 @@ final class AppState: ObservableObject {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
             }
             activeRecordingSession = nil
-            presentError(error)
+            presentError(error, operation: .recordingStop)
         }
     }
 
@@ -2638,11 +2725,45 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func logAppError(_ error: AppError, context: String) {
-        let metadata = [
-            "context": context,
-            "error_type": telemetryErrorType(for: error)
-        ]
+    private func normalizeError(
+        _ error: Error,
+        operation: AppErrorOperation,
+        fallback: (String) -> AppError
+    ) -> AppErrorNormalization {
+        if let appError = error as? AppError {
+            return AppErrorNormalization(
+                appError: appError,
+                operation: operation,
+                underlyingErrorDescription: nil
+            )
+        }
+
+        let underlyingDescription = error.localizedDescription
+        return AppErrorNormalization(
+            appError: fallback(underlyingDescription),
+            operation: operation,
+            underlyingErrorDescription: underlyingDescription
+        )
+    }
+
+    private func logAppError(
+        _ error: AppError,
+        context: String,
+        operation: AppErrorOperation = .generic
+    ) {
+        logAppError(
+            AppErrorNormalization(
+                appError: error,
+                operation: operation,
+                underlyingErrorDescription: nil
+            ),
+            context: context
+        )
+    }
+
+    private func logAppError(_ normalizedError: AppErrorNormalization, context: String) {
+        let error = normalizedError.appError
+        let metadata = appErrorMetadata(for: normalizedError, context: context)
 
         telemetryRecorder.record(.appError, metadata: metadata)
 
@@ -2672,6 +2793,23 @@ final class AppState: ObservableObject {
         case .diagnosticsFailure:
             settingsLogger.error(.appError, error.userMessage, metadata: metadata)
         }
+    }
+
+    private func appErrorMetadata(
+        for normalizedError: AppErrorNormalization,
+        context: String
+    ) -> [String: String] {
+        var metadata = [
+            "context": context,
+            "operation": normalizedError.operation.rawValue,
+            "error_type": telemetryErrorType(for: normalizedError.appError)
+        ]
+
+        if let underlyingErrorDescription = normalizedError.underlyingErrorDescription {
+            metadata["underlying_error"] = underlyingErrorDescription
+        }
+
+        return metadata
     }
 
     private func telemetryErrorType(for error: AppError) -> String {
@@ -2836,8 +2974,18 @@ final class AppState: ObservableObject {
             )
             showTranscriptWindow?()
         } catch {
-            let appError = (error as? AppError) ?? .storageFailure(error.localizedDescription)
-            sessionLibraryLogger.error("recovered_recording_import_failed", appError.userMessage)
+            let normalizedError = normalizeError(
+                error,
+                operation: .recoveredRecordingImport,
+                fallback: { .storageFailure($0) }
+            )
+            let appError = normalizedError.appError
+            logAppError(normalizedError, context: "recovered_recording_import_failed")
+            sessionLibraryLogger.error(
+                "recovered_recording_import_failed",
+                appError.userMessage,
+                metadata: appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
+            )
             setStatus(.error(appError.userMessage), error: appError)
         }
     }

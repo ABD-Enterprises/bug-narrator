@@ -453,6 +453,26 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testPrivacyDataExportFailureUsesStableFallbackAndPreservesUnderlyingDiagnostics() async throws {
+        let privacyDataExporter = MockPrivacyDataExporter()
+        privacyDataExporter.exportResult = .failure(makeFixtureError("temporary export directory is unavailable"))
+        let harness = AppStateHarness(privacyDataExporter: privacyDataExporter)
+        defer { harness.cleanup() }
+
+        await harness.appState.exportPrivacyData()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            AppError.exportFailure("BugNarrator could not create the data export.").userMessage
+        )
+
+        let event = try lastAppErrorTelemetry(in: harness)
+        XCTAssertEqual(event.metadata["operation"], "privacy_export")
+        XCTAssertEqual(event.metadata["error_type"], "export_failure")
+        XCTAssertEqual(event.metadata["underlying_error"], "temporary export directory is unavailable")
+    }
+
     func testSuccessfulSessionSavesCopiesAndDeletesTemporaryAudioFile() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -508,6 +528,31 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.transcriptStore.sessions.count, 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertNil(harness.appState.activeRecordingSession)
+    }
+
+    func testTranscriptionFailureTelemetryIncludesOperationAndUnderlyingError() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "transcription-underlying-error")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        await harness.transcriptionClient.enqueue(
+            .failure(makeFixtureError("provider stream closed before returning text"))
+        )
+
+        await harness.appState.startSession()
+        await harness.appState.stopSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            AppError.transcriptionFailure("provider stream closed before returning text").userMessage
+        )
+
+        let event = try lastAppErrorTelemetry(in: harness)
+        XCTAssertEqual(event.metadata["operation"], "transcription")
+        XCTAssertEqual(event.metadata["error_type"], "transcription_failure")
+        XCTAssertEqual(event.metadata["underlying_error"], "provider stream closed before returning text")
     }
 
     func testSuccessfulTranscriptionWithStorageFailureKeepsTranscriptAvailableForManualSave() async throws {
@@ -1332,7 +1377,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(harness.appState.activeRecordingSession)
     }
 
-    func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async {
+    func testCaptureScreenshotFailureKeepsRecordingAndShowsMessage() async throws {
         let harness = AppStateHarness(
             screenshotCaptureService: MockScreenshotCaptureService(
                 error: AppError.screenshotCaptureFailure("The screenshot file could not be written to disk.")
@@ -1354,6 +1399,11 @@ final class AppStateTests: XCTestCase {
         )
         XCTAssertEqual(harness.appState.activeRecordingSession?.screenshots.count, 0)
         XCTAssertEqual(harness.appState.activeRecordingSession?.markers.count, 0)
+
+        let event = try lastAppErrorTelemetry(in: harness)
+        XCTAssertEqual(event.metadata["operation"], "screenshot_capture")
+        XCTAssertEqual(event.metadata["error_type"], "screenshot_capture_failure")
+        XCTAssertNil(event.metadata["underlying_error"])
     }
 
     func testCaptureScreenshotWithDeniedScreenRecordingKeepsRecordingAndShowsRecoveryContext() async {
@@ -2166,5 +2216,25 @@ final class AppStateTests: XCTestCase {
         let data = Data(json.utf8)
         let decoded = try JSONDecoder().decode(PendingTranscription.self, from: data)
         XCTAssertEqual(decoded.attemptCount, 0)
+    }
+
+    private func makeFixtureError(_ message: String) -> NSError {
+        NSError(
+            domain: "BugNarratorTests",
+            code: 42,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
+    }
+
+    private func lastAppErrorTelemetry(
+        in harness: AppStateHarness,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> (name: String, metadata: [String: String]) {
+        try XCTUnwrap(
+            harness.telemetryRecorder.recordedEvents.last { $0.name == TelemetryEvent.appError.rawValue },
+            file: file,
+            line: line
+        )
     }
 }
