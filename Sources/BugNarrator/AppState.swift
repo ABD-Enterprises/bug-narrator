@@ -4,9 +4,6 @@ import Foundation
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published private(set) var status: AppStatus = .idle()
-    @Published private(set) var currentError: AppError?
-    @Published private(set) var transientToast: TransientToast?
     @Published var showDiscardConfirmation = false
     @Published var currentTranscript: TranscriptSession?
     @Published var selectedTranscriptID: UUID?
@@ -23,6 +20,7 @@ final class AppState: ObservableObject {
     let trackerIntegration: TrackerIntegrationController
     let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
+    let presentationState: AppPresentationState
 
     private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
@@ -102,6 +100,18 @@ final class AppState: ObservableObject {
         var session: TranscriptSession
         let pendingTranscription: PendingTranscription
         let audioFileURL: URL
+    }
+
+    var status: AppStatus {
+        presentationState.status
+    }
+
+    var currentError: AppError? {
+        presentationState.currentError
+    }
+
+    var transientToast: TransientToast? {
+        presentationState.transientToast
     }
 
     var gitHubValidationState: APIKeyValidationState {
@@ -218,6 +228,7 @@ final class AppState: ObservableObject {
         self.settingsStore = settingsStore
         self.transcriptStore = transcriptStore
         self.recordingTimer = recordingTimer
+        self.presentationState = AppPresentationState()
         self.runtimeEnvironment = runtimeEnvironment
         self.audioRecorder = audioRecorder
         self.microphonePermissionService = microphonePermissionService
@@ -269,6 +280,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         aiProviderSettings.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        presentationState.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -1681,15 +1698,14 @@ final class AppState: ObservableObject {
         }
 
         toastDismissTask?.cancel()
-        transientToast = nil
+        presentationState.dismissToast()
         hotkeyManager.unregisterAll()
         stopTimer(resetElapsed: false)
         endActivity()
     }
 
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
-        status = newStatus
-        currentError = error
+        presentationState.setStatus(newStatus, error: error)
     }
 
     private func presentError(_ error: Error) {
@@ -2611,14 +2627,14 @@ final class AppState: ObservableObject {
 
     private func showToast(_ message: String, style: TransientToastStyle = .success) {
         toastDismissTask?.cancel()
-        transientToast = TransientToast(message: message, style: style)
+        presentationState.showToast(TransientToast(message: message, style: style))
         toastDismissTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else {
                 return
             }
 
-            self?.transientToast = nil
+            self?.presentationState.dismissToast()
         }
     }
 
