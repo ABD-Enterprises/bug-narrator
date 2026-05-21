@@ -28,14 +28,14 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 | Recording audio source selection | Shipped | In Progress | Platform-native capture allowed | Windows supports microphone and WASAPI loopback system audio. Mixed mic plus system audio is surfaced as an explicit tracked limitation until muxing is implemented. |
 | Experimental GitHub and Jira export | Shipped as experimental | In Progress | Experimental on both platforms | Windows implementation exists; real credential validation remains in #44. |
 | Keyboard-first accessibility | Shipped baseline, validated in RR-005 | In Progress | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. |
-| Public release packaging | Shipped as signed, notarized DMG | Planned in `WIN-009` | Platform-native packaging allowed | Windows zip packaging exists; signed tester release work is tracked in #75. |
+| Public release packaging | Shipped as signed, notarized DMG | Repo-side signed tester zip path ready; certificate provisioning required | Platform-native packaging allowed | Windows first tester format is a zip containing signed `BugNarrator.Windows.exe` plus signature and package validation evidence. Installer/MSIX can follow if tester distribution requires it. |
 
 ## Current Deliberate Differences
 
 - macOS is the only production platform today.
 - Windows implements the core `record -> review -> refine -> export` path, including session library, review workspace, extraction, export, hotkeys, and hardening coverage, but it still needs real Windows runtime validation in `RR-002` / #44.
 - macOS currently has mixed microphone plus system audio capture beyond Windows; Windows surfaces the limitation explicitly while system-audio loopback support is available.
-- Windows public tester distribution is still blocked on signing/release packaging decisions tracked in #75.
+- Windows public tester distribution is blocked on external code-signing certificate provisioning, not missing repo scripts. The release entrypoint and manual GitHub Actions workflow are in place for the signed tester zip path.
 
 ## Update Rules
 
