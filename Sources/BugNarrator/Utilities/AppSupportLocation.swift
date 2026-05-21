@@ -1,7 +1,9 @@
 import Foundation
+import os.log
 
 enum AppSupportLocation {
     private static let currentAppDirectoryName = "BugNarrator"
+    private static let fallbackDirectoryName = "BugNarrator-ApplicationSupportFallback"
     private static let legacyAppDirectoryNames = ["SessionMic"]
 
     static func appDirectory(fileManager: FileManager = .default) -> URL {
@@ -22,11 +24,28 @@ enum AppSupportLocation {
     }
 
     private static func applicationSupportBaseURL(fileManager: FileManager) -> URL {
-        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ??
-            fileManager.temporaryDirectory.appendingPathComponent(
-                "\(currentAppDirectoryName)-ApplicationSupportFallback",
-                isDirectory: true
-            )
+        if let url = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            return url
+        }
+
+        if let url = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            logFallbackSelection("caches")
+            return url.appendingPathComponent(fallbackDirectoryName, isDirectory: true)
+        }
+
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        if !homeURL.path.isEmpty, homeURL.path != "/" {
+            logFallbackSelection("home")
+            return homeURL.appendingPathComponent(fallbackDirectoryName, isDirectory: true)
+        }
+
+        logFallbackSelection("temporary")
+        return fileManager.temporaryDirectory.appendingPathComponent(fallbackDirectoryName, isDirectory: true)
+    }
+
+    private static func logFallbackSelection(_ fallback: String) {
+        let logger = Logger(subsystem: BugNarratorDiagnostics.subsystem, category: "app-support-location")
+        logger.error("Application Support directory unavailable; using \(fallback, privacy: .public) fallback location.")
     }
 
     private static func migrateLegacyDirectoryIfNeeded(
