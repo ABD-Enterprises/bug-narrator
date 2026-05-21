@@ -50,6 +50,8 @@
 		119A00000000000000000002 /* LocalDataDeletionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */; };
 		121A00000000000000000001 /* AppUtilityActionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000003 /* AppUtilityActionController.swift */; };
 		121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000004 /* AppUtilityActionControllerTests.swift */; };
+		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
+		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
 		113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000004 /* ExportHistoryControllerTests.swift */; };
 		109A00000000000000000001 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000003 /* PermissionRecoveryController.swift */; };
@@ -226,6 +228,8 @@
 		119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionControllerTests.swift; sourceTree = "<group>"; };
 		121A00000000000000000003 /* AppUtilityActionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionController.swift; sourceTree = "<group>"; };
 		121A00000000000000000004 /* AppUtilityActionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionControllerTests.swift; sourceTree = "<group>"; };
+		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
+		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
 		111A00000000000000000004 /* SupportDataControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataControllerTests.swift; sourceTree = "<group>"; };
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
@@ -382,6 +386,7 @@
 				3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */,
 				111A00000000000000000004 /* SupportDataControllerTests.swift */,
 				22447E5581818B8003AA49F8 /* TestSupport.swift */,
+				123A00000000000000000004 /* TransientToastControllerTests.swift */,
 				7EF4558D78ECC185ECA6ED10 /* TranscriptExporterTests.swift */,
 				F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */,
 				A31B0939DF668FFC71CD64FD /* TranscriptionRecoveryControllerTests.swift */,
@@ -510,6 +515,7 @@
 				BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */,
 				800BFCC6407B534886C65D77 /* TranscriptionClient.swift */,
 				2C79C7B495FC353122C29F0B /* TranscriptionRecoveryController.swift */,
+				123A00000000000000000003 /* TransientToastController.swift */,
 				04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */,
 				7A7A34EF1391E51E6B1DB8BF /* TranscriptSectionBuilder.swift */,
 				9F9009216340E4AF51C9EDBA /* TranscriptStore.swift */,
@@ -728,6 +734,7 @@
 				8419388E08492DBAC01BEEE8 /* SingleInstanceControllerTests.swift in Sources */,
 				111A00000000000000000002 /* SupportDataControllerTests.swift in Sources */,
 				5090A54144CACF59295F137C /* TestSupport.swift in Sources */,
+				123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */,
 				683F3BD6F8192C53766A10DC /* TranscriptExporterTests.swift in Sources */,
 				3F4178877259A14D87101CE5 /* TranscriptQualityInspectorTests.swift in Sources */,
 				38B00E4AA8B374646877FBFB /* TranscriptStoreTests.swift in Sources */,
@@ -844,6 +851,7 @@
 				33DB3B8F22BD0E75CFC65F10 /* TranscriptionClient.swift in Sources */,
 				A2E710E8AA18115FD2B9C352 /* TranscriptionRecoveryController.swift in Sources */,
 				5956B9999301BDED53F3B1EC /* TransientToast.swift in Sources */,
+				123A00000000000000000001 /* TransientToastController.swift in Sources */,
 				3B4F5CCC16AB9837DD0BD0F4 /* URLHandler.swift in Sources */,
 				B3F726638452CBD7F5A4DC16 /* WindowCoordinator.swift in Sources */,
 			);
