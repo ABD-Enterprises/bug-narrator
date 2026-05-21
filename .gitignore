@@ -37,3 +37,4 @@ site/build/
 local-transcription/venv/
 local-transcription/build/
 local-transcription/dist/
+.worktrees/
