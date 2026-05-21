@@ -54,6 +54,8 @@
 		125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */; };
 		127A00000000000000000001 /* ScreenshotCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000003 /* ScreenshotCaptureController.swift */; };
 		127A00000000000000000002 /* ScreenshotCaptureControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */; };
+		129A00000000000000000001 /* RecordingStatusMessageBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */; };
+		129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -236,6 +238,8 @@
 		125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
 		127A00000000000000000003 /* ScreenshotCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureController.swift; sourceTree = "<group>"; };
 		127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureControllerTests.swift; sourceTree = "<group>"; };
+		129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilder.swift; sourceTree = "<group>"; };
+		129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilderTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -377,6 +381,7 @@
 				109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */,
 				FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */,
 				6F9B1D06622F36D479935B7D /* ProductInfoTests.swift */,
+				129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */,
 				3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */,
 				115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */,
 				2DE808CBBBE2F1EEE4FF5BEC /* RecoveredRecordingImporterTests.swift */,
@@ -553,6 +558,7 @@
 				6DAA46D23DB94BDF1609FAD9 /* IssueScreenshotAnnotationRenderer.swift */,
 				9D2B31107CC14CDD9E0898ED /* MenuBarStatusPresentation.swift */,
 				17EFDFC12818F99D04C93CC5 /* MicrophonePermissionResolver.swift */,
+				129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */,
 				002A3FB6CC8E66C5C82E0B56 /* RecordingTimerViewModel.swift */,
 				60982ABA90B0CE76BF93E46A /* ReviewWorkspace.swift */,
 				57AE8EA0414CE7C5271CFD16 /* ScreenshotPreviewCache.swift */,
@@ -729,6 +735,7 @@
 				109A00000000000000000002 /* PermissionRecoveryControllerTests.swift in Sources */,
 				7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */,
 				8F3D88D73F1560365347F711 /* ProductInfoTests.swift in Sources */,
+				129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */,
 				2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */,
 				115A00000000000000000002 /* RecoveredRecordingImportControllerTests.swift in Sources */,
 				62313F663336184217D1020B /* RecoveredRecordingImporterTests.swift in Sources */,
@@ -828,6 +835,7 @@
 				30018202D1990BA2524B2CD6 /* RecordingAudioSource.swift in Sources */,
 				5D4B8A830EA58AFC03AE9982 /* RecordingControlPanelView.swift in Sources */,
 				EA159F21E891A76BE6A4E825 /* RecordingSessionController.swift in Sources */,
+				129A00000000000000000001 /* RecordingStatusMessageBuilder.swift in Sources */,
 				1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */,
 				5C18E905F94644D69AA9CB60 /* RecordingTimerViewModel.swift in Sources */,
 				A31A0BF8A4486E52DEA38F29 /* RecoveredRecordingImporter.swift in Sources */,
