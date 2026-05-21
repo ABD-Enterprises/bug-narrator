@@ -91,6 +91,17 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
     }
 
+    func testIssueMutationFailurePresenterRunsCleanupHookOnFailure() {
+        var cleanupCallCount = 0
+        let harness = makeIssueMutationFailurePresenter(
+            prepareErrorPresentationSideEffects: { cleanupCallCount += 1 }
+        )
+
+        harness.presenter.presentFailure(AppError.storageFailure("Could not save."))
+
+        XCTAssertEqual(cleanupCallCount, 1, "presentFailure must run the cleanup hook before delegating to errorPresenter.")
+    }
+
     func testPreflightMapsCredentialTranscriptAndRecordingFailures() throws {
         let harness = try IssueExtractionControllerHarness()
         defer { harness.cleanup() }
@@ -218,7 +229,8 @@ final class IssueExtractionControllerTests: XCTestCase {
     }
 
     private func makeIssueMutationFailurePresenter(
-        status: AppStatus = .idle()
+        status: AppStatus = .idle(),
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {}
     ) -> (
         presenter: IssueMutationFailurePresenter,
         presentationState: AppPresentationState,
@@ -230,7 +242,8 @@ final class IssueExtractionControllerTests: XCTestCase {
             errorPresenter: AppErrorPresenter(
                 presentationState: presentationState,
                 telemetryRecorder: telemetryRecorder
-            )
+            ),
+            prepareErrorPresentationSideEffects: prepareErrorPresentationSideEffects
         )
 
         return (
