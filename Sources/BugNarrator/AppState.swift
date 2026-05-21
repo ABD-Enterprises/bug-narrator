@@ -910,7 +910,9 @@ final class AppState: ObservableObject {
 
         let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
-        setStatus(.transcribing(recordingStatusMessages.transcriptionRetryProgressMessage()))
+        retryTranscriptionStatusPresenter.presentRetryStarted(
+            progressMessage: recordingStatusMessages.transcriptionRetryProgressMessage()
+        )
         recordingSessionController.swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
 
@@ -944,7 +946,7 @@ final class AppState: ObservableObject {
                 finishSuccessfulTranscription(showTranscriptWindow: true)
             case .persistenceFailure(_, let error):
                 transcriptionRecovery.finishRetry()
-                presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+                sessionLibraryStatusPresenter.presentFailure(error)
             case .postTranscriptionFailure(let error):
                 transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
                     at: retryContext.audioFileURL,
@@ -960,7 +962,7 @@ final class AppState: ObservableObject {
             }
 
             transcriptionRecovery.finishRetry()
-            presentError(error, operation: .retryTranscription)
+            retryTranscriptionStatusPresenter.presentFailure(error)
         }
     }
 
