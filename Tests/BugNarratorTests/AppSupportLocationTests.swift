@@ -2,14 +2,50 @@ import XCTest
 @testable import BugNarrator
 
 final class AppSupportLocationTests: XCTestCase {
-    func testAppDirectoryFallsBackWhenApplicationSupportURLIsUnavailable() {
-        let fileManager = StubApplicationSupportFileManager(applicationSupportURLs: [])
+    func testAppDirectoryFallsBackToCachesWhenApplicationSupportURLIsUnavailable() {
+        let cachesRoot = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: cachesRoot) }
+
+        let fileManager = StubApplicationSupportFileManager(
+            applicationSupportURLs: [],
+            cachesURLs: [cachesRoot]
+        )
 
         let appDirectoryURL = AppSupportLocation.appDirectory(fileManager: fileManager)
-        defer { try? FileManager.default.removeItem(at: appDirectoryURL.deletingLastPathComponent()) }
 
         XCTAssertEqual(appDirectoryURL.lastPathComponent, "BugNarrator")
-        XCTAssertEqual(appDirectoryURL.deletingLastPathComponent().lastPathComponent, "BugNarrator-ApplicationSupportFallback")
+        XCTAssertEqual(
+            appDirectoryURL.deletingLastPathComponent().lastPathComponent,
+            "BugNarrator-ApplicationSupportFallback"
+        )
+        XCTAssertEqual(
+            appDirectoryURL.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL,
+            cachesRoot.standardizedFileURL
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: appDirectoryURL.path))
+    }
+
+    func testAppDirectoryFallsBackToHomeWhenApplicationSupportAndCachesAreUnavailable() {
+        let homeRoot = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: homeRoot) }
+
+        let fileManager = StubApplicationSupportFileManager(
+            applicationSupportURLs: [],
+            cachesURLs: [],
+            homeURL: homeRoot
+        )
+
+        let appDirectoryURL = AppSupportLocation.appDirectory(fileManager: fileManager)
+
+        XCTAssertEqual(appDirectoryURL.lastPathComponent, "BugNarrator")
+        XCTAssertEqual(
+            appDirectoryURL.deletingLastPathComponent().lastPathComponent,
+            "BugNarrator-ApplicationSupportFallback"
+        )
+        XCTAssertEqual(
+            appDirectoryURL.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL,
+            homeRoot.standardizedFileURL
+        )
         XCTAssertTrue(FileManager.default.fileExists(atPath: appDirectoryURL.path))
     }
 
@@ -38,9 +74,17 @@ final class AppSupportLocationTests: XCTestCase {
 
 private final class StubApplicationSupportFileManager: FileManager {
     private let applicationSupportURLs: [URL]
+    private let cachesURLs: [URL]
+    private let homeURL: URL?
 
-    init(applicationSupportURLs: [URL]) {
+    init(
+        applicationSupportURLs: [URL],
+        cachesURLs: [URL] = [],
+        homeURL: URL? = nil
+    ) {
         self.applicationSupportURLs = applicationSupportURLs
+        self.cachesURLs = cachesURLs
+        self.homeURL = homeURL
         super.init()
     }
 
@@ -52,6 +96,18 @@ private final class StubApplicationSupportFileManager: FileManager {
             return applicationSupportURLs
         }
 
+        if directory == .cachesDirectory, domainMask == .userDomainMask {
+            return cachesURLs
+        }
+
         return super.urls(for: directory, in: domainMask)
+    }
+
+    override var homeDirectoryForCurrentUser: URL {
+        if let homeURL {
+            return homeURL
+        }
+
+        return super.homeDirectoryForCurrentUser
     }
 }
