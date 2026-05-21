@@ -17,6 +17,10 @@ final class RetryTranscriptionStatusPresenter {
         self.showTranscriptWindow = showTranscriptWindow
     }
 
+    func presentRetryStarted(progressMessage: String) {
+        errorPresenter.setStatus(.transcribing(progressMessage))
+    }
+
     func presentRetryContextFailure(
         appError: AppError,
         opensSettings: Bool,
@@ -45,6 +49,13 @@ final class RetryTranscriptionStatusPresenter {
         errorPresenter.setStatus(.error(failure.statusMessage), error: failure.appError)
         showTranscriptWindow()
         showSettingsWindow()
+    }
+
+    func presentFailure(_ error: Error) {
+        let result = errorPresenter.presentError(error, operation: .retryTranscription)
+        if result.shouldOpenSettingsWindow {
+            showSettingsWindow()
+        }
     }
 }
 

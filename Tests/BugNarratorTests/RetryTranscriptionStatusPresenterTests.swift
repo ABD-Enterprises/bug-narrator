@@ -3,6 +3,21 @@ import XCTest
 
 @MainActor
 final class RetryTranscriptionStatusPresenterTests: XCTestCase {
+    func testPresentRetryStartedSetsProgressStatus() {
+        let harness = RetryTranscriptionStatusPresenterHarness()
+
+        harness.presenter.presentRetryStarted(progressMessage: "Retrying transcription from preserved audio...")
+
+        XCTAssertEqual(
+            harness.presentationState.status,
+            .transcribing("Retrying transcription from preserved audio...")
+        )
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertEqual(harness.showSettingsCallCount, 0)
+        XCTAssertEqual(harness.showTranscriptCallCount, 0)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
     func testPresentRetryContextFailureUsesRecoveryStatusAndOpensSettings() {
         let harness = RetryTranscriptionStatusPresenterHarness()
 
@@ -77,6 +92,22 @@ final class RetryTranscriptionStatusPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["context"], "retry_pending_transcription")
         XCTAssertEqual(telemetry.metadata["operation"], "retry_transcription")
         XCTAssertEqual(telemetry.metadata["error_type"], "invalid_api_key")
+    }
+
+    func testPresentFailureDelegatesToErrorPresenterAndOpensSettingsWhenNeeded() throws {
+        let harness = RetryTranscriptionStatusPresenterHarness()
+
+        harness.presenter.presentFailure(AppError.missingAPIKey)
+
+        XCTAssertEqual(harness.presentationState.status, .error(AppError.missingAPIKey.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, .missingAPIKey)
+        XCTAssertEqual(harness.showSettingsCallCount, 1)
+        XCTAssertEqual(harness.showTranscriptCallCount, 0)
+
+        let telemetry = try harness.lastAppErrorTelemetry()
+        XCTAssertEqual(telemetry.metadata["context"], "present_error")
+        XCTAssertEqual(telemetry.metadata["operation"], "retry_transcription")
+        XCTAssertEqual(telemetry.metadata["error_type"], "missing_api_key")
     }
 }
 
