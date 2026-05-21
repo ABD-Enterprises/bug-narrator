@@ -1,6 +1,8 @@
 import Foundation
 
 struct RecoveredRecordingImporter: RecoveredRecordingImporting {
+    private static let supportedAudioExtensions: Set<String> = ["m4a", "wav"]
+
     private let fileManager: FileManager
     private let recoveryDirectoryURL: URL
     private let qualityInspector: TranscriptQualityInspector
@@ -35,7 +37,7 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
                 includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles]
             )
-            .filter { $0.pathExtension.lowercased() == "m4a" }
+            .filter(Self.isRecoverableAudioFile)
             .filter { !alreadyImported.contains($0.lastPathComponent) }
             .sorted {
                 modificationDate(for: $0) > modificationDate(for: $1)
@@ -126,6 +128,10 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
         }
 
         return nil
+    }
+
+    private static func isRecoverableAudioFile(_ url: URL) -> Bool {
+        supportedAudioExtensions.contains(url.pathExtension.lowercased())
     }
 
     private func modificationDate(for url: URL) -> Date {
