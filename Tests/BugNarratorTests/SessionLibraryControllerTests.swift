@@ -120,9 +120,58 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.clipboardService.copiedStrings, ["Copy me"])
     }
 
+    func testCopyDisplayedTranscriptWithoutDisplayedTranscriptDoesNothing() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .noDisplayedTranscript)
+        XCTAssertTrue(harness.clipboardService.copiedStrings.isEmpty)
+    }
+
+    func testCopyDisplayedTranscriptWithoutTranscriptContentReturnsUnavailable() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let pendingSession = makeSession(
+            index: 1,
+            transcript: "   ",
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        try harness.transcriptStore.add(pendingSession)
+        harness.controller.selectedTranscriptID = pendingSession.id
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .transcriptUnavailable)
+        XCTAssertTrue(harness.clipboardService.copiedStrings.isEmpty)
+    }
+
+    func testCopyDisplayedTranscriptCopiesDisplayedTranscript() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let older = makeSession(index: 1, transcript: "Older transcript")
+        let displayed = makeSession(index: 2, transcript: "Displayed transcript")
+        try harness.transcriptStore.add(older)
+        try harness.transcriptStore.add(displayed)
+        harness.controller.selectedTranscriptID = displayed.id
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .copied)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Displayed transcript"])
+    }
+
     private func makeSession(
         index: Int,
         transcript: String? = nil,
+        pendingTranscription: PendingTranscription? = nil,
         artifactsDirectoryPath: String? = nil
     ) -> TranscriptSession {
         TranscriptSession(
@@ -133,6 +182,7 @@ final class SessionLibraryControllerTests: XCTestCase {
             model: "whisper-1",
             languageHint: nil,
             prompt: nil,
+            pendingTranscription: pendingTranscription,
             artifactsDirectoryPath: artifactsDirectoryPath
         )
     }
