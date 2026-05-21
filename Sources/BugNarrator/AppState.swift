@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var exportHistory: [ExportReceipt] = []
     @Published private(set) var recoveredRecordingImportCount = 0
 
     let settingsStore: SettingsStore
@@ -16,6 +15,7 @@ final class AppState: ObservableObject {
     let presentationState: AppPresentationState
     let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
+    let exportHistoryController: ExportHistoryController
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
@@ -34,7 +34,6 @@ final class AppState: ObservableObject {
 
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
-    private let exportService: any IssueExporting
     private let recoveredRecordingImporter: any RecoveredRecordingImporting
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
@@ -63,7 +62,6 @@ final class AppState: ObservableObject {
         case diagnosticsExport = "diagnostics_export"
         case privacyExport = "privacy_export"
         case export
-        case exportHistory = "export_history"
         case sessionLibrary = "session_library"
         case recoveredRecordingImport = "recovered_recording_import"
     }
@@ -104,6 +102,10 @@ final class AppState: ObservableObject {
 
     var currentError: AppError? {
         presentationState.currentError
+    }
+
+    var exportHistory: [ExportReceipt] {
+        exportHistoryController.exportHistory
     }
 
     var exportDestinationInProgress: ExportDestination? {
@@ -258,6 +260,7 @@ final class AppState: ObservableObject {
             artifactsService: artifactsService,
             clipboardService: clipboardService
         )
+        self.exportHistoryController = ExportHistoryController(exportService: exportService)
         self.issueExtractionController = IssueExtractionController(
             sessionLibrary: self.sessionLibrary,
             issueExtractionService: issueExtractionService
@@ -295,7 +298,6 @@ final class AppState: ObservableObject {
         )
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
-        self.exportService = exportService
         self.recoveredRecordingImporter = recoveredRecordingImporter
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
@@ -351,6 +353,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         sessionLibrary.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        exportHistoryController.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -915,21 +923,7 @@ final class AppState: ObservableObject {
     }
 
     func refreshExportHistory() async {
-        do {
-            exportHistory = try await exportService.exportHistory()
-        } catch {
-            let normalizedError = normalizeError(
-                error,
-                operation: .exportHistory,
-                fallback: { .exportFailure($0) }
-            )
-            exportLogger.warning(
-                "export_history_refresh_failed",
-                normalizedError.appError.userMessage,
-                metadata: appErrorMetadata(for: normalizedError, context: "export_history_refresh_failed")
-            )
-            exportHistory = []
-        }
+        await exportHistoryController.refreshExportHistory()
     }
 
     func copyDisplayedTranscript() {

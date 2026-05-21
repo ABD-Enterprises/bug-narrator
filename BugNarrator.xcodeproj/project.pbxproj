@@ -44,6 +44,8 @@
 		474B8B38A576590B2AB08D3F /* IssueExportReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */; };
 		107A00000000000000000001 /* IssueExportController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107A00000000000000000003 /* IssueExportController.swift */; };
 		107A00000000000000000002 /* IssueExportControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107A00000000000000000004 /* IssueExportControllerTests.swift */; };
+		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
+		113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000004 /* ExportHistoryControllerTests.swift */; };
 		109A00000000000000000001 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000003 /* PermissionRecoveryController.swift */; };
 		109A00000000000000000002 /* PermissionRecoveryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */; };
 		111A00000000000000000001 /* SupportDataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111A00000000000000000003 /* SupportDataController.swift */; };
@@ -204,6 +206,8 @@
 		46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReviewPolicy.swift; sourceTree = "<group>"; };
 		107A00000000000000000003 /* IssueExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportController.swift; sourceTree = "<group>"; };
 		107A00000000000000000004 /* IssueExportControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportControllerTests.swift; sourceTree = "<group>"; };
+		113A00000000000000000003 /* ExportHistoryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportHistoryController.swift; sourceTree = "<group>"; };
+		113A00000000000000000004 /* ExportHistoryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportHistoryControllerTests.swift; sourceTree = "<group>"; };
 		109A00000000000000000003 /* PermissionRecoveryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryController.swift; sourceTree = "<group>"; };
 		109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -326,6 +330,7 @@
 				554387017B49D9CD63967BE3 /* AppStateTests.swift */,
 				F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */,
 				40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */,
+				113A00000000000000000004 /* ExportHistoryControllerTests.swift */,
 				AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */,
 				107A00000000000000000004 /* IssueExportControllerTests.swift */,
 				105A00000000000000000004 /* IssueExtractionControllerTests.swift */,
@@ -445,6 +450,7 @@
 				2FA72EF162C4C4AF53D2CB41 /* DebugBundleExporter.swift */,
 				DC8C8AA3B4EEED739F198572 /* ExportReceiptStore.swift */,
 				7322F6B6A58542DEDFC76CCA /* ExportService.swift */,
+				113A00000000000000000003 /* ExportHistoryController.swift */,
 				2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */,
 				6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */,
 				46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */,
@@ -662,6 +668,7 @@
 				334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */,
 				5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */,
 				FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */,
+				113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */,
 				594983777A69A4D70F71653D /* GitHubExportProviderTests.swift in Sources */,
 				107A00000000000000000002 /* IssueExportControllerTests.swift in Sources */,
 				105A00000000000000000002 /* IssueExtractionControllerTests.swift in Sources */,
@@ -738,6 +745,7 @@
 				4F04273FAEFE2C33F78701B4 /* ElapsedTimeFormatter.swift in Sources */,
 				A73F5969DB4A2C04BC83BF45 /* ExportReceiptStore.swift in Sources */,
 				5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */,
+				113A00000000000000000001 /* ExportHistoryController.swift in Sources */,
 				9E2FEC30CC71E38CBD59106C /* ExtractedIssue.swift in Sources */,
 				2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */,
 				6F50D0E752BEA3CECA1517A4 /* HotkeyAction.swift in Sources */,
