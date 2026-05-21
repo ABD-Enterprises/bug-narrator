@@ -52,6 +52,7 @@ final class AppState: ObservableObject {
     private let hotkeySettingsBinder: HotkeySettingsBinder
     private let objectChangeForwarder: ObservableObjectChangeForwarder
     private let lifecycleNotificationBinder: AppLifecycleNotificationBinder
+    private let launchDiagnosticsReporter: AppLaunchDiagnosticsReporter
     private let artifactsService: any SessionArtifactsManaging
     private let telemetryRecorder: any OperationalTelemetryRecording
 
@@ -297,6 +298,10 @@ final class AppState: ObservableObject {
             runtimeEnvironment: runtimeEnvironment
         )
         self.permissionRecoveryController = permissionRecoveryController
+        self.launchDiagnosticsReporter = AppLaunchDiagnosticsReporter(
+            permissionRecoveryController: permissionRecoveryController,
+            transcriptStore: transcriptStore
+        )
         let appUtilityActions = AppUtilityActionController(
             urlHandler: urlHandler,
             permissionRecoveryController: permissionRecoveryController
@@ -456,7 +461,7 @@ final class AppState: ObservableObject {
         Task { [weak self] in
             await self?.refreshExportHistory()
         }
-        logLaunchDiagnostics()
+        launchDiagnosticsReporter.logLaunchDiagnostics(selectedTranscriptID: selectedTranscriptID)
     }
 
     var elapsedTimeString: String {
@@ -1571,19 +1576,6 @@ final class AppState: ObservableObject {
 
     private func validateRuntimeConfiguration() {
         permissionRecoveryController.validateRuntimeConfiguration()
-    }
-
-    private func logLaunchDiagnostics() {
-        permissionRecoveryController.logLaunchPermissionSnapshot()
-
-        sessionLibraryLogger.info(
-            "launch_session_store_snapshot",
-            "Captured the initial session library state at launch.",
-            metadata: [
-                "stored_session_count": "\(transcriptStore.sessionCount)",
-                "selected_transcript_id": selectedTranscriptID?.uuidString ?? "none"
-            ]
-        )
     }
 
     private func importRecoveredRecordingsAtLaunch() {
