@@ -55,3 +55,52 @@ final class RecoveredRecordingImportController: ObservableObject {
         )
     }
 }
+
+@MainActor
+final class RecoveredRecordingLaunchImportPresenter {
+    private let importController: RecoveredRecordingImportController
+    private let errorPresenter: AppErrorPresenter
+    private let sessionLibraryLogger: DiagnosticsLogger
+    private let setStatus: (AppStatus, AppError?) -> Void
+    private let openTranscriptHistory: () -> Void
+
+    init(
+        importController: RecoveredRecordingImportController,
+        errorPresenter: AppErrorPresenter,
+        sessionLibraryLogger: DiagnosticsLogger = DiagnosticsLogger(category: .sessionLibrary),
+        setStatus: @escaping (AppStatus, AppError?) -> Void,
+        openTranscriptHistory: @escaping () -> Void
+    ) {
+        self.importController = importController
+        self.errorPresenter = errorPresenter
+        self.sessionLibraryLogger = sessionLibraryLogger
+        self.setStatus = setStatus
+        self.openTranscriptHistory = openTranscriptHistory
+    }
+
+    func importRecoveredRecordingsAtLaunch() {
+        do {
+            let outcome = try importController.importRecoveredRecordingsAtLaunch()
+            guard case .imported(let message, let error) = outcome else {
+                return
+            }
+
+            setStatus(.error(message), error)
+            openTranscriptHistory()
+        } catch {
+            let normalizedError = errorPresenter.normalizeError(
+                error,
+                operation: .recoveredRecordingImport,
+                fallback: { .storageFailure($0) }
+            )
+            let appError = normalizedError.appError
+            errorPresenter.logAppError(normalizedError, context: "recovered_recording_import_failed")
+            sessionLibraryLogger.error(
+                "recovered_recording_import_failed",
+                appError.userMessage,
+                metadata: errorPresenter.appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
+            )
+            setStatus(.error(appError.userMessage), appError)
+        }
+    }
+}
