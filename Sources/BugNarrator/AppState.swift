@@ -701,7 +701,7 @@ final class AppState: ObservableObject {
 
         cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
         recordingSessionController.prepareForStopSession()
-        let request = makeTranscriptionRequest()
+        let request = settingsStore.transcriptionRequest
 
         do {
             logSessionStopRequested(recordingSession)
@@ -982,7 +982,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        let request = makeTranscriptionRequest()
+        let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         swapActivity(reason: "Retrying transcription from preserved audio")
@@ -1353,15 +1353,6 @@ final class AppState: ObservableObject {
 
     private func cleanupPendingRecordedAudioIfNeeded() {
         recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
-    }
-
-    private func makeTranscriptionRequest() -> TranscriptionRequest {
-        TranscriptionRequest(
-            model: settingsStore.preferredModelValue,
-            languageHint: settingsStore.normalizedLanguageHint,
-            prompt: settingsStore.normalizedPrompt,
-            apiBaseURL: settingsStore.openAIBaseURLValue
-        )
     }
 
     private func logSessionStopRequested(_ recordingSession: RecordingSessionDraft) {

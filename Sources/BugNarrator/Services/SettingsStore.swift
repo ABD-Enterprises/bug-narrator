@@ -474,6 +474,15 @@ final class SettingsStore: ObservableObject {
         normalizeOptional(transcriptionPrompt)
     }
 
+    var transcriptionRequest: TranscriptionRequest {
+        TranscriptionRequest(
+            model: preferredModelValue,
+            languageHint: normalizedLanguageHint,
+            prompt: normalizedPrompt,
+            apiBaseURL: openAIBaseURLValue
+        )
+    }
+
     var issueExtractionModelValue: String {
         let value = issueExtractionModel.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? "gpt-4.1-mini" : value

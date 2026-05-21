@@ -218,6 +218,26 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {
+        let suiteName = "BugNarrator-TranscriptionRequestSettingsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.preferredModel = "  gpt-4o-transcribe  "
+        store.languageHint = "  en  "
+        store.transcriptionPrompt = "  Focus on tester narration.  "
+        store.openAIBaseURL = "gateway.example.com/openai/"
+
+        let request = store.transcriptionRequest
+
+        XCTAssertEqual(request.model, "gpt-4o-transcribe")
+        XCTAssertEqual(request.languageHint, "en")
+        XCTAssertEqual(request.prompt, "Focus on tester narration.")
+        XCTAssertEqual(request.apiBaseURL.absoluteString, "https://gateway.example.com/openai")
+    }
+
     func testLocalCompatibleProviderRequiresExplicitBaseURLAndModels() {
         let suiteName = "BugNarrator-SettingsProviderCompatibility-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
