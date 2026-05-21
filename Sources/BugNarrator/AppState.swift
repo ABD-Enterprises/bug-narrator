@@ -725,7 +725,7 @@ final class AppState: ObservableObject {
                 request: request,
                 apiKey: apiKey
             )
-            let session = makeTranscriptSession(
+            let session = TranscriptionSessionBuilder.completedSession(
                 from: recordingSession,
                 recordedAudio: recordedAudio,
                 request: request,
@@ -998,7 +998,7 @@ final class AppState: ObservableObject {
                 request: request,
                 apiKey: apiKey
             )
-            let updatedSession = makeRecoveredTranscriptSession(
+            let updatedSession = TranscriptionSessionBuilder.recoveredSession(
                 from: retryContext.session,
                 request: request,
                 result: result
@@ -1400,66 +1400,6 @@ final class AppState: ObservableObject {
         apiKey: String
     ) async throws -> TranscriptionResult {
         try await transcriptionClient.transcribe(fileURL: fileURL, apiKey: apiKey, request: request)
-    }
-
-    private func makeTranscriptSession(
-        from recordingSession: RecordingSessionDraft,
-        recordedAudio: RecordedAudio,
-        request: TranscriptionRequest,
-        result: TranscriptionResult
-    ) -> TranscriptSession {
-        let sections = TranscriptSectionBuilder.buildSections(
-            transcript: result.text,
-            segments: result.segments,
-            markers: recordingSession.markers,
-            duration: recordedAudio.duration
-        )
-
-        return TranscriptSession(
-            id: recordingSession.sessionID,
-            createdAt: Date(),
-            transcript: result.text,
-            duration: recordedAudio.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: recordingSession.markers,
-            screenshots: recordingSession.screenshots,
-            sections: sections,
-            transcriptQualityFindings: result.qualityFindings,
-            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-        )
-    }
-
-    private func makeRecoveredTranscriptSession(
-        from session: TranscriptSession,
-        request: TranscriptionRequest,
-        result: TranscriptionResult
-    ) -> TranscriptSession {
-        let sections = TranscriptSectionBuilder.buildSections(
-            transcript: result.text,
-            segments: result.segments,
-            markers: session.markers,
-            duration: session.duration
-        )
-
-        return TranscriptSession(
-            id: session.id,
-            createdAt: session.createdAt,
-            transcript: result.text,
-            duration: session.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: session.markers,
-            screenshots: session.screenshots,
-            sections: sections,
-            issueExtraction: nil,
-            pendingTranscription: nil,
-            transcriptQualityFindings: result.qualityFindings,
-            updatedAt: Date(),
-            artifactsDirectoryPath: session.artifactsDirectoryPath
-        )
     }
 
     private func completePostTranscriptionPipeline(
