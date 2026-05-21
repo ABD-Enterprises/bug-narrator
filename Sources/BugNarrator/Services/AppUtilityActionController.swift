@@ -138,7 +138,11 @@ final class AppUtilityActionController {
             return .failed(message: "The selected screenshot file is no longer available on this Mac.")
         }
 
-        NSWorkspace.shared.activateFileViewerSelecting([screenshot.fileURL])
+        return revealInFinder(screenshot.fileURL)
+    }
+
+    func revealInFinder(_ url: URL) -> AppUtilityActionResult {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
         return .opened
     }
 
