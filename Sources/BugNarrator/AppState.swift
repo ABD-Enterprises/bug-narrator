@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
     let errorPresenter: AppErrorPresenter
+    let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
@@ -291,6 +292,10 @@ final class AppState: ObservableObject {
             permissionRecoveryController: permissionRecoveryController
         )
         self.appUtilityActions = appUtilityActions
+        self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
         self.recoveredRecordingLaunchImporter = RecoveredRecordingLaunchImportPresenter(
             importController: recoveredRecordingImportController,
             errorPresenter: self.errorPresenter,
@@ -1364,22 +1369,7 @@ final class AppState: ObservableObject {
         cleanupPendingRecordedAudioIfNeeded()
         recordingSessionController.endActivity()
 
-        let normalizedError = errorPresenter.normalizeError(
-            error,
-            operation: .sessionLibrary,
-            fallback: { .storageFailure($0) }
-        )
-        let appError = normalizedError.appError
-        errorPresenter.logAppError(normalizedError, context: "transcript_persist_failed")
-        var metadata = errorPresenter.appErrorMetadata(for: normalizedError, context: "transcript_persist_failed")
-        metadata["session_id"] = session.id.uuidString
-        sessionLibraryLogger.error(
-            "transcript_persist_failed",
-            "Transcription succeeded, but saving the transcript locally failed.",
-            metadata: metadata
-        )
-        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
-        showTranscriptWindow?()
+        transcriptPersistenceFailurePresenter.present(error, sessionID: session.id)
     }
 
     private func handleFinishedRecordingPostTranscriptionResult(
