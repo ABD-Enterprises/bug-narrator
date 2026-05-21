@@ -35,12 +35,50 @@ enum OpenAIErrorMapper {
         return fallback(message)
     }
 
-    private static func parseRetryAfter(from headers: [AnyHashable: Any]?) -> TimeInterval? {
-        guard let retryValue = headers?["Retry-After"] as? String ?? headers?["retry-after"] as? String else {
+    static func parseRetryAfter(from headers: [AnyHashable: Any]?, now: Date = Date()) -> TimeInterval? {
+        guard let retryValue = retryAfterHeaderValue(in: headers) else {
             return nil
         }
-        return TimeInterval(retryValue)
+
+        let trimmed = retryValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let seconds = TimeInterval(trimmed) {
+            return max(seconds, 1)
+        }
+
+        if let date = httpDateFormatter.date(from: trimmed) {
+            let interval = date.timeIntervalSince(now)
+            return max(interval, 1)
+        }
+
+        return nil
     }
+
+    private static func retryAfterHeaderValue(in headers: [AnyHashable: Any]?) -> String? {
+        guard let headers else {
+            return nil
+        }
+
+        for (key, value) in headers {
+            guard let name = key as? String else {
+                continue
+            }
+            if name.caseInsensitiveCompare("Retry-After") == .orderedSame,
+               let stringValue = value as? String {
+                return stringValue
+            }
+        }
+
+        return nil
+    }
+
+    private static let httpDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return formatter
+    }()
 
     static func mapTransportError(_ error: Error, fallback: (String) -> AppError) -> AppError {
         if let appError = error as? AppError {
