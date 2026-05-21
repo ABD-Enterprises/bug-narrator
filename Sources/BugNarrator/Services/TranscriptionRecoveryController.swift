@@ -311,6 +311,16 @@ final class TranscriptionRecoveryController: ObservableObject {
         do {
             try sessionLibrary.persistUpdatedSession(session)
         } catch {
+            transcriptionLogger.error(
+                "transcription_retry_state_persist_failed",
+                "Retry attempt count could not be saved durably; recovery state is in memory only.",
+                metadata: [
+                    "session_id": session.id.uuidString,
+                    "failure_reason": failureReason.rawValue,
+                    "attempt_count": "\(session.pendingTranscription?.attemptCount ?? 0)",
+                    "underlying_error": error.localizedDescription
+                ]
+            )
             sessionLibrary.stageCurrentTranscript(session)
         }
 

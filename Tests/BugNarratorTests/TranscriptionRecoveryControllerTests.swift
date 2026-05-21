@@ -305,6 +305,52 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(failure.statusMessage.contains("retried 3 times"))
     }
 
+    func testRecordRetryableFailureLogsPersistenceErrorWhenIndexCannotBeSaved() async throws {
+        let storeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RetryPersistLog-\(UUID().uuidString)")
+            .appendingPathExtension("json")
+        let diagnosticsStore = DiagnosticsLogStore(storageURL: storeURL)
+        defer { try? FileManager.default.removeItem(at: storeURL) }
+        let transcriptionLogger = DiagnosticsLogger(category: .transcription, store: diagnosticsStore)
+
+        let harness = try TranscriptionRecoveryControllerHarness(transcriptionLogger: transcriptionLogger)
+        defer { harness.cleanup() }
+
+        let session = try harness.addPendingSession(failureReason: .missingAPIKey, attemptCount: 1)
+        guard case .ready(let context) = harness.controller.retryContext(
+            for: session.id,
+            isRecording: false,
+            provider: .openAI,
+            hasUsableAIProviderCredential: true,
+            aiProviderCompatibilityIssue: nil
+        ) else {
+            return XCTFail("Expected ready retry context.")
+        }
+        XCTAssertTrue(harness.controller.beginRetry(for: session.id))
+
+        let indexURL = harness.rootDirectoryURL.appendingPathComponent("sessions.index.json")
+        try? FileManager.default.removeItem(at: indexURL)
+        try FileManager.default.createDirectory(at: indexURL, withIntermediateDirectories: true)
+
+        let failure = try XCTUnwrap(
+            harness.controller.recordRetryableFailure(AppError.invalidAPIKey, context: context, provider: .openAI)
+        )
+
+        XCTAssertEqual(failure.appError, .invalidAPIKey)
+        XCTAssertNil(harness.controller.retryingSessionID)
+        XCTAssertEqual(harness.sessionLibrary.currentTranscript?.id, session.id)
+
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let entries = await diagnosticsStore.recentEntries()
+        let entry = try XCTUnwrap(
+            entries.first { $0.event == "transcription_retry_state_persist_failed" }
+        )
+        XCTAssertEqual(entry.metadata["session_id"], session.id.uuidString)
+        XCTAssertEqual(entry.metadata["failure_reason"], PendingTranscriptionFailureReason.invalidAPIKey.rawValue)
+        XCTAssertEqual(entry.metadata["attempt_count"], "2")
+        XCTAssertNotNil(entry.metadata["underlying_error"])
+    }
+
     func testCleanupPreservedRetryAudioHonorsDebugMode() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }
@@ -328,7 +374,7 @@ private struct TranscriptionRecoveryControllerHarness {
     let controller: TranscriptionRecoveryController
     let request = TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
 
-    init() throws {
+    init(transcriptionLogger: DiagnosticsLogger? = nil) throws {
         rootDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("TranscriptionRecoveryControllerTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
@@ -344,10 +390,18 @@ private struct TranscriptionRecoveryControllerHarness {
             artifactsService: artifactsService,
             clipboardService: MockClipboardService()
         )
-        controller = TranscriptionRecoveryController(
-            sessionLibrary: sessionLibrary,
-            artifactsService: artifactsService
-        )
+        if let transcriptionLogger {
+            controller = TranscriptionRecoveryController(
+                sessionLibrary: sessionLibrary,
+                artifactsService: artifactsService,
+                transcriptionLogger: transcriptionLogger
+            )
+        } else {
+            controller = TranscriptionRecoveryController(
+                sessionLibrary: sessionLibrary,
+                artifactsService: artifactsService
+            )
+        }
     }
 
     func addPendingSession(
