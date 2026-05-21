@@ -4,6 +4,7 @@
 
 - [FIX] Cleared in-flight issue-extraction/export progress when an issue mutation (toggle selection, edit) write fails, so the extraction progress spinner no longer keeps running on top of an unrelated error toast.
 - [FIX] Restored the auto-open of Settings on credential-failure recording starts and the in-flight progress cleanup on any recording-start failure, so a missing/invalid API key surface still directs the user to Settings and stale issue-extraction/export badges from a prior pipeline no longer linger.
+- [FIX] Rendered the "Transcription Pending" timeline entry in the review workspace using the active AI provider's recovery guidance, so Local (Parakeet) sessions no longer surface OpenAI-specific text in the review surface.
 
 ## 1.0.35 - 2026-05-19
 
