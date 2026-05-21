@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     let errorPresenter: AppErrorPresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
+    let recordingStatusMessages: RecordingStatusMessageProvider
     let sessionLibrary: SessionLibraryController
     let exportHistoryController: ExportHistoryController
     let recoveredRecordingImportController: RecoveredRecordingImportController
@@ -253,6 +254,16 @@ final class AppState: ObservableObject {
             recordingTimer: recordingTimer
         )
         self.recordingSessionController = recordingSessionController
+        let recordingStatusMessages = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: settingsStore.recordingAudioSource,
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+                aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
+                autoExtractIssues: settingsStore.autoExtractIssues,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
+        }
+        self.recordingStatusMessages = recordingStatusMessages
         let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
             artifactsService: artifactsService,
@@ -323,11 +334,7 @@ final class AppState: ObservableObject {
             statusPhase: { presentationState.status.phase },
             elapsedDuration: { recordingTimer.elapsedDuration },
             recordingDetailMessage: {
-                RecordingStatusMessageBuilder.recordingDetailMessage(
-                    audioSource: settingsStore.recordingAudioSource,
-                    hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
-                    aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
-                )
+                recordingStatusMessages.recordingDetailMessage()
             },
             setStatus: { status, error in
                 presentationState.setStatus(status, error: error)
@@ -628,7 +635,7 @@ final class AppState: ObservableObject {
 
         let outcome = await recordingSessionController.startSession(
             statusPhase: status.phase,
-            activityReason: recordingActivityReason()
+            activityReason: recordingStatusMessages.recordingActivityReason()
         )
 
         switch outcome {
@@ -646,7 +653,7 @@ final class AppState: ObservableObject {
                 "A start request arrived while a recording session draft was still active; restoring recording state instead of starting a duplicate recorder.",
                 metadata: ["session_id": recordingSession.sessionID.uuidString]
             )
-            setStatus(.recording(recordingDetailMessage()))
+            setStatus(.recording(recordingStatusMessages.recordingDetailMessage()))
             return
 
         case .preflightFailure(let preflightError):
@@ -658,7 +665,7 @@ final class AppState: ObservableObject {
             presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
 
         case .started(let recordingSession):
-            setStatus(.recording(recordingDetailMessage()))
+            setStatus(.recording(recordingStatusMessages.recordingDetailMessage()))
             recordingLogger.info(
                 .sessionStarted,
                 "A feedback session started successfully.",
@@ -678,18 +685,6 @@ final class AppState: ObservableObject {
                 ]
             )
         }
-    }
-
-    private func recordingDetailMessage() -> String {
-        RecordingStatusMessageBuilder.recordingDetailMessage(
-            audioSource: settingsStore.recordingAudioSource,
-            hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
-            aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
-        )
-    }
-
-    private func recordingActivityReason() -> String {
-        RecordingStatusMessageBuilder.recordingActivityReason(audioSource: settingsStore.recordingAudioSource)
     }
 
     func stopSession() async {
@@ -717,7 +712,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
+            setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
             recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcribeAudio(
@@ -984,7 +979,7 @@ final class AppState: ObservableObject {
 
         let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
-        setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
         recordingSessionController.swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
 
@@ -1072,14 +1067,6 @@ final class AppState: ObservableObject {
 
     func captureScreenshot() async {
         await screenshotCaptureController.captureScreenshot()
-    }
-
-    private func transcriptionProgressMessage(step: Int, action: String) -> String {
-        RecordingStatusMessageBuilder.transcriptionProgressMessage(
-            step: step,
-            action: action,
-            autoExtractIssues: settingsStore.autoExtractIssues
-        )
     }
 
     func extractIssuesForDisplayedTranscript() async {
@@ -1380,7 +1367,7 @@ final class AppState: ObservableObject {
     ) async -> PostTranscriptionPipelineResult {
         var session = session
         recordCompletedTranscriptionIfNeeded(session, mode: mode)
-        setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: mode.savingAction)))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 2, action: mode.savingAction)))
 
         do {
             try persistInitialPostTranscriptionSession(session, mode: mode)
@@ -1459,7 +1446,7 @@ final class AppState: ObservableObject {
         apiKey: String
     ) async throws -> TranscriptSession {
         var session = session
-        setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
         recordingSessionController.swapActivity(reason: "Extracting review issues")
 
         let extraction = try await issueExtractionController.extractIssues(
@@ -1479,14 +1466,7 @@ final class AppState: ObservableObject {
         }
 
         recordingSessionController.endActivity()
-        setStatus(.success(transcriptionSuccessMessage()))
-    }
-
-    private func transcriptionSuccessMessage() -> String {
-        RecordingStatusMessageBuilder.transcriptionSuccessMessage(
-            autoExtractIssues: settingsStore.autoExtractIssues,
-            autoCopyTranscript: settingsStore.autoCopyTranscript
-        )
+        setStatus(.success(recordingStatusMessages.transcriptionSuccessMessage()))
     }
 
     private func handleCompletedTranscriptPersistenceFailure(
