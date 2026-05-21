@@ -5,8 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var exportDestinationInProgress: ExportDestination?
-    @Published private(set) var pendingExportReview: IssueExportReview?
     @Published private(set) var exportHistory: [ExportReceipt] = []
     @Published private(set) var recoveredRecordingImportCount = 0
 
@@ -19,6 +17,7 @@ final class AppState: ObservableObject {
     let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
     let issueExtractionController: IssueExtractionController
+    let issueExportController: IssueExportController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
@@ -109,6 +108,14 @@ final class AppState: ObservableObject {
 
     var currentError: AppError? {
         presentationState.currentError
+    }
+
+    var exportDestinationInProgress: ExportDestination? {
+        issueExportController.exportDestinationInProgress
+    }
+
+    var pendingExportReview: IssueExportReview? {
+        issueExportController.pendingExportReview
     }
 
     var transientToast: TransientToast? {
@@ -259,6 +266,11 @@ final class AppState: ObservableObject {
             sessionLibrary: self.sessionLibrary,
             issueExtractionService: issueExtractionService
         )
+        self.issueExportController = IssueExportController(
+            settingsStore: settingsStore,
+            sessionLibrary: self.sessionLibrary,
+            exportService: exportService
+        )
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: self.sessionLibrary,
             artifactsService: artifactsService
@@ -339,6 +351,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         issueExtractionController.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        issueExportController.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -486,7 +504,7 @@ final class AppState: ObservableObject {
     }
 
     func isExporting(to destination: ExportDestination) -> Bool {
-        exportDestinationInProgress == destination
+        issueExportController.isExporting(to: destination)
     }
 
     func refreshPermissionRecoveryState() {
@@ -527,105 +545,27 @@ final class AppState: ObservableObject {
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
-        guard canRequestIssueExport(from: session) else {
-            return false
-        }
-
-        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues else {
-            return false
-        }
-
-        switch destination {
-        case .github:
-            return (try? configuredGitHubIssueGroups(for: selectedIssues)) != nil
-        case .jira:
-            return (try? configuredJiraIssueGroups(for: selectedIssues)) != nil
-        }
+        issueExportController.canExportIssues(from: session, to: destination, statusPhase: status.phase)
     }
 
     func canRequestIssueExport(from session: TranscriptSession) -> Bool {
-        guard status.phase != .recording,
-              status.phase != .transcribing,
-              pendingExportReview == nil,
-              let session = sessionSnapshot(with: session.id),
-              let extraction = session.issueExtraction,
-              !extraction.selectedIssues.isEmpty else {
-            return false
-        }
-
-        return true
+        issueExportController.canRequestIssueExport(from: session, statusPhase: status.phase)
     }
 
     func issueExportSetupMessage(for destination: ExportDestination) -> String? {
-        switch destination {
-        case .github:
-            guard !settingsStore.hasGitHubToken else {
-                return nil
-            }
-            return "GitHub token is missing. Click Set Up GitHub to open Settings."
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration == nil else {
-                return nil
-            }
-            return "Jira connection is missing. Click Set Up Jira to open Settings."
-        }
+        issueExportController.issueExportSetupMessage(for: destination)
     }
 
     func issueExportRoutingMessage(for destination: ExportDestination, session: TranscriptSession) -> String? {
-        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues,
-              !selectedIssues.isEmpty else {
-            return nil
-        }
-
-        switch destination {
-        case .github:
-            guard settingsStore.hasGitHubToken else {
-                return nil
-            }
-
-            let missingCount = selectedIssues.filter { gitHubExportConfiguration(for: $0) == nil }.count
-            guard missingCount > 0 else {
-                return nil
-            }
-            return "Choose a GitHub repository for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration != nil else {
-                return nil
-            }
-
-            let missingCount = selectedIssues.filter { jiraExportConfiguration(for: $0) == nil }.count
-            guard missingCount > 0 else {
-                return nil
-            }
-            return "Choose a Jira project and issue type for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
-        }
+        issueExportController.issueExportRoutingMessage(for: destination, session: session)
     }
 
     func defaultGitHubIssueExportTarget() -> GitHubIssueExportTarget? {
-        guard !settingsStore.normalizedGitHubRepositoryOwner.isEmpty,
-              !settingsStore.normalizedGitHubRepositoryName.isEmpty else {
-            return nil
-        }
-
-        return GitHubIssueExportTarget(
-            repositoryID: settingsStore.normalizedGitHubRepositoryID.nilIfEmpty,
-            owner: settingsStore.normalizedGitHubRepositoryOwner,
-            repository: settingsStore.normalizedGitHubRepositoryName,
-            labels: settingsStore.githubDefaultLabelsList
-        )
+        issueExportController.defaultGitHubIssueExportTarget()
     }
 
     func defaultJiraIssueExportTarget() -> JiraIssueExportTarget? {
-        guard !settingsStore.normalizedJiraProjectKey.isEmpty else {
-            return nil
-        }
-
-        return JiraIssueExportTarget(
-            projectID: settingsStore.normalizedJiraProjectID.nilIfEmpty,
-            projectKey: settingsStore.normalizedJiraProjectKey,
-            issueTypeID: settingsStore.normalizedJiraIssueTypeID,
-            issueTypeName: settingsStore.normalizedJiraIssueType
-        )
+        issueExportController.defaultJiraIssueExportTarget()
     }
 
     func startSession() async {
@@ -1388,145 +1328,54 @@ final class AppState: ObservableObject {
     }
 
     func exportSelectedIssues(from session: TranscriptSession, to destination: ExportDestination) async {
-        guard status.phase != .recording, status.phase != .transcribing else {
-            presentError(AppError.exportFailure("Finish the current background work before exporting issues."), operation: .export)
-            return
-        }
-
-        guard let currentSession = sessionSnapshot(with: session.id) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
-            return
-        }
-
-        guard let extraction = currentSession.issueExtraction else {
-            presentError(AppError.exportFailure("Run issue extraction before exporting."), operation: .export)
-            return
-        }
-
-        let selectedIssues = extraction.selectedIssues
-        guard !selectedIssues.isEmpty else {
-            presentError(AppError.exportFailure("Select at least one extracted issue to export."), operation: .export)
-            return
-        }
-
-        settingsStore.refreshExportSecretsForUserInitiatedAccess()
-
-        do {
-            try validateExportConfiguration(for: destination)
-        } catch {
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
-            if case .exportConfigurationMissing = error as? AppError {
+        let context: IssueExportRequestContext
+        switch issueExportController.preflightIssueExport(
+            from: session,
+            to: destination,
+            statusPhase: status.phase
+        ) {
+        case .success(let readyContext):
+            context = readyContext
+        case .failure(let failure):
+            presentError(failure.error, operation: .export, fallback: { .exportFailure($0) })
+            if failure.opensSettings {
                 showSettingsWindow?()
             }
             return
         }
 
-        guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
-            presentError(AppError.missingAPIKey, operation: .export)
-            return
-        }
-
-        exportDestinationInProgress = destination
         setStatus(.transcribing("Checking \(destination.rawValue) for similar open issues..."))
         beginActivity(reason: "Reviewing similar issues before export")
-        exportLogger.info(
-            "issue_export_review_requested",
-            "Preparing similar issue review before export.",
-            metadata: [
-                "destination": destination.rawValue,
-                "session_id": currentSession.id.uuidString,
-                "issue_count": "\(selectedIssues.count)"
-            ]
-        )
 
         do {
-            let review: IssueExportReview
-
-            switch destination {
-            case .github:
-                let groups = try configuredGitHubIssueGroups(for: selectedIssues)
-                var items: [IssueExportReviewItem] = []
-
-                for group in groups {
-                    try await exportService.validateGitHubConfiguration(group.configuration)
-                    let groupReview = try await exportService.prepareGitHubExportReview(
-                        issues: group.issues,
-                        session: currentSession,
-                        configuration: group.configuration,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    items.append(contentsOf: groupReview.items)
-                }
-
-                review = IssueExportReview(destination: .github, sessionID: currentSession.id, items: items)
-            case .jira:
-                let groups = try configuredJiraIssueGroups(for: selectedIssues)
-                var items: [IssueExportReviewItem] = []
-
-                for group in groups {
-                    try await exportService.validateJiraConfiguration(group.configuration)
-                    let groupReview = try await exportService.prepareJiraExportReview(
-                        issues: group.issues,
-                        session: currentSession,
-                        configuration: group.configuration,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    items.append(contentsOf: groupReview.items)
-                }
-
-                review = IssueExportReview(destination: .jira, sessionID: currentSession.id, items: items)
-            }
-
-            exportDestinationInProgress = nil
+            let review = try await issueExportController.prepareIssueExportReview(
+                for: context,
+                model: settingsStore.issueExtractionModelValue,
+                apiBaseURL: settingsStore.openAIBaseURLValue
+            )
             endActivity()
 
             if review.hasMatches {
-                pendingExportReview = review
-                exportLogger.info(
-                    "issue_export_review_ready",
-                    "Similar issue review is ready for user confirmation.",
-                    metadata: [
-                        "destination": destination.rawValue,
-                        "session_id": currentSession.id.uuidString
-                    ]
-                )
                 setStatus(.success("Review the similar \(destination.rawValue) issues before export."))
             } else {
                 await finalizeIssueExport(using: review)
             }
         } catch {
-            exportDestinationInProgress = nil
             endActivity()
             presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
     }
 
     func cancelPendingExportReview() {
-        pendingExportReview = nil
+        issueExportController.cancelPendingExportReview()
     }
 
     func setExportReviewResolution(_ resolution: SimilarIssueResolution, for issueID: UUID) {
-        guard var review = pendingExportReview,
-              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
-            return
-        }
-
-        review.items[itemIndex].setResolution(resolution)
-        pendingExportReview = review
+        issueExportController.setExportReviewResolution(resolution, for: issueID)
     }
 
     func selectExportReviewMatch(_ matchID: String, for issueID: UUID) {
-        guard var review = pendingExportReview,
-              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
-            return
-        }
-
-        review.items[itemIndex].selectMatch(id: matchID)
-        pendingExportReview = review
+        issueExportController.selectExportReviewMatch(matchID, for: issueID)
     }
 
     func confirmPendingExportReview() async {
@@ -1538,72 +1387,21 @@ final class AppState: ObservableObject {
     }
 
     private func finalizeIssueExport(using review: IssueExportReview) async {
-        guard let currentSession = sessionSnapshot(with: review.sessionID) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
-            pendingExportReview = nil
-            return
-        }
-
         do {
-            let preparedIssues = try IssueExportReviewPolicy.preparedIssues(from: review)
-            let duplicateMatches = try IssueExportReviewPolicy.duplicateMatchResults(from: review)
-
-            pendingExportReview = nil
-            let combinedResults: [ExportResult]
-
-            if preparedIssues.isEmpty {
-                combinedResults = duplicateMatches
-            } else {
-                exportDestinationInProgress = review.destination
+            let requiresRemoteExport = try issueExportController.pendingReviewRequiresRemoteExport(review)
+            if requiresRemoteExport {
                 setStatus(.transcribing("Exporting reviewed issues to \(review.destination.rawValue)..."))
                 beginActivity(reason: "Exporting extracted issues")
+            }
 
-                let exportedResults: [ExportResult]
-                switch review.destination {
-                case .github:
-                    var results: [ExportResult] = []
-                    for group in try configuredGitHubIssueGroups(for: preparedIssues) {
-                        results += try await exportService.exportToGitHub(
-                            issues: group.issues,
-                            session: currentSession,
-                            configuration: group.configuration
-                        )
-                    }
-                    exportedResults = results
-                case .jira:
-                    var results: [ExportResult] = []
-                    for group in try configuredJiraIssueGroups(for: preparedIssues) {
-                        results += try await exportService.exportToJira(
-                            issues: group.issues,
-                            session: currentSession,
-                            configuration: group.configuration
-                        )
-                    }
-                    exportedResults = results
-                }
-
-                combinedResults = exportedResults + duplicateMatches
-                exportDestinationInProgress = nil
+            let completion = try await issueExportController.finalizeIssueExport(using: review)
+            if completion.performedRemoteExport {
                 endActivity()
             }
 
-            exportLogger.info(
-                "issue_export_completed",
-                "Finished exporting selected issues.",
-                metadata: [
-                    "destination": review.destination.rawValue,
-                    "session_id": currentSession.id.uuidString,
-                    "issue_count": "\(combinedResults.count)"
-                ]
-            )
-            setStatus(.success(IssueExportReviewPolicy.exportSummary(
-                for: combinedResults,
-                duplicateCount: duplicateMatches.count,
-                destination: review.destination
-            )))
+            setStatus(.success(completion.summary))
             await refreshExportHistory()
         } catch {
-            exportDestinationInProgress = nil
             endActivity()
             presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
@@ -1691,7 +1489,7 @@ final class AppState: ObservableObject {
                 "status_phase": status.phase.debugName,
                 "has_active_recording_session": activeRecordingSession == nil ? "no" : "yes",
                 "is_extracting_issues": issueExtractionController.issueExtractionSessionID == nil ? "no" : "yes",
-                "is_exporting": exportDestinationInProgress == nil ? "no" : "yes"
+                "is_exporting": issueExportController.exportDestinationInProgress == nil ? "no" : "yes"
             ]
         )
 
@@ -1723,7 +1521,7 @@ final class AppState: ObservableObject {
         endActivity()
         cleanupPendingRecordedAudioIfNeeded()
         issueExtractionController.clearProgress()
-        exportDestinationInProgress = nil
+        issueExportController.clearProgress()
 
         let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
         let appError = normalizedError.appError
@@ -2170,107 +1968,6 @@ final class AppState: ObservableObject {
 
     private func persistUpdatedSession(_ session: TranscriptSession) throws {
         try sessionLibrary.persistUpdatedSession(session)
-    }
-
-    private func validateExportConfiguration(for destination: ExportDestination) throws {
-        switch destination {
-        case .github:
-            guard settingsStore.hasGitHubToken else {
-                throw AppError.exportConfigurationMissing(
-                    "GitHub export requires a personal access token."
-                )
-            }
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration != nil else {
-                throw AppError.exportConfigurationMissing(
-                    "Jira export requires a base URL, email, and API token."
-                )
-            }
-        }
-    }
-
-    private func configuredGitHubIssueGroups(
-        for issues: [ExtractedIssue]
-    ) throws -> [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] {
-        var groups: [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] = []
-
-        for issue in issues {
-            guard let configuration = gitHubExportConfiguration(for: issue) else {
-                throw AppError.exportConfigurationMissing(
-                    "Choose a GitHub repository for every selected issue before exporting."
-                )
-            }
-
-            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
-                groups[groupIndex].issues.append(issue)
-            } else {
-                groups.append((configuration: configuration, issues: [issue]))
-            }
-        }
-
-        return groups
-    }
-
-    private func configuredJiraIssueGroups(
-        for issues: [ExtractedIssue]
-    ) throws -> [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] {
-        var groups: [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] = []
-
-        for issue in issues {
-            guard let configuration = jiraExportConfiguration(for: issue) else {
-                throw AppError.exportConfigurationMissing(
-                    "Choose a Jira project and issue type for every selected issue before exporting."
-                )
-            }
-
-            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
-                groups[groupIndex].issues.append(issue)
-            } else {
-                groups.append((configuration: configuration, issues: [issue]))
-            }
-        }
-
-        return groups
-    }
-
-    private func gitHubExportConfiguration(for issue: ExtractedIssue) -> GitHubExportConfiguration? {
-        guard settingsStore.hasGitHubToken else {
-            return nil
-        }
-
-        let target = issue.gitHubExportTarget ?? defaultGitHubIssueExportTarget()
-        guard let target, target.isComplete else {
-            return nil
-        }
-
-        return GitHubExportConfiguration(
-            token: settingsStore.trimmedGitHubToken,
-            repositoryID: target.repositoryID,
-            owner: target.owner,
-            repository: target.repository,
-            labels: target.labels
-        )
-    }
-
-    private func jiraExportConfiguration(for issue: ExtractedIssue) -> JiraExportConfiguration? {
-        guard let connection = settingsStore.jiraConnectionConfiguration else {
-            return nil
-        }
-
-        let target = issue.jiraExportTarget ?? defaultJiraIssueExportTarget()
-        guard let target, target.isComplete else {
-            return nil
-        }
-
-        return JiraExportConfiguration(
-            baseURL: connection.baseURL,
-            email: connection.email,
-            apiToken: connection.apiToken,
-            projectID: target.projectID,
-            projectKey: target.projectKey,
-            issueTypeID: target.issueTypeID,
-            issueTypeName: target.issueTypeName
-        )
     }
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
