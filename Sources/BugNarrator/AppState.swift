@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     let appUtilityActionPresenter: AppUtilityActionResultPresenter
     let applicationTerminationController: ApplicationTerminationController
     let supportDataController: SupportDataController
+    let supportDataActionPresenter: SupportDataActionPresenter
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
@@ -302,6 +303,11 @@ final class AppState: ObservableObject {
             }
         )
         self.appUtilityActionPresenter = appUtilityActionPresenter
+        self.supportDataActionPresenter = SupportDataActionPresenter(
+            presentationState: presentationState,
+            utilityActions: appUtilityActions,
+            utilityResultPresenter: appUtilityActionPresenter
+        )
         self.supportDataController = SupportDataController(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
@@ -798,7 +804,7 @@ final class AppState: ObservableObject {
 
     func copyDebugInfo() {
         let result = supportDataController.copyDebugInfo(sessionID: currentDebugSessionID)
-        setStatus(.success(result.statusMessage))
+        supportDataActionPresenter.presentCopyDebugInfo(result)
     }
 
     func exportDebugBundle() async {
@@ -809,8 +815,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            appUtilityActionPresenter.present(appUtilityActions.revealInFinder(completion.bundleURL))
-            setStatus(.success(completion.statusMessage))
+            supportDataActionPresenter.presentDebugBundleExport(completion)
         } catch {
             presentError(
                 error,
@@ -828,8 +833,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            appUtilityActionPresenter.present(appUtilityActions.revealInFinder(completion.bundleURL))
-            setStatus(.success(completion.statusMessage))
+            supportDataActionPresenter.presentPrivacyDataExport(completion)
         } catch {
             presentError(
                 error,
@@ -847,7 +851,7 @@ final class AppState: ObservableObject {
 
         do {
             let outcome = try await localDataDeletionController.deleteAllLocalData(currentTranscript: currentTranscript)
-            setStatus(.success(outcome.statusMessage))
+            supportDataActionPresenter.presentLocalDataDeletion(outcome)
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
