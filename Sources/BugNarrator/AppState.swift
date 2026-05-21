@@ -324,25 +324,11 @@ final class AppState: ObservableObject {
             statusPhase: { presentationState.status.phase },
             elapsedDuration: { recordingTimer.elapsedDuration },
             recordingDetailMessage: {
-                let prefix: String
-                switch settingsStore.recordingAudioSource {
-                case .microphone:
-                    prefix = "Recording in progress."
-                case .systemAudio:
-                    prefix = "Recording system audio."
-                case .microphoneAndSystemAudio:
-                    prefix = "Recording microphone and system audio."
-                }
-
-                if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
-                    return prefix
-                }
-
-                if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-                    return "\(prefix) \(compatibilityIssue)"
-                }
-
-                return "\(prefix) Finish the AI provider setup in Settings before stopping to transcribe this session."
+                RecordingStatusMessageBuilder.recordingDetailMessage(
+                    audioSource: settingsStore.recordingAudioSource,
+                    hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+                    aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
+                )
             },
             setStatus: { status, error in
                 presentationState.setStatus(status, error: error)
@@ -697,36 +683,15 @@ final class AppState: ObservableObject {
     }
 
     private func recordingDetailMessage() -> String {
-        let prefix: String
-        switch settingsStore.recordingAudioSource {
-        case .microphone:
-            prefix = "Recording in progress."
-        case .systemAudio:
-            prefix = "Recording system audio."
-        case .microphoneAndSystemAudio:
-            prefix = "Recording microphone and system audio."
-        }
-
-        if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
-            return prefix
-        }
-
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            return "\(prefix) \(compatibilityIssue)"
-        }
-
-        return "\(prefix) Finish the AI provider setup in Settings before stopping to transcribe this session."
+        RecordingStatusMessageBuilder.recordingDetailMessage(
+            audioSource: settingsStore.recordingAudioSource,
+            hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+            aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
+        )
     }
 
     private func recordingActivityReason() -> String {
-        switch settingsStore.recordingAudioSource {
-        case .microphone:
-            return "Recording a spoken feedback session"
-        case .systemAudio:
-            return "Recording system audio for a feedback session"
-        case .microphoneAndSystemAudio:
-            return "Recording microphone and system audio for a feedback session"
-        }
+        RecordingStatusMessageBuilder.recordingActivityReason(audioSource: settingsStore.recordingAudioSource)
     }
 
     func stopSession() async {
@@ -1115,8 +1080,11 @@ final class AppState: ObservableObject {
     }
 
     private func transcriptionProgressMessage(step: Int, action: String) -> String {
-        let totalSteps = settingsStore.autoExtractIssues ? 3 : 2
-        return "Step \(step) of \(totalSteps): \(action)"
+        RecordingStatusMessageBuilder.transcriptionProgressMessage(
+            step: step,
+            action: action,
+            autoExtractIssues: settingsStore.autoExtractIssues
+        )
     }
 
     func extractIssuesForDisplayedTranscript() async {
@@ -1612,15 +1580,10 @@ final class AppState: ObservableObject {
     }
 
     private func transcriptionSuccessMessage() -> String {
-        if settingsStore.autoExtractIssues {
-            return "Session saved. Transcript and extracted issues are ready."
-        }
-
-        if settingsStore.autoCopyTranscript {
-            return "Session saved. Transcript copied to the clipboard."
-        }
-
-        return "Session saved locally and ready for review."
+        RecordingStatusMessageBuilder.transcriptionSuccessMessage(
+            autoExtractIssues: settingsStore.autoExtractIssues,
+            autoCopyTranscript: settingsStore.autoCopyTranscript
+        )
     }
 
     private func handleCompletedTranscriptPersistenceFailure(
