@@ -236,6 +236,7 @@ final class RetryPostTranscriptionResultHandler {
 
         case .persistenceFailure(_, let error):
             transcriptionRecovery.finishRetry()
+            recordingSessionController.endActivity()
             sessionLibraryStatusPresenter.presentFailure(error)
 
         case .postTranscriptionFailure(let error):
