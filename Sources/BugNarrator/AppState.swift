@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     let recordingSessionController: RecordingSessionController
     let recordingSessionStartStatusPresenter: RecordingSessionStartStatusPresenter
     let recordingSessionStopReadinessPresenter: RecordingSessionStopReadinessPresenter
+    let recordingSessionStopFailurePresenter: RecordingSessionStopFailurePresenter
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
     let sessionLibrary: SessionLibraryController
@@ -319,6 +320,10 @@ final class AppState: ObservableObject {
             permissionRecoveryController: permissionRecoveryController
         )
         self.appUtilityActions = appUtilityActions
+        self.recordingSessionStopFailurePresenter = RecordingSessionStopFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
         self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
@@ -1147,17 +1152,21 @@ final class AppState: ObservableObject {
         operation: AppErrorOperation = .generic,
         fallback: (String) -> AppError = { .transcriptionFailure($0) }
     ) {
-        recordingSessionController.stopTimer(resetElapsed: status.phase == .recording)
-        recordingSessionController.endActivity()
-        cleanupPendingRecordedAudioIfNeeded()
-        issueExtractionController.clearProgress()
-        issueExportController.clearProgress()
+        prepareErrorPresentationSideEffects()
 
         let result = errorPresenter.presentError(error, operation: operation, fallback: fallback)
 
         if result.shouldOpenSettingsWindow {
             showSettingsWindow?()
         }
+    }
+
+    private func prepareErrorPresentationSideEffects() {
+        recordingSessionController.stopTimer(resetElapsed: status.phase == .recording)
+        recordingSessionController.endActivity()
+        cleanupPendingRecordedAudioIfNeeded()
+        issueExtractionController.clearProgress()
+        issueExportController.clearProgress()
     }
 
     private func presentPostTranscriptionError(
@@ -1356,10 +1365,12 @@ final class AppState: ObservableObject {
             artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
         }
         recordingSessionController.clearActiveRecordingSession()
-        if recordingSessionController.pendingRecordedAudioSnapshot == nil {
-            presentError(error, operation: .recordingStop, fallback: { .recordingFailure($0) })
+        let hasPendingRecordedAudio = recordingSessionController.pendingRecordedAudioSnapshot != nil
+        prepareErrorPresentationSideEffects()
+        if !hasPendingRecordedAudio {
+            recordingSessionStopFailurePresenter.presentRecordingStopFailure(error)
         } else {
-            presentError(error, operation: .transcription)
+            recordingSessionStopFailurePresenter.presentTranscriptionFailure(error)
         }
     }
 
@@ -1423,7 +1434,8 @@ final class AppState: ObservableObject {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
             }
             recordingSessionController.clearActiveRecordingSession()
-            presentError(error, operation: .recordingStop)
+            prepareErrorPresentationSideEffects()
+            recordingSessionStopFailurePresenter.presentPreservationFailure(error)
         }
     }
 

@@ -229,6 +229,63 @@ final class RecordingSessionControllerTests: XCTestCase {
         XCTAssertEqual(telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_stop")
     }
 
+    func testStopFailurePresenterNormalizesRecordingStopFailure() {
+        let harness = makeStopFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Recorder stop failed"]
+        )
+        let expectedError = AppError.recordingFailure("Recorder stop failed")
+
+        harness.presenter.presentRecordingStopFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_stop")
+    }
+
+    func testStopFailurePresenterNormalizesTranscriptionFailure() {
+        let harness = makeStopFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Upload failed"]
+        )
+        let expectedError = AppError.transcriptionFailure("Upload failed")
+
+        harness.presenter.presentTranscriptionFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "transcription")
+    }
+
+    func testStopFailurePresenterPresentsPreservationFailure() {
+        let harness = makeStopFailurePresenter()
+        let expectedError = AppError.recordingFailure("Preserving the recording failed.")
+
+        harness.presenter.presentPreservationFailure(expectedError)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_stop")
+    }
+
+    func testStopFailurePresenterOpensSettingsForCredentialFailure() {
+        let harness = makeStopFailurePresenter()
+        let expectedError = AppError.missingAPIKey
+
+        harness.presenter.presentTranscriptionFailure(expectedError)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.showSettingsCallCount(), 1)
+    }
+
     func testCancelSessionCancelsRecorderAndRemovesArtifacts() async throws {
         let harness = try RecordingSessionControllerHarness()
         defer { harness.cleanup() }
@@ -306,6 +363,33 @@ final class RecordingSessionControllerTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertNil(harness.controller.pendingRecordedAudioSnapshot)
+    }
+
+    private func makeStopFailurePresenter() -> (
+        presenter: RecordingSessionStopFailurePresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder,
+        showSettingsCallCount: () -> Int
+    ) {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        var showSettingsCallCount = 0
+        let presenter = RecordingSessionStopFailurePresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            ),
+            showSettingsWindow: {
+                showSettingsCallCount += 1
+            }
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder,
+            showSettingsCallCount: { showSettingsCallCount }
+        )
     }
 
     private func makeStartStatusPresenter(
