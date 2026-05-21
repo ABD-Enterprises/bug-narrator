@@ -367,28 +367,31 @@ final class TranscriptionRecoveryController: ObservableObject {
             sourceFileURL: recordedAudio.fileURL
         )
 
-        if fileManager.fileExists(atPath: preservedAudioURL.path) {
-            try fileManager.removeItem(at: preservedAudioURL)
+        let sourceAlreadyPreserved = recordedAudio.fileURL.standardizedFileURL == preservedAudioURL.standardizedFileURL
+
+        if !sourceAlreadyPreserved {
+            if fileManager.fileExists(atPath: preservedAudioURL.path) {
+                try fileManager.removeItem(at: preservedAudioURL)
+            }
+
+            try fileManager.copyItem(at: recordedAudio.fileURL, to: preservedAudioURL)
         }
 
-        if recordedAudio.fileURL.standardizedFileURL == preservedAudioURL.standardizedFileURL {
-            return preservedAudioURL
-        }
-
-        try fileManager.copyItem(at: recordedAudio.fileURL, to: preservedAudioURL)
-
-        let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
-        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard fileSize > 0 else {
-            throw AppError.recordingFailure("The preserved audio file was empty.")
-        }
-
+        try validatePreservedAudio(at: preservedAudioURL)
         recordingLogger.info(
             "recorded_audio_preserved_for_retry",
             "Preserved the finished recording for a later transcription retry.",
             metadata: ["file_name": preservedAudioURL.lastPathComponent]
         )
         return preservedAudioURL
+    }
+
+    private func validatePreservedAudio(at preservedAudioURL: URL) throws {
+        let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
+        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
+        guard fileSize > 0 else {
+            throw AppError.recordingFailure("The preserved audio file was empty.")
+        }
     }
 
 }
