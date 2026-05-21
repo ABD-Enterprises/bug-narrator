@@ -1175,12 +1175,7 @@ final class AppState: ObservableObject {
     }
 
     func openScreenshot(_ screenshot: SessionScreenshot) {
-        guard FileManager.default.fileExists(atPath: screenshot.fileURL.path) else {
-            appUtilityActionPresenter.presentFailure("The selected screenshot file is no longer available on this Mac.")
-            return
-        }
-
-        NSWorkspace.shared.activateFileViewerSelecting([screenshot.fileURL])
+        appUtilityActionPresenter.present(appUtilityActions.openScreenshot(screenshot))
     }
 
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
