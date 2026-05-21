@@ -48,7 +48,6 @@ final class AppState: ObservableObject {
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let artifactsService: any SessionArtifactsManaging
-    private let clipboardService: any ClipboardWriting
     private let telemetryRecorder: any OperationalTelemetryRecording
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
@@ -340,7 +339,6 @@ final class AppState: ObservableObject {
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.artifactsService = artifactsService
-        self.clipboardService = clipboardService
         self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
@@ -1528,10 +1526,7 @@ final class AppState: ObservableObject {
         case .finishedRecording:
             try persistCompletedTranscript(session)
         case .retry:
-            try persistUpdatedSession(session)
-            if settingsStore.autoCopyTranscript {
-                clipboardService.copy(session.transcript)
-            }
+            try persistUpdatedSession(session, autoCopyTranscript: settingsStore.autoCopyTranscript)
         }
     }
 
@@ -1587,12 +1582,11 @@ final class AppState: ObservableObject {
         _ error: Error,
         session: TranscriptSession
     ) {
-        sessionLibrary.stageCurrentTranscript(session)
+        sessionLibrary.stageCurrentTranscript(
+            session,
+            autoCopyTranscript: settingsStore.autoCopyTranscript
+        )
         recordingSessionController.clearActiveRecordingSession()
-
-        if settingsStore.autoCopyTranscript {
-            clipboardService.copy(session.transcript)
-        }
 
         cleanupPendingRecordedAudioIfNeeded()
         endActivity()
@@ -1757,8 +1751,14 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func persistUpdatedSession(_ session: TranscriptSession) throws {
-        try sessionLibrary.persistUpdatedSession(session)
+    private func persistUpdatedSession(
+        _ session: TranscriptSession,
+        autoCopyTranscript: Bool = false
+    ) throws {
+        try sessionLibrary.persistUpdatedSession(
+            session,
+            autoCopyTranscript: autoCopyTranscript
+        )
     }
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
