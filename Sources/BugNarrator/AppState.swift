@@ -33,6 +33,7 @@ final class AppState: ObservableObject {
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let retryTranscriptionStatusPresenter: RetryTranscriptionStatusPresenter
+    let retryableSessionPreservationPresenter: RetryableSessionPreservationPresenter
     let screenshotCoordinator: ScreenshotCoordinator
     let screenshotCaptureController: ScreenshotCaptureController
 
@@ -63,7 +64,6 @@ final class AppState: ObservableObject {
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
-    private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
@@ -342,6 +342,11 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.retryableSessionPreservationPresenter = RetryableSessionPreservationPresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
         let screenshotCoordinator = ScreenshotCoordinator(
             screenCapturePermissionService: screenCapturePermissionService,
@@ -1458,40 +1463,17 @@ final class AppState: ObservableObject {
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
             recordingSessionController.endActivity()
-            errorPresenter.logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
-            setStatus(.error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage), error: appError)
-            showTranscriptWindow?()
-            if appError.suggestsOpenAISettings {
-                showSettingsWindow?()
-            }
+            retryableSessionPreservationPresenter.presentPreservedSession(retryableSession, appError: appError)
 
         case .persistenceFailure(let retryableSession, let error):
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
             recordingSessionController.endActivity()
-
-            let normalizedError = errorPresenter.normalizeError(
+            retryableSessionPreservationPresenter.presentPersistenceFailure(
                 error,
-                operation: .sessionLibrary,
-                fallback: { .storageFailure($0) }
+                retryableSession: retryableSession,
+                recoveryAppError: failureReason.appError
             )
-            let persistenceError = normalizedError.appError
-            errorPresenter.logAppError(normalizedError, context: "retryable_session_persist_failed")
-            var metadata = errorPresenter.appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
-            metadata["session_id"] = retryableSession.id.uuidString
-            sessionLibraryLogger.error(
-                "retryable_session_persist_failed",
-                "The preserved recording could not be saved into local session history.",
-                metadata: metadata
-            )
-            setStatus(
-                .error("Recording preserved, but \(persistenceError.userMessage)"),
-                error: persistenceError
-            )
-            showTranscriptWindow?()
-            if failureReason.appError.suggestsOpenAISettings {
-                showSettingsWindow?()
-            }
 
         case .preservationFailure(let error):
             if !settingsStore.debugMode {
