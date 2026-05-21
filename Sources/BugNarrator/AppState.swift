@@ -22,6 +22,7 @@ final class AppState: ObservableObject {
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
     let appUtilityActions: AppUtilityActionController
+    let applicationTerminationController: ApplicationTerminationController
     let supportDataController: SupportDataController
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
@@ -238,44 +239,51 @@ final class AppState: ObservableObject {
             presentationState: presentationState,
             telemetryRecorder: telemetryRecorder
         )
-        self.transientToastController = TransientToastController(presentationState: presentationState)
-        self.recordingSessionController = RecordingSessionController(
+        let transientToastController = TransientToastController(presentationState: presentationState)
+        self.transientToastController = transientToastController
+        let recordingSessionController = RecordingSessionController(
             audioRecorder: audioRecorder,
             microphonePermissionService: microphonePermissionService,
             artifactsService: artifactsService,
             recordingTimer: recordingTimer
         )
-        self.sessionLibrary = SessionLibraryController(
+        self.recordingSessionController = recordingSessionController
+        let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
             artifactsService: artifactsService,
             clipboardService: clipboardService
         )
+        self.sessionLibrary = sessionLibrary
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
         self.recoveredRecordingImportController = RecoveredRecordingImportController(
             transcriptStore: transcriptStore,
-            sessionLibrary: self.sessionLibrary,
+            sessionLibrary: sessionLibrary,
             recoveredRecordingImporter: recoveredRecordingImporter,
             artifactsService: artifactsService
         )
-        self.issueExtractionController = IssueExtractionController(
-            sessionLibrary: self.sessionLibrary,
+        let issueExtractionController = IssueExtractionController(
+            sessionLibrary: sessionLibrary,
             issueExtractionService: issueExtractionService
         )
-        self.issueExportController = IssueExportController(
+        self.issueExtractionController = issueExtractionController
+        let issueExportController = IssueExportController(
             settingsStore: settingsStore,
-            sessionLibrary: self.sessionLibrary,
+            sessionLibrary: sessionLibrary,
             exportService: exportService
         )
-        self.permissionRecoveryController = PermissionRecoveryController(
+        self.issueExportController = issueExportController
+        let permissionRecoveryController = PermissionRecoveryController(
             microphonePermissionService: microphonePermissionService,
             screenCapturePermissionService: screenCapturePermissionService,
             urlHandler: urlHandler,
             runtimeEnvironment: runtimeEnvironment
         )
-        self.appUtilityActions = AppUtilityActionController(
+        self.permissionRecoveryController = permissionRecoveryController
+        let appUtilityActions = AppUtilityActionController(
             urlHandler: urlHandler,
-            permissionRecoveryController: self.permissionRecoveryController
+            permissionRecoveryController: permissionRecoveryController
         )
+        self.appUtilityActions = appUtilityActions
         self.supportDataController = SupportDataController(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
@@ -288,20 +296,21 @@ final class AppState: ObservableObject {
         )
         self.localDataDeletionController = LocalDataDeletionController(
             transcriptStore: transcriptStore,
-            sessionLibrary: self.sessionLibrary,
+            sessionLibrary: sessionLibrary,
             supportDataController: self.supportDataController,
             exportHistoryController: self.exportHistoryController
         )
         self.transcriptionRecovery = TranscriptionRecoveryController(
-            sessionLibrary: self.sessionLibrary,
+            sessionLibrary: sessionLibrary,
             artifactsService: artifactsService
         )
-        self.screenshotCoordinator = ScreenshotCoordinator(
+        let screenshotCoordinator = ScreenshotCoordinator(
             screenCapturePermissionService: screenCapturePermissionService,
             screenshotCaptureService: screenshotCaptureService,
             screenshotSelectionService: screenshotSelectionService,
             artifactsService: artifactsService
         )
+        self.screenshotCoordinator = screenshotCoordinator
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.artifactsService = artifactsService
@@ -314,6 +323,33 @@ final class AppState: ObservableObject {
         self.aiProviderSettings = AIProviderSettingsController(
             settingsStore: settingsStore,
             transcriptionClient: transcriptionClient
+        )
+        self.applicationTerminationController = ApplicationTerminationController(
+            statusPhase: { presentationState.status.phase },
+            activeRecordingSession: { recordingSessionController.activeRecordingSession },
+            isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
+            isExporting: { issueExportController.exportDestinationInProgress != nil },
+            cancelPendingScreenshotSelection: { reason in
+                screenshotCoordinator.cancelPendingSelection(reason: reason)
+            },
+            showRecordingControls: {
+                appUtilityActions.openRecordingControls()
+            },
+            showToast: { message, style in
+                transientToastController.showToast(message, style: style)
+            },
+            dismissToast: {
+                transientToastController.dismissToast()
+            },
+            unregisterHotkeys: {
+                hotkeyManager.unregisterAll()
+            },
+            stopTimer: { resetElapsed in
+                recordingSessionController.stopTimer(resetElapsed: resetElapsed)
+            },
+            endActivity: {
+                recordingSessionController.endActivity()
+            }
         )
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
@@ -760,28 +796,11 @@ final class AppState: ObservableObject {
     }
 
     func requestApplicationTermination() {
-        guard applicationShouldTerminate() == .terminateNow else {
-            return
-        }
-
-        NSApp.terminate(nil)
+        applicationTerminationController.requestApplicationTermination()
     }
 
     func applicationShouldTerminate() -> NSApplication.TerminateReply {
-        guard status.phase == .recording,
-              let activeRecordingSession else {
-            return .terminateNow
-        }
-
-        recordingLogger.warning(
-            "termination_blocked_while_recording",
-            "BugNarrator blocked an app termination request while a recording session was still active.",
-            metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-        )
-        cancelPendingScreenshotSelection(reason: "Quit was requested while recording, so pending screenshot selection was cancelled.")
-        showRecordingControlWindow?()
-        showToast("Stop recording before quitting BugNarrator.", style: .informational)
-        return .terminateCancel
+        applicationTerminationController.applicationShouldTerminate()
     }
 
     func openAbout() {
@@ -1390,29 +1409,7 @@ final class AppState: ObservableObject {
     }
 
     private func prepareForApplicationTermination() {
-        settingsLogger.info(
-            "application_will_terminate",
-            "BugNarrator is preparing for application shutdown.",
-            metadata: [
-                "status_phase": status.phase.debugName,
-                "has_active_recording_session": activeRecordingSession == nil ? "no" : "yes",
-                "is_extracting_issues": issueExtractionController.issueExtractionSessionID == nil ? "no" : "yes",
-                "is_exporting": issueExportController.exportDestinationInProgress == nil ? "no" : "yes"
-            ]
-        )
-
-        if let activeRecordingSession {
-            recordingLogger.warning(
-                "application_terminating_during_recording",
-                "BugNarrator is terminating while a recording session is still active.",
-                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-            )
-        }
-
-        transientToastController.dismissToast()
-        hotkeyManager.unregisterAll()
-        stopTimer(resetElapsed: false)
-        endActivity()
+        applicationTerminationController.prepareForApplicationTermination()
     }
 
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
@@ -1934,22 +1931,4 @@ final class AppState: ObservableObject {
         }
     }
 
-}
-
-
-private extension AppStatus.Phase {
-    var debugName: String {
-        switch self {
-        case .idle:
-            return "idle"
-        case .recording:
-            return "recording"
-        case .transcribing:
-            return "transcribing"
-        case .success:
-            return "success"
-        case .error:
-            return "error"
-        }
-    }
 }
