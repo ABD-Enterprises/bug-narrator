@@ -456,7 +456,7 @@ final class AppState: ObservableObject {
                 "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
             ]
         )
-        validateRuntimeConfiguration()
+        permissionRecoveryController.validateRuntimeConfiguration()
         importRecoveredRecordingsAtLaunch()
         Task { [weak self] in
             await self?.refreshExportHistory()
@@ -1572,10 +1572,6 @@ final class AppState: ObservableObject {
 
     private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
         permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
-    }
-
-    private func validateRuntimeConfiguration() {
-        permissionRecoveryController.validateRuntimeConfiguration()
     }
 
     private func importRecoveredRecordingsAtLaunch() {
