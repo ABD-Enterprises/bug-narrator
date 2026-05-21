@@ -104,6 +104,37 @@ final class RecordingSessionControllerTests: XCTestCase {
         XCTAssertEqual(harness.artifactsService.removedDirectories, [recordingSession.artifactsDirectoryURL])
     }
 
+    func testCancelStatusPresenterSetsDiscardedStatusForCancelledSession() {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let presenter = RecordingSessionCancelStatusPresenter { status in
+            presentationState.setStatus(status, error: nil)
+        }
+
+        presenter.present(
+            .cancelled(
+                RecordingSessionDraft(
+                    sessionID: UUID(),
+                    artifactsDirectoryURL: URL(fileURLWithPath: "/tmp/bug-narrator-session", isDirectory: true)
+                )
+            )
+        )
+
+        XCTAssertEqual(presentationState.status, .idle("Session discarded."))
+        XCTAssertNil(presentationState.currentError)
+    }
+
+    func testCancelStatusPresenterLeavesStatusForTransitionInProgress() {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let presenter = RecordingSessionCancelStatusPresenter { status in
+            presentationState.setStatus(status, error: nil)
+        }
+
+        presenter.present(.transitionInProgress)
+
+        XCTAssertEqual(presentationState.status, .recording("Recording in progress."))
+        XCTAssertNil(presentationState.currentError)
+    }
+
     func testCleanupPendingRecordedAudioPreservesDebugFilesUntilExplicitCleanup() async throws {
         let harness = try RecordingSessionControllerHarness()
         defer { harness.cleanup() }
