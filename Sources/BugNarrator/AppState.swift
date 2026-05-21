@@ -19,6 +19,7 @@ final class AppState: ObservableObject {
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
+    let supportDataController: SupportDataController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
@@ -38,10 +39,7 @@ final class AppState: ObservableObject {
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
-    private let debugBundleExporter: any DebugBundleExporting
-    private let privacyDataExporter: any PrivacyDataExporting
     private let telemetryRecorder: any OperationalTelemetryRecording
-    private let localPrivacyDataManager: any LocalPrivacyDataManaging
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
@@ -275,6 +273,16 @@ final class AppState: ObservableObject {
             urlHandler: urlHandler,
             runtimeEnvironment: runtimeEnvironment
         )
+        self.supportDataController = SupportDataController(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            exportService: exportService,
+            clipboardService: clipboardService,
+            debugBundleExporter: debugBundleExporter,
+            privacyDataExporter: privacyDataExporter,
+            telemetryRecorder: telemetryRecorder,
+            localPrivacyDataManager: localPrivacyDataManager
+        )
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: self.sessionLibrary,
             artifactsService: artifactsService
@@ -292,10 +300,7 @@ final class AppState: ObservableObject {
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
-        self.debugBundleExporter = debugBundleExporter
-        self.privacyDataExporter = privacyDataExporter
         self.telemetryRecorder = telemetryRecorder
-        self.localPrivacyDataManager = localPrivacyDataManager
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
             exportService: exportService
@@ -475,11 +480,7 @@ final class AppState: ObservableObject {
     }
 
     var debugInfoSnapshot: DebugInfoSnapshot {
-        DebugInfoSnapshot(
-            metadata: BugNarratorMetadata(),
-            settingsStore: settingsStore,
-            sessionID: currentDebugSessionID
-        )
+        supportDataController.debugInfoSnapshot(sessionID: currentDebugSessionID)
     }
 
     var storageRecoveryMessage: String? {
@@ -811,40 +812,20 @@ final class AppState: ObservableObject {
     }
 
     func copyDebugInfo() {
-        let snapshot = debugInfoSnapshot
-        clipboardService.copy(snapshot.clipboardText)
-        settingsLogger.info(
-            "debug_info_copied",
-            "Copied debug info to the clipboard.",
-            metadata: ["session_id": snapshot.sessionID?.uuidString ?? "none"]
-        )
-        setStatus(.success("Debug info copied to the clipboard."))
+        let result = supportDataController.copyDebugInfo(sessionID: currentDebugSessionID)
+        setStatus(.success(result.statusMessage))
     }
 
     func exportDebugBundle() async {
-        let snapshot = await makeDebugBundleSnapshot()
-
         do {
-            guard let bundleURL = try debugBundleExporter.export(snapshot: snapshot) else {
+            guard let completion = try await supportDataController.exportDebugBundle(
+                sessionMetadata: currentDebugSessionMetadata()
+            ) else {
                 return
             }
 
-            settingsLogger.info(
-                "debug_bundle_exported",
-                "Exported a local debug bundle.",
-                metadata: [
-                    "session_id": snapshot.sessionMetadata.sessionID?.uuidString ?? "none",
-                    "debug_mode": snapshot.debugInfo.debugModeEnabled ? "enabled" : "disabled"
-                ]
-            )
-            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
-            setStatus(
-                .success(
-                    settingsStore.debugMode
-                        ? "Debug bundle exported with verbose diagnostics."
-                        : "Debug bundle exported."
-                )
-            )
+            NSWorkspace.shared.activateFileViewerSelecting([completion.bundleURL])
+            setStatus(.success(completion.statusMessage))
         } catch {
             presentError(
                 error,
@@ -856,26 +837,14 @@ final class AppState: ObservableObject {
 
     func exportPrivacyData() async {
         do {
-            let diagnostics = await makePrivacyDataExportDiagnosticsSnapshot()
-            guard let bundleURL = try privacyDataExporter.export(
-                sessions: transcriptStore.allStoredSessions(),
-                settings: makePrivacyDataExportSettingsSnapshot(),
-                diagnostics: diagnostics
+            guard let completion = try await supportDataController.exportPrivacyData(
+                exportHistoryFallback: exportHistory
             ) else {
                 return
             }
 
-            sessionLibraryLogger.info(
-                "privacy_data_exported",
-                "Exported a local privacy data bundle.",
-                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
-            )
-            telemetryRecorder.record(
-                .privacyDataExported,
-                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
-            )
-            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
-            setStatus(.success("Data export created. API keys and tracker credentials were not included."))
+            NSWorkspace.shared.activateFileViewerSelecting([completion.bundleURL])
+            setStatus(.success(completion.statusMessage))
         } catch {
             presentError(
                 error,
@@ -1929,32 +1898,8 @@ final class AppState: ObservableObject {
         sessionLibrary.sessionSnapshot(with: sessionID)
     }
 
-    private func makePrivacyDataExportSettingsSnapshot() -> PrivacyDataExportSettingsSnapshot {
-        PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore)
-    }
-
-    private func makePrivacyDataExportDiagnosticsSnapshot() async -> PrivacyDataExportDiagnosticsSnapshot {
-        let debugInfo = debugInfoSnapshot
-        let recentLogText = await BugNarratorDiagnostics.store.recentLogText(limit: 200)
-        let receipts = (try? await exportService.exportHistory()) ?? exportHistory
-
-        return PrivacyDataExportDiagnosticsSnapshot(
-            appName: debugInfo.appName,
-            versionDescription: debugInfo.versionDescription,
-            macOSVersion: debugInfo.macOSVersion,
-            architecture: debugInfo.architecture,
-            activeTranscriptionModel: debugInfo.activeTranscriptionModel,
-            issueExtractionModel: debugInfo.issueExtractionModel,
-            logLevel: debugInfo.logLevel,
-            debugModeEnabled: debugInfo.debugModeEnabled,
-            recentTelemetryEvents: telemetryRecorder.recentEvents(limit: 200),
-            recentDiagnosticsLog: recentLogText,
-            exportHistory: receipts
-        )
-    }
-
     private func clearLocalPrivacyArtifacts() async {
-        await localPrivacyDataManager.clearLocalSupportArtifacts()
+        await supportDataController.clearLocalPrivacyArtifacts()
         await refreshExportHistory()
     }
 
@@ -2131,14 +2076,6 @@ final class AppState: ObservableObject {
 
     private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
         permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
-    }
-
-    private func makeDebugBundleSnapshot() async -> DebugBundleSnapshot {
-        DebugBundleSnapshot(
-            debugInfo: debugInfoSnapshot,
-            sessionMetadata: currentDebugSessionMetadata(),
-            recentLogText: await BugNarratorDiagnostics.recentLogText()
-        )
     }
 
     private func validateRuntimeConfiguration() {
