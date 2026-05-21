@@ -427,11 +427,11 @@ enum DiagnosticsRedactor {
     ]
 
     private static let tokenPatterns: [NSRegularExpression] = [
-        try! NSRegularExpression(pattern: #"sk-[A-Za-z0-9_-]+"#),
-        try! NSRegularExpression(pattern: #"github_pat_[A-Za-z0-9_]+"#),
-        try! NSRegularExpression(pattern: #"gh[pousr]_[A-Za-z0-9]+"#, options: [.caseInsensitive]),
-        try! NSRegularExpression(pattern: #"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
-    ]
+        makeTokenPattern(#"sk-[A-Za-z0-9_-]+"#),
+        makeTokenPattern(#"github_pat_[A-Za-z0-9_]+"#),
+        makeTokenPattern(#"gh[pousr]_[A-Za-z0-9]+"#, options: [.caseInsensitive]),
+        makeTokenPattern(#"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
+    ].compactMap { $0 }
 
     static func sensitiveValues(in metadata: [String: String]) -> [String] {
         var values = Set<String>()
@@ -505,5 +505,12 @@ enum DiagnosticsRedactor {
         }
 
         return sanitizeFreeformText(value) != value
+    }
+
+    private static func makeTokenPattern(
+        _ pattern: String,
+        options: NSRegularExpression.Options = []
+    ) -> NSRegularExpression? {
+        try? NSRegularExpression(pattern: pattern, options: options)
     }
 }
