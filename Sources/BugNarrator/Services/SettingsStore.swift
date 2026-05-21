@@ -429,22 +429,43 @@ final class SettingsStore: ObservableObject {
         Self.normalizedOpenAIBaseURL(from: openAIBaseURL, provider: aiProvider)
     }
 
+    static let providerFallbackBaseURLs: [AIProvider: URL] = {
+        var table: [AIProvider: URL] = [:]
+        for provider in AIProvider.allCases {
+            guard let url = URL(string: provider.baseURLPlaceholder) else {
+                preconditionFailure(
+                    "AIProvider.\(provider.rawValue).baseURLPlaceholder is not a parseable URL. " +
+                    "Update the placeholder or add an explicit fallback in providerFallbackBaseURLs."
+                )
+            }
+            table[provider] = url
+        }
+        return table
+    }()
+
+    static func fallbackBaseURL(for provider: AIProvider) -> URL {
+        // providerFallbackBaseURLs is built at type init from AIProvider.allCases and asserts
+        // every case is parseable, so this subscript is total.
+        providerFallbackBaseURLs[provider] ?? providerFallbackBaseURLs[.openAI]!
+    }
+
     static func normalizedOpenAIBaseURL(
         from rawValue: String,
         provider: AIProvider = .openAI
     ) -> URL {
+        let fallback = fallbackBaseURL(for: provider)
         let trimmedValue = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         guard !trimmedValue.isEmpty else {
-            return URL(string: provider.baseURLPlaceholder)!
+            return fallback
         }
 
         let candidate = trimmedValue.contains("://") ? trimmedValue : "https://\(trimmedValue)"
         guard var components = URLComponents(string: candidate),
               components.host?.isEmpty == false else {
-            return URL(string: provider.baseURLPlaceholder)!
+            return fallback
         }
 
         if components.scheme?.isEmpty != false {
@@ -455,7 +476,7 @@ final class SettingsStore: ObservableObject {
             components.path = ""
         }
 
-        return components.url ?? URL(string: provider.baseURLPlaceholder)!
+        return components.url ?? fallback
     }
 
     var preferredModelValue: String {
