@@ -984,8 +984,8 @@ final class AppState: ObservableObject {
 
     func saveCurrentTranscriptToHistory() {
         do {
-            if try sessionLibrary.saveCurrentTranscriptToHistory() != nil {
-                setStatus(.success("Transcript saved to session history."))
+            if let status = TranscriptSaveStatusPresenter.status(savedSession: try sessionLibrary.saveCurrentTranscriptToHistory()) {
+                setStatus(status)
             }
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })

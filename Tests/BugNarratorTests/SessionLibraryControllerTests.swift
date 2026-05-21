@@ -131,6 +131,14 @@ final class SessionLibraryControllerTests: XCTestCase {
         )
     }
 
+    func testTranscriptSaveStatusPresenterMapsResults() {
+        XCTAssertNil(TranscriptSaveStatusPresenter.status(savedSession: nil))
+        XCTAssertEqual(
+            TranscriptSaveStatusPresenter.status(savedSession: makeSession(index: 1)),
+            .success("Transcript saved to session history.")
+        )
+    }
+
     func testPersistCompletedTranscriptCopiesWhenRequested() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }

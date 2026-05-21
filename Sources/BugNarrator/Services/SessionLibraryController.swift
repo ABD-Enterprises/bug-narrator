@@ -20,6 +20,16 @@ enum DisplayedTranscriptCopyStatusPresenter {
     }
 }
 
+enum TranscriptSaveStatusPresenter {
+    static func status(savedSession: TranscriptSession?) -> AppStatus? {
+        guard savedSession != nil else {
+            return nil
+        }
+
+        return .success("Transcript saved to session history.")
+    }
+}
+
 enum SessionDeletionStatusPresenter {
     static func status(deletedCount: Int) -> AppStatus? {
         guard deletedCount > 0 else {
