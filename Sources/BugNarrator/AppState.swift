@@ -812,11 +812,7 @@ final class AppState: ObservableObject {
 
             supportDataActionPresenter.presentDebugBundleExport(completion)
         } catch {
-            presentError(
-                error,
-                operation: .diagnosticsExport,
-                fallback: { _ in .diagnosticsFailure("BugNarrator could not create the debug bundle.") }
-            )
+            supportDataActionPresenter.presentDebugBundleExportFailure(error)
         }
     }
 
@@ -830,11 +826,7 @@ final class AppState: ObservableObject {
 
             supportDataActionPresenter.presentPrivacyDataExport(completion)
         } catch {
-            presentError(
-                error,
-                operation: .privacyExport,
-                fallback: { _ in .exportFailure("BugNarrator could not create the data export.") }
-            )
+            supportDataActionPresenter.presentPrivacyDataExportFailure(error)
         }
     }
 

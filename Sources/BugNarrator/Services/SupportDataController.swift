@@ -15,23 +15,51 @@ struct PrivacyDataExportCompletion {
     let statusMessage: String
 }
 
+enum SupportDataActionFailure {
+    case debugBundleExport
+    case privacyDataExport
+    case localDataDeletion
+
+    var operation: AppErrorOperation {
+        switch self {
+        case .debugBundleExport:
+            return .diagnosticsExport
+        case .privacyDataExport:
+            return .privacyExport
+        case .localDataDeletion:
+            return .sessionLibrary
+        }
+    }
+
+    var fallback: (String) -> AppError {
+        switch self {
+        case .debugBundleExport:
+            return { _ in .diagnosticsFailure("BugNarrator could not create the debug bundle.") }
+        case .privacyDataExport:
+            return { _ in .exportFailure("BugNarrator could not create the data export.") }
+        case .localDataDeletion:
+            return { .storageFailure($0) }
+        }
+    }
+}
+
 @MainActor
 final class SupportDataActionPresenter {
     private let setStatus: (AppStatus) -> Void
     private let revealInFinder: (URL) -> AppUtilityActionResult
     private let presentUtilityActionResult: (AppUtilityActionResult) -> Void
-    private let presentDeletionFailure: (Error) -> Void
+    private let presentFailure: (Error, SupportDataActionFailure) -> Void
 
     init(
         setStatus: @escaping (AppStatus) -> Void,
         revealInFinder: @escaping (URL) -> AppUtilityActionResult,
         presentUtilityActionResult: @escaping (AppUtilityActionResult) -> Void,
-        presentDeletionFailure: @escaping (Error) -> Void = { _ in }
+        presentFailure: @escaping (Error, SupportDataActionFailure) -> Void = { _, _ in }
     ) {
         self.setStatus = setStatus
         self.revealInFinder = revealInFinder
         self.presentUtilityActionResult = presentUtilityActionResult
-        self.presentDeletionFailure = presentDeletionFailure
+        self.presentFailure = presentFailure
     }
 
     convenience init(
@@ -50,8 +78,8 @@ final class SupportDataActionPresenter {
             presentUtilityActionResult: { result in
                 utilityResultPresenter.present(result)
             },
-            presentDeletionFailure: { error in
-                _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            presentFailure: { error, failure in
+                _ = errorPresenter.presentError(error, operation: failure.operation, fallback: failure.fallback)
             }
         )
     }
@@ -68,6 +96,14 @@ final class SupportDataActionPresenter {
         presentExportedBundle(at: completion.bundleURL, statusMessage: completion.statusMessage)
     }
 
+    func presentDebugBundleExportFailure(_ error: Error) {
+        presentFailure(error, .debugBundleExport)
+    }
+
+    func presentPrivacyDataExportFailure(_ error: Error) {
+        presentFailure(error, .privacyDataExport)
+    }
+
     func presentLocalDataDeletion(_ outcome: LocalDataDeletionOutcome) {
         presentSuccess(outcome.statusMessage)
     }
@@ -82,7 +118,7 @@ final class SupportDataActionPresenter {
     }
 
     func presentLocalDataDeletionFailure(_ error: Error) {
-        presentDeletionFailure(error)
+        presentFailure(error, .localDataDeletion)
     }
 
     private func presentExportedBundle(at bundleURL: URL, statusMessage: String) {

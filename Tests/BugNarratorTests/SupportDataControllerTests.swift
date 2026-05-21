@@ -158,6 +158,61 @@ final class SupportDataControllerTests: XCTestCase {
     }
 
     func testActionPresenterNormalizesLocalDataDeletionFailure() {
+        let harness = makeSupportDataActionFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Could not clear local data"]
+        )
+        let expectedError = AppError.storageFailure("Could not clear local data")
+
+        harness.presenter.presentLocalDataDeletionFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+    }
+
+    func testActionPresenterNormalizesDebugBundleExportFailure() {
+        let harness = makeSupportDataActionFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Archive failed"]
+        )
+        let expectedError = AppError.diagnosticsFailure("BugNarrator could not create the debug bundle.")
+
+        harness.presenter.presentDebugBundleExportFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "diagnostics_export")
+    }
+
+    func testActionPresenterNormalizesPrivacyDataExportFailure() {
+        let harness = makeSupportDataActionFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Archive failed"]
+        )
+        let expectedError = AppError.exportFailure("BugNarrator could not create the data export.")
+
+        harness.presenter.presentPrivacyDataExportFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "privacy_export")
+    }
+
+    private func makeSupportDataActionFailurePresenter() -> (
+        presenter: SupportDataActionPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
         let presentationState = AppPresentationState()
         let telemetryRecorder = MockOperationalTelemetryRecorder()
         let errorPresenter = AppErrorPresenter(
@@ -168,23 +223,16 @@ final class SupportDataControllerTests: XCTestCase {
             setStatus: { status in presentationState.setStatus(status, error: nil) },
             revealInFinder: { _ in .opened },
             presentUtilityActionResult: { _ in },
-            presentDeletionFailure: { error in
-                _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            presentFailure: { error, failure in
+                _ = errorPresenter.presentError(error, operation: failure.operation, fallback: failure.fallback)
             }
         )
-        let error = NSError(
-            domain: "BugNarratorTests",
-            code: 1,
-            userInfo: [NSLocalizedDescriptionKey: "Could not clear local data"]
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
         )
-        let expectedError = AppError.storageFailure("Could not clear local data")
-
-        presenter.presentLocalDataDeletionFailure(error)
-
-        XCTAssertEqual(presentationState.status, .error(expectedError.userMessage))
-        XCTAssertEqual(presentationState.currentError, expectedError)
-        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.name, "app_error")
-        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
     }
 }
 
