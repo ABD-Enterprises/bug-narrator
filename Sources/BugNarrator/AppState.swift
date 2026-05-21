@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
     let errorPresenter: AppErrorPresenter
+    let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
     let exportHistoryController: ExportHistoryController
@@ -50,7 +51,6 @@ final class AppState: ObservableObject {
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
     private var cancellables = Set<AnyCancellable>()
-    private var toastDismissTask: Task<Void, Never>?
 
     private enum PostTranscriptionPipelineMode: Equatable {
         case finishedRecording
@@ -238,6 +238,7 @@ final class AppState: ObservableObject {
             presentationState: presentationState,
             telemetryRecorder: telemetryRecorder
         )
+        self.transientToastController = TransientToastController(presentationState: presentationState)
         self.recordingSessionController = RecordingSessionController(
             audioRecorder: audioRecorder,
             microphonePermissionService: microphonePermissionService,
@@ -1408,8 +1409,7 @@ final class AppState: ObservableObject {
             )
         }
 
-        toastDismissTask?.cancel()
-        presentationState.dismissToast()
+        transientToastController.dismissToast()
         hotkeyManager.unregisterAll()
         stopTimer(resetElapsed: false)
         endActivity()
@@ -1870,16 +1870,7 @@ final class AppState: ObservableObject {
     }
 
     private func showToast(_ message: String, style: TransientToastStyle = .success) {
-        toastDismissTask?.cancel()
-        presentationState.showToast(TransientToast(message: message, style: style))
-        toastDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else {
-                return
-            }
-
-            self?.presentationState.dismissToast()
-        }
+        transientToastController.showToast(message, style: style)
     }
 
     private var currentDebugSessionID: UUID? {
