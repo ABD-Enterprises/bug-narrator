@@ -1109,7 +1109,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        setStatus(.transcribing("Checking \(destination.rawValue) for similar open issues..."))
+        setStatus(IssueExportStatusPresenter.reviewPreparationStatus(destination: destination))
         recordingSessionController.beginActivity(reason: "Reviewing similar issues before export")
 
         do {
@@ -1121,7 +1121,7 @@ final class AppState: ObservableObject {
             recordingSessionController.endActivity()
 
             if review.hasMatches {
-                setStatus(.success("Review the similar \(destination.rawValue) issues before export."))
+                setStatus(IssueExportStatusPresenter.reviewReadyStatus(destination: destination))
             } else {
                 await finalizeIssueExport(using: review)
             }
@@ -1155,7 +1155,7 @@ final class AppState: ObservableObject {
         do {
             let requiresRemoteExport = try issueExportController.pendingReviewRequiresRemoteExport(review)
             if requiresRemoteExport {
-                setStatus(.transcribing("Exporting reviewed issues to \(review.destination.rawValue)..."))
+                setStatus(IssueExportStatusPresenter.remoteExportStatus(destination: review.destination))
                 recordingSessionController.beginActivity(reason: "Exporting extracted issues")
             }
 
@@ -1164,7 +1164,7 @@ final class AppState: ObservableObject {
                 recordingSessionController.endActivity()
             }
 
-            setStatus(.success(completion.summary))
+            setStatus(IssueExportStatusPresenter.completionStatus(completion))
             await refreshExportHistory()
         } catch {
             recordingSessionController.endActivity()
