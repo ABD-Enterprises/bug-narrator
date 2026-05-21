@@ -1777,11 +1777,15 @@ final class AppState: ObservableObject {
     }
 
     private var currentDebugSessionID: UUID? {
-        activeRecordingSession?.sessionID ?? displayedTranscript?.id ?? currentTranscript?.id
+        DebugSessionContextProvider.currentSessionID(
+            activeRecordingSession: activeRecordingSession,
+            displayedTranscript: displayedTranscript,
+            currentTranscript: currentTranscript
+        )
     }
 
     private func currentDebugSessionMetadata() -> DebugSessionMetadata {
-        DebugSessionMetadata.make(
+        DebugSessionContextProvider.metadata(
             currentTranscript: currentTranscript,
             displayedTranscript: displayedTranscript,
             activeRecordingSession: activeRecordingSession,
