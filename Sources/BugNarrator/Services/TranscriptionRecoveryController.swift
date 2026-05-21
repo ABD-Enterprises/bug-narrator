@@ -2,6 +2,53 @@ import Combine
 import Foundation
 
 @MainActor
+final class RetryTranscriptionStatusPresenter {
+    private let errorPresenter: AppErrorPresenter
+    private let showSettingsWindow: () -> Void
+    private let showTranscriptWindow: () -> Void
+
+    init(
+        errorPresenter: AppErrorPresenter,
+        showSettingsWindow: @escaping () -> Void,
+        showTranscriptWindow: @escaping () -> Void
+    ) {
+        self.errorPresenter = errorPresenter
+        self.showSettingsWindow = showSettingsWindow
+        self.showTranscriptWindow = showTranscriptWindow
+    }
+
+    func presentRetryContextFailure(
+        appError: AppError,
+        opensSettings: Bool,
+        statusMessage: String?
+    ) {
+        if let statusMessage {
+            errorPresenter.setStatus(.error(statusMessage), error: appError)
+        } else {
+            let result = errorPresenter.presentError(appError, operation: .retryTranscription)
+            if result.shouldOpenSettingsWindow {
+                showSettingsWindow()
+            }
+        }
+
+        if opensSettings {
+            showSettingsWindow()
+        }
+    }
+
+    func presentRetryableFailure(_ failure: PendingTranscriptionRetryFailure) {
+        errorPresenter.logAppError(
+            failure.appError,
+            context: "retry_pending_transcription",
+            operation: .retryTranscription
+        )
+        errorPresenter.setStatus(.error(failure.statusMessage), error: failure.appError)
+        showTranscriptWindow()
+        showSettingsWindow()
+    }
+}
+
+@MainActor
 final class TranscriptionRecoveryController: ObservableObject {
     @Published private(set) var retryingSessionID: UUID?
 
