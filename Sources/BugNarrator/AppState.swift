@@ -20,17 +20,19 @@ final class AppState: ObservableObject {
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
+    let appUtilityActions: AppUtilityActionController
     let supportDataController: SupportDataController
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
-    var showTranscriptWindow: (() -> Void)?
-    var showSettingsWindow: (() -> Void)?
-    var showAboutWindow: (() -> Void)?
-    var showChangelogWindow: (() -> Void)?
-    var showSupportWindow: (() -> Void)?
-    var showRecordingControlWindow: (() -> Void)?
+    var showTranscriptWindow: (() -> Void)? { get { appUtilityActions.showTranscriptWindow } set { appUtilityActions.showTranscriptWindow = newValue } }
+    var showSettingsWindow: (() -> Void)? { get { appUtilityActions.showSettingsWindow } set { appUtilityActions.showSettingsWindow = newValue } }
+    var showAboutWindow: (() -> Void)? { get { appUtilityActions.showAboutWindow } set { appUtilityActions.showAboutWindow = newValue } }
+    var showChangelogWindow: (() -> Void)? { get { appUtilityActions.showChangelogWindow } set { appUtilityActions.showChangelogWindow = newValue } }
+    var showSupportWindow: (() -> Void)? { get { appUtilityActions.showSupportWindow } set { appUtilityActions.showSupportWindow = newValue } }
+    var showRecordingControlWindow: (() -> Void)? { get { appUtilityActions.showRecordingControlWindow } set { appUtilityActions.showRecordingControlWindow = newValue } }
+
     var prepareForScreenshotSelection: (() -> Void)?
     var restoreAfterScreenshotSelection: (() -> Void)?
 
@@ -38,7 +40,6 @@ final class AppState: ObservableObject {
     private let hotkeyManager: any HotkeyManaging
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
-    private let urlHandler: any URLOpening
     private let telemetryRecorder: any OperationalTelemetryRecording
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
@@ -270,6 +271,10 @@ final class AppState: ObservableObject {
             urlHandler: urlHandler,
             runtimeEnvironment: runtimeEnvironment
         )
+        self.appUtilityActions = AppUtilityActionController(
+            urlHandler: urlHandler,
+            permissionRecoveryController: self.permissionRecoveryController
+        )
         self.supportDataController = SupportDataController(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
@@ -300,7 +305,6 @@ final class AppState: ObservableObject {
         self.hotkeyManager = hotkeyManager
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
-        self.urlHandler = urlHandler
         self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
@@ -733,15 +737,15 @@ final class AppState: ObservableObject {
     }
 
     func openTranscriptHistory() {
-        showTranscriptWindow?()
+        appUtilityActions.openTranscriptHistory()
     }
 
     func openRecordingControls() {
-        showRecordingControlWindow?()
+        appUtilityActions.openRecordingControls()
     }
 
     func openRecordingControlsAndStartSession() async {
-        showRecordingControlWindow?()
+        appUtilityActions.openRecordingControls()
 
         guard status.phase != .recording else {
             return
@@ -751,8 +755,7 @@ final class AppState: ObservableObject {
     }
 
     func openSettings() {
-        settingsLogger.debug("open_settings", "Opening the Settings window.")
-        showSettingsWindow?()
+        appUtilityActions.openSettings()
     }
 
     func requestApplicationTermination() {
@@ -781,47 +784,47 @@ final class AppState: ObservableObject {
     }
 
     func openAbout() {
-        showAboutWindow?()
+        appUtilityActions.openAbout()
     }
 
     func openChangelog() {
-        showChangelogWindow?()
+        appUtilityActions.openChangelog()
     }
 
     func openGitHubRepository() {
-        openExternalURL(BugNarratorLinks.repository, label: "GitHub repository")
+        presentUtilityActionResult(appUtilityActions.openGitHubRepository())
     }
 
     func openDocumentation() {
-        openExternalURL(BugNarratorLinks.documentation, label: "documentation")
+        presentUtilityActionResult(appUtilityActions.openDocumentation())
     }
 
     func openIssueReporter() {
-        openExternalURL(BugNarratorLinks.issues, label: "issue tracker")
+        presentUtilityActionResult(appUtilityActions.openIssueReporter())
     }
 
     func openSupportDevelopment() {
-        showSupportWindow?()
+        appUtilityActions.openSupportDevelopment()
     }
 
     func openSupportDonationPage() {
-        openExternalURL(BugNarratorLinks.supportDevelopment, label: "PayPal donation page")
+        presentUtilityActionResult(appUtilityActions.openSupportDonationPage())
     }
 
     func openMicrophonePrivacySettings() {
-        presentPermissionSettingsResult(permissionRecoveryController.openMicrophonePrivacySettings())
+        presentPermissionSettingsResult(appUtilityActions.openMicrophonePrivacySettings())
     }
 
     func openScreenRecordingPrivacySettings() {
-        presentPermissionSettingsResult(permissionRecoveryController.openScreenRecordingPrivacySettings())
+        presentPermissionSettingsResult(appUtilityActions.openScreenRecordingPrivacySettings())
     }
 
     func openSystemAudioPrivacySettings() {
-        presentPermissionSettingsResult(permissionRecoveryController.openSystemAudioPrivacySettings())
+        presentPermissionSettingsResult(appUtilityActions.openSystemAudioPrivacySettings())
     }
 
     func checkForUpdates() {
-        openExternalURL(BugNarratorLinks.releases, label: "releases page")
+        presentUtilityActionResult(appUtilityActions.checkForUpdates())
     }
 
     func copyDebugInfo() {
@@ -1336,17 +1339,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func openExternalURL(_ url: URL, label: String) {
-        guard urlHandler.open(url) else {
-            presentUtilityActionFailure("BugNarrator could not open the \(label).")
+    private func presentUtilityActionResult(_ result: AppUtilityActionResult) {
+        guard case .failed(let message) = result else {
             return
         }
 
-        settingsLogger.info(
-            "external_link_opened",
-            "Opened an external support or documentation link.",
-            metadata: ["label": label]
-        )
+        presentUtilityActionFailure(message)
     }
 
     private func presentPermissionSettingsResult(_ result: PermissionSettingsOpenResult) {
