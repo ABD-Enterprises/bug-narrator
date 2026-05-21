@@ -946,17 +946,14 @@ final class AppState: ObservableObject {
     }
 
     func copyDisplayedTranscript() {
-        guard let transcript = displayedTranscript else {
+        switch sessionLibrary.copyDisplayedTranscript() {
+        case .noDisplayedTranscript:
             return
-        }
-
-        guard transcript.hasTranscriptContent else {
+        case .transcriptUnavailable:
             setStatus(.error("Transcription is not available yet. Retry the preserved session first."))
-            return
+        case .copied:
+            setStatus(.success("Transcript copied to the clipboard."))
         }
-
-        clipboardService.copy(transcript.transcript)
-        setStatus(.success("Transcript copied to the clipboard."))
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
