@@ -1,0 +1,101 @@
+name: Windows Tester Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update, for example windows-tester-v0.1.0"
+        required: true
+        type: string
+      runtime:
+        description: "Windows runtime identifier"
+        required: true
+        default: "win-x64"
+        type: string
+      draft:
+        description: "Create the GitHub Release as a draft"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  signed-windows-tester-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Decode signing certificate
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}
+        run: |
+          if (-not $env:CERT_BASE64) {
+            throw "Repository secret BUGNARRATOR_WINDOWS_CERT_BASE64 is required for a real signed Windows tester release."
+          }
+          $certPath = Join-Path $env:RUNNER_TEMP "bugnarrator-windows-signing.pfx"
+          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String($env:CERT_BASE64))
+          "BUGNARRATOR_CERT_PATH=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build signed tester package
+        shell: pwsh
+        env:
+          BUGNARRATOR_CERT_PASSWORD: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:BUGNARRATOR_CERT_PASSWORD) {
+            throw "Repository secret BUGNARRATOR_WINDOWS_CERT_PASSWORD is required for a real signed Windows tester release."
+          }
+          powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 `
+            -Runtime "${{ inputs.runtime }}"
+
+      - name: Upload signed package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugnarrator-windows-signed-tester-release
+          path: |
+            windows/artifacts/packages/BugNarrator-windows-${{ inputs.runtime }}.zip
+            windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-signature.json
+            windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-validation.json
+            windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-release-notes.md
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $args = @(
+            "release", "create", "${{ inputs.tag }}",
+            "windows/artifacts/packages/BugNarrator-windows-${{ inputs.runtime }}.zip",
+            "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-signature.json",
+            "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-validation.json",
+            "--title", "BugNarrator Windows tester ${{ inputs.tag }}",
+            "--notes-file", "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-release-notes.md"
+          )
+          if ("${{ inputs.draft }}" -eq "true") {
+            $args += "--draft"
+          }
+          if ("${{ inputs.prerelease }}" -eq "true") {
+            $args += "--prerelease"
+          }
+          gh @args
+
+      - name: Remove decoded signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:BUGNARRATOR_CERT_PATH -and (Test-Path $env:BUGNARRATOR_CERT_PATH)) {
+            Remove-Item $env:BUGNARRATOR_CERT_PATH -Force
+          }

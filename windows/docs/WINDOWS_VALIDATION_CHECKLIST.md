@@ -198,9 +198,12 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Probe silent output, Bluetooth/headset output, device changes, and unavailable loopback devices.
 
 ## WIN-009: Signed Tester Release
-- Produce the release package.
-- Sign the executable and distributable artifact with a certificate stored outside the repo.
-- Verify signatures and timestamps.
+- Produce the signed tester release package with `powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 -Runtime win-x64`.
+- Confirm the release package is `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`.
+- Confirm the executable inside the publish output is signed with a certificate stored outside the repo.
+- Confirm `windows/artifacts/validation/BugNarrator-windows-win-x64-signature.json` reports Authenticode `Valid` status and includes the signer thumbprint.
+- Confirm `windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json` exists and the packaged-file hashes match the signed publish output.
+- Confirm `windows/artifacts/validation/BugNarrator-windows-win-x64-release-notes.md` includes the artifact path, SHA-256, signature evidence path, and validation evidence path.
 - Validate the signed artifact on a clean Windows machine.
 - Record the artifact path, certificate identity, validation machine, and release notes location.
 

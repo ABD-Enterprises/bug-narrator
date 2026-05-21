@@ -47,6 +47,7 @@ Scripted equivalents:
 powershell -ExecutionPolicy Bypass -File windows/scripts/build-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/test-windows.ps1 -Configuration Debug
 powershell -ExecutionPolicy Bypass -File windows/scripts/package-windows.ps1 -Configuration Release
+powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 -Runtime win-x64
 powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-package.ps1 -Runtime win-x64
 powershell -ExecutionPolicy Bypass -File windows/scripts/validate-windows-single-instance.ps1 -Runtime win-x64
 ```
@@ -64,6 +65,7 @@ Current Windows milestone status:
 - Windows audio-source parity now includes microphone recording and WASAPI loopback system-audio recording; microphone plus system audio is visible as an explicit tracked limitation until mixed-source muxing is implemented
 - automated coverage currently includes `9` core tests and `47` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped self-contained `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
+- `windows/scripts/release-windows-tester.ps1` produces the first tester release format: a zip containing a signed `BugNarrator.Windows.exe`, plus signature, package-validation, and release-note evidence under `windows/artifacts/validation/`
 - `windows/scripts/validate-windows-package.ps1` validates that the published Windows zip contains the expected executable, DLL, and runtime metadata, checks packaged-file hash parity against the publish output, then writes a structured package smoke report for CI/release evidence
 - CI now uploads `bugnarrator-windows-package` and `bugnarrator-windows-validation` artifacts from the Windows runner
 - manual validation is still required for live AI provider transcription, live issue extraction, system-audio capture on representative output devices, overlay/display behavior, DPI scaling, multi-monitor screenshot preview behavior, hotkey behavior under reserved shortcuts and alternate keyboard layouts, session deletion on a real desktop, corrupted-local-state recovery, and real GitHub/Jira credentials on a Windows desktop
@@ -71,4 +73,4 @@ Current Windows milestone status:
 Current follow-up parity tickets:
 
 - `RR-002` / #44 remains the real Windows desktop validation gate.
-- `WIN-009` / #75 tracks the signed Windows tester release path.
+- `WIN-009` / #75 now has the repository-side signed tester release path; the remaining external dependency is a real Windows code-signing certificate configured outside the repo.
