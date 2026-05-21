@@ -139,6 +139,9 @@ final class SupportDataControllerTests: XCTestCase {
             )
         )
         presenter.presentLocalDataDeletion(LocalDataDeletionOutcome(deletedSessionCount: 2))
+        presenter.presentLocalDataDeletion(
+            LocalDataDeletionResult.blocked(message: "Stop recording or transcription before deleting local data.")
+        )
 
         XCTAssertEqual(
             statuses,
@@ -146,7 +149,8 @@ final class SupportDataControllerTests: XCTestCase {
                 .success("Debug info copied to the clipboard."),
                 .success("Debug bundle exported."),
                 .success("Data export created. API keys and tracker credentials were not included."),
-                .success("Deleted 2 local sessions and cleared local diagnostics.")
+                .success("Deleted 2 local sessions and cleared local diagnostics."),
+                .error("Stop recording or transcription before deleting local data.")
             ]
         )
         XCTAssertEqual(revealedURLs, [debugBundleURL, privacyBundleURL])
