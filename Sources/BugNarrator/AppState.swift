@@ -31,6 +31,7 @@ final class AppState: ObservableObject {
     let issueExportController: IssueExportController
     let issueExportPresentationController: IssueExportPresentationController
     let permissionRecoveryController: PermissionRecoveryController
+    let permissionRecoveryStatusPresenter: PermissionRecoveryStatusPresenter
     let appUtilityActions: AppUtilityActionController
     let appUtilityActionPresenter: AppUtilityActionResultPresenter
     let applicationTerminationController: ApplicationTerminationController
@@ -306,6 +307,9 @@ final class AppState: ObservableObject {
             runtimeEnvironment: runtimeEnvironment
         )
         self.permissionRecoveryController = permissionRecoveryController
+        self.permissionRecoveryStatusPresenter = PermissionRecoveryStatusPresenter(
+            errorPresenter: self.errorPresenter
+        )
         self.launchDiagnosticsReporter = AppLaunchDiagnosticsReporter(
             permissionRecoveryController: permissionRecoveryController,
             transcriptStore: transcriptStore
@@ -604,15 +608,12 @@ final class AppState: ObservableObject {
     }
 
     func refreshPermissionRecoveryState() {
-        switch permissionRecoveryController.refreshRecoveryState(
-            currentError: currentError,
-            statusPhase: status.phase
-        ) {
-        case .unchanged:
-            break
-        case .recovered(let recoveredStatus):
-            setStatus(recoveredStatus)
-        }
+        permissionRecoveryStatusPresenter.present(
+            permissionRecoveryController.refreshRecoveryState(
+                currentError: currentError,
+                statusPhase: status.phase
+            )
+        )
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
