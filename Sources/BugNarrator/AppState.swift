@@ -21,6 +21,7 @@ final class AppState: ObservableObject {
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
     let supportDataController: SupportDataController
+    let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
@@ -278,6 +279,12 @@ final class AppState: ObservableObject {
             privacyDataExporter: privacyDataExporter,
             telemetryRecorder: telemetryRecorder,
             localPrivacyDataManager: localPrivacyDataManager
+        )
+        self.localDataDeletionController = LocalDataDeletionController(
+            transcriptStore: transcriptStore,
+            sessionLibrary: self.sessionLibrary,
+            supportDataController: self.supportDataController,
+            exportHistoryController: self.exportHistoryController
         )
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: self.sessionLibrary,
@@ -866,26 +873,12 @@ final class AppState: ObservableObject {
             return
         }
 
-        let idsToDelete = Set(transcriptStore.allStoredSessionIDs())
-            .union(currentTranscript.map { [$0.id] } ?? [])
-        let deletedSessionCount = idsToDelete.count
-
-        if !idsToDelete.isEmpty {
-            deleteSessions(withIDs: idsToDelete)
+        do {
+            let outcome = try await localDataDeletionController.deleteAllLocalData(currentTranscript: currentTranscript)
+            setStatus(.success(outcome.statusMessage))
+        } catch {
+            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
-
-        await clearLocalPrivacyArtifacts()
-
-        let message: String
-        if deletedSessionCount == 0 {
-            message = "Cleared local diagnostics and export history."
-        } else if deletedSessionCount == 1 {
-            message = "Deleted 1 local session and cleared local diagnostics."
-        } else {
-            message = "Deleted \(deletedSessionCount) local sessions and cleared local diagnostics."
-        }
-
-        setStatus(.success(message))
     }
 
     func validateAPIKey() async {
@@ -1872,11 +1865,6 @@ final class AppState: ObservableObject {
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
         sessionLibrary.sessionSnapshot(with: sessionID)
-    }
-
-    private func clearLocalPrivacyArtifacts() async {
-        await supportDataController.clearLocalPrivacyArtifacts()
-        await refreshExportHistory()
     }
 
     private func cancelPendingScreenshotSelection(reason: String) {
