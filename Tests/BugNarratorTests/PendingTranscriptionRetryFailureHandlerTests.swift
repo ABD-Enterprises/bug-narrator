@@ -46,11 +46,14 @@ final class PendingTranscriptionRetryFailureHandlerTests: XCTestCase {
         let context = try harness.makeRetryContext()
 
         XCTAssertTrue(harness.transcriptionRecovery.beginRetry(for: context.session.id))
+        harness.recordingSessionController.beginActivity(reason: "Retrying transcription from preserved audio")
+        XCTAssertTrue(harness.recordingSessionController.hasActiveProcessActivity)
 
         harness.handler.handle(AppError.transcriptionFailure("Network unavailable."), context: context)
 
         let storedSession = try XCTUnwrap(harness.transcriptStore.session(with: context.session.id))
         XCTAssertNil(harness.transcriptionRecovery.retryingSessionID)
+        XCTAssertFalse(harness.recordingSessionController.hasActiveProcessActivity)
         XCTAssertEqual(storedSession.pendingTranscription?.failureReason, .missingAPIKey)
         XCTAssertEqual(storedSession.pendingTranscription?.attemptCount, 0)
         XCTAssertEqual(harness.presentationState.status.phase, .error)
