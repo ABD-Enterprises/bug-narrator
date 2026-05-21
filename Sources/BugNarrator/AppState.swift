@@ -16,6 +16,7 @@ final class AppState: ObservableObject {
     let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
+    let recordingSessionStartStatusPresenter: RecordingSessionStartStatusPresenter
     let recordingSessionStopReadinessPresenter: RecordingSessionStopReadinessPresenter
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
@@ -65,7 +66,6 @@ final class AppState: ObservableObject {
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
-    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
     var status: AppStatus {
@@ -255,6 +255,18 @@ final class AppState: ObservableObject {
             )
         }
         self.recordingStatusMessages = recordingStatusMessages
+        self.recordingSessionStartStatusPresenter = RecordingSessionStartStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            recordingStatusMessages: recordingStatusMessages,
+            startDiagnosticsMetadata: {
+                [
+                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
+                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                    "ai_provider": settingsStore.aiProvider.rawValue
+                ]
+            },
+            telemetryRecorder: telemetryRecorder
+        )
         let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
             artifactsService: artifactsService,
@@ -614,54 +626,7 @@ final class AppState: ObservableObject {
             statusPhase: status.phase,
             activityReason: recordingStatusMessages.recordingActivityReason()
         )
-
-        switch outcome {
-        case .transitionInProgress:
-            recordingLogger.debug(.sessionStartIgnored, "The start request was ignored because another recording transition is already in progress.")
-            return
-
-        case .busy:
-            recordingLogger.warning(.sessionStartRejected, "The start request was rejected because BugNarrator is already busy.")
-            return
-
-        case .restored(let recordingSession):
-            recordingLogger.warning(
-                "session_start_reconciled_active_session",
-                "A start request arrived while a recording session draft was still active; restoring recording state instead of starting a duplicate recorder.",
-                metadata: ["session_id": recordingSession.sessionID.uuidString]
-            )
-            setStatus(.recording(recordingStatusMessages.recordingDetailMessage()))
-            return
-
-        case .preflightFailure(let preflightError):
-            permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
-            presentError(preflightError, operation: .recordingStart)
-            return
-
-        case .failure(let error):
-            presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
-
-        case .started(let recordingSession):
-            setStatus(.recording(recordingStatusMessages.recordingDetailMessage()))
-            recordingLogger.info(
-                .sessionStarted,
-                "A feedback session started successfully.",
-                metadata: [
-                    "session_id": recordingSession.sessionID.uuidString,
-                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                    "ai_provider": settingsStore.aiProvider.rawValue
-                ]
-            )
-            telemetryRecorder.record(
-                .recordingStarted,
-                metadata: [
-                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                    "ai_provider": settingsStore.aiProvider.rawValue
-                ]
-            )
-        }
+        recordingSessionStartStatusPresenter.present(outcome)
     }
 
     func stopSession() async {
