@@ -51,6 +51,7 @@ final class AppState: ObservableObject {
     private let hotkeyManager: any HotkeyManaging
     private let hotkeySettingsBinder: HotkeySettingsBinder
     private let objectChangeForwarder: ObservableObjectChangeForwarder
+    private let lifecycleNotificationBinder: AppLifecycleNotificationBinder
     private let artifactsService: any SessionArtifactsManaging
     private let telemetryRecorder: any OperationalTelemetryRecording
 
@@ -59,8 +60,6 @@ final class AppState: ObservableObject {
     private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
-
-    private var cancellables = Set<AnyCancellable>()
 
     private enum PostTranscriptionPipelineMode: Equatable {
         case finishedRecording
@@ -357,6 +356,7 @@ final class AppState: ObservableObject {
         self.hotkeyManager = hotkeyManager
         self.hotkeySettingsBinder = HotkeySettingsBinder(hotkeyManager: hotkeyManager)
         self.objectChangeForwarder = ObservableObjectChangeForwarder()
+        self.lifecycleNotificationBinder = AppLifecycleNotificationBinder()
         self.artifactsService = artifactsService
         self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
@@ -430,17 +430,14 @@ final class AppState: ObservableObject {
             }
         )
 
-        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-            .sink { [weak self] _ in
+        lifecycleNotificationBinder.bind(
+            didBecomeActive: { [weak self] in
                 self?.refreshPermissionRecoveryState()
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in
+            },
+            willTerminate: { [weak self] in
                 self?.prepareForApplicationTermination()
             }
-            .store(in: &cancellables)
+        )
 
         hotkeySettingsBinder.bind(settingsStore: settingsStore)
 
