@@ -139,6 +139,63 @@ final class SessionLibraryControllerTests: XCTestCase {
         )
     }
 
+    func testSessionLibraryStatusPresenterSetsSavedTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentSavedSession(makeSession(index: 1))
+
+        XCTAssertEqual(harness.presentationState.status, .success("Transcript saved to session history."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForNoSavedTranscript() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentSavedSession(nil)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterSetsDeletionStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDeletedCount(3)
+
+        XCTAssertEqual(harness.presentationState.status, .success("Deleted 3 sessions."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForNoDeletedSessions() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentDeletedCount(0)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterNormalizesFailures() {
+        let harness = makeSessionLibraryStatusPresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Disk full"]
+        )
+        let expectedError = AppError.storageFailure("Disk full")
+
+        harness.presenter.presentFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+    }
+
     func testPersistCompletedTranscriptCopiesWhenRequested() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }
@@ -225,6 +282,29 @@ final class SessionLibraryControllerTests: XCTestCase {
 
         XCTAssertEqual(result, .copied)
         XCTAssertEqual(harness.clipboardService.copiedStrings, ["Displayed transcript"])
+    }
+
+    private func makeSessionLibraryStatusPresenter(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: SessionLibraryStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = SessionLibraryStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
     }
 
     private func makeSession(
