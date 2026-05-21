@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
     let recordingStatusMessages: RecordingStatusMessageProvider
     let postTranscriptionStatusPresenter: PostTranscriptionStatusPresenter
     let postTranscriptionPipeline: PostTranscriptionPipelineController
+    let finishedRecordingPostTranscriptionResultHandler: FinishedRecordingPostTranscriptionResultHandler
     let sessionLibrary: SessionLibraryController
     let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
@@ -359,6 +360,17 @@ final class AppState: ObservableObject {
         self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.finishedRecordingPostTranscriptionResultHandler = FinishedRecordingPostTranscriptionResultHandler(
+            sessionLibrary: sessionLibrary,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            transcriptPersistenceFailurePresenter: self.transcriptPersistenceFailurePresenter,
+            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
+            autoCopyTranscript: { settingsStore.autoCopyTranscript },
+            cleanupPendingRecordedAudio: {
+                recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
+            }
         )
         self.recoveredRecordingLaunchImporter = RecoveredRecordingLaunchImportPresenter(
             importController: recoveredRecordingImportController,
@@ -720,7 +732,7 @@ final class AppState: ObservableObject {
                 apiKey: apiKey,
                 mode: .finishedRecording
             )
-            handleFinishedRecordingPostTranscriptionResult(result)
+            finishedRecordingPostTranscriptionResultHandler.handle(result)
         } catch {
             handleStopSessionFailure(error, recordingSession: recordingSession, request: request)
         }
@@ -1195,38 +1207,6 @@ final class AppState: ObservableObject {
 
         recordingSessionController.endActivity()
         postTranscriptionStatusPresenter.presentSuccess()
-    }
-
-    private func handleCompletedTranscriptPersistenceFailure(
-        _ error: Error,
-        session: TranscriptSession
-    ) {
-        sessionLibrary.stageCurrentTranscript(
-            session,
-            autoCopyTranscript: settingsStore.autoCopyTranscript
-        )
-        recordingSessionController.clearActiveRecordingSession()
-
-        cleanupPendingRecordedAudioIfNeeded()
-        recordingSessionController.endActivity()
-
-        transcriptPersistenceFailurePresenter.present(error, sessionID: session.id)
-    }
-
-    private func handleFinishedRecordingPostTranscriptionResult(
-        _ result: PostTranscriptionPipelineResult
-    ) {
-        switch result {
-        case .success:
-            cleanupPendingRecordedAudioIfNeeded()
-            finishSuccessfulTranscription(showTranscriptWindow: false)
-        case .persistenceFailure(let session, let error):
-            handleCompletedTranscriptPersistenceFailure(error, session: session)
-        case .postTranscriptionFailure(let error):
-            cleanupPendingRecordedAudioIfNeeded()
-            recordingSessionController.endActivity()
-            postTranscriptionFailurePresenter.present(error, operation: .postTranscription)
-        }
     }
 
     private func handleStopSessionFailure(
