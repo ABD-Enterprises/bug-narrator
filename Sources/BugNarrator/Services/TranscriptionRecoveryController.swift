@@ -49,6 +49,67 @@ final class RetryTranscriptionStatusPresenter {
 }
 
 @MainActor
+final class RetryableSessionPreservationPresenter {
+    private let errorPresenter: AppErrorPresenter
+    private let showTranscriptWindow: () -> Void
+    private let showSettingsWindow: () -> Void
+    private let sessionLibraryLogger: DiagnosticsLogger
+
+    init(
+        errorPresenter: AppErrorPresenter,
+        showTranscriptWindow: @escaping () -> Void,
+        showSettingsWindow: @escaping () -> Void,
+        sessionLibraryLogger: DiagnosticsLogger = DiagnosticsLogger(category: .sessionLibrary)
+    ) {
+        self.errorPresenter = errorPresenter
+        self.showTranscriptWindow = showTranscriptWindow
+        self.showSettingsWindow = showSettingsWindow
+        self.sessionLibraryLogger = sessionLibraryLogger
+    }
+
+    func presentPreservedSession(_ retryableSession: TranscriptSession, appError: AppError) {
+        errorPresenter.logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
+        errorPresenter.setStatus(
+            .error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage),
+            error: appError
+        )
+        showTranscriptWindow()
+        if appError.suggestsOpenAISettings {
+            showSettingsWindow()
+        }
+    }
+
+    func presentPersistenceFailure(
+        _ error: Error,
+        retryableSession: TranscriptSession,
+        recoveryAppError: AppError
+    ) {
+        let normalizedError = errorPresenter.normalizeError(
+            error,
+            operation: .sessionLibrary,
+            fallback: { .storageFailure($0) }
+        )
+        let persistenceError = normalizedError.appError
+        errorPresenter.logAppError(normalizedError, context: "retryable_session_persist_failed")
+        var metadata = errorPresenter.appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
+        metadata["session_id"] = retryableSession.id.uuidString
+        sessionLibraryLogger.error(
+            "retryable_session_persist_failed",
+            "The preserved recording could not be saved into local session history.",
+            metadata: metadata
+        )
+        errorPresenter.setStatus(
+            .error("Recording preserved, but \(persistenceError.userMessage)"),
+            error: persistenceError
+        )
+        showTranscriptWindow()
+        if recoveryAppError.suggestsOpenAISettings {
+            showSettingsWindow()
+        }
+    }
+}
+
+@MainActor
 final class TranscriptionRecoveryController: ObservableObject {
     @Published private(set) var retryingSessionID: UUID?
 

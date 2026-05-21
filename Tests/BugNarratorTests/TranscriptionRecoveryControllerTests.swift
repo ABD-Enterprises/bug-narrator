@@ -48,6 +48,83 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(statusMessage, session.transcriptionRecoveryMessage)
     }
 
+    func testPreservationPresenterPresentsPreservedSessionRecoveryStatus() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+        let session = try harness.addPendingSession(failureReason: .missingAPIKey)
+        let presentationState = AppPresentationState()
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        var showTranscriptCallCount = 0
+        var showSettingsCallCount = 0
+        let presenter = RetryableSessionPreservationPresenter(
+            errorPresenter: errorPresenter,
+            showTranscriptWindow: { showTranscriptCallCount += 1 },
+            showSettingsWindow: { showSettingsCallCount += 1 }
+        )
+
+        presenter.presentPreservedSession(session, appError: .missingAPIKey)
+
+        XCTAssertEqual(presentationState.status, .error(try XCTUnwrap(session.transcriptionRecoveryMessage)))
+        XCTAssertEqual(presentationState.currentError, .missingAPIKey)
+        XCTAssertEqual(showTranscriptCallCount, 1)
+        XCTAssertEqual(showSettingsCallCount, 1)
+
+        let telemetry = try XCTUnwrap(
+            telemetryRecorder.recordedEvents.last { $0.name == TelemetryEvent.appError.rawValue }
+        )
+        XCTAssertEqual(telemetry.metadata["context"], "preserve_retryable_session")
+        XCTAssertEqual(telemetry.metadata["operation"], "transcription")
+        XCTAssertEqual(telemetry.metadata["error_type"], "missing_api_key")
+    }
+
+    func testPreservationPresenterPresentsPersistenceFailureRecoveryStatus() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+        let session = try harness.addPendingSession(failureReason: .missingAPIKey)
+        let presentationState = AppPresentationState()
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        var showTranscriptCallCount = 0
+        var showSettingsCallCount = 0
+        let presenter = RetryableSessionPreservationPresenter(
+            errorPresenter: errorPresenter,
+            showTranscriptWindow: { showTranscriptCallCount += 1 },
+            showSettingsWindow: { showSettingsCallCount += 1 }
+        )
+        let underlyingError = NSError(
+            domain: "TranscriptionRecoveryControllerTests",
+            code: 17,
+            userInfo: [NSLocalizedDescriptionKey: "Index path is a directory"]
+        )
+
+        presenter.presentPersistenceFailure(
+            underlyingError,
+            retryableSession: session,
+            recoveryAppError: .missingAPIKey
+        )
+
+        let appError = AppError.storageFailure("Index path is a directory")
+        XCTAssertEqual(presentationState.status, .error("Recording preserved, but \(appError.userMessage)"))
+        XCTAssertEqual(presentationState.currentError, appError)
+        XCTAssertEqual(showTranscriptCallCount, 1)
+        XCTAssertEqual(showSettingsCallCount, 1)
+
+        let telemetry = try XCTUnwrap(
+            telemetryRecorder.recordedEvents.last { $0.name == TelemetryEvent.appError.rawValue }
+        )
+        XCTAssertEqual(telemetry.metadata["context"], "retryable_session_persist_failed")
+        XCTAssertEqual(telemetry.metadata["operation"], "session_library")
+        XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "Index path is a directory")
+    }
+
     func testPreserveRetryableSessionCopiesAudioAndStoresPendingSession() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }
