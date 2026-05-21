@@ -50,6 +50,8 @@
 		119A00000000000000000002 /* LocalDataDeletionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */; };
 		121A00000000000000000001 /* AppUtilityActionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000003 /* AppUtilityActionController.swift */; };
 		121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000004 /* AppUtilityActionControllerTests.swift */; };
+		125A00000000000000000001 /* ApplicationTerminationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000003 /* ApplicationTerminationController.swift */; };
+		125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -228,6 +230,8 @@
 		119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionControllerTests.swift; sourceTree = "<group>"; };
 		121A00000000000000000003 /* AppUtilityActionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionController.swift; sourceTree = "<group>"; };
 		121A00000000000000000004 /* AppUtilityActionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionControllerTests.swift; sourceTree = "<group>"; };
+		125A00000000000000000003 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
+		125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -350,6 +354,7 @@
 				117A00000000000000000004 /* AppErrorPresenterTests.swift */,
 				554387017B49D9CD63967BE3 /* AppStateTests.swift */,
 				121A00000000000000000004 /* AppUtilityActionControllerTests.swift */,
+				125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */,
 				F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */,
 				40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */,
 				113A00000000000000000004 /* ExportHistoryControllerTests.swift */,
@@ -471,6 +476,7 @@
 				99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */,
 				117A00000000000000000003 /* AppErrorPresenter.swift */,
 				121A00000000000000000003 /* AppUtilityActionController.swift */,
+				125A00000000000000000003 /* ApplicationTerminationController.swift */,
 				C9AC8EFE20212B7DE69792FB /* AudioRecorder.swift */,
 				8A59E3782D54041B521412C9 /* AudioUploadPolicy.swift */,
 				A663ED1B160E290FCFAC3AED /* ClipboardService.swift */,
@@ -698,6 +704,7 @@
 				117A00000000000000000002 /* AppErrorPresenterTests.swift in Sources */,
 				334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */,
 				121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */,
+				125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */,
 				5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */,
 				FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */,
 				113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */,
@@ -767,6 +774,7 @@
 				9F837FB17474EEB037FC01B4 /* AppState.swift in Sources */,
 				C4388FB859242F0C2B148293 /* AppStatus.swift in Sources */,
 				121A00000000000000000001 /* AppUtilityActionController.swift in Sources */,
+				125A00000000000000000001 /* ApplicationTerminationController.swift in Sources */,
 				EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */,
 				3FA2E58DF45C2A9FEBF9FE0B /* AtomicBundleDirectoryWriter.swift in Sources */,
 				456F9629727CC070CD248B56 /* AudioRecorder.swift in Sources */,
