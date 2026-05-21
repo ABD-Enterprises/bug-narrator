@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
     let appUtilityActions: AppUtilityActionController
+    let appUtilityActionPresenter: AppUtilityActionResultPresenter
     let applicationTerminationController: ApplicationTerminationController
     let supportDataController: SupportDataController
     let localDataDeletionController: LocalDataDeletionController
@@ -300,6 +301,13 @@ final class AppState: ObservableObject {
             permissionRecoveryController: permissionRecoveryController
         )
         self.appUtilityActions = appUtilityActions
+        let appUtilityActionPresenter = AppUtilityActionResultPresenter(
+            statusPhase: { presentationState.status.phase },
+            setStatus: { status in
+                presentationState.setStatus(status, error: nil)
+            }
+        )
+        self.appUtilityActionPresenter = appUtilityActionPresenter
         self.supportDataController = SupportDataController(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
@@ -810,15 +818,15 @@ final class AppState: ObservableObject {
     }
 
     func openGitHubRepository() {
-        presentUtilityActionResult(appUtilityActions.openGitHubRepository())
+        appUtilityActionPresenter.present(appUtilityActions.openGitHubRepository())
     }
 
     func openDocumentation() {
-        presentUtilityActionResult(appUtilityActions.openDocumentation())
+        appUtilityActionPresenter.present(appUtilityActions.openDocumentation())
     }
 
     func openIssueReporter() {
-        presentUtilityActionResult(appUtilityActions.openIssueReporter())
+        appUtilityActionPresenter.present(appUtilityActions.openIssueReporter())
     }
 
     func openSupportDevelopment() {
@@ -826,23 +834,23 @@ final class AppState: ObservableObject {
     }
 
     func openSupportDonationPage() {
-        presentUtilityActionResult(appUtilityActions.openSupportDonationPage())
+        appUtilityActionPresenter.present(appUtilityActions.openSupportDonationPage())
     }
 
     func openMicrophonePrivacySettings() {
-        presentPermissionSettingsResult(appUtilityActions.openMicrophonePrivacySettings())
+        appUtilityActionPresenter.present(appUtilityActions.openMicrophonePrivacySettings())
     }
 
     func openScreenRecordingPrivacySettings() {
-        presentPermissionSettingsResult(appUtilityActions.openScreenRecordingPrivacySettings())
+        appUtilityActionPresenter.present(appUtilityActions.openScreenRecordingPrivacySettings())
     }
 
     func openSystemAudioPrivacySettings() {
-        presentPermissionSettingsResult(appUtilityActions.openSystemAudioPrivacySettings())
+        appUtilityActionPresenter.present(appUtilityActions.openSystemAudioPrivacySettings())
     }
 
     func checkForUpdates() {
-        presentUtilityActionResult(appUtilityActions.checkForUpdates())
+        appUtilityActionPresenter.present(appUtilityActions.checkForUpdates())
     }
 
     func copyDebugInfo() {
@@ -1225,7 +1233,7 @@ final class AppState: ObservableObject {
 
     func openScreenshot(_ screenshot: SessionScreenshot) {
         guard FileManager.default.fileExists(atPath: screenshot.fileURL.path) else {
-            presentUtilityActionFailure("The selected screenshot file is no longer available on this Mac.")
+            appUtilityActionPresenter.presentFailure("The selected screenshot file is no longer available on this Mac.")
             return
         }
 
@@ -1249,35 +1257,6 @@ final class AppState: ObservableObject {
             Task {
                 await captureScreenshot()
             }
-        }
-    }
-
-    private func presentUtilityActionResult(_ result: AppUtilityActionResult) {
-        guard case .failed(let message) = result else {
-            return
-        }
-
-        presentUtilityActionFailure(message)
-    }
-
-    private func presentPermissionSettingsResult(_ result: PermissionSettingsOpenResult) {
-        switch result {
-        case .opened:
-            return
-        case .failed(let message):
-            presentUtilityActionFailure(message)
-        }
-    }
-
-    private func presentUtilityActionFailure(_ message: String) {
-        settingsLogger.warning("utility_action_failed", message)
-        switch status.phase {
-        case .recording:
-            setStatus(.recording("\(message) Recording is still active."))
-        case .transcribing:
-            setStatus(.transcribing("\(message) Background work is still in progress."))
-        case .idle, .success, .error:
-            setStatus(.error(message))
         }
     }
 
