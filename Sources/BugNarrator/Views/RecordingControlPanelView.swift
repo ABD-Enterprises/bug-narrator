@@ -163,7 +163,11 @@ struct RecordingControlPanelView: View {
 
     private var footerMessage: String {
         if appState.status.phase == .recording && appState.needsAPIKeySetup {
-            return "You can keep recording without an API key. Add it in Settings before stopping if you want transcription."
+            let provider = appState.settingsStore.aiProvider
+            if provider.requiresAPIKey {
+                return "You can keep recording without an API key. Add your \(provider.displayName) key in Settings before stopping if you want transcription."
+            }
+            return "You can keep recording without finishing \(provider.displayName) setup. Open Settings before stopping if you want transcription."
         }
 
         return "The controls stay open until you close them."
@@ -197,7 +201,10 @@ struct RecordingControlPanelView: View {
         case .success:
             return "Latest session ready."
         case .error:
-            return appState.currentError?.recoveryHeadline ?? "Action needed before you continue."
+            if let currentError = appState.currentError {
+                return currentError.recoveryHeadline(for: appState.settingsStore.aiProvider) ?? "Action needed before you continue."
+            }
+            return "Action needed before you continue."
         }
     }
 
@@ -234,7 +241,7 @@ struct RecordingControlPanelView: View {
         case .microphonePermissionDenied, .microphonePermissionRestricted, .screenRecordingPermissionDenied:
             return true
         case let error?:
-            return error.suggestsOpenAISettings
+            return error.suggestsProviderSettings(for: appState.settingsStore.aiProvider)
         case nil:
             return false
         }
@@ -255,7 +262,7 @@ struct RecordingControlPanelView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-        case let error? where error.suggestsOpenAISettings:
+        case let error? where error.suggestsProviderSettings(for: appState.settingsStore.aiProvider):
             Button("Open Settings") {
                 appState.openSettings()
             }
@@ -283,7 +290,7 @@ struct RecordingControlPanelView: View {
 
     private var statusBadgeTitle: String {
         if appState.status.phase == .error, let currentError = appState.currentError {
-            return currentError.statusTitle
+            return currentError.statusTitle(for: appState.settingsStore.aiProvider)
         }
 
         return appState.status.title

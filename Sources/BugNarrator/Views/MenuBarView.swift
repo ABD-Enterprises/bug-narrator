@@ -20,7 +20,7 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 14) {
             statusCard
             if appState.needsAPIKeySetup {
-                apiKeyRequirementCard
+                providerRequirementCard
             }
             controlsSection
 
@@ -183,8 +183,8 @@ struct MenuBarView: View {
             screenRecordingRecoverySection
         case .systemAudio:
             systemAudioRecoverySection
-        case .openAI:
-            openAIKeyRecoverySection
+        case .providerSettings:
+            providerSettingsRecoverySection
         case .exportConfiguration:
             exportConfigurationRecoverySection
         case .storage:
@@ -240,9 +240,13 @@ struct MenuBarView: View {
         }
     }
 
-    private var openAIKeyRecoverySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Open Settings to add or replace your own OpenAI API key. BugNarrator stores it in your macOS Keychain when available.")
+    private var providerSettingsRecoverySection: some View {
+        let provider = appState.settingsStore.aiProvider
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(provider.requiresAPIKey
+                ? "Open Settings to add or replace your \(provider.displayName) API key. BugNarrator stores it in your macOS Keychain when available."
+                : "Open Settings to confirm the \(provider.displayName) server and base URL. BugNarrator keeps this local provider setup on this Mac."
+            )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -289,12 +293,20 @@ struct MenuBarView: View {
         statusPresentation.preferredWidth
     }
 
-    private var apiKeyRequirementCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Bring Your Own OpenAI API Key", systemImage: "key.horizontal.fill")
+    private var providerRequirementCard: some View {
+        let provider = appState.settingsStore.aiProvider
+        return VStack(alignment: .leading, spacing: 10) {
+            Label(
+                provider.requiresAPIKey ? "Bring Your Own \(provider.displayName) API Key" : "\(provider.displayName) Setup Needed",
+                systemImage: provider.requiresAPIKey ? "key.horizontal.fill" : "server.rack"
+            )
                 .font(.subheadline.weight(.semibold))
 
-            Text("BugNarrator sends transcription requests to the OpenAI API. You can start recording without a key, but you need your own API key in Settings before transcription or issue extraction will work. OpenAI usage may incur charges on your account.")
+            Text(
+                provider.requiresAPIKey
+                    ? "BugNarrator sends transcription requests to \(provider.displayName). You can start recording without a key, but you need your own API key in Settings before transcription or issue extraction will work. Provider usage may incur charges on your account."
+                    : "BugNarrator is configured to use \(provider.displayName) for transcription. Recording can start now, but transcription and issue extraction will not work until the local server and base URL are reachable from this Mac."
+            )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -405,20 +417,24 @@ struct MenuBarView: View {
                     Text(pendingTranscriptionSummary)
                         .font(.footnote.weight(.semibold))
 
-                    Text("Restore or replace the OpenAI API key in Settings if needed, then reopen the saved session to retry transcription.")
+                    Text(
+                        appState.settingsStore.aiProvider.requiresAPIKey
+                            ? "Restore or replace the \(appState.settingsStore.aiProvider.displayName) API key in Settings if needed, then reopen the saved session to retry transcription."
+                            : "Confirm the \(appState.settingsStore.aiProvider.displayName) setup in Settings if needed, then reopen the saved session to retry transcription."
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: 10) {
-                        if appState.settingsStore.hasAPIKey {
-                            Button("Open Retry Needed Session") {
-                                openPendingTranscriptionSession()
+                        if appState.needsAPIKeySetup {
+                            Button("Open Settings") {
+                                appState.openSettings()
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         } else {
-                            Button("Open Settings") {
-                                appState.openSettings()
+                            Button("Open Retry Needed Session") {
+                                openPendingTranscriptionSession()
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -648,7 +664,7 @@ struct MenuBarView: View {
 
     private var statusBadgeTitle: String {
         if appState.status.phase == .error, let currentError = appState.currentError {
-            return currentError.statusTitle
+            return currentError.statusTitle(for: appState.settingsStore.aiProvider)
         }
 
         return appState.status.title

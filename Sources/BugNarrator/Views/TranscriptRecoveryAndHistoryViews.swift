@@ -2,7 +2,8 @@ import SwiftUI
 
 struct PendingTranscriptionBanner: View {
     let count: Int
-    let hasAPIKey: Bool
+    let requiresProviderSetup: Bool
+    let provider: AIProvider
     let hasRecoveredRecording: Bool
     let openLatest: () -> Void
     let openSettings: () -> Void
@@ -23,7 +24,7 @@ struct PendingTranscriptionBanner: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
 
-                if !hasAPIKey {
+                if requiresProviderSetup {
                     Button("Open Settings") {
                         openSettings()
                     }
@@ -50,7 +51,11 @@ struct PendingTranscriptionBanner: View {
             return "BugNarrator found audio from an unexpected quit and imported it into the session library. Open the latest recovered item to transcribe it."
         }
 
-        return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your OpenAI API key."
+        if provider.requiresAPIKey {
+            return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your \(provider.displayName) API key."
+        }
+
+        return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing the \(provider.displayName) setup."
     }
 }
 

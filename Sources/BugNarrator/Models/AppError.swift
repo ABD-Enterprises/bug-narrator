@@ -26,14 +26,25 @@ enum AppError: LocalizedError, Equatable {
     case storageFailure(String)
     case diagnosticsFailure(String)
 
-    var userMessage: String {
+    func userMessage(for provider: AIProvider) -> String {
+        let providerName = provider.displayName
+
         switch self {
         case .missingAPIKey:
-            return "BugNarrator requires your own OpenAI API key for transcription and issue extraction. Add it in Settings, then retry transcription."
+            if provider.requiresAPIKey {
+                return "BugNarrator requires your own \(providerName) API key for transcription and issue extraction. Add it in Settings, then retry transcription."
+            }
+            return "BugNarrator requires a working \(providerName) setup for transcription and issue extraction. Open Settings, confirm the server connection, then retry transcription."
         case .invalidAPIKey:
-            return "The OpenAI API key was rejected. Open Settings, replace it, and try again."
+            if provider.requiresAPIKey {
+                return "The \(providerName) API key was rejected. Open Settings, replace it, and try again."
+            }
+            return "BugNarrator could not validate the \(providerName) setup. Open Settings, check the server and base URL, and try again."
         case .revokedAPIKey:
-            return "The OpenAI API key is no longer valid. Open Settings, remove it, and add a new key."
+            if provider.requiresAPIKey {
+                return "The \(providerName) API key is no longer valid. Open Settings, remove it, and add a new key."
+            }
+            return "The saved \(providerName) setup is no longer valid. Open Settings, refresh the connection details, and try again."
         case .microphonePermissionDenied:
             return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again."
         case .microphonePermissionRestricted:
@@ -55,7 +66,7 @@ enum AppError: LocalizedError, Equatable {
         case .transcriptionFailure(let message):
             return "Transcription failed: \(message)"
         case .openAIRequestRejected(let message):
-            return "OpenAI rejected the request: \(message)"
+            return "\(providerName) rejected the request: \(message)"
         case .screenshotCaptureFailure(let message):
             return "Screenshot capture failed: \(message)"
         case .issueExtractionFailure(let message):
@@ -63,14 +74,14 @@ enum AppError: LocalizedError, Equatable {
         case .emptyTranscript:
             return "The transcription finished but returned empty text."
         case .networkTimeout:
-            return "The request to OpenAI timed out. Check your connection and try again."
+            return "The request to \(providerName) timed out. Check the connection and try again."
         case .networkFailure:
-            return "BugNarrator could not reach OpenAI. Check your internet connection and try again."
+            return "BugNarrator could not reach \(providerName). Check the connection and try again."
         case .rateLimited(let retryAfter):
             if let retryAfter {
-                return "OpenAI rate limit reached. Try again in \(Int(retryAfter)) seconds."
+                return "\(providerName) rate limit reached. Try again in \(Int(retryAfter)) seconds."
             }
-            return "OpenAI rate limit reached. Wait a moment and try again."
+            return "\(providerName) rate limit reached. Wait a moment and try again."
         case .exportConfigurationMissing(let message):
             return "Export setup is incomplete: \(message)"
         case .exportFailure(let message):
@@ -82,12 +93,16 @@ enum AppError: LocalizedError, Equatable {
         }
     }
 
-    var statusTitle: String {
+    var userMessage: String {
+        userMessage(for: .openAI)
+    }
+
+    func statusTitle(for provider: AIProvider) -> String {
         switch self {
         case .missingAPIKey:
-            return "OpenAI Key Needed"
+            return provider.requiresAPIKey ? "\(provider.statusTitle) Key Needed" : "\(provider.statusTitle) Setup Needed"
         case .invalidAPIKey, .revokedAPIKey:
-            return "OpenAI Key Rejected"
+            return provider.requiresAPIKey ? "\(provider.statusTitle) Key Rejected" : "\(provider.statusTitle) Setup Rejected"
         case .microphonePermissionDenied:
             return "Microphone Access Needed"
         case .microphonePermissionRestricted:
@@ -125,7 +140,11 @@ enum AppError: LocalizedError, Equatable {
         }
     }
 
-    var recoveryHeadline: String? {
+    var statusTitle: String {
+        statusTitle(for: .openAI)
+    }
+
+    func recoveryHeadline(for provider: AIProvider) -> String? {
         switch self {
         case .microphonePermissionDenied:
             return "Microphone access is blocked."
@@ -142,11 +161,15 @@ enum AppError: LocalizedError, Equatable {
         case .screenRecordingPermissionDenied:
             return "Screen recording access is blocked."
         case .missingAPIKey:
-            return "Add your OpenAI API key before continuing."
+            return provider.requiresAPIKey
+                ? "Add your \(provider.displayName) API key before continuing."
+                : "Finish the \(provider.displayName) setup before continuing."
         case .invalidAPIKey, .revokedAPIKey:
-            return "Replace your OpenAI API key before continuing."
+            return provider.requiresAPIKey
+                ? "Replace your \(provider.displayName) API key before continuing."
+                : "Repair the \(provider.displayName) setup before continuing."
         case .networkTimeout, .networkFailure, .rateLimited:
-            return "BugNarrator could not reach OpenAI."
+            return "BugNarrator could not reach \(provider.displayName)."
         case .exportConfigurationMissing:
             return "Finish export setup before continuing."
         case .storageFailure:
@@ -156,17 +179,25 @@ enum AppError: LocalizedError, Equatable {
         }
     }
 
+    var recoveryHeadline: String? {
+        recoveryHeadline(for: .openAI)
+    }
+
     var errorDescription: String? {
         userMessage
     }
 
-    var suggestsOpenAISettings: Bool {
+    func suggestsProviderSettings(for provider: AIProvider) -> Bool {
         switch self {
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
             return true
         default:
             return false
         }
+    }
+
+    var suggestsOpenAISettings: Bool {
+        suggestsProviderSettings(for: .openAI)
     }
 
     var suggestsMicrophoneSettings: Bool {

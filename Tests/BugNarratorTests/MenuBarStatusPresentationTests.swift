@@ -32,13 +32,13 @@ final class MenuBarStatusPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.preferredWidth, 420)
     }
 
-    func testOpenAIErrorUsesSettingsRecoveryAction() {
+    func testProviderSetupErrorUsesSettingsRecoveryAction() {
         let presentation = MenuBarStatusPresentation(
             status: .error(AppError.invalidAPIKey.userMessage),
             currentError: .invalidAPIKey
         )
 
-        XCTAssertEqual(presentation.recoveryAction, .openAI)
+        XCTAssertEqual(presentation.recoveryAction, .providerSettings)
         XCTAssertEqual(presentation.preferredWidth, 420)
     }
 

@@ -42,7 +42,7 @@ enum ReviewWorkspace {
                     timestamp: 0,
                     kind: .transcript,
                     title: "Transcription Pending",
-                    text: session.transcriptionRecoveryMessage ?? "Retry transcription after restoring your OpenAI API key.",
+                    text: session.transcriptionRecoveryMessage ?? "Retry transcription after restoring the provider setup.",
                     secondaryText: "The finished audio was preserved with this session.",
                     index: nil,
                     screenshotID: nil

@@ -432,7 +432,8 @@ final class AppState: ObservableObject {
     }
 
     var needsAPIKeySetup: Bool {
-        !settingsStore.hasUsableAIProviderCredential || settingsStore.aiProviderCompatibilityIssue != nil
+        settingsStore.aiProviderCompatibilityIssue != nil ||
+            (settingsStore.aiProvider.requiresAPIKey && !settingsStore.hasUsableAIProviderCredential)
     }
 
     var preferredRecordingWorkflowSummary: String {
@@ -735,7 +736,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
+            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Preparing audio for transcription...")))
             swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcribeAudio(
@@ -1088,6 +1089,7 @@ final class AppState: ObservableObject {
         switch transcriptionRecovery.retryContext(
             for: sessionID,
             isRecording: status.phase == .recording,
+            provider: settingsStore.aiProvider,
             hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
             aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue
         ) {
@@ -1745,6 +1747,10 @@ final class AppState: ObservableObject {
         presentationState.setStatus(newStatus, error: error)
     }
 
+    func providerAwareMessage(_ error: AppError) -> String {
+        error.userMessage(for: settingsStore.aiProvider)
+    }
+
     private func presentError(
         _ error: Error,
         operation: AppErrorOperation = .generic,
@@ -1759,7 +1765,7 @@ final class AppState: ObservableObject {
         let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
         let appError = normalizedError.appError
         logAppError(normalizedError, context: "present_error")
-        setStatus(.error(appError.userMessage), error: appError)
+        setStatus(.error(providerAwareMessage(appError)), error: appError)
 
         switch appError {
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey, .exportConfigurationMissing:
@@ -2129,7 +2135,11 @@ final class AppState: ObservableObject {
         _ error: Error,
         context: PendingTranscriptionRetryContext
     ) -> Bool {
-        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(error, context: context) else {
+        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(
+            error,
+            context: context,
+            provider: settingsStore.aiProvider
+        ) else {
             return false
         }
 
@@ -2160,9 +2170,12 @@ final class AppState: ObservableObject {
             cleanupPendingRecordedAudioIfNeeded()
             endActivity()
             logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
-            setStatus(.error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage), error: appError)
+            setStatus(
+                .error(retryableSession.transcriptionRecoveryMessage(for: settingsStore.aiProvider) ?? providerAwareMessage(appError)),
+                error: appError
+            )
             showTranscriptWindow?()
-            if appError.suggestsOpenAISettings {
+            if appError.suggestsProviderSettings(for: settingsStore.aiProvider) {
                 showSettingsWindow?()
             }
 
@@ -2190,7 +2203,7 @@ final class AppState: ObservableObject {
                 error: persistenceError
             )
             showTranscriptWindow?()
-            if failureReason.appError.suggestsOpenAISettings {
+            if failureReason.appError.suggestsProviderSettings(for: settingsStore.aiProvider) {
                 showSettingsWindow?()
             }
 
@@ -2644,16 +2657,16 @@ final class AppState: ObservableObject {
                 operation: .recoveredRecordingImport,
                 fallback: { .storageFailure($0) }
             )
-            let appError = normalizedError.appError
-            logAppError(normalizedError, context: "recovered_recording_import_failed")
-            sessionLibraryLogger.error(
-                "recovered_recording_import_failed",
-                appError.userMessage,
-                metadata: appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
-            )
-            setStatus(.error(appError.userMessage), error: appError)
-        }
+        let appError = normalizedError.appError
+        logAppError(normalizedError, context: "recovered_recording_import_failed")
+        sessionLibraryLogger.error(
+            "recovered_recording_import_failed",
+            providerAwareMessage(appError),
+            metadata: appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
+        )
+        setStatus(.error(providerAwareMessage(appError)), error: appError)
     }
+}
 
 }
 
