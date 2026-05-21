@@ -1,6 +1,8 @@
 import Foundation
 
 struct RecoveredRecordingImporter: RecoveredRecordingImporting {
+    private static let supportedAudioExtensions: Set<String> = ["m4a", "wav"]
+
     private let fileManager: FileManager
     private let recoveryDirectoryURL: URL
     private let qualityInspector: TranscriptQualityInspector
@@ -32,10 +34,10 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
         let audioFiles = try fileManager
             .contentsOfDirectory(
                 at: recoveryDirectoryURL,
-                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey],
                 options: [.skipsHiddenFiles]
             )
-            .filter { $0.pathExtension.lowercased() == "m4a" }
+            .filter(Self.isImportableAudioFile)
             .filter { !alreadyImported.contains($0.lastPathComponent) }
             .sorted {
                 modificationDate(for: $0) > modificationDate(for: $1)
@@ -126,6 +128,24 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
         }
 
         return nil
+    }
+
+    private static func isRecoverableAudioFile(_ url: URL) -> Bool {
+        supportedAudioExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func isImportableAudioFile(_ url: URL) -> Bool {
+        isRecoverableAudioFile(url) && isRegularFile(url) && fileSize(for: url) > 0
+    }
+
+    private static func isRegularFile(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+        return values?.isRegularFile == true
+    }
+
+    private static func fileSize(for url: URL) -> Int {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        return values?.fileSize ?? 0
     }
 
     private func modificationDate(for url: URL) -> Date {

@@ -2,6 +2,169 @@ import Combine
 import Foundation
 
 @MainActor
+final class RetryTranscriptionStatusPresenter {
+    private let errorPresenter: AppErrorPresenter
+    private let showSettingsWindow: () -> Void
+    private let showTranscriptWindow: () -> Void
+
+    init(
+        errorPresenter: AppErrorPresenter,
+        showSettingsWindow: @escaping () -> Void,
+        showTranscriptWindow: @escaping () -> Void
+    ) {
+        self.errorPresenter = errorPresenter
+        self.showSettingsWindow = showSettingsWindow
+        self.showTranscriptWindow = showTranscriptWindow
+    }
+
+    func presentRetryStarted(progressMessage: String) {
+        errorPresenter.setStatus(.transcribing(progressMessage))
+    }
+
+    func presentRetryContextFailure(
+        appError: AppError,
+        opensSettings: Bool,
+        statusMessage: String?
+    ) {
+        if let statusMessage {
+            errorPresenter.setStatus(.error(statusMessage), error: appError)
+        } else {
+            let result = errorPresenter.presentError(appError, operation: .retryTranscription)
+            if result.shouldOpenSettingsWindow {
+                showSettingsWindow()
+            }
+        }
+
+        if opensSettings {
+            showSettingsWindow()
+        }
+    }
+
+    func presentRetryableFailure(_ failure: PendingTranscriptionRetryFailure) {
+        errorPresenter.logAppError(
+            failure.appError,
+            context: "retry_pending_transcription",
+            operation: .retryTranscription
+        )
+        errorPresenter.setStatus(.error(failure.statusMessage), error: failure.appError)
+        showTranscriptWindow()
+        showSettingsWindow()
+    }
+
+    func presentFailure(_ error: Error) {
+        let result = errorPresenter.presentError(error, operation: .retryTranscription)
+        if result.shouldOpenSettingsWindow {
+            showSettingsWindow()
+        }
+    }
+}
+
+@MainActor
+final class PendingTranscriptionRetryFailureHandler {
+    private let transcriptionRecovery: TranscriptionRecoveryController
+    private let recordingSessionController: RecordingSessionController
+    private let retryStatusPresenter: RetryTranscriptionStatusPresenter
+    private let provider: () -> AIProvider
+
+    init(
+        transcriptionRecovery: TranscriptionRecoveryController,
+        recordingSessionController: RecordingSessionController,
+        retryStatusPresenter: RetryTranscriptionStatusPresenter,
+        provider: @escaping () -> AIProvider
+    ) {
+        self.transcriptionRecovery = transcriptionRecovery
+        self.recordingSessionController = recordingSessionController
+        self.retryStatusPresenter = retryStatusPresenter
+        self.provider = provider
+    }
+
+    func handle(_ error: Error, context: PendingTranscriptionRetryContext) {
+        recordingSessionController.endActivity()
+
+        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(
+            error,
+            context: context,
+            provider: provider()
+        ) else {
+            transcriptionRecovery.finishRetry()
+            retryStatusPresenter.presentFailure(error)
+            return
+        }
+
+        retryStatusPresenter.presentRetryableFailure(retryFailure)
+    }
+}
+
+@MainActor
+final class RetryableSessionPreservationPresenter {
+    private let errorPresenter: AppErrorPresenter
+    private let showTranscriptWindow: () -> Void
+    private let showSettingsWindow: () -> Void
+    private let provider: () -> AIProvider
+    private let sessionLibraryLogger: DiagnosticsLogger
+
+    init(
+        errorPresenter: AppErrorPresenter,
+        showTranscriptWindow: @escaping () -> Void,
+        showSettingsWindow: @escaping () -> Void,
+        provider: @escaping () -> AIProvider,
+        sessionLibraryLogger: DiagnosticsLogger = DiagnosticsLogger(category: .sessionLibrary)
+    ) {
+        self.errorPresenter = errorPresenter
+        self.showTranscriptWindow = showTranscriptWindow
+        self.showSettingsWindow = showSettingsWindow
+        self.provider = provider
+        self.sessionLibraryLogger = sessionLibraryLogger
+    }
+
+    func presentPreservedSession(_ retryableSession: TranscriptSession, appError: AppError) {
+        let currentProvider = provider()
+        errorPresenter.logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
+        errorPresenter.setStatus(
+            .error(
+                retryableSession.transcriptionRecoveryMessage(for: currentProvider)
+                    ?? appError.userMessage(for: currentProvider)
+            ),
+            error: appError
+        )
+        showTranscriptWindow()
+        if appError.suggestsProviderSettings(for: currentProvider) {
+            showSettingsWindow()
+        }
+    }
+
+    func presentPersistenceFailure(
+        _ error: Error,
+        retryableSession: TranscriptSession,
+        recoveryAppError: AppError
+    ) {
+        let currentProvider = provider()
+        let normalizedError = errorPresenter.normalizeError(
+            error,
+            operation: .sessionLibrary,
+            fallback: { .storageFailure($0) }
+        )
+        let persistenceError = normalizedError.appError
+        errorPresenter.logAppError(normalizedError, context: "retryable_session_persist_failed")
+        var metadata = errorPresenter.appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
+        metadata["session_id"] = retryableSession.id.uuidString
+        sessionLibraryLogger.error(
+            "retryable_session_persist_failed",
+            "The preserved recording could not be saved into local session history.",
+            metadata: metadata
+        )
+        errorPresenter.setStatus(
+            .error("Recording preserved, but \(persistenceError.userMessage(for: currentProvider))"),
+            error: persistenceError
+        )
+        showTranscriptWindow()
+        if recoveryAppError.suggestsProviderSettings(for: currentProvider) {
+            showSettingsWindow()
+        }
+    }
+}
+
+@MainActor
 final class TranscriptionRecoveryController: ObservableObject {
     @Published private(set) var retryingSessionID: UUID?
 
@@ -133,6 +296,7 @@ final class TranscriptionRecoveryController: ObservableObject {
             audioFileName: pendingTranscription.audioFileName,
             failureReason: failureReason,
             preservedAt: pendingTranscription.preservedAt,
+            recoveredSourceFileName: pendingTranscription.recoveredSourceFileName,
             attemptCount: pendingTranscription.attemptCount + 1
         )
 
@@ -168,7 +332,7 @@ final class TranscriptionRecoveryController: ObservableObject {
                 recordedAudio,
                 in: recordingSession.artifactsDirectoryURL
             )
-            let retryableSession = makeRetryableSession(
+            let retryableSession = TranscriptionSessionBuilder.retryableSession(
                 from: recordingSession,
                 recordedAudio: recordedAudio,
                 request: request,
@@ -224,22 +388,17 @@ final class TranscriptionRecoveryController: ObservableObject {
             sourceFileURL: recordedAudio.fileURL
         )
 
-        if fileManager.fileExists(atPath: preservedAudioURL.path) {
-            try fileManager.removeItem(at: preservedAudioURL)
+        let sourceAlreadyPreserved = recordedAudio.fileURL.standardizedFileURL == preservedAudioURL.standardizedFileURL
+
+        if !sourceAlreadyPreserved {
+            if fileManager.fileExists(atPath: preservedAudioURL.path) {
+                try fileManager.removeItem(at: preservedAudioURL)
+            }
+
+            try fileManager.copyItem(at: recordedAudio.fileURL, to: preservedAudioURL)
         }
 
-        if recordedAudio.fileURL.standardizedFileURL == preservedAudioURL.standardizedFileURL {
-            return preservedAudioURL
-        }
-
-        try fileManager.copyItem(at: recordedAudio.fileURL, to: preservedAudioURL)
-
-        let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
-        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard fileSize > 0 else {
-            throw AppError.recordingFailure("The preserved audio file was empty.")
-        }
-
+        try validatePreservedAudio(at: preservedAudioURL)
         recordingLogger.info(
             "recorded_audio_preserved_for_retry",
             "Preserved the finished recording for a later transcription retry.",
@@ -248,34 +407,14 @@ final class TranscriptionRecoveryController: ObservableObject {
         return preservedAudioURL
     }
 
-    private func makeRetryableSession(
-        from recordingSession: RecordingSessionDraft,
-        recordedAudio: RecordedAudio,
-        request: TranscriptionRequest,
-        failureReason: PendingTranscriptionFailureReason,
-        preservedAudioURL: URL
-    ) -> TranscriptSession {
-        TranscriptSession(
-            id: recordingSession.sessionID,
-            createdAt: Date(),
-            transcript: "",
-            duration: recordedAudio.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: recordingSession.markers,
-            screenshots: recordingSession.screenshots,
-            sections: [],
-            issueExtraction: nil,
-            pendingTranscription: PendingTranscription(
-                audioFileName: preservedAudioURL.lastPathComponent,
-                failureReason: failureReason,
-                preservedAt: Date()
-            ),
-            updatedAt: Date(),
-            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-        )
+    private func validatePreservedAudio(at preservedAudioURL: URL) throws {
+        let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
+        let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
+        guard fileSize > 0 else {
+            throw AppError.recordingFailure("The preserved audio file was empty.")
+        }
     }
+
 }
 
 struct PendingTranscriptionRetryContext {

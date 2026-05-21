@@ -1,6 +1,76 @@
 import Combine
 import Foundation
 
+enum DisplayedTranscriptCopyResult: Equatable {
+    case noDisplayedTranscript
+    case transcriptUnavailable
+    case copied
+}
+
+enum DisplayedTranscriptCopyStatusPresenter {
+    static func status(for result: DisplayedTranscriptCopyResult) -> AppStatus? {
+        switch result {
+        case .noDisplayedTranscript:
+            return nil
+        case .transcriptUnavailable:
+            return .error("Transcription is not available yet. Retry the preserved session first.")
+        case .copied:
+            return .success("Transcript copied to the clipboard.")
+        }
+    }
+}
+
+enum TranscriptSaveStatusPresenter {
+    static func status(savedSession: TranscriptSession?) -> AppStatus? {
+        guard savedSession != nil else {
+            return nil
+        }
+
+        return .success("Transcript saved to session history.")
+    }
+}
+
+enum SessionDeletionStatusPresenter {
+    static func status(deletedCount: Int) -> AppStatus? {
+        guard deletedCount > 0 else {
+            return nil
+        }
+
+        return .success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions.")
+    }
+}
+
+@MainActor
+final class SessionLibraryStatusPresenter {
+    private let errorPresenter: AppErrorPresenter
+
+    init(errorPresenter: AppErrorPresenter) {
+        self.errorPresenter = errorPresenter
+    }
+
+    func presentDisplayedTranscriptCopyResult(_ result: DisplayedTranscriptCopyResult) {
+        if let status = DisplayedTranscriptCopyStatusPresenter.status(for: result) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
+    func presentSavedSession(_ savedSession: TranscriptSession?) {
+        if let status = TranscriptSaveStatusPresenter.status(savedSession: savedSession) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
+    func presentDeletedCount(_ deletedCount: Int) {
+        if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
+    func presentFailure(_ error: Error) {
+        _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+    }
+}
+
 @MainActor
 final class SessionLibraryController: ObservableObject {
     @Published var currentTranscript: TranscriptSession?
@@ -74,9 +144,16 @@ final class SessionLibraryController: ObservableObject {
         currentTranscript = session
     }
 
-    func stageCurrentTranscript(_ session: TranscriptSession) {
+    func stageCurrentTranscript(
+        _ session: TranscriptSession,
+        autoCopyTranscript: Bool = false
+    ) {
         currentTranscript = session
         selectedTranscriptID = session.id
+
+        if autoCopyTranscript {
+            clipboardService.copy(session.transcript)
+        }
     }
 
     func selectLatestPendingTranscriptionSession() {
@@ -171,6 +248,19 @@ final class SessionLibraryController: ObservableObject {
         )
     }
 
+    func copyDisplayedTranscript() -> DisplayedTranscriptCopyResult {
+        guard let transcript = displayedTranscript else {
+            return .noDisplayedTranscript
+        }
+
+        guard transcript.hasTranscriptContent else {
+            return .transcriptUnavailable
+        }
+
+        clipboardService.copy(transcript.transcript)
+        return .copied
+    }
+
     func persistRetryableSession(_ session: TranscriptSession) throws {
         try transcriptStore.add(session)
         stageCurrentTranscript(session)
@@ -178,7 +268,8 @@ final class SessionLibraryController: ObservableObject {
 
     func persistUpdatedSession(
         _ session: TranscriptSession,
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        autoCopyTranscript: Bool = false
     ) throws {
         var session = session
         session.updatedAt = updatedAt
@@ -187,6 +278,10 @@ final class SessionLibraryController: ObservableObject {
 
         if transcriptStore.session(with: session.id) != nil {
             try transcriptStore.add(session)
+        }
+
+        if autoCopyTranscript {
+            clipboardService.copy(session.transcript)
         }
 
         selectedTranscriptID = session.id
