@@ -586,6 +586,13 @@ Deliverables:
 - validate the signed artifact on a clean Windows machine
 - publish release notes and validation evidence
 
+Current status:
+
+- the first tester artifact is a signed zip containing `BugNarrator.Windows.exe`
+- `windows/scripts/release-windows-tester.ps1` packages, signs, verifies Authenticode status, repacks, validates, and writes release evidence
+- `.github/workflows/windows-tester-release.yml` can publish the signed package and evidence to GitHub Releases when real signing secrets are configured
+- the remaining blocker is external certificate provisioning, not repository wiring
+
 Tracking:
 
 - GitHub issue #75
