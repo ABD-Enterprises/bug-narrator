@@ -16,6 +16,66 @@ struct PrivacyDataExportCompletion {
 }
 
 @MainActor
+final class SupportDataActionPresenter {
+    private let setStatus: (AppStatus) -> Void
+    private let revealInFinder: (URL) -> AppUtilityActionResult
+    private let presentUtilityActionResult: (AppUtilityActionResult) -> Void
+
+    init(
+        setStatus: @escaping (AppStatus) -> Void,
+        revealInFinder: @escaping (URL) -> AppUtilityActionResult,
+        presentUtilityActionResult: @escaping (AppUtilityActionResult) -> Void
+    ) {
+        self.setStatus = setStatus
+        self.revealInFinder = revealInFinder
+        self.presentUtilityActionResult = presentUtilityActionResult
+    }
+
+    convenience init(
+        presentationState: AppPresentationState,
+        utilityActions: AppUtilityActionController,
+        utilityResultPresenter: AppUtilityActionResultPresenter
+    ) {
+        self.init(
+            setStatus: { status in
+                presentationState.setStatus(status, error: nil)
+            },
+            revealInFinder: { url in
+                utilityActions.revealInFinder(url)
+            },
+            presentUtilityActionResult: { result in
+                utilityResultPresenter.present(result)
+            }
+        )
+    }
+
+    func presentCopyDebugInfo(_ result: DebugInfoCopyResult) {
+        presentSuccess(result.statusMessage)
+    }
+
+    func presentDebugBundleExport(_ completion: DebugBundleExportCompletion) {
+        presentExportedBundle(at: completion.bundleURL, statusMessage: completion.statusMessage)
+    }
+
+    func presentPrivacyDataExport(_ completion: PrivacyDataExportCompletion) {
+        presentExportedBundle(at: completion.bundleURL, statusMessage: completion.statusMessage)
+    }
+
+    func presentLocalDataDeletion(_ outcome: LocalDataDeletionOutcome) {
+        presentSuccess(outcome.statusMessage)
+    }
+
+    private func presentExportedBundle(at bundleURL: URL, statusMessage: String) {
+        presentUtilityActionResult(revealInFinder(bundleURL))
+        presentSuccess(statusMessage)
+    }
+
+    private func presentSuccess(_ message: String) {
+        setStatus(.success(message))
+    }
+}
+
+@MainActor
 final class SupportDataController {
     private let settingsStore: SettingsStore
     private let transcriptStore: TranscriptStore
