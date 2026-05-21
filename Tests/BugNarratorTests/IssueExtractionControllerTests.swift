@@ -14,6 +14,66 @@ final class IssueExtractionControllerTests: XCTestCase {
         )
     }
 
+    func testManualIssueExtractionPresenterSetsProgressStatus() {
+        let harness = makeManualIssueExtractionPresenter()
+
+        harness.presenter.presentRequestStarted(sessionID: UUID())
+
+        XCTAssertEqual(harness.presentationState.status, IssueExtractionStatusPresenter.manualProgressStatus)
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertEqual(harness.transcriptWindowOpenCount(), 0)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 0)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testManualIssueExtractionPresenterSetsCompletionStatusAndShowsTranscriptWindow() {
+        let harness = makeManualIssueExtractionPresenter(status: .transcribing("Running extraction."))
+
+        harness.presenter.presentCompletion(issueCount: 2)
+
+        XCTAssertEqual(
+            harness.presentationState.status,
+            IssueExtractionStatusPresenter.manualCompletionStatus(issueCount: 2)
+        )
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertEqual(harness.transcriptWindowOpenCount(), 1)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 0)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testManualIssueExtractionPresenterPresentsPreflightFailure() {
+        let harness = makeManualIssueExtractionPresenter()
+        let expectedError = AppError.missingAPIKey
+
+        harness.presenter.presentPreflightFailure(expectedError, sessionID: UUID())
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.transcriptWindowOpenCount(), 0)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 1)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "post_transcription")
+    }
+
+    func testManualIssueExtractionPresenterNormalizesExtractionFailure() {
+        let harness = makeManualIssueExtractionPresenter(status: .transcribing("Running extraction."))
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Extraction timed out"]
+        )
+        let expectedError = AppError.issueExtractionFailure("Extraction timed out")
+
+        harness.presenter.presentFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.transcriptWindowOpenCount(), 0)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 0)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "post_transcription")
+    }
+
     func testPreflightMapsCredentialTranscriptAndRecordingFailures() throws {
         let harness = try IssueExtractionControllerHarness()
         defer { harness.cleanup() }
@@ -137,6 +197,41 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(
             harness.transcriptStore.session(with: session.id)?.issueExtraction?.issues.map(\.isSelectedForExport),
             [false, false]
+        )
+    }
+
+    private func makeManualIssueExtractionPresenter(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: ManualIssueExtractionStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder,
+        transcriptWindowOpenCount: () -> Int,
+        settingsWindowOpenCount: () -> Int
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        var transcriptWindowOpenCount = 0
+        var settingsWindowOpenCount = 0
+        let presenter = ManualIssueExtractionStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            ),
+            showTranscriptWindow: {
+                transcriptWindowOpenCount += 1
+            },
+            showSettingsWindow: {
+                settingsWindowOpenCount += 1
+            }
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder,
+            transcriptWindowOpenCount: { transcriptWindowOpenCount },
+            settingsWindowOpenCount: { settingsWindowOpenCount }
         )
     }
 }

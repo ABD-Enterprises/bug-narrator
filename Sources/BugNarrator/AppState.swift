@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
     let recoveredRecordingImportController: RecoveredRecordingImportController
     private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
     let issueExtractionController: IssueExtractionController
+    let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
     let appUtilityActions: AppUtilityActionController
@@ -308,6 +309,11 @@ final class AppState: ObservableObject {
             permissionRecoveryController: permissionRecoveryController
         )
         self.appUtilityActions = appUtilityActions
+        self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
         self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
@@ -1001,13 +1007,8 @@ final class AppState: ObservableObject {
             aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
             statusPhase: status.phase
         ) else {
-            setStatus(IssueExtractionStatusPresenter.manualProgressStatus)
+            manualIssueExtractionStatusPresenter.presentRequestStarted(sessionID: transcriptSession.id)
             recordingSessionController.beginActivity(reason: "Extracting review issues")
-            transcriptionLogger.info(
-                "issue_extraction_requested",
-                "Issue extraction was requested for the selected transcript.",
-                metadata: ["session_id": transcriptSession.id.uuidString]
-            )
 
             do {
                 guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
@@ -1023,21 +1024,15 @@ final class AppState: ObservableObject {
                 )
 
                 recordingSessionController.endActivity()
-                setStatus(IssueExtractionStatusPresenter.manualCompletionStatus(issueCount: extraction.issues.count))
-                showTranscriptWindow?()
+                manualIssueExtractionStatusPresenter.presentCompletion(issueCount: extraction.issues.count)
             } catch {
-                presentError(error, operation: .postTranscription, fallback: { .issueExtractionFailure($0) })
+                manualIssueExtractionStatusPresenter.presentFailure(error)
             }
 
             return
         }
 
-        transcriptionLogger.warning(
-            "issue_extraction_preflight_failed",
-            preflightError.userMessage,
-            metadata: ["session_id": transcriptSession.id.uuidString]
-        )
-        presentError(preflightError, operation: .postTranscription)
+        manualIssueExtractionStatusPresenter.presentPreflightFailure(preflightError, sessionID: transcriptSession.id)
     }
 
     func updateExtractedIssue(_ updatedIssue: ExtractedIssue, in sessionID: UUID) {
