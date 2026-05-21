@@ -2,6 +2,20 @@ import XCTest
 @testable import BugNarrator
 
 final class DiagnosticsLoggerTests: XCTestCase {
+    func testFreeformRedactionSanitizesKnownTokenPatterns() {
+        let sanitized = DiagnosticsRedactor.sanitizeFreeformText(
+            """
+            OpenAI sk-test_TOKEN-123 GitHub github_pat_testTOKEN123 cli ghp_TESTTOKEN123 header Bearer test.token-123
+            """
+        )
+
+        XCTAssertTrue(sanitized.contains("<redacted>"))
+        XCTAssertFalse(sanitized.contains("sk-test_TOKEN-123"))
+        XCTAssertFalse(sanitized.contains("github_pat_testTOKEN123"))
+        XCTAssertFalse(sanitized.contains("ghp_TESTTOKEN123"))
+        XCTAssertFalse(sanitized.contains("Bearer test.token-123"))
+    }
+
     func testLoggerRedactsCredentialsFromMetadataAndMessage() async {
         BugNarratorDiagnostics.setDebugModeEnabled(true)
         let storageURL = FileManager.default.temporaryDirectory
