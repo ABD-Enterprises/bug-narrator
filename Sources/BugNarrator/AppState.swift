@@ -415,9 +415,23 @@ final class AppState: ObservableObject {
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
-        self.hotkeyManager.onHotKeyPressed = { [weak self] action in
-            Task { @MainActor [weak self] in
-                self?.handleHotKeyPressed(action)
+        let hotkeyActionDispatcher = HotkeyActionDispatcher(
+            statusPhase: { [weak self] in
+                self?.status.phase ?? .idle
+            },
+            startRecording: { [weak self] in
+                await self?.openRecordingControlsAndStartSession()
+            },
+            stopRecording: { [weak self] in
+                await self?.stopSession()
+            },
+            captureScreenshot: { [weak self] in
+                await self?.captureScreenshot()
+            }
+        )
+        self.hotkeyManager.onHotKeyPressed = { action in
+            Task { @MainActor in
+                hotkeyActionDispatcher.handle(action)
             }
         }
 
@@ -1191,26 +1205,6 @@ final class AppState: ObservableObject {
         }
 
         NSWorkspace.shared.activateFileViewerSelecting([screenshot.fileURL])
-    }
-
-    private func handleHotKeyPressed(_ action: HotkeyAction) {
-        switch action {
-        case .startRecording:
-            Task {
-                await openRecordingControlsAndStartSession()
-            }
-        case .stopRecording:
-            guard status.phase == .recording else {
-                return
-            }
-            Task {
-                await stopSession()
-            }
-        case .captureScreenshot:
-            Task {
-                await captureScreenshot()
-            }
-        }
     }
 
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
