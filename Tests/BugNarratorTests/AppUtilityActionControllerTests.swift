@@ -46,6 +46,61 @@ final class AppUtilityActionControllerTests: XCTestCase {
         XCTAssertEqual(result, .opened(BugNarratorLinks.microphonePrivacySettings))
         XCTAssertEqual(harness.urlHandler.openedURLs, [BugNarratorLinks.microphonePrivacySettings])
     }
+
+    func testFailureStatusPreservesActiveWorkPhases() {
+        let message = "BugNarrator could not open the documentation."
+
+        XCTAssertEqual(
+            AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .recording),
+            .recording("BugNarrator could not open the documentation. Recording is still active.")
+        )
+        XCTAssertEqual(
+            AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .transcribing),
+            .transcribing("BugNarrator could not open the documentation. Background work is still in progress.")
+        )
+    }
+
+    func testFailureStatusMapsInactivePhasesToError() {
+        let message = "The selected screenshot file is no longer available on this Mac."
+
+        XCTAssertEqual(
+            AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .idle),
+            .error(message)
+        )
+        XCTAssertEqual(
+            AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .success),
+            .error(message)
+        )
+        XCTAssertEqual(
+            AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .error),
+            .error(message)
+        )
+    }
+
+    func testPresenterAppliesFailedResultsAndIgnoresOpenedResults() {
+        var phase = AppStatus.Phase.idle
+        var statuses: [AppStatus] = []
+        let presenter = AppUtilityActionResultPresenter(
+            statusPhase: { phase },
+            setStatus: { statuses.append($0) }
+        )
+
+        presenter.present(AppUtilityActionResult.opened)
+        presenter.present(PermissionSettingsOpenResult.opened(BugNarratorLinks.microphonePrivacySettings))
+        XCTAssertTrue(statuses.isEmpty)
+
+        presenter.present(AppUtilityActionResult.failed(message: "BugNarrator could not open the issue tracker."))
+        phase = .recording
+        presenter.present(PermissionSettingsOpenResult.failed("BugNarrator could not open System Settings."))
+
+        XCTAssertEqual(
+            statuses,
+            [
+                .error("BugNarrator could not open the issue tracker."),
+                .recording("BugNarrator could not open System Settings. Recording is still active.")
+            ]
+        )
+    }
 }
 
 @MainActor
