@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
 
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
+    private let hotkeySettingsBinder: HotkeySettingsBinder
     private let artifactsService: any SessionArtifactsManaging
     private let telemetryRecorder: any OperationalTelemetryRecording
 
@@ -353,6 +354,7 @@ final class AppState: ObservableObject {
         )
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
+        self.hotkeySettingsBinder = HotkeySettingsBinder(hotkeyManager: hotkeyManager)
         self.artifactsService = artifactsService
         self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
@@ -473,27 +475,6 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        settingsStore.$startRecordingHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .startRecording)
-            }
-            .store(in: &cancellables)
-
-        settingsStore.$stopRecordingHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .stopRecording)
-            }
-            .store(in: &cancellables)
-
-        settingsStore.$screenshotHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .captureScreenshot)
-            }
-            .store(in: &cancellables)
-
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
                 self?.refreshPermissionRecoveryState()
@@ -506,9 +487,7 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        hotkeyManager.register(shortcut: settingsStore.startRecordingHotkeyShortcut, for: .startRecording)
-        hotkeyManager.register(shortcut: settingsStore.stopRecordingHotkeyShortcut, for: .stopRecording)
-        hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
+        hotkeySettingsBinder.bind(settingsStore: settingsStore)
 
         settingsLogger.info(
             "app_state_initialized",
