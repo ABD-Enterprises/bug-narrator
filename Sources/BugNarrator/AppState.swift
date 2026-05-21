@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var recoveredRecordingImportCount = 0
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
@@ -16,6 +15,7 @@ final class AppState: ObservableObject {
     let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
     let exportHistoryController: ExportHistoryController
+    let recoveredRecordingImportController: RecoveredRecordingImportController
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
@@ -34,7 +34,6 @@ final class AppState: ObservableObject {
 
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
-    private let recoveredRecordingImporter: any RecoveredRecordingImporting
     private let artifactsService: any SessionArtifactsManaging
     private let clipboardService: any ClipboardWriting
     private let urlHandler: any URLOpening
@@ -102,6 +101,10 @@ final class AppState: ObservableObject {
 
     var currentError: AppError? {
         presentationState.currentError
+    }
+
+    var recoveredRecordingImportCount: Int {
+        recoveredRecordingImportController.recoveredRecordingImportCount
     }
 
     var exportHistory: [ExportReceipt] {
@@ -261,6 +264,12 @@ final class AppState: ObservableObject {
             clipboardService: clipboardService
         )
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
+        self.recoveredRecordingImportController = RecoveredRecordingImportController(
+            transcriptStore: transcriptStore,
+            sessionLibrary: self.sessionLibrary,
+            recoveredRecordingImporter: recoveredRecordingImporter,
+            artifactsService: artifactsService
+        )
         self.issueExtractionController = IssueExtractionController(
             sessionLibrary: self.sessionLibrary,
             issueExtractionService: issueExtractionService
@@ -298,7 +307,6 @@ final class AppState: ObservableObject {
         )
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
-        self.recoveredRecordingImporter = recoveredRecordingImporter
         self.artifactsService = artifactsService
         self.clipboardService = clipboardService
         self.urlHandler = urlHandler
@@ -359,6 +367,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         exportHistoryController.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        recoveredRecordingImportController.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -2091,28 +2105,12 @@ final class AppState: ObservableObject {
 
     private func importRecoveredRecordingsAtLaunch() {
         do {
-            let importedCount = try recoveredRecordingImporter.importRecoverableRecordings(
-                into: transcriptStore,
-                artifactsService: artifactsService
-            )
-            recoveredRecordingImportCount = importedCount
-
-            guard importedCount > 0 else {
+            let outcome = try recoveredRecordingImportController.importRecoveredRecordingsAtLaunch()
+            guard case .imported(let message, let error) = outcome else {
                 return
             }
 
-            sessionLibrary.selectLatestPendingTranscriptionSession()
-            sessionLibraryLogger.warning(
-                "recovered_recordings_imported",
-                "Imported recovered recordings as retryable transcript sessions.",
-                metadata: ["imported_count": "\(importedCount)"]
-            )
-            setStatus(
-                .error(importedCount == 1
-                    ? "Recovered 1 recording after an unexpected quit. Open Session Library to transcribe it."
-                    : "Recovered \(importedCount) recordings after an unexpected quit. Open Session Library to transcribe them."),
-                error: .transcriptionFailure("Recovered recordings are waiting for transcription.")
-            )
+            setStatus(.error(message), error: error)
             showTranscriptWindow?()
         } catch {
             let normalizedError = normalizeError(
