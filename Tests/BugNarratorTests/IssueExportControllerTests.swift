@@ -30,6 +30,84 @@ final class IssueExportControllerTests: XCTestCase {
         )
     }
 
+    func testIssueExportPresentationControllerSetsExportStatuses() {
+        let harness = makeIssueExportPresentationController()
+        let completion = IssueExportCompletion(
+            destination: .github,
+            sessionID: UUID(),
+            results: [],
+            duplicateCount: 1,
+            performedRemoteExport: false
+        )
+
+        harness.presenter.presentReviewPreparation(destination: .github)
+        XCTAssertEqual(
+            harness.presentationState.status,
+            IssueExportStatusPresenter.reviewPreparationStatus(destination: .github)
+        )
+
+        harness.presenter.presentReviewReady(destination: .jira)
+        XCTAssertEqual(
+            harness.presentationState.status,
+            IssueExportStatusPresenter.reviewReadyStatus(destination: .jira)
+        )
+
+        harness.presenter.presentRemoteExportStarted(destination: .github)
+        XCTAssertEqual(
+            harness.presentationState.status,
+            IssueExportStatusPresenter.remoteExportStatus(destination: .github)
+        )
+
+        harness.presenter.presentCompletion(completion)
+        XCTAssertEqual(harness.presentationState.status, IssueExportStatusPresenter.completionStatus(completion))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 0)
+    }
+
+    func testIssueExportPresentationControllerOpensSettingsForConfigurationFailure() {
+        let harness = makeIssueExportPresentationController()
+        let expectedError = AppError.exportConfigurationMissing("GitHub token is missing.")
+        let failure = IssueExportPreflightFailure(error: expectedError, opensSettings: true)
+
+        harness.presenter.presentPreflightFailure(failure)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 1)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "export")
+    }
+
+    func testIssueExportPresentationControllerOpensSettingsForMissingAPIKeyFailure() {
+        let harness = makeIssueExportPresentationController()
+        let expectedError = AppError.missingAPIKey
+        let failure = IssueExportPreflightFailure(error: expectedError, opensSettings: false)
+
+        harness.presenter.presentPreflightFailure(failure)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 1)
+    }
+
+    func testIssueExportPresentationControllerNormalizesGenericExportFailure() {
+        let harness = makeIssueExportPresentationController()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Remote export failed"]
+        )
+        let expectedError = AppError.exportFailure("Remote export failed")
+
+        harness.presenter.presentFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.settingsWindowOpenCount(), 0)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "export")
+    }
+
     func testReadinessAndDefaultGitHubRouting() throws {
         let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
@@ -232,6 +310,35 @@ final class IssueExportControllerTests: XCTestCase {
         XCTAssertTrue(completion.performedRemoteExport)
         XCTAssertEqual(exportedIssues.count, 1)
         XCTAssertTrue(exportedIssues.first?.note?.contains("Related to #142") == true)
+    }
+
+    private func makeIssueExportPresentationController(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: IssueExportPresentationController,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder,
+        settingsWindowOpenCount: () -> Int
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        var settingsWindowOpenCount = 0
+        let presenter = IssueExportPresentationController(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            ),
+            showSettingsWindow: {
+                settingsWindowOpenCount += 1
+            }
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder,
+            settingsWindowOpenCount: { settingsWindowOpenCount }
+        )
     }
 }
 

@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     let issueExtractionController: IssueExtractionController
     let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
     let issueExportController: IssueExportController
+    let issueExportPresentationController: IssueExportPresentationController
     let permissionRecoveryController: PermissionRecoveryController
     let appUtilityActions: AppUtilityActionController
     let appUtilityActionPresenter: AppUtilityActionResultPresenter
@@ -312,6 +313,10 @@ final class AppState: ObservableObject {
         self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.issueExportPresentationController = IssueExportPresentationController(
+            errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
         self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
@@ -1069,14 +1074,11 @@ final class AppState: ObservableObject {
         case .success(let readyContext):
             context = readyContext
         case .failure(let failure):
-            presentError(failure.error, operation: .export, fallback: { .exportFailure($0) })
-            if failure.opensSettings {
-                showSettingsWindow?()
-            }
+            issueExportPresentationController.presentPreflightFailure(failure)
             return
         }
 
-        setStatus(IssueExportStatusPresenter.reviewPreparationStatus(destination: destination))
+        issueExportPresentationController.presentReviewPreparation(destination: destination)
         recordingSessionController.beginActivity(reason: "Reviewing similar issues before export")
 
         do {
@@ -1088,13 +1090,13 @@ final class AppState: ObservableObject {
             recordingSessionController.endActivity()
 
             if review.hasMatches {
-                setStatus(IssueExportStatusPresenter.reviewReadyStatus(destination: destination))
+                issueExportPresentationController.presentReviewReady(destination: destination)
             } else {
                 await finalizeIssueExport(using: review)
             }
         } catch {
             recordingSessionController.endActivity()
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
+            issueExportPresentationController.presentFailure(error)
         }
     }
 
@@ -1122,7 +1124,7 @@ final class AppState: ObservableObject {
         do {
             let requiresRemoteExport = try issueExportController.pendingReviewRequiresRemoteExport(review)
             if requiresRemoteExport {
-                setStatus(IssueExportStatusPresenter.remoteExportStatus(destination: review.destination))
+                issueExportPresentationController.presentRemoteExportStarted(destination: review.destination)
                 recordingSessionController.beginActivity(reason: "Exporting extracted issues")
             }
 
@@ -1131,11 +1133,11 @@ final class AppState: ObservableObject {
                 recordingSessionController.endActivity()
             }
 
-            setStatus(IssueExportStatusPresenter.completionStatus(completion))
+            issueExportPresentationController.presentCompletion(completion)
             await refreshExportHistory()
         } catch {
             recordingSessionController.endActivity()
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
+            issueExportPresentationController.presentFailure(error)
         }
     }
 
