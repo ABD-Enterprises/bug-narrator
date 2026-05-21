@@ -134,3 +134,65 @@ final class PostTranscriptionPipelineController {
         return session
     }
 }
+
+@MainActor
+final class FinishedRecordingPostTranscriptionResultHandler {
+    private let sessionLibrary: SessionLibraryController
+    private let recordingSessionController: RecordingSessionController
+    private let statusPresenter: PostTranscriptionStatusPresenter
+    private let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
+    private let postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter
+    private let autoCopyTranscript: () -> Bool
+    private let cleanupPendingRecordedAudio: () -> Void
+
+    init(
+        sessionLibrary: SessionLibraryController,
+        recordingSessionController: RecordingSessionController,
+        statusPresenter: PostTranscriptionStatusPresenter,
+        transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter,
+        postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter,
+        autoCopyTranscript: @escaping () -> Bool,
+        cleanupPendingRecordedAudio: @escaping () -> Void
+    ) {
+        self.sessionLibrary = sessionLibrary
+        self.recordingSessionController = recordingSessionController
+        self.statusPresenter = statusPresenter
+        self.transcriptPersistenceFailurePresenter = transcriptPersistenceFailurePresenter
+        self.postTranscriptionFailurePresenter = postTranscriptionFailurePresenter
+        self.autoCopyTranscript = autoCopyTranscript
+        self.cleanupPendingRecordedAudio = cleanupPendingRecordedAudio
+    }
+
+    func handle(_ result: PostTranscriptionPipelineResult) {
+        switch result {
+        case .success:
+            cleanupPendingRecordedAudio()
+            recordingSessionController.endActivity()
+            statusPresenter.presentSuccess()
+
+        case .persistenceFailure(let session, let error):
+            handleCompletedTranscriptPersistenceFailure(error, session: session)
+
+        case .postTranscriptionFailure(let error):
+            cleanupPendingRecordedAudio()
+            recordingSessionController.endActivity()
+            postTranscriptionFailurePresenter.present(error, operation: .postTranscription)
+        }
+    }
+
+    private func handleCompletedTranscriptPersistenceFailure(
+        _ error: Error,
+        session: TranscriptSession
+    ) {
+        sessionLibrary.stageCurrentTranscript(
+            session,
+            autoCopyTranscript: autoCopyTranscript()
+        )
+        recordingSessionController.clearActiveRecordingSession()
+
+        cleanupPendingRecordedAudio()
+        recordingSessionController.endActivity()
+
+        transcriptPersistenceFailurePresenter.present(error, sessionID: session.id)
+    }
+}
