@@ -46,6 +46,8 @@
 		107A00000000000000000002 /* IssueExportControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107A00000000000000000004 /* IssueExportControllerTests.swift */; };
 		117A00000000000000000001 /* AppErrorPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 117A00000000000000000003 /* AppErrorPresenter.swift */; };
 		117A00000000000000000002 /* AppErrorPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 117A00000000000000000004 /* AppErrorPresenterTests.swift */; };
+		119A00000000000000000001 /* LocalDataDeletionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119A00000000000000000003 /* LocalDataDeletionController.swift */; };
+		119A00000000000000000002 /* LocalDataDeletionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
 		113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000004 /* ExportHistoryControllerTests.swift */; };
 		109A00000000000000000001 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000003 /* PermissionRecoveryController.swift */; };
@@ -218,6 +220,8 @@
 		115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveredRecordingImportControllerTests.swift; sourceTree = "<group>"; };
 		117A00000000000000000003 /* AppErrorPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenter.swift; sourceTree = "<group>"; };
 		117A00000000000000000004 /* AppErrorPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenterTests.swift; sourceTree = "<group>"; };
+		119A00000000000000000003 /* LocalDataDeletionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionController.swift; sourceTree = "<group>"; };
+		119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
 		111A00000000000000000004 /* SupportDataControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataControllerTests.swift; sourceTree = "<group>"; };
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
@@ -347,6 +351,7 @@
 				DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */,
 				B0D1F9ADC8F56876FCB33162 /* KeychainServiceTests.swift */,
 				C08F86DC1FE575150583FFC4 /* LaunchContinuityMonitorTests.swift */,
+				119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */,
 				EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */,
 				5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */,
 				9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */,
@@ -471,6 +476,7 @@
 				F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */,
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
 				417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */,
+				119A00000000000000000003 /* LocalDataDeletionController.swift */,
 				F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */,
 				FFEDE046F0F85BBC5DD5D7D7 /* MicrophonePermissionService.swift */,
 				0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */,
@@ -689,6 +695,7 @@
 				57C3B6C3C646F1588CF4E45C /* JiraExportProviderTests.swift in Sources */,
 				6F4442D6646F20C3D3536F67 /* KeychainServiceTests.swift in Sources */,
 				5A0B0CC8B83B83D9C0180ECD /* LaunchContinuityMonitorTests.swift in Sources */,
+				119A00000000000000000002 /* LocalDataDeletionControllerTests.swift in Sources */,
 				0952565F78B2C3C544A8B4FC /* MenuBarStatusPresentationTests.swift in Sources */,
 				14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */,
 				C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */,
@@ -776,6 +783,7 @@
 				88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */,
 				280973289AE78D9919ECD80C /* KeychainService.swift in Sources */,
 				099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */,
+				119A00000000000000000001 /* LocalDataDeletionController.swift in Sources */,
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
 				E8037E3123427D9DE61D3BE7 /* MenuBarLabelView.swift in Sources */,
 				821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */,
