@@ -38,3 +38,7 @@ local-transcription/venv/
 local-transcription/build/
 local-transcription/dist/
 .worktrees/
+
+# scripts/validate.sh and scripts/swift-parse-check.sh write status/output
+# files here on every run; they should never be committed.
+artifacts/validation/
