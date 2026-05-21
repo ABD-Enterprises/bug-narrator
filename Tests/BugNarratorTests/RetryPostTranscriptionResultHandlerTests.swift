@@ -40,6 +40,8 @@ final class RetryPostTranscriptionResultHandlerTests: XCTestCase {
         let context = try harness.makeRetryContext(index: 3)
 
         XCTAssertTrue(harness.transcriptionRecovery.beginRetry(for: context.session.id))
+        harness.recordingSessionController.beginActivity(reason: "Retry post-transcription")
+        XCTAssertTrue(harness.recordingSessionController.hasActiveProcessActivity)
 
         harness.handler.handle(
             .persistenceFailure(session: context.session, error: AppError.storageFailure("Disk full.")),
@@ -47,6 +49,10 @@ final class RetryPostTranscriptionResultHandlerTests: XCTestCase {
         )
 
         XCTAssertNil(harness.transcriptionRecovery.retryingSessionID)
+        XCTAssertFalse(
+            harness.recordingSessionController.hasActiveProcessActivity,
+            "Retry persistence failure must end the process activity."
+        )
         XCTAssertTrue(FileManager.default.fileExists(atPath: context.audioFileURL.path))
         XCTAssertFalse(harness.transcriptWindowSpy.didShow)
         XCTAssertEqual(harness.presentationState.status.phase, .error)
