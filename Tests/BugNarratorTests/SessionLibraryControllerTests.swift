@@ -119,6 +119,18 @@ final class SessionLibraryControllerTests: XCTestCase {
         )
     }
 
+    func testDisplayedTranscriptCopyStatusPresenterMapsResults() {
+        XCTAssertNil(DisplayedTranscriptCopyStatusPresenter.status(for: .noDisplayedTranscript))
+        XCTAssertEqual(
+            DisplayedTranscriptCopyStatusPresenter.status(for: .transcriptUnavailable),
+            .error("Transcription is not available yet. Retry the preserved session first.")
+        )
+        XCTAssertEqual(
+            DisplayedTranscriptCopyStatusPresenter.status(for: .copied),
+            .success("Transcript copied to the clipboard.")
+        )
+    }
+
     func testPersistCompletedTranscriptCopiesWhenRequested() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }

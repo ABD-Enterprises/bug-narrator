@@ -892,13 +892,9 @@ final class AppState: ObservableObject {
     }
 
     func copyDisplayedTranscript() {
-        switch sessionLibrary.copyDisplayedTranscript() {
-        case .noDisplayedTranscript:
-            return
-        case .transcriptUnavailable:
-            setStatus(.error("Transcription is not available yet. Retry the preserved session first."))
-        case .copied:
-            setStatus(.success("Transcript copied to the clipboard."))
+        let result = sessionLibrary.copyDisplayedTranscript()
+        if let status = DisplayedTranscriptCopyStatusPresenter.status(for: result) {
+            setStatus(status)
         }
     }
 
