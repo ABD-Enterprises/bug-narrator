@@ -140,10 +140,72 @@ final class RecoveredRecordingImporterTests: XCTestCase {
         XCTAssertTrue(store.sessions.isEmpty)
     }
 
+    func testImporterContinuesAfterPerFileFailureAndCleansOrphanArtifacts() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let recoveryDirectoryURL = rootDirectoryURL.appendingPathComponent("RecoveredRecordings", isDirectory: true)
+        try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
+
+        let firstAudioURL = recoveryDirectoryURL.appendingPathComponent("first-recording.m4a")
+        let secondAudioURL = recoveryDirectoryURL.appendingPathComponent("second-recording.m4a")
+        try Data("first".utf8).write(to: firstAudioURL)
+        try Data("second".utf8).write(to: secondAudioURL)
+        let attributes: [FileAttributeKey: Any] = [.modificationDate: Date(timeIntervalSinceNow: -60)]
+        try FileManager.default.setAttributes(attributes, ofItemAtPath: secondAudioURL.path)
+
+        let store = TranscriptStore(storageURL: rootDirectoryURL.appendingPathComponent("sessions.json"))
+        let underlyingService = MockArtifactsService(rootDirectoryURL: rootDirectoryURL.appendingPathComponent("artifacts"))
+        let failingService = FailFirstArtifactsService(underlying: underlyingService)
+        let importer = RecoveredRecordingImporter(recoveryDirectoryURL: recoveryDirectoryURL)
+
+        XCTAssertEqual(
+            try importer.importRecoverableRecordings(into: store, artifactsService: failingService),
+            1
+        )
+        XCTAssertEqual(store.sessions.count, 1)
+        XCTAssertEqual(store.sessions.first?.recoveredSourceFileName, "second-recording.m4a")
+        XCTAssertEqual(failingService.createCallCount, 2)
+        XCTAssertEqual(underlyingService.createdDirectories.count, 1)
+    }
+
     private func makeTempDirectory() -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-RecoveredRecordingImporterTests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         return directoryURL
+    }
+}
+
+private final class FailFirstArtifactsService: SessionArtifactsManaging {
+    private let underlying: MockArtifactsService
+    private(set) var createCallCount = 0
+
+    init(underlying: MockArtifactsService) {
+        self.underlying = underlying
+    }
+
+    func createArtifactsDirectory(for sessionID: UUID) throws -> URL {
+        createCallCount += 1
+        if createCallCount == 1 {
+            throw NSError(
+                domain: "FailFirstArtifactsService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Simulated artifacts directory failure."]
+            )
+        }
+        return try underlying.createArtifactsDirectory(for: sessionID)
+    }
+
+    func makeRecordedAudioURL(in directoryURL: URL, sourceFileURL: URL) -> URL {
+        underlying.makeRecordedAudioURL(in: directoryURL, sourceFileURL: sourceFileURL)
+    }
+
+    func makeScreenshotURL(in directoryURL: URL, prefix: String, index: Int, elapsedTime: TimeInterval) -> URL {
+        underlying.makeScreenshotURL(in: directoryURL, prefix: prefix, index: index, elapsedTime: elapsedTime)
+    }
+
+    func removeArtifactsDirectory(at directoryURL: URL) {
+        underlying.removeArtifactsDirectory(at: directoryURL)
     }
 }
