@@ -139,6 +139,39 @@ final class SessionLibraryControllerTests: XCTestCase {
         )
     }
 
+    func testSessionLibraryStatusPresenterSetsCopiedTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.copied)
+
+        XCTAssertEqual(harness.presentationState.status, .success("Transcript copied to the clipboard."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterSetsUnavailableTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.transcriptUnavailable)
+
+        XCTAssertEqual(
+            harness.presentationState.status,
+            .error("Transcription is not available yet. Retry the preserved session first.")
+        )
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForMissingDisplayedTranscript() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.noDisplayedTranscript)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
     func testSessionLibraryStatusPresenterSetsSavedTranscriptStatus() {
         let harness = makeSessionLibraryStatusPresenter()
 

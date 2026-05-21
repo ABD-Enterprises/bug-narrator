@@ -48,6 +48,12 @@ final class SessionLibraryStatusPresenter {
         self.errorPresenter = errorPresenter
     }
 
+    func presentDisplayedTranscriptCopyResult(_ result: DisplayedTranscriptCopyResult) {
+        if let status = DisplayedTranscriptCopyStatusPresenter.status(for: result) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
     func presentSavedSession(_ savedSession: TranscriptSession?) {
         if let status = TranscriptSaveStatusPresenter.status(savedSession: savedSession) {
             errorPresenter.setStatus(status)
