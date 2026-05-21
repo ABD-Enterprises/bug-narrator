@@ -56,6 +56,8 @@
 		127A00000000000000000002 /* ScreenshotCaptureControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */; };
 		129A00000000000000000001 /* RecordingStatusMessageBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */; };
 		129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */; };
+		131A00000000000000000001 /* DebugSessionContextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131A00000000000000000003 /* DebugSessionContextProvider.swift */; };
+		131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131A00000000000000000004 /* DebugSessionContextProviderTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -240,6 +242,8 @@
 		127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureControllerTests.swift; sourceTree = "<group>"; };
 		129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilder.swift; sourceTree = "<group>"; };
 		129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilderTests.swift; sourceTree = "<group>"; };
+		131A00000000000000000003 /* DebugSessionContextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProvider.swift; sourceTree = "<group>"; };
+		131A00000000000000000004 /* DebugSessionContextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProviderTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -364,6 +368,7 @@
 				121A00000000000000000004 /* AppUtilityActionControllerTests.swift */,
 				125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */,
 				F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */,
+				131A00000000000000000004 /* DebugSessionContextProviderTests.swift */,
 				40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */,
 				113A00000000000000000004 /* ExportHistoryControllerTests.swift */,
 				AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */,
@@ -554,6 +559,7 @@
 				D6C80DD2FADBED13E068990D /* BugNarratorLinks.swift */,
 				C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */,
 				33F136949087AFDDDEB2B830 /* ChangelogDocument.swift */,
+				131A00000000000000000003 /* DebugSessionContextProvider.swift */,
 				4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */,
 				6DAA46D23DB94BDF1609FAD9 /* IssueScreenshotAnnotationRenderer.swift */,
 				9D2B31107CC14CDD9E0898ED /* MenuBarStatusPresentation.swift */,
@@ -718,6 +724,7 @@
 				121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */,
 				125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */,
 				5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */,
+				131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */,
 				FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */,
 				113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */,
 				594983777A69A4D70F71653D /* GitHubExportProviderTests.swift in Sources */,
@@ -799,6 +806,7 @@
 				562BF7C0BF2A8D013BA2F63F /* BugNarratorMetadata.swift in Sources */,
 				77CFDF30D3F7AEFA54C4E367 /* ChangelogDocument.swift in Sources */,
 				5CB8DACFD986D905D03D0E6A /* ChangelogView.swift in Sources */,
+				131A00000000000000000001 /* DebugSessionContextProvider.swift in Sources */,
 				B53060D07F7F2428BD78E807 /* ClipboardService.swift in Sources */,
 				040E1F8A34C1C16904AB8370 /* DebugBundleExporter.swift in Sources */,
 				4F04273FAEFE2C33F78701B4 /* ElapsedTimeFormatter.swift in Sources */,
