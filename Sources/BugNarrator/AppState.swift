@@ -702,7 +702,9 @@ final class AppState: ObservableObject {
 
         defer { recordingSessionController.finishStoppingSession() }
 
-        cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
+        screenshotCaptureController.cancelPendingSelection(
+            reason: "Stopping the active session cancels pending screenshot selection."
+        )
         recordingSessionController.prepareForStopSession()
         let request = settingsStore.transcriptionRequest
 
@@ -723,10 +725,10 @@ final class AppState: ObservableObject {
             setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
             recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
-            let transcriptionResult = try await transcribeAudio(
-                at: recordedAudio.fileURL,
-                request: request,
-                apiKey: apiKey
+            let transcriptionResult = try await transcriptionClient.transcribe(
+                fileURL: recordedAudio.fileURL,
+                apiKey: apiKey,
+                request: request
             )
             let session = TranscriptionSessionBuilder.completedSession(
                 from: recordingSession,
@@ -758,7 +760,9 @@ final class AppState: ObservableObject {
             preserveFile: settingsStore.debugMode,
             onCancelWillBegin: { [weak self] in
                 self?.showDiscardConfirmation = false
-                self?.cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
+                self?.screenshotCaptureController.cancelPendingSelection(
+                    reason: "Discarding the active session cancels pending screenshot selection."
+                )
             }
         )
 
@@ -996,10 +1000,10 @@ final class AppState: ObservableObject {
                 throw AppError.missingAPIKey
             }
 
-            let result = try await transcribeAudio(
-                at: retryContext.audioFileURL,
-                request: request,
-                apiKey: apiKey
+            let result = try await transcriptionClient.transcribe(
+                fileURL: retryContext.audioFileURL,
+                apiKey: apiKey,
+                request: request
             )
             let updatedSession = TranscriptionSessionBuilder.recoveredSession(
                 from: retryContext.session,
@@ -1331,14 +1335,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func transcribeAudio(
-        at fileURL: URL,
-        request: TranscriptionRequest,
-        apiKey: String
-    ) async throws -> TranscriptionResult {
-        try await transcriptionClient.transcribe(fileURL: fileURL, apiKey: apiKey, request: request)
-    }
-
     private func completePostTranscriptionPipeline(
         session: TranscriptSession,
         apiKey: String,
@@ -1401,9 +1397,15 @@ final class AppState: ObservableObject {
     ) throws {
         switch mode {
         case .finishedRecording:
-            try persistCompletedTranscript(session)
+            try sessionLibrary.persistCompletedTranscript(
+                session,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
         case .retry:
-            try persistUpdatedSession(session, autoCopyTranscript: settingsStore.autoCopyTranscript)
+            try sessionLibrary.persistUpdatedSession(
+                session,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
         }
     }
 
@@ -1612,35 +1614,6 @@ final class AppState: ObservableObject {
             recordingSessionController.clearActiveRecordingSession()
             presentError(error, operation: .recordingStop)
         }
-    }
-
-    private func persistCompletedTranscript(_ session: TranscriptSession) throws {
-        try sessionLibrary.persistCompletedTranscript(
-            session,
-            autoCopyTranscript: settingsStore.autoCopyTranscript
-        )
-    }
-
-    private func persistUpdatedSession(
-        _ session: TranscriptSession,
-        autoCopyTranscript: Bool = false
-    ) throws {
-        try sessionLibrary.persistUpdatedSession(
-            session,
-            autoCopyTranscript: autoCopyTranscript
-        )
-    }
-
-    private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
-        sessionLibrary.sessionSnapshot(with: sessionID)
-    }
-
-    private func cancelPendingScreenshotSelection(reason: String) {
-        screenshotCaptureController.cancelPendingSelection(reason: reason)
-    }
-
-    private func showToast(_ message: String, style: TransientToastStyle = .success) {
-        transientToastController.showToast(message, style: style)
     }
 
     private var currentDebugSessionID: UUID? {
