@@ -18,10 +18,10 @@ final class AppState: ObservableObject {
     let sessionLibrary: SessionLibraryController
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
+    let permissionRecoveryController: PermissionRecoveryController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
-    private let runtimeEnvironment: AppRuntimeEnvironment
     var showTranscriptWindow: (() -> Void)?
     var showSettingsWindow: (() -> Void)?
     var showAboutWindow: (() -> Void)?
@@ -31,8 +31,6 @@ final class AppState: ObservableObject {
     var prepareForScreenshotSelection: (() -> Void)?
     var restoreAfterScreenshotSelection: (() -> Void)?
 
-    private let microphonePermissionService: any MicrophonePermissionServicing
-    private let screenCapturePermissionService: any ScreenCapturePermissionServicing
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let exportService: any IssueExporting
@@ -271,6 +269,12 @@ final class AppState: ObservableObject {
             sessionLibrary: self.sessionLibrary,
             exportService: exportService
         )
+        self.permissionRecoveryController = PermissionRecoveryController(
+            microphonePermissionService: microphonePermissionService,
+            screenCapturePermissionService: screenCapturePermissionService,
+            urlHandler: urlHandler,
+            runtimeEnvironment: runtimeEnvironment
+        )
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: self.sessionLibrary,
             artifactsService: artifactsService
@@ -281,9 +285,6 @@ final class AppState: ObservableObject {
             screenshotSelectionService: screenshotSelectionService,
             artifactsService: artifactsService
         )
-        self.runtimeEnvironment = runtimeEnvironment
-        self.microphonePermissionService = microphonePermissionService
-        self.screenCapturePermissionService = screenCapturePermissionService
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.exportService = exportService
@@ -508,39 +509,14 @@ final class AppState: ObservableObject {
     }
 
     func refreshPermissionRecoveryState() {
-        permissionsLogger.debug(
-            "permission_recovery_refresh_started",
-            "Refreshing permission recovery state after BugNarrator became active.",
-            metadata: [
-                "microphone_status": microphonePermissionService.currentStatus().rawValue,
-                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
-            ]
-        )
-
-        switch currentError {
-        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
-            guard status.phase != .recording, status.phase != .transcribing else {
-                return
-            }
-
-            let microphoneStatus = microphonePermissionService.currentStatus()
-            guard microphoneStatus == .granted else {
-                return
-            }
-
-            setStatus(.idle("Microphone access enabled. You can start recording again."))
-        case .screenRecordingPermissionDenied:
-            guard screenCapturePermissionService.currentStatus() == .granted else {
-                return
-            }
-
-            if status.phase == .recording {
-                setStatus(.recording("Screen Recording access enabled. You can capture screenshots again."))
-            } else {
-                setStatus(.idle("Screen Recording access enabled. You can capture screenshots again."))
-            }
-        default:
-            return
+        switch permissionRecoveryController.refreshRecoveryState(
+            currentError: currentError,
+            statusPhase: status.phase
+        ) {
+        case .unchanged:
+            break
+        case .recovered(let recoveredStatus):
+            setStatus(recoveredStatus)
         }
     }
 
@@ -819,45 +795,15 @@ final class AppState: ObservableObject {
     }
 
     func openMicrophonePrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.microphonePrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Microphone settings automatically.")
+        presentPermissionSettingsResult(permissionRecoveryController.openMicrophonePrivacySettings())
     }
 
     func openScreenRecordingPrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.screenRecordingPrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Screen Recording settings automatically.")
+        presentPermissionSettingsResult(permissionRecoveryController.openScreenRecordingPrivacySettings())
     }
 
     func openSystemAudioPrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.screenRecordingPrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Screen & System Audio Recording settings automatically.")
+        presentPermissionSettingsResult(permissionRecoveryController.openSystemAudioPrivacySettings())
     }
 
     func checkForUpdates() {
@@ -1447,6 +1393,15 @@ final class AppState: ObservableObject {
             "Opened an external support or documentation link.",
             metadata: ["label": label]
         )
+    }
+
+    private func presentPermissionSettingsResult(_ result: PermissionSettingsOpenResult) {
+        switch result {
+        case .opened:
+            return
+        case .failed(let message):
+            presentUtilityActionFailure(message)
+        }
     }
 
     private func presentUtilityActionFailure(_ message: String) {
@@ -2175,23 +2130,7 @@ final class AppState: ObservableObject {
     }
 
     private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
-        microphonePermissionService.recoveryGuidance(
-            for: microphoneRecoveryStatus,
-            runtimeEnvironment: runtimeEnvironment
-        )
-    }
-
-    private var microphoneRecoveryStatus: MicrophonePermissionStatus {
-        switch currentError {
-        case .microphonePermissionDenied:
-            return .denied
-        case .microphonePermissionRestricted:
-            return .restricted
-        case .microphoneUnavailable:
-            return .captureSetupFailed
-        default:
-            return microphonePermissionService.currentStatus()
-        }
+        permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
     }
 
     private func makeDebugBundleSnapshot() async -> DebugBundleSnapshot {
@@ -2203,35 +2142,11 @@ final class AppState: ObservableObject {
     }
 
     private func validateRuntimeConfiguration() {
-        guard let microphoneUsageDescription = Bundle.main.object(
-            forInfoDictionaryKey: "NSMicrophoneUsageDescription"
-        ) as? String else {
-            permissionsLogger.error(
-                "runtime_configuration_missing_microphone_usage_description",
-                "BugNarrator is missing NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
-            )
-            return
-        }
-
-        if microphoneUsageDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            permissionsLogger.error(
-                "runtime_configuration_empty_microphone_usage_description",
-                "BugNarrator has an empty NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
-            )
-        }
+        permissionRecoveryController.validateRuntimeConfiguration()
     }
 
     private func logLaunchDiagnostics() {
-        permissionsLogger.info(
-            "launch_permission_snapshot",
-            "Captured the initial permission state snapshot for this BugNarrator app copy.",
-            metadata: [
-                "bundle_path": runtimeEnvironment.bundlePath,
-                "is_local_testing_build": runtimeEnvironment.isLocalTestingBuild ? "yes" : "no",
-                "microphone_status": microphonePermissionService.currentStatus().rawValue,
-                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
-            ]
-        )
+        permissionRecoveryController.logLaunchPermissionSnapshot()
 
         sessionLibraryLogger.info(
             "launch_session_store_snapshot",
