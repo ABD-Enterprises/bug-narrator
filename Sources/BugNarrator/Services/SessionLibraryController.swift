@@ -80,9 +80,16 @@ final class SessionLibraryController: ObservableObject {
         currentTranscript = session
     }
 
-    func stageCurrentTranscript(_ session: TranscriptSession) {
+    func stageCurrentTranscript(
+        _ session: TranscriptSession,
+        autoCopyTranscript: Bool = false
+    ) {
         currentTranscript = session
         selectedTranscriptID = session.id
+
+        if autoCopyTranscript {
+            clipboardService.copy(session.transcript)
+        }
     }
 
     func selectLatestPendingTranscriptionSession() {
@@ -197,7 +204,8 @@ final class SessionLibraryController: ObservableObject {
 
     func persistUpdatedSession(
         _ session: TranscriptSession,
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        autoCopyTranscript: Bool = false
     ) throws {
         var session = session
         session.updatedAt = updatedAt
@@ -206,6 +214,10 @@ final class SessionLibraryController: ObservableObject {
 
         if transcriptStore.session(with: session.id) != nil {
             try transcriptStore.add(session)
+        }
+
+        if autoCopyTranscript {
+            clipboardService.copy(session.transcript)
         }
 
         selectedTranscriptID = session.id

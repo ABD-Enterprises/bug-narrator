@@ -120,6 +120,33 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.clipboardService.copiedStrings, ["Copy me"])
     }
 
+    func testStageCurrentTranscriptCopiesWhenRequested() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = makeSession(index: 1, transcript: "Recovered transcript")
+
+        harness.controller.stageCurrentTranscript(session, autoCopyTranscript: true)
+
+        XCTAssertEqual(harness.controller.currentTranscript?.id, session.id)
+        XCTAssertEqual(harness.controller.selectedTranscriptID, session.id)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Recovered transcript"])
+    }
+
+    func testPersistUpdatedSessionCopiesWhenRequested() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = makeSession(index: 1, transcript: "Retried transcript")
+        try harness.transcriptStore.add(session)
+
+        try harness.controller.persistUpdatedSession(session, autoCopyTranscript: true)
+
+        XCTAssertEqual(harness.controller.currentTranscript?.id, session.id)
+        XCTAssertEqual(harness.controller.selectedTranscriptID, session.id)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Retried transcript"])
+    }
+
     func testCopyDisplayedTranscriptWithoutDisplayedTranscriptDoesNothing() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }
