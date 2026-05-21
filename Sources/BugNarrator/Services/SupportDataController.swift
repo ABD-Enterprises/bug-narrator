@@ -20,19 +20,23 @@ final class SupportDataActionPresenter {
     private let setStatus: (AppStatus) -> Void
     private let revealInFinder: (URL) -> AppUtilityActionResult
     private let presentUtilityActionResult: (AppUtilityActionResult) -> Void
+    private let presentDeletionFailure: (Error) -> Void
 
     init(
         setStatus: @escaping (AppStatus) -> Void,
         revealInFinder: @escaping (URL) -> AppUtilityActionResult,
-        presentUtilityActionResult: @escaping (AppUtilityActionResult) -> Void
+        presentUtilityActionResult: @escaping (AppUtilityActionResult) -> Void,
+        presentDeletionFailure: @escaping (Error) -> Void = { _ in }
     ) {
         self.setStatus = setStatus
         self.revealInFinder = revealInFinder
         self.presentUtilityActionResult = presentUtilityActionResult
+        self.presentDeletionFailure = presentDeletionFailure
     }
 
     convenience init(
         presentationState: AppPresentationState,
+        errorPresenter: AppErrorPresenter,
         utilityActions: AppUtilityActionController,
         utilityResultPresenter: AppUtilityActionResultPresenter
     ) {
@@ -45,6 +49,9 @@ final class SupportDataActionPresenter {
             },
             presentUtilityActionResult: { result in
                 utilityResultPresenter.present(result)
+            },
+            presentDeletionFailure: { error in
+                _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
             }
         )
     }
@@ -72,6 +79,10 @@ final class SupportDataActionPresenter {
         case .deleted(let outcome):
             presentLocalDataDeletion(outcome)
         }
+    }
+
+    func presentLocalDataDeletionFailure(_ error: Error) {
+        presentDeletionFailure(error)
     }
 
     private func presentExportedBundle(at bundleURL: URL, statusMessage: String) {
