@@ -108,8 +108,9 @@ final class SystemAudioRecorder: AudioRecording {
             metadata: ["file_name": currentFileURL.lastPathComponent]
         )
 
-        tapSession.invalidate()
         activeWriter.close()
+        ioQueue.sync { }
+        tapSession.invalidate()
         cleanupActiveState()
 
         try validateRecordedAudioFile(at: currentFileURL)
@@ -128,8 +129,9 @@ final class SystemAudioRecorder: AudioRecording {
 
     func cancelRecording(preserveFile: Bool) async {
         let fileURL = currentFileURL
-        tapSession?.invalidate()
         activeWriter?.close()
+        ioQueue.sync { }
+        tapSession?.invalidate()
         cleanupActiveState()
 
         guard !preserveFile, let fileURL else {
