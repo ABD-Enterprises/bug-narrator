@@ -74,6 +74,23 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "post_transcription")
     }
 
+    func testIssueMutationFailurePresenterNormalizesStorageFailure() {
+        let harness = makeIssueMutationFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Could not save issue"]
+        )
+        let expectedError = AppError.storageFailure("Could not save issue")
+
+        harness.presenter.presentFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+    }
+
     func testPreflightMapsCredentialTranscriptAndRecordingFailures() throws {
         let harness = try IssueExtractionControllerHarness()
         defer { harness.cleanup() }
@@ -197,6 +214,29 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(
             harness.transcriptStore.session(with: session.id)?.issueExtraction?.issues.map(\.isSelectedForExport),
             [false, false]
+        )
+    }
+
+    private func makeIssueMutationFailurePresenter(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: IssueMutationFailurePresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = IssueMutationFailurePresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
         )
     }
 
