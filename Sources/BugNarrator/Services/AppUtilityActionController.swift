@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum AppUtilityActionResult: Equatable {
@@ -130,6 +131,15 @@ final class AppUtilityActionController {
 
     func checkForUpdates() -> AppUtilityActionResult {
         openExternalURL(BugNarratorLinks.releases, label: "releases page")
+    }
+
+    func openScreenshot(_ screenshot: SessionScreenshot) -> AppUtilityActionResult {
+        guard FileManager.default.fileExists(atPath: screenshot.fileURL.path) else {
+            return .failed(message: "The selected screenshot file is no longer available on this Mac.")
+        }
+
+        NSWorkspace.shared.activateFileViewerSelecting([screenshot.fileURL])
+        return .opened
     }
 
     private func openExternalURL(_ url: URL, label: String) -> AppUtilityActionResult {
