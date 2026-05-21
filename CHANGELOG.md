@@ -4,6 +4,7 @@
 
 - [CHANGE] Removed the launch-time unexpected-quit recording recovery importer and its recovered-recording prompts; leftover crash audio is no longer surfaced as a persistent transcription failure or retry action.
 - [FIX] Logged a diagnostics error when the transcription retry attempt count cannot be saved durably, so operators can see when recovery state is in memory only instead of silently disappearing on the next launch.
+- [FIX] Respected task cancellation between resolving displays and writing the screenshot file, so cancelling a region screenshot mid-flight no longer drops a PNG on disk after the user dismissed the selection.
 - [CHANGE] Repointed the default GitHub export repository and in-app project links from `deffenda/bug-narrator` to `ABD-Enterprises/bug-narrator`. Fresh installs and UI-test seeded settings now resolve to the canonical organization repo; existing installs keep whatever owner/repo the user previously configured.
 - [FIX] Cleared in-flight issue-extraction/export progress when an issue mutation (toggle selection, edit) write fails, so the extraction progress spinner no longer keeps running on top of an unrelated error toast.
 - [FIX] Restored the auto-open of Settings on credential-failure recording starts and the in-flight progress cleanup on any recording-start failure, so a missing/invalid API key surface still directs the user to Settings and stale issue-extraction/export badges from a prior pipeline no longer linger.

@@ -272,15 +272,19 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
             ]
         )
 
+        try Task.checkCancellation()
+
         var capturedDisplays: [CapturedDisplayImage] = []
         capturedDisplays.reserveCapacity(intersectingDisplays.count)
         for (display, sourceRect) in intersectingDisplays {
+            try Task.checkCancellation()
             capturedDisplays.append(
                 try await imageProvider.captureDisplayImage(for: display, sourceRect: sourceRect)
             )
         }
 
         let image = try makeCompositeImage(from: capturedDisplays, bounds: selectionRect)
+        try Task.checkCancellation()
         try imageWriter.writePNG(image, to: url)
         try validateCapturedScreenshotFile(at: url)
         screenshotLogger.info(

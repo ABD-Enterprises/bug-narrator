@@ -166,6 +166,87 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
         }
     }
 
+    func testCaptureScreenshotCancellationAfterDisplaysResolvedSkipsCaptureAndWrite() async throws {
+        let temporaryRoot = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+
+        let display = ScreenCaptureDisplaySnapshot(
+            displayID: 1,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            pixelWidth: 100,
+            pixelHeight: 100
+        )
+        let provider = MockScreenCaptureImageProvider(
+            displays: [display],
+            imagesByDisplayID: [
+                1: try makeSolidImage(width: 100, height: 100, color: CGColor(red: 0, green: 1, blue: 0, alpha: 1))
+            ]
+        )
+        let service = ScreenshotCaptureService(
+            imageProvider: provider,
+            imageWriter: PNGScreenshotImageWriter()
+        )
+        let outputURL = temporaryRoot.appendingPathComponent("capture.png")
+
+        let cancellationBox = TaskCancellationBox()
+        provider.afterAvailableDisplays = { cancellationBox.cancel() }
+        let task = Task {
+            try await service.captureScreenshot(in: CGRect(x: 0, y: 0, width: 100, height: 100), to: outputURL)
+        }
+        cancellationBox.task = task
+
+        do {
+            try await task.value
+            XCTFail("Expected screenshot capture cancellation.")
+        } catch is CancellationError {
+            XCTAssertEqual(provider.availableDisplaysCallCount, 1)
+            XCTAssertEqual(provider.captureDisplayImageCallCount, 0)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
+        } catch {
+            XCTFail("Expected CancellationError, got \(error).")
+        }
+    }
+
+    func testCaptureScreenshotCancellationAfterCaptureDoesNotWriteFile() async throws {
+        let temporaryRoot = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+
+        let display = ScreenCaptureDisplaySnapshot(
+            displayID: 1,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            pixelWidth: 100,
+            pixelHeight: 100
+        )
+        let provider = MockScreenCaptureImageProvider(
+            displays: [display],
+            imagesByDisplayID: [
+                1: try makeSolidImage(width: 100, height: 100, color: CGColor(red: 0, green: 1, blue: 0, alpha: 1))
+            ]
+        )
+        let service = ScreenshotCaptureService(
+            imageProvider: provider,
+            imageWriter: PNGScreenshotImageWriter()
+        )
+        let outputURL = temporaryRoot.appendingPathComponent("capture.png")
+
+        let cancellationBox = TaskCancellationBox()
+        provider.afterCaptureDisplayImage = { cancellationBox.cancel() }
+        let task = Task {
+            try await service.captureScreenshot(in: CGRect(x: 0, y: 0, width: 100, height: 100), to: outputURL)
+        }
+        cancellationBox.task = task
+
+        do {
+            try await task.value
+            XCTFail("Expected screenshot capture cancellation.")
+        } catch is CancellationError {
+            XCTAssertEqual(provider.captureDisplayImageCallCount, 1)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
+        } catch {
+            XCTFail("Expected CancellationError, got \(error).")
+        }
+    }
+
     func testCaptureScreenshotFailsWhenNoDisplaysAreAvailable() async {
         let service = ScreenshotCaptureService(
             imageProvider: MockScreenCaptureImageProvider(displays: []),
@@ -240,10 +321,20 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
     }
 }
 
+private final class TaskCancellationBox: @unchecked Sendable {
+    var task: Task<Void, Error>?
+
+    func cancel() {
+        task?.cancel()
+    }
+}
+
 private final class MockScreenCaptureImageProvider: ScreenCaptureImageProviding {
     var displays: [ScreenCaptureDisplaySnapshot] = []
     var imagesByDisplayID: [CGDirectDisplayID: CGImage] = [:]
     var error: Error?
+    var afterAvailableDisplays: (() -> Void)?
+    var afterCaptureDisplayImage: (() -> Void)?
     private(set) var requestedSourceRects: [CGRect] = []
     private(set) var availableDisplaysCallCount = 0
     private(set) var captureDisplayImageCallCount = 0
@@ -266,6 +357,7 @@ private final class MockScreenCaptureImageProvider: ScreenCaptureImageProviding 
             throw error
         }
 
+        afterAvailableDisplays?()
         return displays
     }
 
@@ -297,6 +389,7 @@ private final class MockScreenCaptureImageProvider: ScreenCaptureImageProviding 
             )
         } ?? display.frame
 
+        afterCaptureDisplayImage?()
         return CapturedDisplayImage(display: display, capturedFrame: capturedFrame, image: image)
     }
 }
