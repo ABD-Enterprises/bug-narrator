@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [SECURITY] Stopped forwarding the saved OpenAI API key in the Authorization header to non-OpenAI providers (Local Parakeet, Local-Compatible, OpenAI-Compatible), so a previously-configured OpenAI key is no longer leaked to localhost or third-party gateways during validation or transcription.
 - [CHANGE] Repointed the default GitHub export repository and in-app project links from `deffenda/bug-narrator` to `ABD-Enterprises/bug-narrator`. Fresh installs and UI-test seeded settings now resolve to the canonical organization repo; existing installs keep whatever owner/repo the user previously configured.
 - [FIX] Cleared in-flight issue-extraction/export progress when an issue mutation (toggle selection, edit) write fails, so the extraction progress spinner no longer keeps running on top of an unrelated error toast.
 - [FIX] Restored the auto-open of Settings on credential-failure recording starts and the in-flight progress cleanup on any recording-start failure, so a missing/invalid API key surface still directs the user to Settings and stale issue-extraction/export badges from a prior pipeline no longer linger.
