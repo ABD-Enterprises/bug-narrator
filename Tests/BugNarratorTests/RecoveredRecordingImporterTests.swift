@@ -56,6 +56,50 @@ final class RecoveredRecordingImporterTests: XCTestCase {
         XCTAssertTrue(session.preview.contains("Recovered recording found"))
     }
 
+    func testImporterCreatesRetryablePendingSessionForRecoveredSystemAudioWAV() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let recoveryDirectoryURL = rootDirectoryURL.appendingPathComponent("RecoveredRecordings", isDirectory: true)
+        try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
+        let audioURL = recoveryDirectoryURL.appendingPathComponent("crash-recovery-system-audio.wav")
+        try Data("system audio".utf8).write(to: audioURL)
+
+        let store = TranscriptStore(storageURL: rootDirectoryURL.appendingPathComponent("sessions.json"))
+        let artifactsService = MockArtifactsService(rootDirectoryURL: rootDirectoryURL.appendingPathComponent("artifacts"))
+        let importer = RecoveredRecordingImporter(recoveryDirectoryURL: recoveryDirectoryURL)
+
+        XCTAssertEqual(try importer.importRecoverableRecordings(into: store, artifactsService: artifactsService), 1)
+
+        let session = try XCTUnwrap(store.sessions.first)
+        XCTAssertEqual(session.pendingTranscription?.failureReason, .crashRecovery)
+        XCTAssertEqual(session.pendingTranscription?.audioFileName, "recording.wav")
+        XCTAssertEqual(session.pendingTranscription?.recoveredSourceFileName, audioURL.lastPathComponent)
+        XCTAssertEqual(session.recoveredSourceFileName, audioURL.lastPathComponent)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path
+            )
+        )
+    }
+
+    func testImporterIgnoresUnsupportedRecoveredFiles() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let recoveryDirectoryURL = rootDirectoryURL.appendingPathComponent("RecoveredRecordings", isDirectory: true)
+        try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
+        try Data("not audio".utf8).write(to: recoveryDirectoryURL.appendingPathComponent("notes.txt"))
+        try Data("not supported".utf8).write(to: recoveryDirectoryURL.appendingPathComponent("recording.mp3"))
+
+        let store = TranscriptStore(storageURL: rootDirectoryURL.appendingPathComponent("sessions.json"))
+        let artifactsService = MockArtifactsService(rootDirectoryURL: rootDirectoryURL.appendingPathComponent("artifacts"))
+        let importer = RecoveredRecordingImporter(recoveryDirectoryURL: recoveryDirectoryURL)
+
+        XCTAssertEqual(try importer.importRecoverableRecordings(into: store, artifactsService: artifactsService), 0)
+        XCTAssertTrue(store.sessions.isEmpty)
+    }
+
     private func makeTempDirectory() -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-RecoveredRecordingImporterTests-\(UUID().uuidString)", isDirectory: true)
