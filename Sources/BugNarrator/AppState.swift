@@ -46,6 +46,7 @@ final class AppState: ObservableObject {
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let retryTranscriptionStatusPresenter: RetryTranscriptionStatusPresenter
+    let pendingTranscriptionRetryFailureHandler: PendingTranscriptionRetryFailureHandler
     let retryableSessionPreservationPresenter: RetryableSessionPreservationPresenter
     let screenshotCoordinator: ScreenshotCoordinator
     let screenshotCaptureController: ScreenshotCaptureController
@@ -420,6 +421,11 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.pendingTranscriptionRetryFailureHandler = PendingTranscriptionRetryFailureHandler(
+            transcriptionRecovery: self.transcriptionRecovery,
+            recordingSessionController: recordingSessionController,
+            retryStatusPresenter: self.retryTranscriptionStatusPresenter
         )
         self.retryableSessionPreservationPresenter = RetryableSessionPreservationPresenter(
             errorPresenter: self.errorPresenter,
@@ -984,12 +990,7 @@ final class AppState: ObservableObject {
             )
             retryPostTranscriptionResultHandler.handle(pipelineResult, context: retryContext)
         } catch {
-            if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
-                return
-            }
-
-            transcriptionRecovery.finishRetry()
-            retryTranscriptionStatusPresenter.presentFailure(error)
+            pendingTranscriptionRetryFailureHandler.handle(error, context: retryContext)
         }
     }
 
@@ -1232,19 +1233,6 @@ final class AppState: ObservableObject {
                 "attempt_count": "\(context.pendingTranscription.attemptCount + 1)"
             ]
         )
-    }
-
-    private func handlePendingTranscriptionRetryFailure(
-        _ error: Error,
-        context: PendingTranscriptionRetryContext
-    ) -> Bool {
-        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(error, context: context) else {
-            return false
-        }
-
-        recordingSessionController.endActivity()
-        retryTranscriptionStatusPresenter.presentRetryableFailure(retryFailure)
-        return true
     }
 
     private func preserveRetryableSession(

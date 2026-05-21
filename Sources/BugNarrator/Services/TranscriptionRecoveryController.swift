@@ -60,6 +60,34 @@ final class RetryTranscriptionStatusPresenter {
 }
 
 @MainActor
+final class PendingTranscriptionRetryFailureHandler {
+    private let transcriptionRecovery: TranscriptionRecoveryController
+    private let recordingSessionController: RecordingSessionController
+    private let retryStatusPresenter: RetryTranscriptionStatusPresenter
+
+    init(
+        transcriptionRecovery: TranscriptionRecoveryController,
+        recordingSessionController: RecordingSessionController,
+        retryStatusPresenter: RetryTranscriptionStatusPresenter
+    ) {
+        self.transcriptionRecovery = transcriptionRecovery
+        self.recordingSessionController = recordingSessionController
+        self.retryStatusPresenter = retryStatusPresenter
+    }
+
+    func handle(_ error: Error, context: PendingTranscriptionRetryContext) {
+        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(error, context: context) else {
+            transcriptionRecovery.finishRetry()
+            retryStatusPresenter.presentFailure(error)
+            return
+        }
+
+        recordingSessionController.endActivity()
+        retryStatusPresenter.presentRetryableFailure(retryFailure)
+    }
+}
+
+@MainActor
 final class RetryableSessionPreservationPresenter {
     private let errorPresenter: AppErrorPresenter
     private let showTranscriptWindow: () -> Void
