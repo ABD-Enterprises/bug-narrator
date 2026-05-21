@@ -2,6 +2,23 @@ import Combine
 import Foundation
 
 @MainActor
+final class ObservableObjectChangeForwarder {
+    private var cancellables = Set<AnyCancellable>()
+
+    func forward(_ publishers: [ObservableObjectPublisher], notify: @escaping () -> Void) {
+        cancellables.removeAll()
+
+        for publisher in publishers {
+            publisher
+                .sink { _ in
+                    notify()
+                }
+                .store(in: &cancellables)
+        }
+    }
+}
+
+@MainActor
 final class AppPresentationState: ObservableObject {
     @Published private(set) var status: AppStatus
     @Published private(set) var currentError: AppError?

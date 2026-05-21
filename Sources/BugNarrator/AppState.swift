@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let hotkeySettingsBinder: HotkeySettingsBinder
+    private let objectChangeForwarder: ObservableObjectChangeForwarder
     private let artifactsService: any SessionArtifactsManaging
     private let telemetryRecorder: any OperationalTelemetryRecording
 
@@ -355,6 +356,7 @@ final class AppState: ObservableObject {
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.hotkeySettingsBinder = HotkeySettingsBinder(hotkeyManager: hotkeyManager)
+        self.objectChangeForwarder = ObservableObjectChangeForwarder()
         self.artifactsService = artifactsService
         self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
@@ -409,71 +411,24 @@ final class AppState: ObservableObject {
             self?.showSettingsWindow?()
         }
 
-        trackerIntegration.objectWillChange
-            .sink { [weak self] _ in
+        objectChangeForwarder.forward(
+            [
+                trackerIntegration.objectWillChange,
+                aiProviderSettings.objectWillChange,
+                presentationState.objectWillChange,
+                recordingSessionController.objectWillChange,
+                sessionLibrary.objectWillChange,
+                exportHistoryController.objectWillChange,
+                recoveredRecordingImportController.objectWillChange,
+                issueExtractionController.objectWillChange,
+                issueExportController.objectWillChange,
+                transcriptionRecovery.objectWillChange,
+                screenshotCoordinator.objectWillChange
+            ],
+            notify: { [weak self] in
                 self?.objectWillChange.send()
             }
-            .store(in: &cancellables)
-
-        aiProviderSettings.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        presentationState.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        recordingSessionController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        sessionLibrary.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        exportHistoryController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        recoveredRecordingImportController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        issueExtractionController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        issueExportController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        transcriptionRecovery.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        screenshotCoordinator.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
+        )
 
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
