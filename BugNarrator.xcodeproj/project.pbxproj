@@ -56,6 +56,7 @@
 		127A00000000000000000002 /* ScreenshotCaptureControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */; };
 		129A00000000000000000001 /* RecordingStatusMessageBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */; };
 		129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */; };
+		189A00000000000000000001 /* RetryTranscriptionStatusPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189A00000000000000000002 /* RetryTranscriptionStatusPresenterTests.swift */; };
 		131A00000000000000000001 /* DebugSessionContextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131A00000000000000000003 /* DebugSessionContextProvider.swift */; };
 		131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131A00000000000000000004 /* DebugSessionContextProviderTests.swift */; };
 		137A00000000000000000001 /* TranscriptionSessionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137A00000000000000000003 /* TranscriptionSessionBuilder.swift */; };
@@ -244,6 +245,7 @@
 		127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureControllerTests.swift; sourceTree = "<group>"; };
 		129A00000000000000000003 /* RecordingStatusMessageBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilder.swift; sourceTree = "<group>"; };
 		129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageBuilderTests.swift; sourceTree = "<group>"; };
+		189A00000000000000000002 /* RetryTranscriptionStatusPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryTranscriptionStatusPresenterTests.swift; sourceTree = "<group>"; };
 		131A00000000000000000003 /* DebugSessionContextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProvider.swift; sourceTree = "<group>"; };
 		131A00000000000000000004 /* DebugSessionContextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProviderTests.swift; sourceTree = "<group>"; };
 		137A00000000000000000003 /* TranscriptionSessionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSessionBuilder.swift; sourceTree = "<group>"; };
@@ -394,6 +396,7 @@
 				3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */,
 				115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */,
 				2DE808CBBBE2F1EEE4FF5BEC /* RecoveredRecordingImporterTests.swift */,
+				189A00000000000000000002 /* RetryTranscriptionStatusPresenterTests.swift */,
 				34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */,
 				4FD6EC791976A8AD3A45D1E3 /* RoutingAudioRecorderTests.swift */,
 				84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */,
@@ -752,6 +755,7 @@
 				2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */,
 				115A00000000000000000002 /* RecoveredRecordingImportControllerTests.swift in Sources */,
 				62313F663336184217D1020B /* RecoveredRecordingImporterTests.swift in Sources */,
+				189A00000000000000000001 /* RetryTranscriptionStatusPresenterTests.swift in Sources */,
 				634C2CA46D17B6AA571D0771 /* ReviewWorkspaceTests.swift in Sources */,
 				79EE80974F21923B656A5F87 /* RoutingAudioRecorderTests.swift in Sources */,
 				9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */,

@@ -30,6 +30,7 @@ final class AppState: ObservableObject {
     let supportDataActionPresenter: SupportDataActionPresenter
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
+    let retryTranscriptionStatusPresenter: RetryTranscriptionStatusPresenter
     let screenshotCoordinator: ScreenshotCoordinator
     let screenshotCaptureController: ScreenshotCaptureController
 
@@ -327,6 +328,11 @@ final class AppState: ObservableObject {
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: sessionLibrary,
             artifactsService: artifactsService
+        )
+        self.retryTranscriptionStatusPresenter = RetryTranscriptionStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
         )
         let screenshotCoordinator = ScreenshotCoordinator(
             screenCapturePermissionService: screenCapturePermissionService,
@@ -911,14 +917,11 @@ final class AppState: ObservableObject {
         case .duplicate:
             return
         case .failure(let appError, let opensSettings, let statusMessage):
-            if let statusMessage {
-                setStatus(.error(statusMessage), error: appError)
-            } else {
-                presentError(appError, operation: .retryTranscription)
-            }
-            if opensSettings {
-                showSettingsWindow?()
-            }
+            retryTranscriptionStatusPresenter.presentRetryContextFailure(
+                appError: appError,
+                opensSettings: opensSettings,
+                statusMessage: statusMessage
+            )
             return
         }
 
@@ -1455,12 +1458,7 @@ final class AppState: ObservableObject {
         }
 
         recordingSessionController.endActivity()
-
-        let appError = retryFailure.appError
-        errorPresenter.logAppError(appError, context: "retry_pending_transcription", operation: .retryTranscription)
-        setStatus(.error(retryFailure.statusMessage), error: appError)
-        showTranscriptWindow?()
-        showSettingsWindow?()
+        retryTranscriptionStatusPresenter.presentRetryableFailure(retryFailure)
         return true
     }
 
