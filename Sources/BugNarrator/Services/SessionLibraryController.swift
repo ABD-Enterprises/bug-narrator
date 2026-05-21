@@ -7,6 +7,19 @@ enum DisplayedTranscriptCopyResult: Equatable {
     case copied
 }
 
+enum DisplayedTranscriptCopyStatusPresenter {
+    static func status(for result: DisplayedTranscriptCopyResult) -> AppStatus? {
+        switch result {
+        case .noDisplayedTranscript:
+            return nil
+        case .transcriptUnavailable:
+            return .error("Transcription is not available yet. Retry the preserved session first.")
+        case .copied:
+            return .success("Transcript copied to the clipboard.")
+        }
+    }
+}
+
 enum SessionDeletionStatusPresenter {
     static func status(deletedCount: Int) -> AppStatus? {
         guard deletedCount > 0 else {
