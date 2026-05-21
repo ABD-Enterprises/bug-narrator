@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
     let postTranscriptionStatusPresenter: PostTranscriptionStatusPresenter
     let postTranscriptionPipeline: PostTranscriptionPipelineController
     let finishedRecordingPostTranscriptionResultHandler: FinishedRecordingPostTranscriptionResultHandler
+    let retryPostTranscriptionResultHandler: RetryPostTranscriptionResultHandler
     let sessionLibrary: SessionLibraryController
     let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
@@ -424,6 +425,14 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.retryPostTranscriptionResultHandler = RetryPostTranscriptionResultHandler(
+            transcriptionRecovery: self.transcriptionRecovery,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            sessionLibraryStatusPresenter: self.sessionLibraryStatusPresenter,
+            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
+            debugMode: { settingsStore.debugMode }
         )
         let screenshotCoordinator = ScreenshotCoordinator(
             screenCapturePermissionService: screenCapturePermissionService,
@@ -968,30 +977,12 @@ final class AppState: ObservableObject {
                 result: result
             )
 
-            switch await postTranscriptionPipeline.complete(
+            let pipelineResult = await postTranscriptionPipeline.complete(
                 session: updatedSession,
                 apiKey: apiKey,
                 mode: .retry
-            ) {
-            case .success:
-                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
-                    at: retryContext.audioFileURL,
-                    debugMode: settingsStore.debugMode
-                )
-                transcriptionRecovery.finishRetry()
-                finishSuccessfulTranscription(showTranscriptWindow: true)
-            case .persistenceFailure(_, let error):
-                transcriptionRecovery.finishRetry()
-                sessionLibraryStatusPresenter.presentFailure(error)
-            case .postTranscriptionFailure(let error):
-                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
-                    at: retryContext.audioFileURL,
-                    debugMode: settingsStore.debugMode
-                )
-                transcriptionRecovery.finishRetry()
-                recordingSessionController.endActivity()
-                postTranscriptionFailurePresenter.present(error, operation: .retryTranscription)
-            }
+            )
+            retryPostTranscriptionResultHandler.handle(pipelineResult, context: retryContext)
         } catch {
             if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
                 return
@@ -1198,15 +1189,6 @@ final class AppState: ObservableObject {
         recordingSessionStopReadinessPresenter.recordingSession(
             for: recordingSessionController.beginStoppingSession(statusPhase: status.phase)
         )
-    }
-
-    private func finishSuccessfulTranscription(showTranscriptWindow: Bool) {
-        if showTranscriptWindow {
-            postTranscriptionStatusPresenter.presentTranscriptWindow()
-        }
-
-        recordingSessionController.endActivity()
-        postTranscriptionStatusPresenter.presentSuccess()
     }
 
     private func handleStopSessionFailure(

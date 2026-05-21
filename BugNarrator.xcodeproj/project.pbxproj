@@ -64,6 +64,7 @@
 		227A00000000000000000001 /* PostTranscriptionPipelineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227A00000000000000000003 /* PostTranscriptionPipelineController.swift */; };
 		227A00000000000000000002 /* PostTranscriptionPipelineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */; };
 		229A00000000000000000001 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 229A00000000000000000003 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */; };
+		231A00000000000000000001 /* RetryPostTranscriptionResultHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231A00000000000000000003 /* RetryPostTranscriptionResultHandlerTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -256,6 +257,7 @@
 		227A00000000000000000003 /* PostTranscriptionPipelineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionPipelineController.swift; sourceTree = "<group>"; };
 		227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionPipelineControllerTests.swift; sourceTree = "<group>"; };
 		229A00000000000000000003 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedRecordingPostTranscriptionResultHandlerTests.swift; sourceTree = "<group>"; };
+		231A00000000000000000003 /* RetryPostTranscriptionResultHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryPostTranscriptionResultHandlerTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -384,6 +386,7 @@
 				40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */,
 				113A00000000000000000004 /* ExportHistoryControllerTests.swift */,
 				229A00000000000000000003 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */,
+				231A00000000000000000003 /* RetryPostTranscriptionResultHandlerTests.swift */,
 				AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */,
 				107A00000000000000000004 /* IssueExportControllerTests.swift */,
 				105A00000000000000000004 /* IssueExtractionControllerTests.swift */,
@@ -746,6 +749,7 @@
 				FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */,
 				113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */,
 				229A00000000000000000001 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift in Sources */,
+				231A00000000000000000001 /* RetryPostTranscriptionResultHandlerTests.swift in Sources */,
 				594983777A69A4D70F71653D /* GitHubExportProviderTests.swift in Sources */,
 				107A00000000000000000002 /* IssueExportControllerTests.swift in Sources */,
 				105A00000000000000000002 /* IssueExtractionControllerTests.swift in Sources */,
