@@ -76,13 +76,14 @@ final class PendingTranscriptionRetryFailureHandler {
     }
 
     func handle(_ error: Error, context: PendingTranscriptionRetryContext) {
+        recordingSessionController.endActivity()
+
         guard let retryFailure = transcriptionRecovery.recordRetryableFailure(error, context: context) else {
             transcriptionRecovery.finishRetry()
             retryStatusPresenter.presentFailure(error)
             return
         }
 
-        recordingSessionController.endActivity()
         retryStatusPresenter.presentRetryableFailure(retryFailure)
     }
 }

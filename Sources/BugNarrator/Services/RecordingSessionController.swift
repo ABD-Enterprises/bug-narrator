@@ -208,6 +208,10 @@ final class RecordingSessionController: ObservableObject {
         pendingRecordedAudio
     }
 
+    var hasActiveProcessActivity: Bool {
+        processActivity != nil
+    }
+
     func startSession(
         statusPhase: AppStatus.Phase,
         activityReason: String
