@@ -81,6 +81,75 @@ final class RecordingSessionControllerTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.stopCallCount, 0)
     }
 
+    func testStopReadinessPresenterReturnsReadySession() {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+        let recordingSession = RecordingSessionDraft(
+            sessionID: UUID(),
+            artifactsDirectoryURL: URL(fileURLWithPath: "/tmp/bug-narrator-ready-session", isDirectory: true)
+        )
+
+        let readySession = presenter.recordingSession(for: .ready(recordingSession))
+
+        XCTAssertEqual(readySession?.sessionID, recordingSession.sessionID)
+        XCTAssertEqual(readySession?.artifactsDirectoryURL, recordingSession.artifactsDirectoryURL)
+        XCTAssertEqual(presentationState.status, .recording("Recording in progress."))
+        XCTAssertNil(presentationState.currentError)
+        XCTAssertTrue(telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testStopReadinessPresenterLeavesStatusForTransitionInProgress() {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let presenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: MockOperationalTelemetryRecorder()
+            )
+        )
+
+        XCTAssertNil(presenter.recordingSession(for: .transitionInProgress))
+        XCTAssertEqual(presentationState.status, .recording("Recording in progress."))
+        XCTAssertNil(presentationState.currentError)
+    }
+
+    func testStopReadinessPresenterLeavesStatusForNoActiveRecording() {
+        let presentationState = AppPresentationState(status: .idle("Ready."))
+        let presenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: MockOperationalTelemetryRecorder()
+            )
+        )
+
+        XCTAssertNil(presenter.recordingSession(for: .noActiveRecording))
+        XCTAssertEqual(presentationState.status, .idle("Ready."))
+        XCTAssertNil(presentationState.currentError)
+    }
+
+    func testStopReadinessPresenterPresentsMissingMetadataError() {
+        let presentationState = AppPresentationState(status: .recording("Recording in progress."))
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+        let expectedError = AppError.recordingFailure("The recording session metadata was unavailable.")
+
+        XCTAssertNil(presenter.recordingSession(for: .missingSessionMetadata))
+        XCTAssertEqual(presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(presentationState.currentError, expectedError)
+        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_stop")
+    }
+
     func testCancelSessionCancelsRecorderAndRemovesArtifacts() async throws {
         let harness = try RecordingSessionControllerHarness()
         defer { harness.cleanup() }

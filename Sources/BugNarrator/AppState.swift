@@ -16,6 +16,7 @@ final class AppState: ObservableObject {
     let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
+    let recordingSessionStopReadinessPresenter: RecordingSessionStopReadinessPresenter
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
     let sessionLibrary: SessionLibraryController
@@ -238,6 +239,9 @@ final class AppState: ObservableObject {
             recordingTimer: recordingTimer
         )
         self.recordingSessionController = recordingSessionController
+        self.recordingSessionStopReadinessPresenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: self.errorPresenter
+        )
         self.recordingSessionCancelStatusPresenter = RecordingSessionCancelStatusPresenter(
             setStatus: { status in presentationState.setStatus(status, error: nil) }
         )
@@ -1225,25 +1229,9 @@ final class AppState: ObservableObject {
     }
 
     private func beginStoppingSession() -> RecordingSessionDraft? {
-        switch recordingSessionController.beginStoppingSession(statusPhase: status.phase) {
-        case .transitionInProgress:
-            recordingLogger.debug(.sessionStopIgnored, "The stop request was ignored because another recording transition is already in progress.")
-            return nil
-
-        case .noActiveRecording:
-            recordingLogger.warning(.sessionStopRejected, "The stop request was rejected because no recording session is active.")
-            return nil
-
-        case .missingSessionMetadata:
-            presentError(
-                AppError.recordingFailure("The recording session metadata was unavailable."),
-                operation: .recordingStop
-            )
-            return nil
-
-        case .ready(let recordingSession):
-            return recordingSession
-        }
+        recordingSessionStopReadinessPresenter.recordingSession(
+            for: recordingSessionController.beginStoppingSession(statusPhase: status.phase)
+        )
     }
 
     private func completePostTranscriptionPipeline(
