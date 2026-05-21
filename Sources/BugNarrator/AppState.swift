@@ -350,6 +350,7 @@ final class AppState: ObservableObject {
         self.appUtilityActionPresenter = appUtilityActionPresenter
         self.supportDataActionPresenter = SupportDataActionPresenter(
             presentationState: presentationState,
+            errorPresenter: self.errorPresenter,
             utilityActions: appUtilityActions,
             utilityResultPresenter: appUtilityActionPresenter
         )
@@ -845,7 +846,7 @@ final class AppState: ObservableObject {
             )
             supportDataActionPresenter.presentLocalDataDeletion(result)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            supportDataActionPresenter.presentLocalDataDeletionFailure(error)
         }
     }
 

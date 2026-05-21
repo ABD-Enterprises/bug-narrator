@@ -156,6 +156,36 @@ final class SupportDataControllerTests: XCTestCase {
         XCTAssertEqual(revealedURLs, [debugBundleURL, privacyBundleURL])
         XCTAssertEqual(presentedUtilityResults, [.opened, .opened])
     }
+
+    func testActionPresenterNormalizesLocalDataDeletionFailure() {
+        let presentationState = AppPresentationState()
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        let presenter = SupportDataActionPresenter(
+            setStatus: { status in presentationState.setStatus(status, error: nil) },
+            revealInFinder: { _ in .opened },
+            presentUtilityActionResult: { _ in },
+            presentDeletionFailure: { error in
+                _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            }
+        )
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Could not clear local data"]
+        )
+        let expectedError = AppError.storageFailure("Could not clear local data")
+
+        presenter.presentLocalDataDeletionFailure(error)
+
+        XCTAssertEqual(presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(presentationState.currentError, expectedError)
+        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+    }
 }
 
 @MainActor
