@@ -69,6 +69,19 @@ final class ManualIssueExtractionStatusPresenter {
 }
 
 @MainActor
+final class IssueMutationFailurePresenter {
+    private let errorPresenter: AppErrorPresenter
+
+    init(errorPresenter: AppErrorPresenter) {
+        self.errorPresenter = errorPresenter
+    }
+
+    func presentFailure(_ error: Error) {
+        _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+    }
+}
+
+@MainActor
 final class IssueExtractionController: ObservableObject {
     @Published private(set) var issueExtractionSessionID: UUID?
 
