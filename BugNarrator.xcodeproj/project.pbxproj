@@ -48,6 +48,8 @@
 		113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000004 /* ExportHistoryControllerTests.swift */; };
 		109A00000000000000000001 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000003 /* PermissionRecoveryController.swift */; };
 		109A00000000000000000002 /* PermissionRecoveryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */; };
+		115A00000000000000000001 /* RecoveredRecordingImportController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115A00000000000000000003 /* RecoveredRecordingImportController.swift */; };
+		115A00000000000000000002 /* RecoveredRecordingImportControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */; };
 		111A00000000000000000001 /* SupportDataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111A00000000000000000003 /* SupportDataController.swift */; };
 		111A00000000000000000002 /* SupportDataControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111A00000000000000000004 /* SupportDataControllerTests.swift */; };
 		105A00000000000000000001 /* IssueExtractionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105A00000000000000000003 /* IssueExtractionController.swift */; };
@@ -210,6 +212,8 @@
 		113A00000000000000000004 /* ExportHistoryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportHistoryControllerTests.swift; sourceTree = "<group>"; };
 		109A00000000000000000003 /* PermissionRecoveryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryController.swift; sourceTree = "<group>"; };
 		109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryControllerTests.swift; sourceTree = "<group>"; };
+		115A00000000000000000003 /* RecoveredRecordingImportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveredRecordingImportController.swift; sourceTree = "<group>"; };
+		115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveredRecordingImportControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
 		111A00000000000000000004 /* SupportDataControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataControllerTests.swift; sourceTree = "<group>"; };
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
@@ -346,6 +350,7 @@
 				FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */,
 				6F9B1D06622F36D479935B7D /* ProductInfoTests.swift */,
 				3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */,
+				115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */,
 				2DE808CBBBE2F1EEE4FF5BEC /* RecoveredRecordingImporterTests.swift */,
 				34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */,
 				4FD6EC791976A8AD3A45D1E3 /* RoutingAudioRecorderTests.swift */,
@@ -468,6 +473,7 @@
 				109A00000000000000000003 /* PermissionRecoveryController.swift */,
 				97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */,
 				875DD52AC7741ABC898365F4 /* RecordingSessionController.swift */,
+				115A00000000000000000003 /* RecoveredRecordingImportController.swift */,
 				BC5286F2E07F27DFA63F4B76 /* RecoveredRecordingImporter.swift */,
 				A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */,
 				811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */,
@@ -684,6 +690,7 @@
 				7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */,
 				8F3D88D73F1560365347F711 /* ProductInfoTests.swift in Sources */,
 				2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */,
+				115A00000000000000000002 /* RecoveredRecordingImportControllerTests.swift in Sources */,
 				62313F663336184217D1020B /* RecoveredRecordingImporterTests.swift in Sources */,
 				634C2CA46D17B6AA571D0771 /* ReviewWorkspaceTests.swift in Sources */,
 				79EE80974F21923B656A5F87 /* RoutingAudioRecorderTests.swift in Sources */,
@@ -778,6 +785,7 @@
 				1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */,
 				5C18E905F94644D69AA9CB60 /* RecordingTimerViewModel.swift in Sources */,
 				A31A0BF8A4486E52DEA38F29 /* RecoveredRecordingImporter.swift in Sources */,
+				115A00000000000000000001 /* RecoveredRecordingImportController.swift in Sources */,
 				981A2F83EC4A0550815EF1B4 /* ReviewWorkspace.swift in Sources */,
 				F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */,
 				DC0465161F26D6650C80F1CF /* ScreenCapturePermissionService.swift in Sources */,
