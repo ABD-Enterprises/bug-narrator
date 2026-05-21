@@ -231,7 +231,8 @@ final class AppState: ObservableObject {
         self.presentationState = presentationState
         self.errorPresenter = AppErrorPresenter(
             presentationState: presentationState,
-            telemetryRecorder: telemetryRecorder
+            telemetryRecorder: telemetryRecorder,
+            provider: { [settingsStore] in settingsStore.aiProvider }
         )
         let transientToastController = TransientToastController(presentationState: presentationState)
         self.transientToastController = transientToastController
