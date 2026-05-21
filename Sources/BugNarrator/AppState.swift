@@ -667,7 +667,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
+            setStatus(.transcribing(recordingStatusMessages.transcriptionUploadProgressMessage()))
             recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcriptionClient.transcribe(
@@ -928,7 +928,7 @@ final class AppState: ObservableObject {
 
         let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
-        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionRetryProgressMessage()))
         recordingSessionController.swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
 
@@ -1250,7 +1250,7 @@ final class AppState: ObservableObject {
     ) async -> PostTranscriptionPipelineResult {
         var session = session
         recordCompletedTranscriptionIfNeeded(session, mode: mode)
-        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 2, action: mode.savingAction)))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionSavingProgressMessage(mode: mode)))
 
         do {
             try persistInitialPostTranscriptionSession(session, mode: mode)
@@ -1335,7 +1335,7 @@ final class AppState: ObservableObject {
         apiKey: String
     ) async throws -> TranscriptSession {
         var session = session
-        setStatus(.transcribing(recordingStatusMessages.transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
+        setStatus(.transcribing(recordingStatusMessages.transcriptionIssueExtractionProgressMessage()))
         recordingSessionController.swapActivity(reason: "Extracting review issues")
 
         let extraction = try await issueExtractionController.extractIssues(
