@@ -52,6 +52,8 @@
 		121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000004 /* AppUtilityActionControllerTests.swift */; };
 		125A00000000000000000001 /* ApplicationTerminationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000003 /* ApplicationTerminationController.swift */; };
 		125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */; };
+		127A00000000000000000001 /* ScreenshotCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000003 /* ScreenshotCaptureController.swift */; };
+		127A00000000000000000002 /* ScreenshotCaptureControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -232,6 +234,8 @@
 		121A00000000000000000004 /* AppUtilityActionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionControllerTests.swift; sourceTree = "<group>"; };
 		125A00000000000000000003 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
 		125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
+		127A00000000000000000003 /* ScreenshotCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureController.swift; sourceTree = "<group>"; };
+		127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureControllerTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -381,6 +385,7 @@
 				84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */,
 				8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */,
 				94052C02271A22E78259D71B /* ScreenshotCaptureServiceTests.swift */,
+				127A00000000000000000004 /* ScreenshotCaptureControllerTests.swift */,
 				92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */,
 				20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */,
 				CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */,
@@ -507,6 +512,7 @@
 				A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */,
 				811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */,
 				54A8F3C1B2AFF52FBD3D8703 /* ScreenshotCaptureService.swift */,
+				127A00000000000000000003 /* ScreenshotCaptureController.swift */,
 				440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */,
 				EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */,
 				6B6F8B0D0A9D777735FD3E44 /* ServiceProtocols.swift */,
@@ -731,6 +737,7 @@
 				9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */,
 				28FFF0FBF53923BC686FF79D /* ScreenshotAnnotationTests.swift in Sources */,
 				05491334A5AA806307646EE5 /* ScreenshotCaptureServiceTests.swift in Sources */,
+				127A00000000000000000002 /* ScreenshotCaptureControllerTests.swift in Sources */,
 				52C0B842187598C05C4C39D2 /* ScreenshotCoordinatorTests.swift in Sources */,
 				6F0782ACEFF9342CFD3D6D87 /* ScreenshotSelectionServiceTests.swift in Sources */,
 				F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */,
@@ -829,6 +836,7 @@
 				F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */,
 				DC0465161F26D6650C80F1CF /* ScreenCapturePermissionService.swift in Sources */,
 				6DC57655A6904ADCF5D41040 /* ScreenshotCaptureService.swift in Sources */,
+				127A00000000000000000001 /* ScreenshotCaptureController.swift in Sources */,
 				71EF8448D05ED4023C8D7CF0 /* ScreenshotCoordinator.swift in Sources */,
 				CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */,
 				B254C34FC1E013052F77EEA5 /* ScreenshotSelectionService.swift in Sources */,

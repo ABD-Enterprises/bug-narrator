@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
+    let screenshotCaptureController: ScreenshotCaptureController
 
     var showTranscriptWindow: (() -> Void)? { get { appUtilityActions.showTranscriptWindow } set { appUtilityActions.showTranscriptWindow = newValue } }
     var showSettingsWindow: (() -> Void)? { get { appUtilityActions.showSettingsWindow } set { appUtilityActions.showSettingsWindow = newValue } }
@@ -35,8 +36,14 @@ final class AppState: ObservableObject {
     var showSupportWindow: (() -> Void)? { get { appUtilityActions.showSupportWindow } set { appUtilityActions.showSupportWindow = newValue } }
     var showRecordingControlWindow: (() -> Void)? { get { appUtilityActions.showRecordingControlWindow } set { appUtilityActions.showRecordingControlWindow = newValue } }
 
-    var prepareForScreenshotSelection: (() -> Void)?
-    var restoreAfterScreenshotSelection: (() -> Void)?
+    var prepareForScreenshotSelection: (() -> Void)? {
+        get { screenshotCaptureController.prepareForScreenshotSelection }
+        set { screenshotCaptureController.prepareForScreenshotSelection = newValue }
+    }
+    var restoreAfterScreenshotSelection: (() -> Void)? {
+        get { screenshotCaptureController.restoreAfterScreenshotSelection }
+        set { screenshotCaptureController.restoreAfterScreenshotSelection = newValue }
+    }
 
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
@@ -48,7 +55,6 @@ final class AppState: ObservableObject {
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
     private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
-    private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
     private var cancellables = Set<AnyCancellable>()
@@ -311,6 +317,40 @@ final class AppState: ObservableObject {
             artifactsService: artifactsService
         )
         self.screenshotCoordinator = screenshotCoordinator
+        self.screenshotCaptureController = ScreenshotCaptureController(
+            screenshotCoordinator: screenshotCoordinator,
+            recordingSessionController: recordingSessionController,
+            errorPresenter: self.errorPresenter,
+            statusPhase: { presentationState.status.phase },
+            elapsedDuration: { recordingTimer.elapsedDuration },
+            recordingDetailMessage: {
+                let prefix: String
+                switch settingsStore.recordingAudioSource {
+                case .microphone:
+                    prefix = "Recording in progress."
+                case .systemAudio:
+                    prefix = "Recording system audio."
+                case .microphoneAndSystemAudio:
+                    prefix = "Recording microphone and system audio."
+                }
+
+                if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
+                    return prefix
+                }
+
+                if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+                    return "\(prefix) \(compatibilityIssue)"
+                }
+
+                return "\(prefix) Finish the AI provider setup in Settings before stopping to transcribe this session."
+            },
+            setStatus: { status, error in
+                presentationState.setStatus(status, error: error)
+            },
+            showToast: { message, style in
+                transientToastController.showToast(message, style: style)
+            }
+        )
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
         self.artifactsService = artifactsService
@@ -552,7 +592,7 @@ final class AppState: ObservableObject {
     }
 
     var isScreenshotCaptureInProgress: Bool {
-        screenshotCoordinator.isCaptureInProgress
+        screenshotCaptureController.isCaptureInProgress
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
@@ -1071,104 +1111,7 @@ final class AppState: ObservableObject {
     }
 
     func captureScreenshot() async {
-        guard status.phase == .recording, let recordingSession = activeRecordingSession else {
-            let error = AppError.noActiveSession("Start a feedback session before capturing a screenshot.")
-            screenshotLogger.warning("screenshot_rejected_no_session", error.userMessage)
-            setStatus(.error(error.userMessage), error: error)
-            return
-        }
-
-        if isScreenshotCaptureInProgress {
-            let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
-            screenshotLogger.warning("screenshot_rejected_busy", error.userMessage)
-            setStatus(.recording(error.userMessage), error: error)
-            return
-        }
-
-        let screenshotIndex = recordingSession.screenshots.count + 1
-        let markerIndex = recordingSession.markers.count + 1
-        let elapsedTime = max(recordingSessionController.currentDuration, elapsedDuration)
-        let markerID = UUID()
-        let markerTitle = "Screenshot \(screenshotIndex)"
-
-        do {
-            let captureResult = try await screenshotCoordinator.captureScreenshot(
-                in: recordingSession,
-                prefix: "capture",
-                index: screenshotIndex,
-                elapsedTime: elapsedTime,
-                associatedMarkerID: markerID,
-                onSelectionWillBegin: { [weak self] in
-                    self?.setStatus(.recording("Drag to select a screenshot region. Press Esc to cancel."))
-                    self?.prepareForScreenshotSelection?()
-                },
-                onSelectionDidEnd: { [weak self] in
-                    self?.restoreAfterScreenshotSelection?()
-                },
-                isSessionActive: { [weak self] sessionID in
-                    guard let self else {
-                        return false
-                    }
-                    return status.phase == .recording && activeRecordingSession?.sessionID == sessionID
-                }
-            )
-            guard case let .captured(screenshot) = captureResult else {
-                guard status.phase == .recording,
-                      activeRecordingSession?.sessionID == recordingSession.sessionID else {
-                    return
-                }
-                setStatus(.recording(recordingDetailMessage()))
-                showToast("Screenshot canceled", style: .informational)
-                return
-            }
-            guard status.phase == .recording,
-                  var latestRecordingSession = activeRecordingSession,
-                  latestRecordingSession.sessionID == recordingSession.sessionID else {
-                return
-            }
-            latestRecordingSession.markers.append(
-                SessionMarker(
-                    id: markerID,
-                    index: markerIndex,
-                    elapsedTime: elapsedTime,
-                    title: markerTitle,
-                    note: nil,
-                    screenshotID: screenshot.id
-                )
-            )
-            latestRecordingSession.screenshots.append(screenshot)
-            recordingSessionController.updateActiveRecordingSession(latestRecordingSession)
-            screenshotLogger.info(
-                "screenshot_captured",
-                "Captured a screenshot and inserted the automatic marker.",
-                metadata: [
-                    "session_id": recordingSession.sessionID.uuidString,
-                    "screenshot_index": "\(screenshotIndex)",
-                    "marker_index": "\(markerIndex)"
-                ]
-            )
-            setStatus(.recording("Captured \(markerTitle)."))
-            showToast("Screenshot captured")
-        } catch {
-            let normalizedError = errorPresenter.normalizeError(
-                error,
-                operation: .screenshotCapture,
-                fallback: { .screenshotCaptureFailure($0) }
-            )
-            let appError = normalizedError.appError
-            guard status.phase == .recording else {
-                return
-            }
-            errorPresenter.logAppError(normalizedError, context: "screenshot_capture_failed")
-            var metadata = errorPresenter.appErrorMetadata(for: normalizedError, context: "screenshot_capture_failed")
-            metadata["session_id"] = recordingSession.sessionID.uuidString
-            screenshotLogger.error(
-                "screenshot_capture_failed",
-                appError.userMessage,
-                metadata: metadata
-            )
-            setStatus(.recording(appError.userMessage), error: appError)
-        }
+        await screenshotCaptureController.captureScreenshot()
     }
 
     private func transcriptionProgressMessage(step: Int, action: String) -> String {
@@ -1863,7 +1806,7 @@ final class AppState: ObservableObject {
     }
 
     private func cancelPendingScreenshotSelection(reason: String) {
-        screenshotCoordinator.cancelPendingSelection(reason: reason)
+        screenshotCaptureController.cancelPendingSelection(reason: reason)
     }
 
     private func showToast(_ message: String, style: TransientToastStyle = .success) {
