@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
     let issueExtractionController: IssueExtractionController
     let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
+    let issueMutationFailurePresenter: IssueMutationFailurePresenter
     let issueExportController: IssueExportController
     let issueExportPresentationController: IssueExportPresentationController
     let permissionRecoveryController: PermissionRecoveryController
@@ -318,6 +319,9 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.issueMutationFailurePresenter = IssueMutationFailurePresenter(
+            errorPresenter: self.errorPresenter
         )
         self.issueExportPresentationController = IssueExportPresentationController(
             errorPresenter: self.errorPresenter,
@@ -1037,7 +1041,7 @@ final class AppState: ObservableObject {
         do {
             try issueExtractionController.updateExtractedIssue(updatedIssue, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
@@ -1045,7 +1049,7 @@ final class AppState: ObservableObject {
         do {
             try issueExtractionController.setIssueSelection(isSelected, issueID: issueID, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
@@ -1053,7 +1057,7 @@ final class AppState: ObservableObject {
         do {
             try issueExtractionController.setAllIssuesSelected(isSelected, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
