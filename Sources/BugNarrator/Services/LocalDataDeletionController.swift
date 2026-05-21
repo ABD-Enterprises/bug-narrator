@@ -16,6 +16,11 @@ struct LocalDataDeletionOutcome: Equatable {
     }
 }
 
+enum LocalDataDeletionResult: Equatable {
+    case blocked(message: String)
+    case deleted(LocalDataDeletionOutcome)
+}
+
 @MainActor
 final class LocalDataDeletionController {
     private let transcriptStore: TranscriptStore
@@ -33,6 +38,17 @@ final class LocalDataDeletionController {
         self.sessionLibrary = sessionLibrary
         self.supportDataController = supportDataController
         self.exportHistoryController = exportHistoryController
+    }
+
+    func deleteAllLocalData(
+        currentTranscript: TranscriptSession?,
+        statusPhase: AppStatus.Phase
+    ) async throws -> LocalDataDeletionResult {
+        guard statusPhase != .recording, statusPhase != .transcribing else {
+            return .blocked(message: "Stop recording or transcription before deleting local data.")
+        }
+
+        return .deleted(try await deleteAllLocalData(currentTranscript: currentTranscript))
     }
 
     func deleteAllLocalData(currentTranscript: TranscriptSession?) async throws -> LocalDataDeletionOutcome {

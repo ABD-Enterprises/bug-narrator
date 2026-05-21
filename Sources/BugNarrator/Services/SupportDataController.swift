@@ -65,6 +65,15 @@ final class SupportDataActionPresenter {
         presentSuccess(outcome.statusMessage)
     }
 
+    func presentLocalDataDeletion(_ result: LocalDataDeletionResult) {
+        switch result {
+        case .blocked(let message):
+            setStatus(.error(message))
+        case .deleted(let outcome):
+            presentLocalDataDeletion(outcome)
+        }
+    }
+
     private func presentExportedBundle(at bundleURL: URL, statusMessage: String) {
         presentUtilityActionResult(revealInFinder(bundleURL))
         presentSuccess(statusMessage)

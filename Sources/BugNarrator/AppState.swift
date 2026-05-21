@@ -844,14 +844,12 @@ final class AppState: ObservableObject {
     }
 
     func deleteAllLocalData() async {
-        guard status.phase != .recording, status.phase != .transcribing else {
-            setStatus(.error("Stop recording or transcription before deleting local data."))
-            return
-        }
-
         do {
-            let outcome = try await localDataDeletionController.deleteAllLocalData(currentTranscript: currentTranscript)
-            supportDataActionPresenter.presentLocalDataDeletion(outcome)
+            let result = try await localDataDeletionController.deleteAllLocalData(
+                currentTranscript: currentTranscript,
+                statusPhase: status.phase
+            )
+            supportDataActionPresenter.presentLocalDataDeletion(result)
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }

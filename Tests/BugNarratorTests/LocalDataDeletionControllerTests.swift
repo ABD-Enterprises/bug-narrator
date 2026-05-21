@@ -3,6 +3,38 @@ import XCTest
 
 @MainActor
 final class LocalDataDeletionControllerTests: XCTestCase {
+    func testDeleteAllLocalDataReportsBlockedResultWhileRecording() async throws {
+        let harness = LocalDataDeletionControllerHarness()
+        defer { harness.cleanup() }
+
+        let result = try await harness.controller.deleteAllLocalData(
+            currentTranscript: nil,
+            statusPhase: .recording
+        )
+
+        XCTAssertEqual(
+            result,
+            .blocked(message: "Stop recording or transcription before deleting local data.")
+        )
+        XCTAssertEqual(harness.localPrivacyDataManager.clearCallCount, 0)
+    }
+
+    func testDeleteAllLocalDataReportsBlockedResultWhileTranscribing() async throws {
+        let harness = LocalDataDeletionControllerHarness()
+        defer { harness.cleanup() }
+
+        let result = try await harness.controller.deleteAllLocalData(
+            currentTranscript: nil,
+            statusPhase: .transcribing
+        )
+
+        XCTAssertEqual(
+            result,
+            .blocked(message: "Stop recording or transcription before deleting local data.")
+        )
+        XCTAssertEqual(harness.localPrivacyDataManager.clearCallCount, 0)
+    }
+
     func testDeleteAllLocalDataClearsPrivacyArtifactsWhenNoSessionsExist() async throws {
         let harness = LocalDataDeletionControllerHarness()
         defer { harness.cleanup() }
@@ -21,7 +53,11 @@ final class LocalDataDeletionControllerTests: XCTestCase {
         try harness.transcriptStore.add(session)
         harness.sessionLibrary.stageCurrentTranscript(session)
 
-        let outcome = try await harness.controller.deleteAllLocalData(currentTranscript: harness.sessionLibrary.currentTranscript)
+        let result = try await harness.controller.deleteAllLocalData(
+            currentTranscript: harness.sessionLibrary.currentTranscript,
+            statusPhase: .idle
+        )
+        let outcome = try XCTUnwrap(result.deletedOutcome)
 
         XCTAssertEqual(outcome.deletedSessionCount, 1)
         XCTAssertEqual(outcome.statusMessage, "Deleted 1 local session and cleared local diagnostics.")
@@ -45,6 +81,16 @@ final class LocalDataDeletionControllerTests: XCTestCase {
         XCTAssertTrue(harness.transcriptStore.sessions.isEmpty)
         XCTAssertNil(harness.sessionLibrary.currentTranscript)
         XCTAssertEqual(harness.localPrivacyDataManager.clearCallCount, 1)
+    }
+}
+
+private extension LocalDataDeletionResult {
+    var deletedOutcome: LocalDataDeletionOutcome? {
+        guard case .deleted(let outcome) = self else {
+            return nil
+        }
+
+        return outcome
     }
 }
 
