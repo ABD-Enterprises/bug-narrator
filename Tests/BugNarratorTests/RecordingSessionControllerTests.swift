@@ -44,6 +44,85 @@ final class RecordingSessionControllerTests: XCTestCase {
         XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
     }
 
+    func testStartStatusPresenterSetsRecordingStatusAndTelemetryForStartedSession() {
+        let harness = makeStartStatusPresenter()
+        let recordingSession = RecordingSessionDraft(
+            sessionID: UUID(),
+            artifactsDirectoryURL: URL(fileURLWithPath: "/tmp/bug-narrator-started-session", isDirectory: true)
+        )
+
+        harness.presenter.present(.started(recordingSession))
+
+        XCTAssertEqual(harness.presentationState.status, .recording(harness.recordingMessage))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.count, 1)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "recording_started")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata, harness.diagnosticsMetadata)
+    }
+
+    func testStartStatusPresenterSetsRecordingStatusForRestoredSession() {
+        let harness = makeStartStatusPresenter(status: .idle("Ready."))
+        let recordingSession = RecordingSessionDraft(
+            sessionID: UUID(),
+            artifactsDirectoryURL: URL(fileURLWithPath: "/tmp/bug-narrator-restored-session", isDirectory: true)
+        )
+
+        harness.presenter.present(.restored(recordingSession))
+
+        XCTAssertEqual(harness.presentationState.status, .recording(harness.recordingMessage))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testStartStatusPresenterPresentsPreflightFailure() {
+        let harness = makeStartStatusPresenter()
+        let expectedError = AppError.microphonePermissionDenied
+
+        harness.presenter.present(.preflightFailure(expectedError))
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_start")
+    }
+
+    func testStartStatusPresenterNormalizesGenericStartFailure() {
+        let harness = makeStartStatusPresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Recorder unavailable"]
+        )
+        let expectedError = AppError.recordingFailure("Recorder unavailable")
+
+        harness.presenter.present(.failure(error))
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_start")
+    }
+
+    func testStartStatusPresenterLeavesStatusForTransitionInProgress() {
+        let harness = makeStartStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.present(.transitionInProgress)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testStartStatusPresenterLeavesStatusForBusyApp() {
+        let harness = makeStartStatusPresenter(status: .transcribing("Uploading..."))
+
+        harness.presenter.present(.busy)
+
+        XCTAssertEqual(harness.presentationState.status, .transcribing("Uploading..."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
     func testStopSessionReturnsRecordedAudioAndStoresHandoff() async throws {
         let harness = try RecordingSessionControllerHarness()
         defer { harness.cleanup() }
@@ -227,6 +306,50 @@ final class RecordingSessionControllerTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertNil(harness.controller.pendingRecordedAudioSnapshot)
+    }
+
+    private func makeStartStatusPresenter(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: RecordingSessionStartStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder,
+        recordingMessage: String,
+        diagnosticsMetadata: [String: String]
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let statusMessages = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: .microphone,
+                hasUsableAIProviderCredential: true,
+                aiProviderCompatibilityIssue: nil,
+                autoExtractIssues: false,
+                autoCopyTranscript: false
+            )
+        }
+        let diagnosticsMetadata = [
+            "audio_source": RecordingAudioSource.microphone.diagnosticsValue,
+            "has_ai_provider_credential": "yes",
+            "ai_provider": "openAI"
+        ]
+        let presenter = RecordingSessionStartStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            ),
+            recordingStatusMessages: statusMessages,
+            startDiagnosticsMetadata: { diagnosticsMetadata },
+            telemetryRecorder: telemetryRecorder
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder,
+            recordingMessage: statusMessages.recordingDetailMessage(),
+            diagnosticsMetadata: diagnosticsMetadata
+        )
     }
 }
 
