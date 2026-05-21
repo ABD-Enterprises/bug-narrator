@@ -192,4 +192,87 @@ final class RecordingStatusMessageBuilderTests: XCTestCase {
             "Step 3 of 3: Extracting reviewable issues..."
         )
     }
+
+    @MainActor
+    func testPostTranscriptionStatusPresenterPresentsProgressStatuses() {
+        let harness = makePostTranscriptionStatusPresenter(autoExtractIssues: true)
+
+        harness.presenter.presentUploadProgress()
+        XCTAssertEqual(
+            harness.status(),
+            .transcribing("Step 1 of 3: Uploading audio to OpenAI for transcription...")
+        )
+
+        harness.presenter.presentSavingProgress(mode: .finishedRecording)
+        XCTAssertEqual(
+            harness.status(),
+            .transcribing("Step 2 of 3: Saving the finished session locally...")
+        )
+
+        harness.presenter.presentSavingProgress(mode: .retry)
+        XCTAssertEqual(
+            harness.status(),
+            .transcribing("Step 2 of 3: Saving the recovered session locally...")
+        )
+
+        harness.presenter.presentIssueExtractionProgress()
+        XCTAssertEqual(
+            harness.status(),
+            .transcribing("Step 3 of 3: Extracting reviewable issues...")
+        )
+    }
+
+    @MainActor
+    func testPostTranscriptionStatusPresenterOpensTranscriptWindowAndPresentsSuccess() {
+        let harness = makePostTranscriptionStatusPresenter(
+            autoExtractIssues: false,
+            autoCopyTranscript: true
+        )
+
+        harness.presenter.presentTranscriptWindow()
+        harness.presenter.presentSuccess()
+
+        XCTAssertEqual(harness.showTranscriptWindowCallCount(), 1)
+        XCTAssertEqual(
+            harness.status(),
+            .success("Session saved. Transcript copied to the clipboard.")
+        )
+    }
+
+    @MainActor
+    private func makePostTranscriptionStatusPresenter(
+        autoExtractIssues: Bool,
+        autoCopyTranscript: Bool = false
+    ) -> (
+        presenter: PostTranscriptionStatusPresenter,
+        status: () -> AppStatus,
+        showTranscriptWindowCallCount: () -> Int
+    ) {
+        var status = AppStatus.idle()
+        var showTranscriptWindowCallCount = 0
+        let provider = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: .microphone,
+                hasUsableAIProviderCredential: true,
+                aiProviderCompatibilityIssue: nil,
+                autoExtractIssues: autoExtractIssues,
+                autoCopyTranscript: autoCopyTranscript
+            )
+        }
+        let presenter = PostTranscriptionStatusPresenter(
+            recordingStatusMessages: provider,
+            setStatus: { newStatus in
+                status = newStatus
+            },
+            showTranscriptWindow: {
+                showTranscriptWindowCallCount += 1
+            }
+        )
+
+        return (
+            presenter: presenter,
+            status: { status },
+            showTranscriptWindowCallCount: { showTranscriptWindowCallCount }
+        )
+    }
 }

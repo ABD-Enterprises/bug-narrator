@@ -21,6 +21,7 @@ final class AppState: ObservableObject {
     let recordingSessionStopFailurePresenter: RecordingSessionStopFailurePresenter
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
+    let postTranscriptionStatusPresenter: PostTranscriptionStatusPresenter
     let sessionLibrary: SessionLibraryController
     let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
@@ -323,6 +324,11 @@ final class AppState: ObservableObject {
         self.recordingSessionStopFailurePresenter = RecordingSessionStopFailurePresenter(
             errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.postTranscriptionStatusPresenter = PostTranscriptionStatusPresenter(
+            recordingStatusMessages: recordingStatusMessages,
+            setStatus: { status in presentationState.setStatus(status, error: nil) },
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
         )
         self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
             errorPresenter: self.errorPresenter,
@@ -682,7 +688,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing(recordingStatusMessages.transcriptionUploadProgressMessage()))
+            postTranscriptionStatusPresenter.presentUploadProgress()
             recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcriptionClient.transcribe(
@@ -1205,7 +1211,7 @@ final class AppState: ObservableObject {
     ) async -> PostTranscriptionPipelineResult {
         var session = session
         recordCompletedTranscriptionIfNeeded(session, mode: mode)
-        setStatus(.transcribing(recordingStatusMessages.transcriptionSavingProgressMessage(mode: mode)))
+        postTranscriptionStatusPresenter.presentSavingProgress(mode: mode)
 
         do {
             try persistInitialPostTranscriptionSession(session, mode: mode)
@@ -1282,7 +1288,7 @@ final class AppState: ObservableObject {
 
         sessionLibrary.setCurrentTranscript(session)
         recordingSessionController.clearActiveRecordingSession()
-        showTranscriptWindow?()
+        postTranscriptionStatusPresenter.presentTranscriptWindow()
     }
 
     private func extractIssuesAfterTranscription(
@@ -1290,7 +1296,7 @@ final class AppState: ObservableObject {
         apiKey: String
     ) async throws -> TranscriptSession {
         var session = session
-        setStatus(.transcribing(recordingStatusMessages.transcriptionIssueExtractionProgressMessage()))
+        postTranscriptionStatusPresenter.presentIssueExtractionProgress()
         recordingSessionController.swapActivity(reason: "Extracting review issues")
 
         let extraction = try await issueExtractionController.extractIssues(
@@ -1306,11 +1312,11 @@ final class AppState: ObservableObject {
 
     private func finishSuccessfulTranscription(showTranscriptWindow: Bool) {
         if showTranscriptWindow {
-            self.showTranscriptWindow?()
+            postTranscriptionStatusPresenter.presentTranscriptWindow()
         }
 
         recordingSessionController.endActivity()
-        setStatus(.success(recordingStatusMessages.transcriptionSuccessMessage()))
+        postTranscriptionStatusPresenter.presentSuccess()
     }
 
     private func handleCompletedTranscriptPersistenceFailure(
