@@ -61,6 +61,8 @@
 		131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131A00000000000000000004 /* DebugSessionContextProviderTests.swift */; };
 		137A00000000000000000001 /* TranscriptionSessionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137A00000000000000000003 /* TranscriptionSessionBuilder.swift */; };
 		137A00000000000000000002 /* TranscriptionSessionBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137A00000000000000000004 /* TranscriptionSessionBuilderTests.swift */; };
+		227A00000000000000000001 /* PostTranscriptionPipelineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227A00000000000000000003 /* PostTranscriptionPipelineController.swift */; };
+		227A00000000000000000002 /* PostTranscriptionPipelineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */; };
 		123A00000000000000000001 /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000003 /* TransientToastController.swift */; };
 		123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123A00000000000000000004 /* TransientToastControllerTests.swift */; };
 		113A00000000000000000001 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113A00000000000000000003 /* ExportHistoryController.swift */; };
@@ -250,6 +252,8 @@
 		131A00000000000000000004 /* DebugSessionContextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProviderTests.swift; sourceTree = "<group>"; };
 		137A00000000000000000003 /* TranscriptionSessionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSessionBuilder.swift; sourceTree = "<group>"; };
 		137A00000000000000000004 /* TranscriptionSessionBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSessionBuilderTests.swift; sourceTree = "<group>"; };
+		227A00000000000000000003 /* PostTranscriptionPipelineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionPipelineController.swift; sourceTree = "<group>"; };
+		227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionPipelineControllerTests.swift; sourceTree = "<group>"; };
 		123A00000000000000000003 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		123A00000000000000000004 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		111A00000000000000000003 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
@@ -390,6 +394,7 @@
 				9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */,
 				D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */,
 				109A00000000000000000004 /* PermissionRecoveryControllerTests.swift */,
+				227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */,
 				FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */,
 				6F9B1D06622F36D479935B7D /* ProductInfoTests.swift */,
 				129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */,
@@ -523,6 +528,7 @@
 				60CD6EFC4CDBFE13C31BD38D /* OpenAIErrorMapper.swift */,
 				AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */,
 				109A00000000000000000003 /* PermissionRecoveryController.swift */,
+				227A00000000000000000003 /* PostTranscriptionPipelineController.swift */,
 				97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */,
 				875DD52AC7741ABC898365F4 /* RecordingSessionController.swift */,
 				115A00000000000000000003 /* RecoveredRecordingImportController.swift */,
@@ -749,6 +755,7 @@
 				C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */,
 				00D88D70666311588A8ED4F3 /* OperationalTelemetryRecorderTests.swift in Sources */,
 				109A00000000000000000002 /* PermissionRecoveryControllerTests.swift in Sources */,
+				227A00000000000000000002 /* PostTranscriptionPipelineControllerTests.swift in Sources */,
 				7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */,
 				8F3D88D73F1560365347F711 /* ProductInfoTests.swift in Sources */,
 				129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */,
@@ -850,6 +857,7 @@
 				7251FD6A3C965C5D9A87805F /* OpenAIErrorMapper.swift in Sources */,
 				C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */,
 				109A00000000000000000001 /* PermissionRecoveryController.swift in Sources */,
+				227A00000000000000000001 /* PostTranscriptionPipelineController.swift in Sources */,
 				A29BE3EF9236161E2E8713CD /* PrivacyDataExporter.swift in Sources */,
 				30018202D1990BA2524B2CD6 /* RecordingAudioSource.swift in Sources */,
 				5D4B8A830EA58AFC03AE9982 /* RecordingControlPanelView.swift in Sources */,

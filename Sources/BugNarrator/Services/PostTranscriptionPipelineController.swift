@@ -1,0 +1,136 @@
+import Foundation
+
+@MainActor
+final class PostTranscriptionPipelineController {
+    private let settingsStore: SettingsStore
+    private let sessionLibrary: SessionLibraryController
+    private let issueExtractionController: IssueExtractionController
+    private let recordingSessionController: RecordingSessionController
+    private let statusPresenter: PostTranscriptionStatusPresenter
+    private let telemetryRecorder: any OperationalTelemetryRecording
+    private let transcriptionLogger: DiagnosticsLogger
+
+    init(
+        settingsStore: SettingsStore,
+        sessionLibrary: SessionLibraryController,
+        issueExtractionController: IssueExtractionController,
+        recordingSessionController: RecordingSessionController,
+        statusPresenter: PostTranscriptionStatusPresenter,
+        telemetryRecorder: any OperationalTelemetryRecording,
+        transcriptionLogger: DiagnosticsLogger = DiagnosticsLogger(category: .transcription)
+    ) {
+        self.settingsStore = settingsStore
+        self.sessionLibrary = sessionLibrary
+        self.issueExtractionController = issueExtractionController
+        self.recordingSessionController = recordingSessionController
+        self.statusPresenter = statusPresenter
+        self.telemetryRecorder = telemetryRecorder
+        self.transcriptionLogger = transcriptionLogger
+    }
+
+    func complete(
+        session: TranscriptSession,
+        apiKey: String,
+        mode: PostTranscriptionPipelineMode
+    ) async -> PostTranscriptionPipelineResult {
+        var session = session
+        recordCompletedTranscriptionIfNeeded(session, mode: mode)
+        statusPresenter.presentSavingProgress(mode: mode)
+
+        do {
+            try persistInitialPostTranscriptionSession(session, mode: mode)
+        } catch {
+            return .persistenceFailure(session: session, error: error)
+        }
+
+        finalizeInitialPostTranscriptionPersistence(session, mode: mode)
+
+        guard settingsStore.autoExtractIssues else {
+            return .success(session)
+        }
+
+        do {
+            session = try await extractIssuesAfterTranscription(for: session, apiKey: apiKey)
+            return .success(session)
+        } catch {
+            return .postTranscriptionFailure(error)
+        }
+    }
+
+    private func recordCompletedTranscriptionIfNeeded(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) {
+        guard mode.recordsCompletionTelemetry else {
+            return
+        }
+
+        transcriptionLogger.info(
+            .transcriptionCompleted,
+            "BugNarrator finished transcription and created a transcript session.",
+            metadata: [
+                "session_id": session.id.uuidString,
+                "marker_count": "\(session.markerCount)",
+                "screenshot_count": "\(session.screenshotCount)"
+            ]
+        )
+        telemetryRecorder.record(
+            .transcriptionCompleted,
+            metadata: [
+                "marker_count": "\(session.markerCount)",
+                "screenshot_count": "\(session.screenshotCount)",
+                "model": session.model
+            ]
+        )
+    }
+
+    private func persistInitialPostTranscriptionSession(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) throws {
+        switch mode {
+        case .finishedRecording:
+            try sessionLibrary.persistCompletedTranscript(
+                session,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
+        case .retry:
+            try sessionLibrary.persistUpdatedSession(
+                session,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
+        }
+    }
+
+    private func finalizeInitialPostTranscriptionPersistence(
+        _ session: TranscriptSession,
+        mode: PostTranscriptionPipelineMode
+    ) {
+        guard mode == .finishedRecording else {
+            return
+        }
+
+        sessionLibrary.setCurrentTranscript(session)
+        recordingSessionController.clearActiveRecordingSession()
+        statusPresenter.presentTranscriptWindow()
+    }
+
+    private func extractIssuesAfterTranscription(
+        for session: TranscriptSession,
+        apiKey: String
+    ) async throws -> TranscriptSession {
+        var session = session
+        statusPresenter.presentIssueExtractionProgress()
+        recordingSessionController.swapActivity(reason: "Extracting review issues")
+
+        let extraction = try await issueExtractionController.extractIssues(
+            for: session,
+            apiKey: apiKey,
+            model: settingsStore.issueExtractionModelValue,
+            apiBaseURL: settingsStore.openAIBaseURLValue,
+            completionLog: .postTranscription
+        )
+        session.issueExtraction = extraction
+        return session
+    }
+}
