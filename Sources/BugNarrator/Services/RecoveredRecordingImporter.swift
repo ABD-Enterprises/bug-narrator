@@ -37,7 +37,7 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
                 includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles]
             )
-            .filter(Self.isRecoverableAudioFile)
+            .filter(Self.isImportableAudioFile)
             .filter { !alreadyImported.contains($0.lastPathComponent) }
             .sorted {
                 modificationDate(for: $0) > modificationDate(for: $1)
@@ -132,6 +132,15 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
 
     private static func isRecoverableAudioFile(_ url: URL) -> Bool {
         supportedAudioExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func isImportableAudioFile(_ url: URL) -> Bool {
+        isRecoverableAudioFile(url) && fileSize(for: url) > 0
+    }
+
+    private static func fileSize(for url: URL) -> Int {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        return values?.fileSize ?? 0
     }
 
     private func modificationDate(for url: URL) -> Date {
