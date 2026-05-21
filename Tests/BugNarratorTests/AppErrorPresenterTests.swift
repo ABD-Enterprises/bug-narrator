@@ -121,6 +121,35 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["error_type"], "invalid_api_key")
     }
 
+    func testPresentErrorRendersActiveProviderMessageWhenProviderIsParakeet() {
+        let harness = AppErrorPresenterHarness(provider: { .parakeetLocal })
+
+        _ = harness.presenter.presentError(AppError.networkTimeout, operation: .transcription)
+
+        let status = harness.presentationState.status
+        guard case .error(let text) = status else {
+            return XCTFail("Expected error status, got \(status).")
+        }
+        XCTAssertFalse(text.contains("OpenAI"), "Parakeet error text should not contain OpenAI: \(text)")
+        XCTAssertTrue(
+            text.contains(AIProvider.parakeetLocal.displayName),
+            "Parakeet error text should reference active provider: \(text)"
+        )
+    }
+
+    func testPresentPostTranscriptionErrorOpensSettingsForParakeetCredentialFailure() {
+        let harness = AppErrorPresenterHarness(provider: { .parakeetLocal })
+
+        let result = harness.presenter.presentPostTranscriptionError(AppError.missingAPIKey)
+
+        XCTAssertTrue(result.shouldOpenSettingsWindow)
+        let status = harness.presentationState.status
+        guard case .error(let text) = status else {
+            return XCTFail("Expected error status, got \(status).")
+        }
+        XCTAssertFalse(text.contains("OpenAI"), "Parakeet error text should not contain OpenAI: \(text)")
+    }
+
     func testTranscriptPersistenceFailurePresenterPrefixesStatusAndOpensTranscript() throws {
         let harness = AppErrorPresenterHarness()
         let underlyingError = NSError(
@@ -157,10 +186,11 @@ private final class AppErrorPresenterHarness {
     let telemetryRecorder = MockOperationalTelemetryRecorder()
     let presenter: AppErrorPresenter
 
-    init() {
+    init(provider: @escaping () -> AIProvider = { .openAI }) {
         self.presenter = AppErrorPresenter(
             presentationState: presentationState,
-            telemetryRecorder: telemetryRecorder
+            telemetryRecorder: telemetryRecorder,
+            provider: provider
         )
     }
 
