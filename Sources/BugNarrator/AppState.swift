@@ -63,30 +63,6 @@ final class AppState: ObservableObject {
     private let permissionsLogger = DiagnosticsLogger(category: .permissions)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    private enum PostTranscriptionPipelineMode: Equatable {
-        case finishedRecording
-        case retry
-
-        var savingAction: String {
-            switch self {
-            case .finishedRecording:
-                return "Saving the finished session locally..."
-            case .retry:
-                return "Saving the recovered session locally..."
-            }
-        }
-
-        var recordsCompletionTelemetry: Bool {
-            self == .finishedRecording
-        }
-    }
-
-    private enum PostTranscriptionPipelineResult {
-        case success(TranscriptSession)
-        case persistenceFailure(session: TranscriptSession, error: Error)
-        case postTranscriptionFailure(Error)
-    }
-
     var status: AppStatus {
         presentationState.status
     }
