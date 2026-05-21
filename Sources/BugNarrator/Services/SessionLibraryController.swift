@@ -43,9 +43,14 @@ enum SessionDeletionStatusPresenter {
 @MainActor
 final class SessionLibraryStatusPresenter {
     private let errorPresenter: AppErrorPresenter
+    private let prepareErrorPresentationSideEffects: () -> Void
 
-    init(errorPresenter: AppErrorPresenter) {
+    init(
+        errorPresenter: AppErrorPresenter,
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {}
+    ) {
         self.errorPresenter = errorPresenter
+        self.prepareErrorPresentationSideEffects = prepareErrorPresentationSideEffects
     }
 
     func presentDisplayedTranscriptCopyResult(_ result: DisplayedTranscriptCopyResult) {
@@ -67,6 +72,7 @@ final class SessionLibraryStatusPresenter {
     }
 
     func presentFailure(_ error: Error) {
+        prepareErrorPresentationSideEffects()
         _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
     }
 }
