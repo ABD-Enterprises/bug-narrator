@@ -202,6 +202,22 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
     }
 
+    func testSessionLibraryStatusPresenterRunsCleanupHookOnFailure() {
+        var cleanupCallCount = 0
+        let harness = makeSessionLibraryStatusPresenter(
+            prepareErrorPresentationSideEffects: { cleanupCallCount += 1 }
+        )
+
+        harness.presenter.presentFailure(AppError.storageFailure("Disk locked."))
+
+        XCTAssertEqual(cleanupCallCount, 1, "presentFailure must run the cleanup hook before delegating to errorPresenter.")
+        XCTAssertEqual(
+            harness.presentationState.status,
+            .error(AppError.storageFailure("Disk locked.").userMessage)
+        )
+        XCTAssertEqual(harness.presentationState.currentError, .storageFailure("Disk locked."))
+    }
+
     func testSessionLibraryStatusPresenterLeavesStatusForNoDeletedSessions() {
         let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
 
@@ -318,7 +334,8 @@ final class SessionLibraryControllerTests: XCTestCase {
     }
 
     private func makeSessionLibraryStatusPresenter(
-        status: AppStatus = .idle()
+        status: AppStatus = .idle(),
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {}
     ) -> (
         presenter: SessionLibraryStatusPresenter,
         presentationState: AppPresentationState,
@@ -330,7 +347,8 @@ final class SessionLibraryControllerTests: XCTestCase {
             errorPresenter: AppErrorPresenter(
                 presentationState: presentationState,
                 telemetryRecorder: telemetryRecorder
-            )
+            ),
+            prepareErrorPresentationSideEffects: prepareErrorPresentationSideEffects
         )
 
         return (
