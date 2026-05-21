@@ -809,7 +809,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            NSWorkspace.shared.activateFileViewerSelecting([completion.bundleURL])
+            appUtilityActionPresenter.present(appUtilityActions.revealInFinder(completion.bundleURL))
             setStatus(.success(completion.statusMessage))
         } catch {
             presentError(
@@ -828,7 +828,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            NSWorkspace.shared.activateFileViewerSelecting([completion.bundleURL])
+            appUtilityActionPresenter.present(appUtilityActions.revealInFinder(completion.bundleURL))
             setStatus(.success(completion.statusMessage))
         } catch {
             presentError(
