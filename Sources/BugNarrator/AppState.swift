@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
     let postTranscriptionStatusPresenter: PostTranscriptionStatusPresenter
+    let postTranscriptionPipeline: PostTranscriptionPipelineController
     let sessionLibrary: SessionLibraryController
     let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
@@ -70,7 +71,6 @@ final class AppState: ObservableObject {
     private let lifecycleNotificationBinder: AppLifecycleNotificationBinder
     private let launchDiagnosticsReporter: AppLaunchDiagnosticsReporter
     private let artifactsService: any SessionArtifactsManaging
-    private let telemetryRecorder: any OperationalTelemetryRecording
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
@@ -335,6 +335,15 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
+        self.postTranscriptionPipeline = PostTranscriptionPipelineController(
+            settingsStore: settingsStore,
+            sessionLibrary: sessionLibrary,
+            issueExtractionController: issueExtractionController,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            telemetryRecorder: telemetryRecorder,
+            transcriptionLogger: transcriptionLogger
+        )
         self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
@@ -433,7 +442,6 @@ final class AppState: ObservableObject {
         self.objectChangeForwarder = ObservableObjectChangeForwarder()
         self.lifecycleNotificationBinder = AppLifecycleNotificationBinder()
         self.artifactsService = artifactsService
-        self.telemetryRecorder = telemetryRecorder
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
             exportService: exportService
@@ -707,7 +715,7 @@ final class AppState: ObservableObject {
                 request: request,
                 result: transcriptionResult
             )
-            let result = await completePostTranscriptionPipeline(
+            let result = await postTranscriptionPipeline.complete(
                 session: session,
                 apiKey: apiKey,
                 mode: .finishedRecording
@@ -948,7 +956,7 @@ final class AppState: ObservableObject {
                 result: result
             )
 
-            switch await completePostTranscriptionPipeline(
+            switch await postTranscriptionPipeline.complete(
                 session: updatedSession,
                 apiKey: apiKey,
                 mode: .retry
@@ -1178,112 +1186,6 @@ final class AppState: ObservableObject {
         recordingSessionStopReadinessPresenter.recordingSession(
             for: recordingSessionController.beginStoppingSession(statusPhase: status.phase)
         )
-    }
-
-    private func completePostTranscriptionPipeline(
-        session: TranscriptSession,
-        apiKey: String,
-        mode: PostTranscriptionPipelineMode
-    ) async -> PostTranscriptionPipelineResult {
-        var session = session
-        recordCompletedTranscriptionIfNeeded(session, mode: mode)
-        postTranscriptionStatusPresenter.presentSavingProgress(mode: mode)
-
-        do {
-            try persistInitialPostTranscriptionSession(session, mode: mode)
-        } catch {
-            return .persistenceFailure(session: session, error: error)
-        }
-
-        finalizeInitialPostTranscriptionPersistence(session, mode: mode)
-
-        guard settingsStore.autoExtractIssues else {
-            return .success(session)
-        }
-
-        do {
-            session = try await extractIssuesAfterTranscription(for: session, apiKey: apiKey)
-            return .success(session)
-        } catch {
-            return .postTranscriptionFailure(error)
-        }
-    }
-
-    private func recordCompletedTranscriptionIfNeeded(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) {
-        guard mode.recordsCompletionTelemetry else {
-            return
-        }
-
-        transcriptionLogger.info(
-            .transcriptionCompleted,
-            "BugNarrator finished transcription and created a transcript session.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "marker_count": "\(session.markerCount)",
-                "screenshot_count": "\(session.screenshotCount)"
-            ]
-        )
-        telemetryRecorder.record(
-            .transcriptionCompleted,
-            metadata: [
-                "marker_count": "\(session.markerCount)",
-                "screenshot_count": "\(session.screenshotCount)",
-                "model": session.model
-            ]
-        )
-    }
-
-    private func persistInitialPostTranscriptionSession(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) throws {
-        switch mode {
-        case .finishedRecording:
-            try sessionLibrary.persistCompletedTranscript(
-                session,
-                autoCopyTranscript: settingsStore.autoCopyTranscript
-            )
-        case .retry:
-            try sessionLibrary.persistUpdatedSession(
-                session,
-                autoCopyTranscript: settingsStore.autoCopyTranscript
-            )
-        }
-    }
-
-    private func finalizeInitialPostTranscriptionPersistence(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) {
-        guard mode == .finishedRecording else {
-            return
-        }
-
-        sessionLibrary.setCurrentTranscript(session)
-        recordingSessionController.clearActiveRecordingSession()
-        postTranscriptionStatusPresenter.presentTranscriptWindow()
-    }
-
-    private func extractIssuesAfterTranscription(
-        for session: TranscriptSession,
-        apiKey: String
-    ) async throws -> TranscriptSession {
-        var session = session
-        postTranscriptionStatusPresenter.presentIssueExtractionProgress()
-        recordingSessionController.swapActivity(reason: "Extracting review issues")
-
-        let extraction = try await issueExtractionController.extractIssues(
-            for: session,
-            apiKey: apiKey,
-            model: settingsStore.issueExtractionModelValue,
-            apiBaseURL: settingsStore.openAIBaseURLValue,
-            completionLog: .postTranscription
-        )
-        session.issueExtraction = extraction
-        return session
     }
 
     private func finishSuccessfulTranscription(showTranscriptWindow: Bool) {
