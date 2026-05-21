@@ -1029,7 +1029,7 @@ final class AppState: ObservableObject {
             aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
             statusPhase: status.phase
         ) else {
-            setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
+            setStatus(IssueExtractionStatusPresenter.manualProgressStatus)
             recordingSessionController.beginActivity(reason: "Extracting review issues")
             transcriptionLogger.info(
                 "issue_extraction_requested",
@@ -1051,7 +1051,7 @@ final class AppState: ObservableObject {
                 )
 
                 recordingSessionController.endActivity()
-                setStatus(.success("Extracted \(extraction.issues.count) review issues."))
+                setStatus(IssueExtractionStatusPresenter.manualCompletionStatus(issueCount: extraction.issues.count))
                 showTranscriptWindow?()
             } catch {
                 presentError(error, operation: .postTranscription, fallback: { .issueExtractionFailure($0) })
