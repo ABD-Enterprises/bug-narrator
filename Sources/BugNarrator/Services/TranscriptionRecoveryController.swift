@@ -162,7 +162,7 @@ final class TranscriptionRecoveryController: ObservableObject {
                 recordedAudio,
                 in: recordingSession.artifactsDirectoryURL
             )
-            let retryableSession = makeRetryableSession(
+            let retryableSession = TranscriptionSessionBuilder.retryableSession(
                 from: recordingSession,
                 recordedAudio: recordedAudio,
                 request: request,
@@ -242,34 +242,6 @@ final class TranscriptionRecoveryController: ObservableObject {
         return preservedAudioURL
     }
 
-    private func makeRetryableSession(
-        from recordingSession: RecordingSessionDraft,
-        recordedAudio: RecordedAudio,
-        request: TranscriptionRequest,
-        failureReason: PendingTranscriptionFailureReason,
-        preservedAudioURL: URL
-    ) -> TranscriptSession {
-        TranscriptSession(
-            id: recordingSession.sessionID,
-            createdAt: Date(),
-            transcript: "",
-            duration: recordedAudio.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: recordingSession.markers,
-            screenshots: recordingSession.screenshots,
-            sections: [],
-            issueExtraction: nil,
-            pendingTranscription: PendingTranscription(
-                audioFileName: preservedAudioURL.lastPathComponent,
-                failureReason: failureReason,
-                preservedAt: Date()
-            ),
-            updatedAt: Date(),
-            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-        )
-    }
 }
 
 struct PendingTranscriptionRetryContext {

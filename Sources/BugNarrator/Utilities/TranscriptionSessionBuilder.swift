@@ -61,4 +61,35 @@ enum TranscriptionSessionBuilder {
             artifactsDirectoryPath: session.artifactsDirectoryPath
         )
     }
+
+    static func retryableSession(
+        from recordingSession: RecordingSessionDraft,
+        recordedAudio: RecordedAudio,
+        request: TranscriptionRequest,
+        failureReason: PendingTranscriptionFailureReason,
+        preservedAudioURL: URL,
+        createdAt: Date = Date(),
+        preservedAt: Date = Date()
+    ) -> TranscriptSession {
+        TranscriptSession(
+            id: recordingSession.sessionID,
+            createdAt: createdAt,
+            transcript: "",
+            duration: recordedAudio.duration,
+            model: request.model,
+            languageHint: request.languageHint,
+            prompt: request.prompt,
+            markers: recordingSession.markers,
+            screenshots: recordingSession.screenshots,
+            sections: [],
+            issueExtraction: nil,
+            pendingTranscription: PendingTranscription(
+                audioFileName: preservedAudioURL.lastPathComponent,
+                failureReason: failureReason,
+                preservedAt: preservedAt
+            ),
+            updatedAt: createdAt,
+            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
+        )
+    }
 }
