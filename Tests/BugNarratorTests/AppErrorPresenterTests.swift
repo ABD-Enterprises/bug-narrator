@@ -71,6 +71,35 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["operation"], "post_transcription")
         XCTAssertEqual(telemetry.metadata["error_type"], "invalid_api_key")
     }
+
+    func testTranscriptPersistenceFailurePresenterPrefixesStatusAndOpensTranscript() throws {
+        let harness = AppErrorPresenterHarness()
+        let underlyingError = NSError(
+            domain: "AppErrorPresenterTests",
+            code: 11,
+            userInfo: [NSLocalizedDescriptionKey: "Disk locked"]
+        )
+        var showTranscriptCallCount = 0
+        let presenter = TranscriptPersistenceFailurePresenter(
+            errorPresenter: harness.presenter,
+            showTranscriptWindow: {
+                showTranscriptCallCount += 1
+            }
+        )
+
+        presenter.present(underlyingError, sessionID: UUID())
+
+        let appError = AppError.storageFailure("Disk locked")
+        XCTAssertEqual(harness.presentationState.status, .error("Transcript ready, but \(appError.userMessage)"))
+        XCTAssertEqual(harness.presentationState.currentError, appError)
+        XCTAssertEqual(showTranscriptCallCount, 1)
+
+        let telemetry = try harness.lastAppErrorTelemetry()
+        XCTAssertEqual(telemetry.metadata["context"], "transcript_persist_failed")
+        XCTAssertEqual(telemetry.metadata["operation"], "session_library")
+        XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "Disk locked")
+    }
 }
 
 @MainActor
