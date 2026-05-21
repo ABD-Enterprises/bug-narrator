@@ -3,6 +3,29 @@ import XCTest
 
 @MainActor
 final class PermissionRecoveryControllerTests: XCTestCase {
+    func testStatusPresenterAppliesRecoveredStatus() {
+        let harness = makeStatusPresenter(currentError: .microphonePermissionDenied)
+
+        harness.presenter.present(.recovered(.idle("Microphone access enabled. You can start recording again.")))
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Microphone access enabled. You can start recording again."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testStatusPresenterLeavesUnchangedOutcomeUntouched() {
+        let harness = makeStatusPresenter(
+            status: .error("Microphone access is still blocked."),
+            currentError: .microphonePermissionDenied
+        )
+
+        harness.presenter.present(.unchanged)
+
+        XCTAssertEqual(harness.presentationState.status, .error("Microphone access is still blocked."))
+        XCTAssertEqual(harness.presentationState.currentError, .microphonePermissionDenied)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
     func testRefreshRecoversMicrophoneDeniedStateWhenAccessIsGranted() {
         let harness = PermissionRecoveryControllerHarness(microphonePermissionState: .authorized)
 
@@ -105,6 +128,30 @@ final class PermissionRecoveryControllerTests: XCTestCase {
                 BugNarratorLinks.securityPrivacySettings,
                 BugNarratorLinks.systemSettingsApp
             ]
+        )
+    }
+
+    private func makeStatusPresenter(
+        status: AppStatus = .idle(),
+        currentError: AppError? = nil
+    ) -> (
+        presenter: PermissionRecoveryStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
+        let presentationState = AppPresentationState(status: status, currentError: currentError)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = PermissionRecoveryStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
         )
     }
 }
