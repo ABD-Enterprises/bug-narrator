@@ -21,6 +21,7 @@ final class AppState: ObservableObject {
     let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
     let sessionLibrary: SessionLibraryController
+    let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
     let recoveredRecordingImportController: RecoveredRecordingImportController
     private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
@@ -275,6 +276,9 @@ final class AppState: ObservableObject {
             clipboardService: clipboardService
         )
         self.sessionLibrary = sessionLibrary
+        self.sessionLibraryStatusPresenter = SessionLibraryStatusPresenter(
+            errorPresenter: self.errorPresenter
+        )
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
         let recoveredRecordingImportController = RecoveredRecordingImportController(
             transcriptStore: transcriptStore,
@@ -967,33 +971,25 @@ final class AppState: ObservableObject {
 
     func saveCurrentTranscriptToHistory() {
         do {
-            if let status = TranscriptSaveStatusPresenter.status(savedSession: try sessionLibrary.saveCurrentTranscriptToHistory()) {
-                setStatus(status)
-            }
+            sessionLibraryStatusPresenter.presentSavedSession(try sessionLibrary.saveCurrentTranscriptToHistory())
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
     func deleteDisplayedTranscript() {
         do {
-            let deletedCount = try sessionLibrary.deleteDisplayedTranscript()
-            if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
-                setStatus(status)
-            }
+            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteDisplayedTranscript())
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
     func deleteSessions(withIDs ids: Set<UUID>) {
         do {
-            let deletedCount = try sessionLibrary.deleteSessions(withIDs: ids)
-            if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
-                setStatus(status)
-            }
+            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteSessions(withIDs: ids))
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
