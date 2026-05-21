@@ -5,11 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var issueExtractionSessionID: UUID?
-    @Published private(set) var exportDestinationInProgress: ExportDestination?
-    @Published private(set) var pendingExportReview: IssueExportReview?
-    @Published private(set) var exportHistory: [ExportReceipt] = []
-    @Published private(set) var recoveredRecordingImportCount = 0
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
@@ -17,92 +12,72 @@ final class AppState: ObservableObject {
     let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
     let presentationState: AppPresentationState
+    let errorPresenter: AppErrorPresenter
+    let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
+    let postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter
+    let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
+    let recordingSessionStartStatusPresenter: RecordingSessionStartStatusPresenter
+    let recordingSessionStopReadinessPresenter: RecordingSessionStopReadinessPresenter
+    let recordingSessionStopFailurePresenter: RecordingSessionStopFailurePresenter
+    let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
+    let recordingStatusMessages: RecordingStatusMessageProvider
+    let postTranscriptionStatusPresenter: PostTranscriptionStatusPresenter
+    let postTranscriptionPipeline: PostTranscriptionPipelineController
+    let finishedRecordingPostTranscriptionResultHandler: FinishedRecordingPostTranscriptionResultHandler
+    let retryPostTranscriptionResultHandler: RetryPostTranscriptionResultHandler
     let sessionLibrary: SessionLibraryController
+    let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
+    let exportHistoryController: ExportHistoryController
+    let recoveredRecordingImportController: RecoveredRecordingImportController
+    private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
+    let issueExtractionController: IssueExtractionController
+    let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
+    let issueMutationFailurePresenter: IssueMutationFailurePresenter
+    let issueExportController: IssueExportController
+    let issueExportPresentationController: IssueExportPresentationController
+    let permissionRecoveryController: PermissionRecoveryController
+    let permissionRecoveryStatusPresenter: PermissionRecoveryStatusPresenter
+    let appUtilityActions: AppUtilityActionController
+    let appUtilityActionPresenter: AppUtilityActionResultPresenter
+    let applicationTerminationController: ApplicationTerminationController
+    let supportDataController: SupportDataController
+    let supportDataActionPresenter: SupportDataActionPresenter
+    let localDataDeletionController: LocalDataDeletionController
     let transcriptionRecovery: TranscriptionRecoveryController
+    let retryTranscriptionStatusPresenter: RetryTranscriptionStatusPresenter
+    let pendingTranscriptionRetryFailureHandler: PendingTranscriptionRetryFailureHandler
+    let retryableSessionPreservationPresenter: RetryableSessionPreservationPresenter
     let screenshotCoordinator: ScreenshotCoordinator
+    let screenshotCaptureController: ScreenshotCaptureController
 
-    private let runtimeEnvironment: AppRuntimeEnvironment
-    var showTranscriptWindow: (() -> Void)?
-    var showSettingsWindow: (() -> Void)?
-    var showAboutWindow: (() -> Void)?
-    var showChangelogWindow: (() -> Void)?
-    var showSupportWindow: (() -> Void)?
-    var showRecordingControlWindow: (() -> Void)?
-    var prepareForScreenshotSelection: (() -> Void)?
-    var restoreAfterScreenshotSelection: (() -> Void)?
+    var showTranscriptWindow: (() -> Void)? { get { appUtilityActions.showTranscriptWindow } set { appUtilityActions.showTranscriptWindow = newValue } }
+    var showSettingsWindow: (() -> Void)? { get { appUtilityActions.showSettingsWindow } set { appUtilityActions.showSettingsWindow = newValue } }
+    var showAboutWindow: (() -> Void)? { get { appUtilityActions.showAboutWindow } set { appUtilityActions.showAboutWindow = newValue } }
+    var showChangelogWindow: (() -> Void)? { get { appUtilityActions.showChangelogWindow } set { appUtilityActions.showChangelogWindow = newValue } }
+    var showSupportWindow: (() -> Void)? { get { appUtilityActions.showSupportWindow } set { appUtilityActions.showSupportWindow = newValue } }
+    var showRecordingControlWindow: (() -> Void)? { get { appUtilityActions.showRecordingControlWindow } set { appUtilityActions.showRecordingControlWindow = newValue } }
 
-    private let microphonePermissionService: any MicrophonePermissionServicing
-    private let screenCapturePermissionService: any ScreenCapturePermissionServicing
+    var prepareForScreenshotSelection: (() -> Void)? {
+        get { screenshotCaptureController.prepareForScreenshotSelection }
+        set { screenshotCaptureController.prepareForScreenshotSelection = newValue }
+    }
+    var restoreAfterScreenshotSelection: (() -> Void)? {
+        get { screenshotCaptureController.restoreAfterScreenshotSelection }
+        set { screenshotCaptureController.restoreAfterScreenshotSelection = newValue }
+    }
+
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
-    private let issueExtractionService: any IssueExtracting
-    private let exportService: any IssueExporting
-    private let recoveredRecordingImporter: any RecoveredRecordingImporting
+    private let hotkeySettingsBinder: HotkeySettingsBinder
+    private let objectChangeForwarder: ObservableObjectChangeForwarder
+    private let lifecycleNotificationBinder: AppLifecycleNotificationBinder
+    private let launchDiagnosticsReporter: AppLaunchDiagnosticsReporter
     private let artifactsService: any SessionArtifactsManaging
-    private let clipboardService: any ClipboardWriting
-    private let urlHandler: any URLOpening
-    private let debugBundleExporter: any DebugBundleExporting
-    private let privacyDataExporter: any PrivacyDataExporting
-    private let telemetryRecorder: any OperationalTelemetryRecording
-    private let localPrivacyDataManager: any LocalPrivacyDataManaging
 
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
-    private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
-    private let exportLogger = DiagnosticsLogger(category: .export)
-    private let permissionsLogger = DiagnosticsLogger(category: .permissions)
-    private let screenshotLogger = DiagnosticsLogger(category: .screenshots)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
-
-    private var cancellables = Set<AnyCancellable>()
-    private var toastDismissTask: Task<Void, Never>?
-
-    private enum AppErrorOperation: String {
-        case generic
-        case recordingStart = "recording_start"
-        case recordingStop = "recording_stop"
-        case transcription
-        case retryTranscription = "retry_transcription"
-        case postTranscription = "post_transcription"
-        case screenshotCapture = "screenshot_capture"
-        case diagnosticsExport = "diagnostics_export"
-        case privacyExport = "privacy_export"
-        case export
-        case exportHistory = "export_history"
-        case sessionLibrary = "session_library"
-        case recoveredRecordingImport = "recovered_recording_import"
-    }
-
-    private struct AppErrorNormalization {
-        let appError: AppError
-        let operation: AppErrorOperation
-        let underlyingErrorDescription: String?
-    }
-
-    private enum PostTranscriptionPipelineMode: Equatable {
-        case finishedRecording
-        case retry
-
-        var savingAction: String {
-            switch self {
-            case .finishedRecording:
-                return "Saving the finished session locally..."
-            case .retry:
-                return "Saving the recovered session locally..."
-            }
-        }
-
-        var recordsCompletionTelemetry: Bool {
-            self == .finishedRecording
-        }
-    }
-
-    private enum PostTranscriptionPipelineResult {
-        case success(TranscriptSession)
-        case persistenceFailure(session: TranscriptSession, error: Error)
-        case postTranscriptionFailure(Error)
-    }
 
     var status: AppStatus {
         presentationState.status
@@ -110,6 +85,22 @@ final class AppState: ObservableObject {
 
     var currentError: AppError? {
         presentationState.currentError
+    }
+
+    var recoveredRecordingImportCount: Int {
+        recoveredRecordingImportController.recoveredRecordingImportCount
+    }
+
+    var exportHistory: [ExportReceipt] {
+        exportHistoryController.exportHistory
+    }
+
+    var exportDestinationInProgress: ExportDestination? {
+        issueExportController.exportDestinationInProgress
+    }
+
+    var pendingExportReview: IssueExportReview? {
+        issueExportController.pendingExportReview
     }
 
     var transientToast: TransientToast? {
@@ -244,43 +235,242 @@ final class AppState: ObservableObject {
         self.settingsStore = settingsStore
         self.transcriptStore = transcriptStore
         self.recordingTimer = recordingTimer
-        self.presentationState = AppPresentationState()
-        self.recordingSessionController = RecordingSessionController(
+        let presentationState = AppPresentationState()
+        self.presentationState = presentationState
+        self.errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        let transientToastController = TransientToastController(presentationState: presentationState)
+        self.transientToastController = transientToastController
+        let recordingSessionController = RecordingSessionController(
             audioRecorder: audioRecorder,
             microphonePermissionService: microphonePermissionService,
             artifactsService: artifactsService,
             recordingTimer: recordingTimer
         )
-        self.sessionLibrary = SessionLibraryController(
+        self.recordingSessionController = recordingSessionController
+        self.recordingSessionStopReadinessPresenter = RecordingSessionStopReadinessPresenter(
+            errorPresenter: self.errorPresenter
+        )
+        self.recordingSessionCancelStatusPresenter = RecordingSessionCancelStatusPresenter(
+            setStatus: { status in presentationState.setStatus(status, error: nil) }
+        )
+        let recordingStatusMessages = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: settingsStore.recordingAudioSource,
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+                aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
+                autoExtractIssues: settingsStore.autoExtractIssues,
+                autoCopyTranscript: settingsStore.autoCopyTranscript
+            )
+        }
+        self.recordingStatusMessages = recordingStatusMessages
+        self.recordingSessionStartStatusPresenter = RecordingSessionStartStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            recordingStatusMessages: recordingStatusMessages,
+            startDiagnosticsMetadata: {
+                [
+                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
+                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
+                    "ai_provider": settingsStore.aiProvider.rawValue
+                ]
+            },
+            telemetryRecorder: telemetryRecorder
+        )
+        let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
             artifactsService: artifactsService,
             clipboardService: clipboardService
         )
-        self.transcriptionRecovery = TranscriptionRecoveryController(
-            sessionLibrary: self.sessionLibrary,
+        self.sessionLibrary = sessionLibrary
+        self.sessionLibraryStatusPresenter = SessionLibraryStatusPresenter(
+            errorPresenter: self.errorPresenter
+        )
+        self.exportHistoryController = ExportHistoryController(exportService: exportService)
+        let recoveredRecordingImportController = RecoveredRecordingImportController(
+            transcriptStore: transcriptStore,
+            sessionLibrary: sessionLibrary,
+            recoveredRecordingImporter: recoveredRecordingImporter,
             artifactsService: artifactsService
         )
-        self.screenshotCoordinator = ScreenshotCoordinator(
+        self.recoveredRecordingImportController = recoveredRecordingImportController
+        let issueExtractionController = IssueExtractionController(
+            sessionLibrary: sessionLibrary,
+            issueExtractionService: issueExtractionService
+        )
+        self.issueExtractionController = issueExtractionController
+        let issueExportController = IssueExportController(
+            settingsStore: settingsStore,
+            sessionLibrary: sessionLibrary,
+            exportService: exportService
+        )
+        self.issueExportController = issueExportController
+        let permissionRecoveryController = PermissionRecoveryController(
+            microphonePermissionService: microphonePermissionService,
+            screenCapturePermissionService: screenCapturePermissionService,
+            urlHandler: urlHandler,
+            runtimeEnvironment: runtimeEnvironment
+        )
+        self.permissionRecoveryController = permissionRecoveryController
+        self.permissionRecoveryStatusPresenter = PermissionRecoveryStatusPresenter(
+            errorPresenter: self.errorPresenter
+        )
+        self.launchDiagnosticsReporter = AppLaunchDiagnosticsReporter(
+            permissionRecoveryController: permissionRecoveryController,
+            transcriptStore: transcriptStore
+        )
+        let appUtilityActions = AppUtilityActionController(
+            urlHandler: urlHandler,
+            permissionRecoveryController: permissionRecoveryController
+        )
+        self.appUtilityActions = appUtilityActions
+        self.recordingSessionStopFailurePresenter = RecordingSessionStopFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.postTranscriptionStatusPresenter = PostTranscriptionStatusPresenter(
+            recordingStatusMessages: recordingStatusMessages,
+            setStatus: { status in presentationState.setStatus(status, error: nil) },
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.postTranscriptionFailurePresenter = PostTranscriptionFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.postTranscriptionPipeline = PostTranscriptionPipelineController(
+            settingsStore: settingsStore,
+            sessionLibrary: sessionLibrary,
+            issueExtractionController: issueExtractionController,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            telemetryRecorder: telemetryRecorder,
+            transcriptionLogger: transcriptionLogger
+        )
+        self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.issueMutationFailurePresenter = IssueMutationFailurePresenter(
+            errorPresenter: self.errorPresenter
+        )
+        self.issueExportPresentationController = IssueExportPresentationController(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
+        )
+        self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.finishedRecordingPostTranscriptionResultHandler = FinishedRecordingPostTranscriptionResultHandler(
+            sessionLibrary: sessionLibrary,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            transcriptPersistenceFailurePresenter: self.transcriptPersistenceFailurePresenter,
+            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
+            autoCopyTranscript: { settingsStore.autoCopyTranscript },
+            cleanupPendingRecordedAudio: {
+                recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
+            }
+        )
+        self.recoveredRecordingLaunchImporter = RecoveredRecordingLaunchImportPresenter(
+            importController: recoveredRecordingImportController,
+            errorPresenter: self.errorPresenter,
+            setStatus: { status, error in
+                presentationState.setStatus(status, error: error)
+            },
+            openTranscriptHistory: {
+                appUtilityActions.openTranscriptHistory()
+            }
+        )
+        let appUtilityActionPresenter = AppUtilityActionResultPresenter(
+            statusPhase: { presentationState.status.phase },
+            setStatus: { status in
+                presentationState.setStatus(status, error: nil)
+            }
+        )
+        self.appUtilityActionPresenter = appUtilityActionPresenter
+        self.supportDataActionPresenter = SupportDataActionPresenter(
+            presentationState: presentationState,
+            errorPresenter: self.errorPresenter,
+            utilityActions: appUtilityActions,
+            utilityResultPresenter: appUtilityActionPresenter
+        )
+        self.supportDataController = SupportDataController(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
+            exportService: exportService,
+            clipboardService: clipboardService,
+            debugBundleExporter: debugBundleExporter,
+            privacyDataExporter: privacyDataExporter,
+            telemetryRecorder: telemetryRecorder,
+            localPrivacyDataManager: localPrivacyDataManager
+        )
+        self.localDataDeletionController = LocalDataDeletionController(
+            transcriptStore: transcriptStore,
+            sessionLibrary: sessionLibrary,
+            supportDataController: self.supportDataController,
+            exportHistoryController: self.exportHistoryController
+        )
+        self.transcriptionRecovery = TranscriptionRecoveryController(
+            sessionLibrary: sessionLibrary,
+            artifactsService: artifactsService
+        )
+        self.retryTranscriptionStatusPresenter = RetryTranscriptionStatusPresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.pendingTranscriptionRetryFailureHandler = PendingTranscriptionRetryFailureHandler(
+            transcriptionRecovery: self.transcriptionRecovery,
+            recordingSessionController: recordingSessionController,
+            retryStatusPresenter: self.retryTranscriptionStatusPresenter,
+            provider: { settingsStore.aiProvider }
+        )
+        self.retryableSessionPreservationPresenter = RetryableSessionPreservationPresenter(
+            errorPresenter: self.errorPresenter,
+            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
+            provider: { settingsStore.aiProvider }
+        )
+        self.retryPostTranscriptionResultHandler = RetryPostTranscriptionResultHandler(
+            transcriptionRecovery: self.transcriptionRecovery,
+            recordingSessionController: recordingSessionController,
+            statusPresenter: self.postTranscriptionStatusPresenter,
+            sessionLibraryStatusPresenter: self.sessionLibraryStatusPresenter,
+            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
+            debugMode: { settingsStore.debugMode }
+        )
+        let screenshotCoordinator = ScreenshotCoordinator(
             screenCapturePermissionService: screenCapturePermissionService,
             screenshotCaptureService: screenshotCaptureService,
             screenshotSelectionService: screenshotSelectionService,
             artifactsService: artifactsService
         )
-        self.runtimeEnvironment = runtimeEnvironment
-        self.microphonePermissionService = microphonePermissionService
-        self.screenCapturePermissionService = screenCapturePermissionService
+        self.screenshotCoordinator = screenshotCoordinator
+        self.screenshotCaptureController = ScreenshotCaptureController(
+            screenshotCoordinator: screenshotCoordinator,
+            recordingSessionController: recordingSessionController,
+            errorPresenter: self.errorPresenter,
+            statusPhase: { presentationState.status.phase },
+            elapsedDuration: { recordingTimer.elapsedDuration },
+            recordingDetailMessage: {
+                recordingStatusMessages.recordingDetailMessage()
+            },
+            setStatus: { status, error in
+                presentationState.setStatus(status, error: error)
+            },
+            showToast: { message, style in
+                transientToastController.showToast(message, style: style)
+            }
+        )
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
-        self.issueExtractionService = issueExtractionService
-        self.exportService = exportService
-        self.recoveredRecordingImporter = recoveredRecordingImporter
+        self.hotkeySettingsBinder = HotkeySettingsBinder(hotkeyManager: hotkeyManager)
+        self.objectChangeForwarder = ObservableObjectChangeForwarder()
+        self.lifecycleNotificationBinder = AppLifecycleNotificationBinder()
         self.artifactsService = artifactsService
-        self.clipboardService = clipboardService
-        self.urlHandler = urlHandler
-        self.debugBundleExporter = debugBundleExporter
-        self.privacyDataExporter = privacyDataExporter
-        self.telemetryRecorder = telemetryRecorder
-        self.localPrivacyDataManager = localPrivacyDataManager
         self.trackerIntegration = TrackerIntegrationController(
             settingsStore: settingsStore,
             exportService: exportService
@@ -289,12 +479,54 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             transcriptionClient: transcriptionClient
         )
+        let applicationTerminationController = ApplicationTerminationController(
+            statusPhase: { presentationState.status.phase },
+            activeRecordingSession: { recordingSessionController.activeRecordingSession },
+            isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
+            isExporting: { issueExportController.exportDestinationInProgress != nil },
+            cancelPendingScreenshotSelection: { reason in
+                screenshotCoordinator.cancelPendingSelection(reason: reason)
+            },
+            showRecordingControls: {
+                appUtilityActions.openRecordingControls()
+            },
+            showToast: { message, style in
+                transientToastController.showToast(message, style: style)
+            },
+            dismissToast: {
+                transientToastController.dismissToast()
+            },
+            unregisterHotkeys: {
+                hotkeyManager.unregisterAll()
+            },
+            stopTimer: { resetElapsed in
+                recordingSessionController.stopTimer(resetElapsed: resetElapsed)
+            },
+            endActivity: {
+                recordingSessionController.endActivity()
+            }
+        )
+        self.applicationTerminationController = applicationTerminationController
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
-        self.hotkeyManager.onHotKeyPressed = { [weak self] action in
-            Task { @MainActor [weak self] in
-                self?.handleHotKeyPressed(action)
+        let hotkeyActionDispatcher = HotkeyActionDispatcher(
+            statusPhase: { [weak self] in
+                self?.status.phase ?? .idle
+            },
+            startRecording: { [weak self] in
+                await self?.openRecordingControlsAndStartSession()
+            },
+            stopRecording: { [weak self] in
+                await self?.stopSession()
+            },
+            captureScreenshot: { [weak self] in
+                await self?.captureScreenshot()
+            }
+        )
+        self.hotkeyManager.onHotKeyPressed = { action in
+            Task { @MainActor in
+                hotkeyActionDispatcher.handle(action)
             }
         }
 
@@ -306,84 +538,35 @@ final class AppState: ObservableObject {
             self?.showSettingsWindow?()
         }
 
-        trackerIntegration.objectWillChange
-            .sink { [weak self] _ in
+        objectChangeForwarder.forward(
+            [
+                trackerIntegration.objectWillChange,
+                aiProviderSettings.objectWillChange,
+                presentationState.objectWillChange,
+                recordingSessionController.objectWillChange,
+                sessionLibrary.objectWillChange,
+                exportHistoryController.objectWillChange,
+                recoveredRecordingImportController.objectWillChange,
+                issueExtractionController.objectWillChange,
+                issueExportController.objectWillChange,
+                transcriptionRecovery.objectWillChange,
+                screenshotCoordinator.objectWillChange
+            ],
+            notify: { [weak self] in
                 self?.objectWillChange.send()
             }
-            .store(in: &cancellables)
+        )
 
-        aiProviderSettings.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        presentationState.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        recordingSessionController.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        sessionLibrary.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        transcriptionRecovery.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        screenshotCoordinator.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        settingsStore.$startRecordingHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .startRecording)
-            }
-            .store(in: &cancellables)
-
-        settingsStore.$stopRecordingHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .stopRecording)
-            }
-            .store(in: &cancellables)
-
-        settingsStore.$screenshotHotkeyShortcut
-            .removeDuplicates()
-            .sink { [weak self] shortcut in
-                self?.hotkeyManager.register(shortcut: shortcut, for: .captureScreenshot)
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-            .sink { [weak self] _ in
+        lifecycleNotificationBinder.bind(
+            didBecomeActive: { [weak self] in
                 self?.refreshPermissionRecoveryState()
+            },
+            willTerminate: {
+                applicationTerminationController.prepareForApplicationTermination()
             }
-            .store(in: &cancellables)
+        )
 
-        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in
-                self?.prepareForApplicationTermination()
-            }
-            .store(in: &cancellables)
-
-        hotkeyManager.register(shortcut: settingsStore.startRecordingHotkeyShortcut, for: .startRecording)
-        hotkeyManager.register(shortcut: settingsStore.stopRecordingHotkeyShortcut, for: .stopRecording)
-        hotkeyManager.register(shortcut: settingsStore.screenshotHotkeyShortcut, for: .captureScreenshot)
+        hotkeySettingsBinder.bind(settingsStore: settingsStore)
 
         settingsLogger.info(
             "app_state_initialized",
@@ -395,12 +578,12 @@ final class AppState: ObservableObject {
                 "debug_mode": settingsStore.debugMode ? "enabled" : "disabled"
             ]
         )
-        validateRuntimeConfiguration()
-        importRecoveredRecordingsAtLaunch()
+        permissionRecoveryController.validateRuntimeConfiguration()
+        recoveredRecordingLaunchImporter.importRecoveredRecordingsAtLaunch()
         Task { [weak self] in
             await self?.refreshExportHistory()
         }
-        logLaunchDiagnostics()
+        launchDiagnosticsReporter.logLaunchDiagnostics(selectedTranscriptID: selectedTranscriptID)
     }
 
     var elapsedTimeString: String {
@@ -449,11 +632,7 @@ final class AppState: ObservableObject {
     }
 
     var debugInfoSnapshot: DebugInfoSnapshot {
-        DebugInfoSnapshot(
-            metadata: BugNarratorMetadata(),
-            settingsStore: settingsStore,
-            sessionID: currentDebugSessionID
-        )
+        supportDataController.debugInfoSnapshot(sessionID: currentDebugSessionID)
     }
 
     var storageRecoveryMessage: String? {
@@ -471,154 +650,48 @@ final class AppState: ObservableObject {
     }
 
     var isScreenshotCaptureInProgress: Bool {
-        screenshotCoordinator.isCaptureInProgress
+        screenshotCaptureController.isCaptureInProgress
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
-        issueExtractionSessionID == session.id
+        issueExtractionController.isExtractingIssues(for: session)
     }
 
     func isExporting(to destination: ExportDestination) -> Bool {
-        exportDestinationInProgress == destination
+        issueExportController.isExporting(to: destination)
     }
 
     func refreshPermissionRecoveryState() {
-        permissionsLogger.debug(
-            "permission_recovery_refresh_started",
-            "Refreshing permission recovery state after BugNarrator became active.",
-            metadata: [
-                "microphone_status": microphonePermissionService.currentStatus().rawValue,
-                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
-            ]
+        permissionRecoveryStatusPresenter.present(
+            permissionRecoveryController.refreshRecoveryState(
+                currentError: currentError,
+                statusPhase: status.phase
+            )
         )
-
-        switch currentError {
-        case .microphonePermissionDenied, .microphonePermissionRestricted, .microphoneUnavailable:
-            guard status.phase != .recording, status.phase != .transcribing else {
-                return
-            }
-
-            let microphoneStatus = microphonePermissionService.currentStatus()
-            guard microphoneStatus == .granted else {
-                return
-            }
-
-            setStatus(.idle("Microphone access enabled. You can start recording again."))
-        case .screenRecordingPermissionDenied:
-            guard screenCapturePermissionService.currentStatus() == .granted else {
-                return
-            }
-
-            if status.phase == .recording {
-                setStatus(.recording("Screen Recording access enabled. You can capture screenshots again."))
-            } else {
-                setStatus(.idle("Screen Recording access enabled. You can capture screenshots again."))
-            }
-        default:
-            return
-        }
     }
 
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
-        guard canRequestIssueExport(from: session) else {
-            return false
-        }
-
-        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues else {
-            return false
-        }
-
-        switch destination {
-        case .github:
-            return (try? configuredGitHubIssueGroups(for: selectedIssues)) != nil
-        case .jira:
-            return (try? configuredJiraIssueGroups(for: selectedIssues)) != nil
-        }
+        issueExportController.canExportIssues(from: session, to: destination, statusPhase: status.phase)
     }
 
     func canRequestIssueExport(from session: TranscriptSession) -> Bool {
-        guard status.phase != .recording,
-              status.phase != .transcribing,
-              pendingExportReview == nil,
-              let session = sessionSnapshot(with: session.id),
-              let extraction = session.issueExtraction,
-              !extraction.selectedIssues.isEmpty else {
-            return false
-        }
-
-        return true
+        issueExportController.canRequestIssueExport(from: session, statusPhase: status.phase)
     }
 
     func issueExportSetupMessage(for destination: ExportDestination) -> String? {
-        switch destination {
-        case .github:
-            guard !settingsStore.hasGitHubToken else {
-                return nil
-            }
-            return "GitHub token is missing. Click Set Up GitHub to open Settings."
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration == nil else {
-                return nil
-            }
-            return "Jira connection is missing. Click Set Up Jira to open Settings."
-        }
+        issueExportController.issueExportSetupMessage(for: destination)
     }
 
     func issueExportRoutingMessage(for destination: ExportDestination, session: TranscriptSession) -> String? {
-        guard let selectedIssues = sessionSnapshot(with: session.id)?.issueExtraction?.selectedIssues,
-              !selectedIssues.isEmpty else {
-            return nil
-        }
-
-        switch destination {
-        case .github:
-            guard settingsStore.hasGitHubToken else {
-                return nil
-            }
-
-            let missingCount = selectedIssues.filter { gitHubExportConfiguration(for: $0) == nil }.count
-            guard missingCount > 0 else {
-                return nil
-            }
-            return "Choose a GitHub repository for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration != nil else {
-                return nil
-            }
-
-            let missingCount = selectedIssues.filter { jiraExportConfiguration(for: $0) == nil }.count
-            guard missingCount > 0 else {
-                return nil
-            }
-            return "Choose a Jira project and issue type for \(missingCount) selected issue\(missingCount == 1 ? "" : "s")."
-        }
+        issueExportController.issueExportRoutingMessage(for: destination, session: session)
     }
 
     func defaultGitHubIssueExportTarget() -> GitHubIssueExportTarget? {
-        guard !settingsStore.normalizedGitHubRepositoryOwner.isEmpty,
-              !settingsStore.normalizedGitHubRepositoryName.isEmpty else {
-            return nil
-        }
-
-        return GitHubIssueExportTarget(
-            repositoryID: settingsStore.normalizedGitHubRepositoryID.nilIfEmpty,
-            owner: settingsStore.normalizedGitHubRepositoryOwner,
-            repository: settingsStore.normalizedGitHubRepositoryName,
-            labels: settingsStore.githubDefaultLabelsList
-        )
+        issueExportController.defaultGitHubIssueExportTarget()
     }
 
     func defaultJiraIssueExportTarget() -> JiraIssueExportTarget? {
-        guard !settingsStore.normalizedJiraProjectKey.isEmpty else {
-            return nil
-        }
-
-        return JiraIssueExportTarget(
-            projectID: settingsStore.normalizedJiraProjectID.nilIfEmpty,
-            projectKey: settingsStore.normalizedJiraProjectKey,
-            issueTypeID: settingsStore.normalizedJiraIssueTypeID,
-            issueTypeName: settingsStore.normalizedJiraIssueType
-        )
+        issueExportController.defaultJiraIssueExportTarget()
     }
 
     func startSession() async {
@@ -626,89 +699,9 @@ final class AppState: ObservableObject {
 
         let outcome = await recordingSessionController.startSession(
             statusPhase: status.phase,
-            activityReason: recordingActivityReason()
+            activityReason: recordingStatusMessages.recordingActivityReason()
         )
-
-        switch outcome {
-        case .transitionInProgress:
-            recordingLogger.debug(.sessionStartIgnored, "The start request was ignored because another recording transition is already in progress.")
-            return
-
-        case .busy:
-            recordingLogger.warning(.sessionStartRejected, "The start request was rejected because BugNarrator is already busy.")
-            return
-
-        case .restored(let recordingSession):
-            recordingLogger.warning(
-                "session_start_reconciled_active_session",
-                "A start request arrived while a recording session draft was still active; restoring recording state instead of starting a duplicate recorder.",
-                metadata: ["session_id": recordingSession.sessionID.uuidString]
-            )
-            setStatus(.recording(recordingDetailMessage()))
-            return
-
-        case .preflightFailure(let preflightError):
-            permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
-            presentError(preflightError, operation: .recordingStart)
-            return
-
-        case .failure(let error):
-            presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
-
-        case .started(let recordingSession):
-            setStatus(.recording(recordingDetailMessage()))
-            recordingLogger.info(
-                .sessionStarted,
-                "A feedback session started successfully.",
-                metadata: [
-                    "session_id": recordingSession.sessionID.uuidString,
-                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                    "ai_provider": settingsStore.aiProvider.rawValue
-                ]
-            )
-            telemetryRecorder.record(
-                .recordingStarted,
-                metadata: [
-                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                    "ai_provider": settingsStore.aiProvider.rawValue
-                ]
-            )
-        }
-    }
-
-    private func recordingDetailMessage() -> String {
-        let prefix: String
-        switch settingsStore.recordingAudioSource {
-        case .microphone:
-            prefix = "Recording in progress."
-        case .systemAudio:
-            prefix = "Recording system audio."
-        case .microphoneAndSystemAudio:
-            prefix = "Recording microphone and system audio."
-        }
-
-        if settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil {
-            return prefix
-        }
-
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            return "\(prefix) \(compatibilityIssue)"
-        }
-
-        return "\(prefix) Finish the AI provider setup in Settings before stopping to transcribe this session."
-    }
-
-    private func recordingActivityReason() -> String {
-        switch settingsStore.recordingAudioSource {
-        case .microphone:
-            return "Recording a spoken feedback session"
-        case .systemAudio:
-            return "Recording system audio for a feedback session"
-        case .microphoneAndSystemAudio:
-            return "Recording microphone and system audio for a feedback session"
-        }
+        recordingSessionStartStatusPresenter.present(outcome)
     }
 
     func stopSession() async {
@@ -718,9 +711,11 @@ final class AppState: ObservableObject {
 
         defer { recordingSessionController.finishStoppingSession() }
 
-        cancelPendingScreenshotSelection(reason: "Stopping the active session cancels pending screenshot selection.")
+        screenshotCaptureController.cancelPendingSelection(
+            reason: "Stopping the active session cancels pending screenshot selection."
+        )
         recordingSessionController.prepareForStopSession()
-        let request = makeTranscriptionRequest()
+        let request = settingsStore.transcriptionRequest
 
         do {
             logSessionStopRequested(recordingSession)
@@ -736,26 +731,26 @@ final class AppState: ObservableObject {
                 return
             }
 
-            setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Preparing audio for transcription...")))
-            swapActivity(reason: "Uploading audio for transcription")
+            postTranscriptionStatusPresenter.presentUploadProgress()
+            recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
-            let transcriptionResult = try await transcribeAudio(
-                at: recordedAudio.fileURL,
-                request: request,
-                apiKey: apiKey
+            let transcriptionResult = try await transcriptionClient.transcribe(
+                fileURL: recordedAudio.fileURL,
+                apiKey: apiKey,
+                request: request
             )
-            let session = makeTranscriptSession(
+            let session = TranscriptionSessionBuilder.completedSession(
                 from: recordingSession,
                 recordedAudio: recordedAudio,
                 request: request,
                 result: transcriptionResult
             )
-            let result = await completePostTranscriptionPipeline(
+            let result = await postTranscriptionPipeline.complete(
                 session: session,
                 apiKey: apiKey,
                 mode: .finishedRecording
             )
-            handleFinishedRecordingPostTranscriptionResult(result)
+            finishedRecordingPostTranscriptionResultHandler.handle(result)
         } catch {
             handleStopSessionFailure(error, recordingSession: recordingSession, request: request)
         }
@@ -774,37 +769,25 @@ final class AppState: ObservableObject {
             preserveFile: settingsStore.debugMode,
             onCancelWillBegin: { [weak self] in
                 self?.showDiscardConfirmation = false
-                self?.cancelPendingScreenshotSelection(reason: "Discarding the active session cancels pending screenshot selection.")
+                self?.screenshotCaptureController.cancelPendingSelection(
+                    reason: "Discarding the active session cancels pending screenshot selection."
+                )
             }
         )
 
-        switch outcome {
-        case .transitionInProgress:
-            recordingLogger.debug("session_cancel_ignored", "The cancel request was ignored because another recording transition is already in progress.")
-            return
-
-        case .cancelled(let activeRecordingSession):
-            if let activeRecordingSession {
-                recordingLogger.info(
-                    "session_cancelled",
-                    "The active feedback session was discarded.",
-                    metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-                )
-            }
-            setStatus(.idle("Session discarded."))
-        }
+        recordingSessionCancelStatusPresenter.present(outcome)
     }
 
     func openTranscriptHistory() {
-        showTranscriptWindow?()
+        appUtilityActions.openTranscriptHistory()
     }
 
     func openRecordingControls() {
-        showRecordingControlWindow?()
+        appUtilityActions.openRecordingControls()
     }
 
     func openRecordingControlsAndStartSession() async {
-        showRecordingControlWindow?()
+        appUtilityActions.openRecordingControls()
 
         guard status.phase != .recording else {
             return
@@ -814,210 +797,104 @@ final class AppState: ObservableObject {
     }
 
     func openSettings() {
-        settingsLogger.debug("open_settings", "Opening the Settings window.")
-        showSettingsWindow?()
+        appUtilityActions.openSettings()
     }
 
     func requestApplicationTermination() {
-        guard applicationShouldTerminate() == .terminateNow else {
-            return
-        }
-
-        NSApp.terminate(nil)
+        applicationTerminationController.requestApplicationTermination()
     }
 
     func applicationShouldTerminate() -> NSApplication.TerminateReply {
-        guard status.phase == .recording,
-              let activeRecordingSession else {
-            return .terminateNow
-        }
-
-        recordingLogger.warning(
-            "termination_blocked_while_recording",
-            "BugNarrator blocked an app termination request while a recording session was still active.",
-            metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-        )
-        cancelPendingScreenshotSelection(reason: "Quit was requested while recording, so pending screenshot selection was cancelled.")
-        showRecordingControlWindow?()
-        showToast("Stop recording before quitting BugNarrator.", style: .informational)
-        return .terminateCancel
+        applicationTerminationController.applicationShouldTerminate()
     }
 
     func openAbout() {
-        showAboutWindow?()
+        appUtilityActions.openAbout()
     }
 
     func openChangelog() {
-        showChangelogWindow?()
+        appUtilityActions.openChangelog()
     }
 
     func openGitHubRepository() {
-        openExternalURL(BugNarratorLinks.repository, label: "GitHub repository")
+        appUtilityActionPresenter.present(appUtilityActions.openGitHubRepository())
     }
 
     func openDocumentation() {
-        openExternalURL(BugNarratorLinks.documentation, label: "documentation")
+        appUtilityActionPresenter.present(appUtilityActions.openDocumentation())
     }
 
     func openIssueReporter() {
-        openExternalURL(BugNarratorLinks.issues, label: "issue tracker")
+        appUtilityActionPresenter.present(appUtilityActions.openIssueReporter())
     }
 
     func openSupportDevelopment() {
-        showSupportWindow?()
+        appUtilityActions.openSupportDevelopment()
     }
 
     func openSupportDonationPage() {
-        openExternalURL(BugNarratorLinks.supportDevelopment, label: "PayPal donation page")
+        appUtilityActionPresenter.present(appUtilityActions.openSupportDonationPage())
     }
 
     func openMicrophonePrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.microphonePrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Microphone settings automatically.")
+        appUtilityActionPresenter.present(appUtilityActions.openMicrophonePrivacySettings())
     }
 
     func openScreenRecordingPrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.screenRecordingPrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Screen Recording settings automatically.")
+        appUtilityActionPresenter.present(appUtilityActions.openScreenRecordingPrivacySettings())
     }
 
     func openSystemAudioPrivacySettings() {
-        let candidateURLs = [
-            BugNarratorLinks.screenRecordingPrivacySettings,
-            BugNarratorLinks.securityPrivacySettings,
-            BugNarratorLinks.systemSettingsApp
-        ]
-
-        for url in candidateURLs where urlHandler.open(url) {
-            return
-        }
-
-        presentUtilityActionFailure("BugNarrator could not open Screen & System Audio Recording settings automatically.")
+        appUtilityActionPresenter.present(appUtilityActions.openSystemAudioPrivacySettings())
     }
 
     func checkForUpdates() {
-        openExternalURL(BugNarratorLinks.releases, label: "releases page")
+        appUtilityActionPresenter.present(appUtilityActions.checkForUpdates())
     }
 
     func copyDebugInfo() {
-        let snapshot = debugInfoSnapshot
-        clipboardService.copy(snapshot.clipboardText)
-        settingsLogger.info(
-            "debug_info_copied",
-            "Copied debug info to the clipboard.",
-            metadata: ["session_id": snapshot.sessionID?.uuidString ?? "none"]
-        )
-        setStatus(.success("Debug info copied to the clipboard."))
+        let result = supportDataController.copyDebugInfo(sessionID: currentDebugSessionID)
+        supportDataActionPresenter.presentCopyDebugInfo(result)
     }
 
     func exportDebugBundle() async {
-        let snapshot = await makeDebugBundleSnapshot()
-
         do {
-            guard let bundleURL = try debugBundleExporter.export(snapshot: snapshot) else {
+            guard let completion = try await supportDataController.exportDebugBundle(
+                sessionMetadata: currentDebugSessionMetadata()
+            ) else {
                 return
             }
 
-            settingsLogger.info(
-                "debug_bundle_exported",
-                "Exported a local debug bundle.",
-                metadata: [
-                    "session_id": snapshot.sessionMetadata.sessionID?.uuidString ?? "none",
-                    "debug_mode": snapshot.debugInfo.debugModeEnabled ? "enabled" : "disabled"
-                ]
-            )
-            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
-            setStatus(
-                .success(
-                    settingsStore.debugMode
-                        ? "Debug bundle exported with verbose diagnostics."
-                        : "Debug bundle exported."
-                )
-            )
+            supportDataActionPresenter.presentDebugBundleExport(completion)
         } catch {
-            presentError(
-                error,
-                operation: .diagnosticsExport,
-                fallback: { _ in .diagnosticsFailure("BugNarrator could not create the debug bundle.") }
-            )
+            supportDataActionPresenter.presentDebugBundleExportFailure(error)
         }
     }
 
     func exportPrivacyData() async {
         do {
-            let diagnostics = await makePrivacyDataExportDiagnosticsSnapshot()
-            guard let bundleURL = try privacyDataExporter.export(
-                sessions: transcriptStore.allStoredSessions(),
-                settings: makePrivacyDataExportSettingsSnapshot(),
-                diagnostics: diagnostics
+            guard let completion = try await supportDataController.exportPrivacyData(
+                exportHistoryFallback: exportHistory
             ) else {
                 return
             }
 
-            sessionLibraryLogger.info(
-                "privacy_data_exported",
-                "Exported a local privacy data bundle.",
-                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
-            )
-            telemetryRecorder.record(
-                .privacyDataExported,
-                metadata: ["session_count": "\(transcriptStore.sessionCount)"]
-            )
-            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
-            setStatus(.success("Data export created. API keys and tracker credentials were not included."))
+            supportDataActionPresenter.presentPrivacyDataExport(completion)
         } catch {
-            presentError(
-                error,
-                operation: .privacyExport,
-                fallback: { _ in .exportFailure("BugNarrator could not create the data export.") }
-            )
+            supportDataActionPresenter.presentPrivacyDataExportFailure(error)
         }
     }
 
     func deleteAllLocalData() async {
-        guard status.phase != .recording, status.phase != .transcribing else {
-            setStatus(.error("Stop recording or transcription before deleting local data."))
-            return
+        do {
+            let result = try await localDataDeletionController.deleteAllLocalData(
+                currentTranscript: currentTranscript,
+                statusPhase: status.phase
+            )
+            supportDataActionPresenter.presentLocalDataDeletion(result)
+        } catch {
+            supportDataActionPresenter.presentLocalDataDeletionFailure(error)
         }
-
-        let idsToDelete = Set(transcriptStore.allStoredSessionIDs())
-            .union(currentTranscript.map { [$0.id] } ?? [])
-        let deletedSessionCount = idsToDelete.count
-
-        if !idsToDelete.isEmpty {
-            deleteSessions(withIDs: idsToDelete)
-        }
-
-        await clearLocalPrivacyArtifacts()
-
-        let message: String
-        if deletedSessionCount == 0 {
-            message = "Cleared local diagnostics and export history."
-        } else if deletedSessionCount == 1 {
-            message = "Deleted 1 local session and cleared local diagnostics."
-        } else {
-            message = "Deleted \(deletedSessionCount) local sessions and cleared local diagnostics."
-        }
-
-        setStatus(.success(message))
     }
 
     func validateAPIKey() async {
@@ -1053,35 +930,11 @@ final class AppState: ObservableObject {
     }
 
     func refreshExportHistory() async {
-        do {
-            exportHistory = try await exportService.exportHistory()
-        } catch {
-            let normalizedError = normalizeError(
-                error,
-                operation: .exportHistory,
-                fallback: { .exportFailure($0) }
-            )
-            exportLogger.warning(
-                "export_history_refresh_failed",
-                normalizedError.appError.userMessage,
-                metadata: appErrorMetadata(for: normalizedError, context: "export_history_refresh_failed")
-            )
-            exportHistory = []
-        }
+        await exportHistoryController.refreshExportHistory()
     }
 
     func copyDisplayedTranscript() {
-        guard let transcript = displayedTranscript else {
-            return
-        }
-
-        guard transcript.hasTranscriptContent else {
-            setStatus(.error("Transcription is not available yet. Retry the preserved session first."))
-            return
-        }
-
-        clipboardService.copy(transcript.transcript)
-        setStatus(.success("Transcript copied to the clipboard."))
+        sessionLibraryStatusPresenter.presentDisplayedTranscriptCopyResult(sessionLibrary.copyDisplayedTranscript())
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
@@ -1098,14 +951,11 @@ final class AppState: ObservableObject {
         case .duplicate:
             return
         case .failure(let appError, let opensSettings, let statusMessage):
-            if let statusMessage {
-                setStatus(.error(statusMessage), error: appError)
-            } else {
-                presentError(appError, operation: .retryTranscription)
-            }
-            if opensSettings {
-                showSettingsWindow?()
-            }
+            retryTranscriptionStatusPresenter.presentRetryContextFailure(
+                appError: appError,
+                opensSettings: opensSettings,
+                statusMessage: statusMessage
+            )
             return
         }
 
@@ -1113,10 +963,12 @@ final class AppState: ObservableObject {
             return
         }
 
-        let request = makeTranscriptionRequest()
+        let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
-        setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
-        swapActivity(reason: "Retrying transcription from preserved audio")
+        retryTranscriptionStatusPresenter.presentRetryStarted(
+            progressMessage: recordingStatusMessages.transcriptionRetryProgressMessage()
+        )
+        recordingSessionController.swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
 
         do {
@@ -1124,187 +976,54 @@ final class AppState: ObservableObject {
                 throw AppError.missingAPIKey
             }
 
-            let result = try await transcribeAudio(
-                at: retryContext.audioFileURL,
-                request: request,
-                apiKey: apiKey
+            let result = try await transcriptionClient.transcribe(
+                fileURL: retryContext.audioFileURL,
+                apiKey: apiKey,
+                request: request
             )
-            let updatedSession = makeRecoveredTranscriptSession(
+            let updatedSession = TranscriptionSessionBuilder.recoveredSession(
                 from: retryContext.session,
                 request: request,
                 result: result
             )
 
-            switch await completePostTranscriptionPipeline(
+            let pipelineResult = await postTranscriptionPipeline.complete(
                 session: updatedSession,
                 apiKey: apiKey,
                 mode: .retry
-            ) {
-            case .success:
-                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
-                    at: retryContext.audioFileURL,
-                    debugMode: settingsStore.debugMode
-                )
-                transcriptionRecovery.finishRetry()
-                finishSuccessfulTranscription(showTranscriptWindow: true)
-            case .persistenceFailure(_, let error):
-                transcriptionRecovery.finishRetry()
-                presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
-            case .postTranscriptionFailure(let error):
-                transcriptionRecovery.cleanupPreservedRetryAudioIfNeeded(
-                    at: retryContext.audioFileURL,
-                    debugMode: settingsStore.debugMode
-                )
-                transcriptionRecovery.finishRetry()
-                endActivity()
-                presentPostTranscriptionError(error, operation: .retryTranscription)
-            }
+            )
+            retryPostTranscriptionResultHandler.handle(pipelineResult, context: retryContext)
         } catch {
-            if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
-                return
-            }
-
-            transcriptionRecovery.finishRetry()
-            presentError(error, operation: .retryTranscription)
+            pendingTranscriptionRetryFailureHandler.handle(error, context: retryContext)
         }
     }
 
     func saveCurrentTranscriptToHistory() {
         do {
-            if try sessionLibrary.saveCurrentTranscriptToHistory() != nil {
-                setStatus(.success("Transcript saved to session history."))
-            }
+            sessionLibraryStatusPresenter.presentSavedSession(try sessionLibrary.saveCurrentTranscriptToHistory())
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
     func deleteDisplayedTranscript() {
         do {
-            presentDeletedSessionStatus(try sessionLibrary.deleteDisplayedTranscript())
+            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteDisplayedTranscript())
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
     func deleteSessions(withIDs ids: Set<UUID>) {
         do {
-            presentDeletedSessionStatus(try sessionLibrary.deleteSessions(withIDs: ids))
+            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteSessions(withIDs: ids))
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
-        }
-    }
-
-    private func presentDeletedSessionStatus(_ deletedCount: Int) {
-        if deletedCount > 0 {
-            setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
+            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
     func captureScreenshot() async {
-        guard status.phase == .recording, let recordingSession = activeRecordingSession else {
-            let error = AppError.noActiveSession("Start a feedback session before capturing a screenshot.")
-            screenshotLogger.warning("screenshot_rejected_no_session", error.userMessage)
-            setStatus(.error(error.userMessage), error: error)
-            return
-        }
-
-        if isScreenshotCaptureInProgress {
-            let error = AppError.screenshotCaptureFailure("Wait for the current screenshot to finish, then try again.")
-            screenshotLogger.warning("screenshot_rejected_busy", error.userMessage)
-            setStatus(.recording(error.userMessage), error: error)
-            return
-        }
-
-        let screenshotIndex = recordingSession.screenshots.count + 1
-        let markerIndex = recordingSession.markers.count + 1
-        let elapsedTime = max(recordingSessionController.currentDuration, elapsedDuration)
-        let markerID = UUID()
-        let markerTitle = "Screenshot \(screenshotIndex)"
-
-        do {
-            let captureResult = try await screenshotCoordinator.captureScreenshot(
-                in: recordingSession,
-                prefix: "capture",
-                index: screenshotIndex,
-                elapsedTime: elapsedTime,
-                associatedMarkerID: markerID,
-                onSelectionWillBegin: { [weak self] in
-                    self?.setStatus(.recording("Drag to select a screenshot region. Press Esc to cancel."))
-                    self?.prepareForScreenshotSelection?()
-                },
-                onSelectionDidEnd: { [weak self] in
-                    self?.restoreAfterScreenshotSelection?()
-                },
-                isSessionActive: { [weak self] sessionID in
-                    guard let self else {
-                        return false
-                    }
-                    return status.phase == .recording && activeRecordingSession?.sessionID == sessionID
-                }
-            )
-            guard case let .captured(screenshot) = captureResult else {
-                guard status.phase == .recording,
-                      activeRecordingSession?.sessionID == recordingSession.sessionID else {
-                    return
-                }
-                setStatus(.recording(recordingDetailMessage()))
-                showToast("Screenshot canceled", style: .informational)
-                return
-            }
-            guard status.phase == .recording,
-                  var latestRecordingSession = activeRecordingSession,
-                  latestRecordingSession.sessionID == recordingSession.sessionID else {
-                return
-            }
-            latestRecordingSession.markers.append(
-                SessionMarker(
-                    id: markerID,
-                    index: markerIndex,
-                    elapsedTime: elapsedTime,
-                    title: markerTitle,
-                    note: nil,
-                    screenshotID: screenshot.id
-                )
-            )
-            latestRecordingSession.screenshots.append(screenshot)
-            recordingSessionController.updateActiveRecordingSession(latestRecordingSession)
-            screenshotLogger.info(
-                "screenshot_captured",
-                "Captured a screenshot and inserted the automatic marker.",
-                metadata: [
-                    "session_id": recordingSession.sessionID.uuidString,
-                    "screenshot_index": "\(screenshotIndex)",
-                    "marker_index": "\(markerIndex)"
-                ]
-            )
-            setStatus(.recording("Captured \(markerTitle)."))
-            showToast("Screenshot captured")
-        } catch {
-            let normalizedError = normalizeError(
-                error,
-                operation: .screenshotCapture,
-                fallback: { .screenshotCaptureFailure($0) }
-            )
-            let appError = normalizedError.appError
-            guard status.phase == .recording else {
-                return
-            }
-            logAppError(normalizedError, context: "screenshot_capture_failed")
-            var metadata = appErrorMetadata(for: normalizedError, context: "screenshot_capture_failed")
-            metadata["session_id"] = recordingSession.sessionID.uuidString
-            screenshotLogger.error(
-                "screenshot_capture_failed",
-                appError.userMessage,
-                metadata: metadata
-            )
-            setStatus(.recording(appError.userMessage), error: appError)
-        }
-    }
-
-    private func transcriptionProgressMessage(step: Int, action: String) -> String {
-        let totalSteps = settingsStore.autoExtractIssues ? 3 : 2
-        return "Step \(step) of \(totalSteps): \(action)"
+        await screenshotCaptureController.captureScreenshot()
     }
 
     func extractIssuesForDisplayedTranscript() async {
@@ -1312,254 +1031,110 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
-            issueExtractionSessionID = transcriptSession.id
-            setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
-            beginActivity(reason: "Extracting review issues")
-            transcriptionLogger.info(
-                "issue_extraction_requested",
-                "Issue extraction was requested for the selected transcript.",
-                metadata: ["session_id": transcriptSession.id.uuidString]
-            )
+        guard let preflightError = issueExtractionController.preflightIssueExtraction(
+            for: transcriptSession,
+            hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+            aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
+            statusPhase: status.phase
+        ) else {
+            manualIssueExtractionStatusPresenter.presentRequestStarted(sessionID: transcriptSession.id)
+            recordingSessionController.beginActivity(reason: "Extracting review issues")
 
             do {
                 guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                     throw AppError.missingAPIKey
                 }
 
-                let extraction = try await issueExtractionService.extractIssues(
-                    from: transcriptSession,
+                let extraction = try await issueExtractionController.extractIssues(
+                    for: transcriptSession,
                     apiKey: apiKey,
                     model: settingsStore.issueExtractionModelValue,
-                    apiBaseURL: settingsStore.openAIBaseURLValue
+                    apiBaseURL: settingsStore.openAIBaseURLValue,
+                    completionLog: .manual
                 )
 
-                var updatedSession = transcriptSession
-                updatedSession.issueExtraction = extraction
-                try persistUpdatedSession(updatedSession)
-
-                issueExtractionSessionID = nil
-                endActivity()
-                transcriptionLogger.info(
-                    "issue_extraction_completed",
-                    "Issue extraction finished successfully.",
-                    metadata: [
-                        "session_id": transcriptSession.id.uuidString,
-                        "issue_count": "\(extraction.issues.count)"
-                    ]
-                )
-                setStatus(.success("Extracted \(extraction.issues.count) review issues."))
-                showTranscriptWindow?()
+                recordingSessionController.endActivity()
+                manualIssueExtractionStatusPresenter.presentCompletion(issueCount: extraction.issues.count)
             } catch {
-                issueExtractionSessionID = nil
-                presentError(error, operation: .postTranscription, fallback: { .issueExtractionFailure($0) })
+                manualIssueExtractionStatusPresenter.presentFailure(error)
             }
 
             return
         }
 
-        transcriptionLogger.warning(
-            "issue_extraction_preflight_failed",
-            preflightError.userMessage,
-            metadata: ["session_id": transcriptSession.id.uuidString]
-        )
-        presentError(preflightError, operation: .postTranscription)
+        manualIssueExtractionStatusPresenter.presentPreflightFailure(preflightError, sessionID: transcriptSession.id)
     }
 
     func updateExtractedIssue(_ updatedIssue: ExtractedIssue, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction,
-              let issueIndex = extraction.issues.firstIndex(where: { $0.id == updatedIssue.id }) else {
-            return
-        }
-
-        extraction.issues[issueIndex] = updatedIssue
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.updateExtractedIssue(updatedIssue, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
     func setIssueSelection(_ isSelected: Bool, issueID: UUID, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction,
-              let issueIndex = extraction.issues.firstIndex(where: { $0.id == issueID }) else {
-            return
-        }
-
-        extraction.issues[issueIndex].isSelectedForExport = isSelected
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.setIssueSelection(isSelected, issueID: issueID, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
     func setAllIssuesSelected(_ isSelected: Bool, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction else {
-            return
-        }
-
-        extraction.issues = extraction.issues.map { issue in
-            var updatedIssue = issue
-            updatedIssue.isSelectedForExport = isSelected
-            return updatedIssue
-        }
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.setAllIssuesSelected(isSelected, in: sessionID)
         } catch {
-            presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+            issueMutationFailurePresenter.presentFailure(error)
         }
     }
 
     func exportSelectedIssues(from session: TranscriptSession, to destination: ExportDestination) async {
-        guard status.phase != .recording, status.phase != .transcribing else {
-            presentError(AppError.exportFailure("Finish the current background work before exporting issues."), operation: .export)
+        let context: IssueExportRequestContext
+        switch issueExportController.preflightIssueExport(
+            from: session,
+            to: destination,
+            statusPhase: status.phase
+        ) {
+        case .success(let readyContext):
+            context = readyContext
+        case .failure(let failure):
+            issueExportPresentationController.presentPreflightFailure(failure)
             return
         }
 
-        guard let currentSession = sessionSnapshot(with: session.id) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
-            return
-        }
-
-        guard let extraction = currentSession.issueExtraction else {
-            presentError(AppError.exportFailure("Run issue extraction before exporting."), operation: .export)
-            return
-        }
-
-        let selectedIssues = extraction.selectedIssues
-        guard !selectedIssues.isEmpty else {
-            presentError(AppError.exportFailure("Select at least one extracted issue to export."), operation: .export)
-            return
-        }
-
-        settingsStore.refreshExportSecretsForUserInitiatedAccess()
+        issueExportPresentationController.presentReviewPreparation(destination: destination)
+        recordingSessionController.beginActivity(reason: "Reviewing similar issues before export")
 
         do {
-            try validateExportConfiguration(for: destination)
-        } catch {
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
-            if case .exportConfigurationMissing = error as? AppError {
-                showSettingsWindow?()
-            }
-            return
-        }
-
-        guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
-            presentError(AppError.missingAPIKey, operation: .export)
-            return
-        }
-
-        exportDestinationInProgress = destination
-        setStatus(.transcribing("Checking \(destination.rawValue) for similar open issues..."))
-        beginActivity(reason: "Reviewing similar issues before export")
-        exportLogger.info(
-            "issue_export_review_requested",
-            "Preparing similar issue review before export.",
-            metadata: [
-                "destination": destination.rawValue,
-                "session_id": currentSession.id.uuidString,
-                "issue_count": "\(selectedIssues.count)"
-            ]
-        )
-
-        do {
-            let review: IssueExportReview
-
-            switch destination {
-            case .github:
-                let groups = try configuredGitHubIssueGroups(for: selectedIssues)
-                var items: [IssueExportReviewItem] = []
-
-                for group in groups {
-                    try await exportService.validateGitHubConfiguration(group.configuration)
-                    let groupReview = try await exportService.prepareGitHubExportReview(
-                        issues: group.issues,
-                        session: currentSession,
-                        configuration: group.configuration,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    items.append(contentsOf: groupReview.items)
-                }
-
-                review = IssueExportReview(destination: .github, sessionID: currentSession.id, items: items)
-            case .jira:
-                let groups = try configuredJiraIssueGroups(for: selectedIssues)
-                var items: [IssueExportReviewItem] = []
-
-                for group in groups {
-                    try await exportService.validateJiraConfiguration(group.configuration)
-                    let groupReview = try await exportService.prepareJiraExportReview(
-                        issues: group.issues,
-                        session: currentSession,
-                        configuration: group.configuration,
-                        apiKey: apiKey,
-                        model: settingsStore.issueExtractionModelValue,
-                        apiBaseURL: settingsStore.openAIBaseURLValue
-                    )
-                    items.append(contentsOf: groupReview.items)
-                }
-
-                review = IssueExportReview(destination: .jira, sessionID: currentSession.id, items: items)
-            }
-
-            exportDestinationInProgress = nil
-            endActivity()
+            let review = try await issueExportController.prepareIssueExportReview(
+                for: context,
+                model: settingsStore.issueExtractionModelValue,
+                apiBaseURL: settingsStore.openAIBaseURLValue
+            )
+            recordingSessionController.endActivity()
 
             if review.hasMatches {
-                pendingExportReview = review
-                exportLogger.info(
-                    "issue_export_review_ready",
-                    "Similar issue review is ready for user confirmation.",
-                    metadata: [
-                        "destination": destination.rawValue,
-                        "session_id": currentSession.id.uuidString
-                    ]
-                )
-                setStatus(.success("Review the similar \(destination.rawValue) issues before export."))
+                issueExportPresentationController.presentReviewReady(destination: destination)
             } else {
                 await finalizeIssueExport(using: review)
             }
         } catch {
-            exportDestinationInProgress = nil
-            endActivity()
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
+            recordingSessionController.endActivity()
+            issueExportPresentationController.presentFailure(error)
         }
     }
 
     func cancelPendingExportReview() {
-        pendingExportReview = nil
+        issueExportController.cancelPendingExportReview()
     }
 
     func setExportReviewResolution(_ resolution: SimilarIssueResolution, for issueID: UUID) {
-        guard var review = pendingExportReview,
-              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
-            return
-        }
-
-        review.items[itemIndex].setResolution(resolution)
-        pendingExportReview = review
+        issueExportController.setExportReviewResolution(resolution, for: issueID)
     }
 
     func selectExportReviewMatch(_ matchID: String, for issueID: UUID) {
-        guard var review = pendingExportReview,
-              let itemIndex = review.items.firstIndex(where: { $0.issue.id == issueID }) else {
-            return
-        }
-
-        review.items[itemIndex].selectMatch(id: matchID)
-        pendingExportReview = review
+        issueExportController.selectExportReviewMatch(matchID, for: issueID)
     }
 
     func confirmPendingExportReview() async {
@@ -1571,242 +1146,40 @@ final class AppState: ObservableObject {
     }
 
     private func finalizeIssueExport(using review: IssueExportReview) async {
-        guard let currentSession = sessionSnapshot(with: review.sessionID) else {
-            presentError(AppError.exportFailure("This session is no longer available in the library."), operation: .export)
-            pendingExportReview = nil
-            return
-        }
-
         do {
-            let preparedIssues = try IssueExportReviewPolicy.preparedIssues(from: review)
-            let duplicateMatches = try IssueExportReviewPolicy.duplicateMatchResults(from: review)
-
-            pendingExportReview = nil
-            let combinedResults: [ExportResult]
-
-            if preparedIssues.isEmpty {
-                combinedResults = duplicateMatches
-            } else {
-                exportDestinationInProgress = review.destination
-                setStatus(.transcribing("Exporting reviewed issues to \(review.destination.rawValue)..."))
-                beginActivity(reason: "Exporting extracted issues")
-
-                let exportedResults: [ExportResult]
-                switch review.destination {
-                case .github:
-                    var results: [ExportResult] = []
-                    for group in try configuredGitHubIssueGroups(for: preparedIssues) {
-                        results += try await exportService.exportToGitHub(
-                            issues: group.issues,
-                            session: currentSession,
-                            configuration: group.configuration
-                        )
-                    }
-                    exportedResults = results
-                case .jira:
-                    var results: [ExportResult] = []
-                    for group in try configuredJiraIssueGroups(for: preparedIssues) {
-                        results += try await exportService.exportToJira(
-                            issues: group.issues,
-                            session: currentSession,
-                            configuration: group.configuration
-                        )
-                    }
-                    exportedResults = results
-                }
-
-                combinedResults = exportedResults + duplicateMatches
-                exportDestinationInProgress = nil
-                endActivity()
+            let requiresRemoteExport = try issueExportController.pendingReviewRequiresRemoteExport(review)
+            if requiresRemoteExport {
+                issueExportPresentationController.presentRemoteExportStarted(destination: review.destination)
+                recordingSessionController.beginActivity(reason: "Exporting extracted issues")
             }
 
-            exportLogger.info(
-                "issue_export_completed",
-                "Finished exporting selected issues.",
-                metadata: [
-                    "destination": review.destination.rawValue,
-                    "session_id": currentSession.id.uuidString,
-                    "issue_count": "\(combinedResults.count)"
-                ]
-            )
-            setStatus(.success(IssueExportReviewPolicy.exportSummary(
-                for: combinedResults,
-                duplicateCount: duplicateMatches.count,
-                destination: review.destination
-            )))
+            let completion = try await issueExportController.finalizeIssueExport(using: review)
+            if completion.performedRemoteExport {
+                recordingSessionController.endActivity()
+            }
+
+            issueExportPresentationController.presentCompletion(completion)
             await refreshExportHistory()
         } catch {
-            exportDestinationInProgress = nil
-            endActivity()
-            presentError(error, operation: .export, fallback: { .exportFailure($0) })
+            recordingSessionController.endActivity()
+            issueExportPresentationController.presentFailure(error)
         }
     }
 
     func openScreenshot(_ screenshot: SessionScreenshot) {
-        guard FileManager.default.fileExists(atPath: screenshot.fileURL.path) else {
-            presentUtilityActionFailure("The selected screenshot file is no longer available on this Mac.")
-            return
-        }
-
-        NSWorkspace.shared.activateFileViewerSelecting([screenshot.fileURL])
+        appUtilityActionPresenter.present(appUtilityActions.openScreenshot(screenshot))
     }
 
-    private func handleHotKeyPressed(_ action: HotkeyAction) {
-        switch action {
-        case .startRecording:
-            Task {
-                await openRecordingControlsAndStartSession()
-            }
-        case .stopRecording:
-            guard status.phase == .recording else {
-                return
-            }
-            Task {
-                await stopSession()
-            }
-        case .captureScreenshot:
-            Task {
-                await captureScreenshot()
-            }
-        }
-    }
-
-    private func openExternalURL(_ url: URL, label: String) {
-        guard urlHandler.open(url) else {
-            presentUtilityActionFailure("BugNarrator could not open the \(label).")
-            return
-        }
-
-        settingsLogger.info(
-            "external_link_opened",
-            "Opened an external support or documentation link.",
-            metadata: ["label": label]
-        )
-    }
-
-    private func presentUtilityActionFailure(_ message: String) {
-        settingsLogger.warning("utility_action_failed", message)
-        switch status.phase {
-        case .recording:
-            setStatus(.recording("\(message) Recording is still active."))
-        case .transcribing:
-            setStatus(.transcribing("\(message) Background work is still in progress."))
-        case .idle, .success, .error:
-            setStatus(.error(message))
-        }
-    }
-
-    private func startTimer() {
-        recordingSessionController.startTimer()
-    }
-
-    private func stopTimer(resetElapsed: Bool) {
-        recordingSessionController.stopTimer(resetElapsed: resetElapsed)
-    }
-
-    private func beginActivity(reason: String) {
-        recordingSessionController.beginActivity(reason: reason)
-    }
-
-    private func swapActivity(reason: String) {
-        recordingSessionController.swapActivity(reason: reason)
-    }
-
-    private func endActivity() {
+    private func prepareErrorPresentationSideEffects() {
+        recordingSessionController.stopTimer(resetElapsed: status.phase == .recording)
         recordingSessionController.endActivity()
-    }
-
-    private func prepareForApplicationTermination() {
-        settingsLogger.info(
-            "application_will_terminate",
-            "BugNarrator is preparing for application shutdown.",
-            metadata: [
-                "status_phase": status.phase.debugName,
-                "has_active_recording_session": activeRecordingSession == nil ? "no" : "yes",
-                "is_extracting_issues": issueExtractionSessionID == nil ? "no" : "yes",
-                "is_exporting": exportDestinationInProgress == nil ? "no" : "yes"
-            ]
-        )
-
-        if let activeRecordingSession {
-            recordingLogger.warning(
-                "application_terminating_during_recording",
-                "BugNarrator is terminating while a recording session is still active.",
-                metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-            )
-        }
-
-        toastDismissTask?.cancel()
-        presentationState.dismissToast()
-        hotkeyManager.unregisterAll()
-        stopTimer(resetElapsed: false)
-        endActivity()
-    }
-
-    private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
-        presentationState.setStatus(newStatus, error: error)
-    }
-
-    func providerAwareMessage(_ error: AppError) -> String {
-        error.userMessage(for: settingsStore.aiProvider)
-    }
-
-    private func presentError(
-        _ error: Error,
-        operation: AppErrorOperation = .generic,
-        fallback: (String) -> AppError = { .transcriptionFailure($0) }
-    ) {
-        stopTimer(resetElapsed: status.phase == .recording)
-        endActivity()
         cleanupPendingRecordedAudioIfNeeded()
-        issueExtractionSessionID = nil
-        exportDestinationInProgress = nil
-
-        let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
-        let appError = normalizedError.appError
-        logAppError(normalizedError, context: "present_error")
-        setStatus(.error(providerAwareMessage(appError)), error: appError)
-
-        switch appError {
-        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey, .exportConfigurationMissing:
-            showSettingsWindow?()
-        default:
-            break
-        }
-    }
-
-    private func presentPostTranscriptionError(
-        _ error: Error,
-        operation: AppErrorOperation = .postTranscription
-    ) {
-        let normalizedError = normalizeError(
-            error,
-            operation: operation,
-            fallback: { .issueExtractionFailure($0) }
-        )
-        let appError = normalizedError.appError
-        logAppError(normalizedError, context: "present_post_transcription_error")
-        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
-
-        switch appError {
-        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
-            showSettingsWindow?()
-        default:
-            break
-        }
+        issueExtractionController.clearProgress()
+        issueExportController.clearProgress()
     }
 
     private func cleanupPendingRecordedAudioIfNeeded() {
         recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
-    }
-
-    private func makeTranscriptionRequest() -> TranscriptionRequest {
-        TranscriptionRequest(
-            model: settingsStore.preferredModelValue,
-            languageHint: settingsStore.normalizedLanguageHint,
-            prompt: settingsStore.normalizedPrompt,
-            apiBaseURL: settingsStore.openAIBaseURLValue
-        )
     }
 
     private func logSessionStopRequested(_ recordingSession: RecordingSessionDraft) {
@@ -1818,276 +1191,9 @@ final class AppState: ObservableObject {
     }
 
     private func beginStoppingSession() -> RecordingSessionDraft? {
-        switch recordingSessionController.beginStoppingSession(statusPhase: status.phase) {
-        case .transitionInProgress:
-            recordingLogger.debug(.sessionStopIgnored, "The stop request was ignored because another recording transition is already in progress.")
-            return nil
-
-        case .noActiveRecording:
-            recordingLogger.warning(.sessionStopRejected, "The stop request was rejected because no recording session is active.")
-            return nil
-
-        case .missingSessionMetadata:
-            presentError(
-                AppError.recordingFailure("The recording session metadata was unavailable."),
-                operation: .recordingStop
-            )
-            return nil
-
-        case .ready(let recordingSession):
-            return recordingSession
-        }
-    }
-
-    private func transcribeAudio(
-        at fileURL: URL,
-        request: TranscriptionRequest,
-        apiKey: String
-    ) async throws -> TranscriptionResult {
-        try await transcriptionClient.transcribe(fileURL: fileURL, apiKey: apiKey, request: request)
-    }
-
-    private func makeTranscriptSession(
-        from recordingSession: RecordingSessionDraft,
-        recordedAudio: RecordedAudio,
-        request: TranscriptionRequest,
-        result: TranscriptionResult
-    ) -> TranscriptSession {
-        let sections = TranscriptSectionBuilder.buildSections(
-            transcript: result.text,
-            segments: result.segments,
-            markers: recordingSession.markers,
-            duration: recordedAudio.duration
+        recordingSessionStopReadinessPresenter.recordingSession(
+            for: recordingSessionController.beginStoppingSession(statusPhase: status.phase)
         )
-
-        return TranscriptSession(
-            id: recordingSession.sessionID,
-            createdAt: Date(),
-            transcript: result.text,
-            duration: recordedAudio.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: recordingSession.markers,
-            screenshots: recordingSession.screenshots,
-            sections: sections,
-            transcriptQualityFindings: result.qualityFindings,
-            artifactsDirectoryPath: recordingSession.artifactsDirectoryURL.path
-        )
-    }
-
-    private func makeRecoveredTranscriptSession(
-        from session: TranscriptSession,
-        request: TranscriptionRequest,
-        result: TranscriptionResult
-    ) -> TranscriptSession {
-        let sections = TranscriptSectionBuilder.buildSections(
-            transcript: result.text,
-            segments: result.segments,
-            markers: session.markers,
-            duration: session.duration
-        )
-
-        return TranscriptSession(
-            id: session.id,
-            createdAt: session.createdAt,
-            transcript: result.text,
-            duration: session.duration,
-            model: request.model,
-            languageHint: request.languageHint,
-            prompt: request.prompt,
-            markers: session.markers,
-            screenshots: session.screenshots,
-            sections: sections,
-            issueExtraction: nil,
-            pendingTranscription: nil,
-            transcriptQualityFindings: result.qualityFindings,
-            updatedAt: Date(),
-            artifactsDirectoryPath: session.artifactsDirectoryPath
-        )
-    }
-
-    private func completePostTranscriptionPipeline(
-        session: TranscriptSession,
-        apiKey: String,
-        mode: PostTranscriptionPipelineMode
-    ) async -> PostTranscriptionPipelineResult {
-        var session = session
-        recordCompletedTranscriptionIfNeeded(session, mode: mode)
-        setStatus(.transcribing(transcriptionProgressMessage(step: 2, action: mode.savingAction)))
-
-        do {
-            try persistInitialPostTranscriptionSession(session, mode: mode)
-        } catch {
-            return .persistenceFailure(session: session, error: error)
-        }
-
-        finalizeInitialPostTranscriptionPersistence(session, mode: mode)
-
-        guard settingsStore.autoExtractIssues else {
-            return .success(session)
-        }
-
-        do {
-            session = try await extractIssuesAfterTranscription(for: session, apiKey: apiKey)
-            return .success(session)
-        } catch {
-            return .postTranscriptionFailure(error)
-        }
-    }
-
-    private func recordCompletedTranscriptionIfNeeded(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) {
-        guard mode.recordsCompletionTelemetry else {
-            return
-        }
-
-        transcriptionLogger.info(
-            .transcriptionCompleted,
-            "BugNarrator finished transcription and created a transcript session.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "marker_count": "\(session.markerCount)",
-                "screenshot_count": "\(session.screenshotCount)"
-            ]
-        )
-        telemetryRecorder.record(
-            .transcriptionCompleted,
-            metadata: [
-                "marker_count": "\(session.markerCount)",
-                "screenshot_count": "\(session.screenshotCount)",
-                "model": session.model
-            ]
-        )
-    }
-
-    private func persistInitialPostTranscriptionSession(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) throws {
-        switch mode {
-        case .finishedRecording:
-            try persistCompletedTranscript(session)
-        case .retry:
-            try persistUpdatedSession(session)
-            if settingsStore.autoCopyTranscript {
-                clipboardService.copy(session.transcript)
-            }
-        }
-    }
-
-    private func finalizeInitialPostTranscriptionPersistence(
-        _ session: TranscriptSession,
-        mode: PostTranscriptionPipelineMode
-    ) {
-        guard mode == .finishedRecording else {
-            return
-        }
-
-        sessionLibrary.setCurrentTranscript(session)
-        recordingSessionController.clearActiveRecordingSession()
-        showTranscriptWindow?()
-    }
-
-    private func extractIssuesAfterTranscription(
-        for session: TranscriptSession,
-        apiKey: String
-    ) async throws -> TranscriptSession {
-        var session = session
-        issueExtractionSessionID = session.id
-        defer { issueExtractionSessionID = nil }
-
-        setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
-        swapActivity(reason: "Extracting review issues")
-
-        let extraction = try await issueExtractionService.extractIssues(
-            from: session,
-            apiKey: apiKey,
-            model: settingsStore.issueExtractionModelValue,
-            apiBaseURL: settingsStore.openAIBaseURLValue
-        )
-        session.issueExtraction = extraction
-        try persistUpdatedSession(session)
-        transcriptionLogger.info(
-            "issue_extraction_completed_after_transcription",
-            "Automatic issue extraction completed after transcription.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "issue_count": "\(extraction.issues.count)"
-            ]
-        )
-        return session
-    }
-
-    private func finishSuccessfulTranscription(showTranscriptWindow: Bool) {
-        if showTranscriptWindow {
-            self.showTranscriptWindow?()
-        }
-
-        endActivity()
-        setStatus(.success(transcriptionSuccessMessage()))
-    }
-
-    private func transcriptionSuccessMessage() -> String {
-        if settingsStore.autoExtractIssues {
-            return "Session saved. Transcript and extracted issues are ready."
-        }
-
-        if settingsStore.autoCopyTranscript {
-            return "Session saved. Transcript copied to the clipboard."
-        }
-
-        return "Session saved locally and ready for review."
-    }
-
-    private func handleCompletedTranscriptPersistenceFailure(
-        _ error: Error,
-        session: TranscriptSession
-    ) {
-        sessionLibrary.stageCurrentTranscript(session)
-        recordingSessionController.clearActiveRecordingSession()
-
-        if settingsStore.autoCopyTranscript {
-            clipboardService.copy(session.transcript)
-        }
-
-        cleanupPendingRecordedAudioIfNeeded()
-        endActivity()
-
-        let normalizedError = normalizeError(
-            error,
-            operation: .sessionLibrary,
-            fallback: { .storageFailure($0) }
-        )
-        let appError = normalizedError.appError
-        logAppError(normalizedError, context: "transcript_persist_failed")
-        var metadata = appErrorMetadata(for: normalizedError, context: "transcript_persist_failed")
-        metadata["session_id"] = session.id.uuidString
-        sessionLibraryLogger.error(
-            "transcript_persist_failed",
-            "Transcription succeeded, but saving the transcript locally failed.",
-            metadata: metadata
-        )
-        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
-        showTranscriptWindow?()
-    }
-
-    private func handleFinishedRecordingPostTranscriptionResult(
-        _ result: PostTranscriptionPipelineResult
-    ) {
-        switch result {
-        case .success:
-            cleanupPendingRecordedAudioIfNeeded()
-            finishSuccessfulTranscription(showTranscriptWindow: false)
-        case .persistenceFailure(let session, let error):
-            handleCompletedTranscriptPersistenceFailure(error, session: session)
-        case .postTranscriptionFailure(let error):
-            cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
-            presentPostTranscriptionError(error, operation: .postTranscription)
-        }
     }
 
     private func handleStopSessionFailure(
@@ -2110,10 +1216,12 @@ final class AppState: ObservableObject {
             artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
         }
         recordingSessionController.clearActiveRecordingSession()
-        if recordingSessionController.pendingRecordedAudioSnapshot == nil {
-            presentError(error, operation: .recordingStop, fallback: { .recordingFailure($0) })
+        let hasPendingRecordedAudio = recordingSessionController.pendingRecordedAudioSnapshot != nil
+        prepareErrorPresentationSideEffects()
+        if !hasPendingRecordedAudio {
+            recordingSessionStopFailurePresenter.presentRecordingStopFailure(error)
         } else {
-            presentError(error, operation: .transcription)
+            recordingSessionStopFailurePresenter.presentTranscriptionFailure(error)
         }
     }
 
@@ -2131,28 +1239,6 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func handlePendingTranscriptionRetryFailure(
-        _ error: Error,
-        context: PendingTranscriptionRetryContext
-    ) -> Bool {
-        guard let retryFailure = transcriptionRecovery.recordRetryableFailure(
-            error,
-            context: context,
-            provider: settingsStore.aiProvider
-        ) else {
-            return false
-        }
-
-        endActivity()
-
-        let appError = retryFailure.appError
-        logAppError(appError, context: "retry_pending_transcription", operation: .retryTranscription)
-        setStatus(.error(retryFailure.statusMessage), error: appError)
-        showTranscriptWindow?()
-        showSettingsWindow?()
-        return true
-    }
-
     private func preserveRetryableSession(
         from recordingSession: RecordingSessionDraft,
         recordedAudio: RecordedAudio,
@@ -2168,387 +1254,39 @@ final class AppState: ObservableObject {
         case .preserved(let retryableSession, let appError):
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
-            logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
-            setStatus(
-                .error(retryableSession.transcriptionRecoveryMessage(for: settingsStore.aiProvider) ?? providerAwareMessage(appError)),
-                error: appError
-            )
-            showTranscriptWindow?()
-            if appError.suggestsProviderSettings(for: settingsStore.aiProvider) {
-                showSettingsWindow?()
-            }
+            recordingSessionController.endActivity()
+            retryableSessionPreservationPresenter.presentPreservedSession(retryableSession, appError: appError)
 
         case .persistenceFailure(let retryableSession, let error):
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
-
-            let normalizedError = normalizeError(
+            recordingSessionController.endActivity()
+            retryableSessionPreservationPresenter.presentPersistenceFailure(
                 error,
-                operation: .sessionLibrary,
-                fallback: { .storageFailure($0) }
+                retryableSession: retryableSession,
+                recoveryAppError: failureReason.appError
             )
-            let persistenceError = normalizedError.appError
-            logAppError(normalizedError, context: "retryable_session_persist_failed")
-            var metadata = appErrorMetadata(for: normalizedError, context: "retryable_session_persist_failed")
-            metadata["session_id"] = retryableSession.id.uuidString
-            sessionLibraryLogger.error(
-                "retryable_session_persist_failed",
-                "The preserved recording could not be saved into local session history.",
-                metadata: metadata
-            )
-            setStatus(
-                .error("Recording preserved, but \(persistenceError.userMessage)"),
-                error: persistenceError
-            )
-            showTranscriptWindow?()
-            if failureReason.appError.suggestsProviderSettings(for: settingsStore.aiProvider) {
-                showSettingsWindow?()
-            }
 
         case .preservationFailure(let error):
             if !settingsStore.debugMode {
                 artifactsService.removeArtifactsDirectory(at: recordingSession.artifactsDirectoryURL)
             }
             recordingSessionController.clearActiveRecordingSession()
-            presentError(error, operation: .recordingStop)
-        }
-    }
-
-    private func persistCompletedTranscript(_ session: TranscriptSession) throws {
-        try sessionLibrary.persistCompletedTranscript(
-            session,
-            autoCopyTranscript: settingsStore.autoCopyTranscript
-        )
-    }
-
-    private func persistUpdatedSession(_ session: TranscriptSession) throws {
-        try sessionLibrary.persistUpdatedSession(session)
-    }
-
-    private func preflightForIssueExtraction(_ session: TranscriptSession) -> AppError? {
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            return .transcriptionFailure(compatibilityIssue)
-        }
-
-        guard settingsStore.hasUsableAIProviderCredential else {
-            return .missingAPIKey
-        }
-
-        let transcript = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !transcript.isEmpty else {
-            return .emptyTranscript
-        }
-
-        guard status.phase != .recording else {
-            return .recordingFailure("Stop the current recording before extracting issues.")
-        }
-
-        return nil
-    }
-
-    private func validateExportConfiguration(for destination: ExportDestination) throws {
-        switch destination {
-        case .github:
-            guard settingsStore.hasGitHubToken else {
-                throw AppError.exportConfigurationMissing(
-                    "GitHub export requires a personal access token."
-                )
-            }
-        case .jira:
-            guard settingsStore.jiraConnectionConfiguration != nil else {
-                throw AppError.exportConfigurationMissing(
-                    "Jira export requires a base URL, email, and API token."
-                )
-            }
-        }
-    }
-
-    private func configuredGitHubIssueGroups(
-        for issues: [ExtractedIssue]
-    ) throws -> [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] {
-        var groups: [(configuration: GitHubExportConfiguration, issues: [ExtractedIssue])] = []
-
-        for issue in issues {
-            guard let configuration = gitHubExportConfiguration(for: issue) else {
-                throw AppError.exportConfigurationMissing(
-                    "Choose a GitHub repository for every selected issue before exporting."
-                )
-            }
-
-            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
-                groups[groupIndex].issues.append(issue)
-            } else {
-                groups.append((configuration: configuration, issues: [issue]))
-            }
-        }
-
-        return groups
-    }
-
-    private func configuredJiraIssueGroups(
-        for issues: [ExtractedIssue]
-    ) throws -> [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] {
-        var groups: [(configuration: JiraExportConfiguration, issues: [ExtractedIssue])] = []
-
-        for issue in issues {
-            guard let configuration = jiraExportConfiguration(for: issue) else {
-                throw AppError.exportConfigurationMissing(
-                    "Choose a Jira project and issue type for every selected issue before exporting."
-                )
-            }
-
-            if let groupIndex = groups.firstIndex(where: { $0.configuration == configuration }) {
-                groups[groupIndex].issues.append(issue)
-            } else {
-                groups.append((configuration: configuration, issues: [issue]))
-            }
-        }
-
-        return groups
-    }
-
-    private func gitHubExportConfiguration(for issue: ExtractedIssue) -> GitHubExportConfiguration? {
-        guard settingsStore.hasGitHubToken else {
-            return nil
-        }
-
-        let target = issue.gitHubExportTarget ?? defaultGitHubIssueExportTarget()
-        guard let target, target.isComplete else {
-            return nil
-        }
-
-        return GitHubExportConfiguration(
-            token: settingsStore.trimmedGitHubToken,
-            repositoryID: target.repositoryID,
-            owner: target.owner,
-            repository: target.repository,
-            labels: target.labels
-        )
-    }
-
-    private func jiraExportConfiguration(for issue: ExtractedIssue) -> JiraExportConfiguration? {
-        guard let connection = settingsStore.jiraConnectionConfiguration else {
-            return nil
-        }
-
-        let target = issue.jiraExportTarget ?? defaultJiraIssueExportTarget()
-        guard let target, target.isComplete else {
-            return nil
-        }
-
-        return JiraExportConfiguration(
-            baseURL: connection.baseURL,
-            email: connection.email,
-            apiToken: connection.apiToken,
-            projectID: target.projectID,
-            projectKey: target.projectKey,
-            issueTypeID: target.issueTypeID,
-            issueTypeName: target.issueTypeName
-        )
-    }
-
-    private func editableSession(with sessionID: UUID) -> TranscriptSession? {
-        sessionLibrary.editableSession(with: sessionID)
-    }
-
-    private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
-        sessionLibrary.sessionSnapshot(with: sessionID)
-    }
-
-    private func makePrivacyDataExportSettingsSnapshot() -> PrivacyDataExportSettingsSnapshot {
-        PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore)
-    }
-
-    private func makePrivacyDataExportDiagnosticsSnapshot() async -> PrivacyDataExportDiagnosticsSnapshot {
-        let debugInfo = debugInfoSnapshot
-        let recentLogText = await BugNarratorDiagnostics.store.recentLogText(limit: 200)
-        let receipts = (try? await exportService.exportHistory()) ?? exportHistory
-
-        return PrivacyDataExportDiagnosticsSnapshot(
-            appName: debugInfo.appName,
-            versionDescription: debugInfo.versionDescription,
-            macOSVersion: debugInfo.macOSVersion,
-            architecture: debugInfo.architecture,
-            activeTranscriptionModel: debugInfo.activeTranscriptionModel,
-            issueExtractionModel: debugInfo.issueExtractionModel,
-            logLevel: debugInfo.logLevel,
-            debugModeEnabled: debugInfo.debugModeEnabled,
-            recentTelemetryEvents: telemetryRecorder.recentEvents(limit: 200),
-            recentDiagnosticsLog: recentLogText,
-            exportHistory: receipts
-        )
-    }
-
-    private func clearLocalPrivacyArtifacts() async {
-        await localPrivacyDataManager.clearLocalSupportArtifacts()
-        await refreshExportHistory()
-    }
-
-    private func cancelPendingScreenshotSelection(reason: String) {
-        screenshotCoordinator.cancelPendingSelection(reason: reason)
-    }
-
-    private func showToast(_ message: String, style: TransientToastStyle = .success) {
-        toastDismissTask?.cancel()
-        presentationState.showToast(TransientToast(message: message, style: style))
-        toastDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else {
-                return
-            }
-
-            self?.presentationState.dismissToast()
-        }
-    }
-
-    private func normalizeError(
-        _ error: Error,
-        operation: AppErrorOperation,
-        fallback: (String) -> AppError
-    ) -> AppErrorNormalization {
-        if let appError = error as? AppError {
-            return AppErrorNormalization(
-                appError: appError,
-                operation: operation,
-                underlyingErrorDescription: nil
-            )
-        }
-
-        let underlyingDescription = error.localizedDescription
-        return AppErrorNormalization(
-            appError: fallback(underlyingDescription),
-            operation: operation,
-            underlyingErrorDescription: underlyingDescription
-        )
-    }
-
-    private func logAppError(
-        _ error: AppError,
-        context: String,
-        operation: AppErrorOperation = .generic
-    ) {
-        logAppError(
-            AppErrorNormalization(
-                appError: error,
-                operation: operation,
-                underlyingErrorDescription: nil
-            ),
-            context: context
-        )
-    }
-
-    private func logAppError(_ normalizedError: AppErrorNormalization, context: String) {
-        let error = normalizedError.appError
-        let metadata = appErrorMetadata(for: normalizedError, context: context)
-
-        telemetryRecorder.record(.appError, metadata: metadata)
-
-        switch error {
-        case .microphonePermissionDenied,
-             .microphonePermissionRestricted,
-             .microphoneUnavailable,
-             .systemAudioFeatureDisabled,
-             .systemAudioConsentRequired,
-             .systemAudioUnavailable,
-             .screenRecordingPermissionDenied:
-            permissionsLogger.warning(.appError, error.userMessage, metadata: metadata)
-        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
-            settingsLogger.warning(.appError, error.userMessage, metadata: metadata)
-        case .recordingFailure:
-            recordingLogger.error(.appError, error.userMessage, metadata: metadata)
-        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited:
-            transcriptionLogger.error(.appError, error.userMessage, metadata: metadata)
-        case .screenshotCaptureFailure:
-            screenshotLogger.error(.appError, error.userMessage, metadata: metadata)
-        case .exportConfigurationMissing, .exportFailure:
-            exportLogger.error(.appError, error.userMessage, metadata: metadata)
-        case .storageFailure:
-            sessionLibraryLogger.error(.appError, error.userMessage, metadata: metadata)
-        case .noActiveSession:
-            recordingLogger.warning(.appError, error.userMessage, metadata: metadata)
-        case .diagnosticsFailure:
-            settingsLogger.error(.appError, error.userMessage, metadata: metadata)
-        }
-    }
-
-    private func appErrorMetadata(
-        for normalizedError: AppErrorNormalization,
-        context: String
-    ) -> [String: String] {
-        var metadata = [
-            "context": context,
-            "operation": normalizedError.operation.rawValue,
-            "error_type": telemetryErrorType(for: normalizedError.appError)
-        ]
-
-        if let underlyingErrorDescription = normalizedError.underlyingErrorDescription {
-            metadata["underlying_error"] = underlyingErrorDescription
-        }
-
-        return metadata
-    }
-
-    private func telemetryErrorType(for error: AppError) -> String {
-        switch error {
-        case .microphonePermissionDenied:
-            return "microphone_permission_denied"
-        case .microphonePermissionRestricted:
-            return "microphone_permission_restricted"
-        case .microphoneUnavailable:
-            return "microphone_unavailable"
-        case .systemAudioFeatureDisabled:
-            return "system_audio_feature_disabled"
-        case .systemAudioConsentRequired:
-            return "system_audio_consent_required"
-        case .systemAudioUnavailable:
-            return "system_audio_unavailable"
-        case .screenRecordingPermissionDenied:
-            return "screen_recording_permission_denied"
-        case .missingAPIKey:
-            return "missing_api_key"
-        case .invalidAPIKey:
-            return "invalid_api_key"
-        case .revokedAPIKey:
-            return "revoked_api_key"
-        case .recordingFailure:
-            return "recording_failure"
-        case .transcriptionFailure:
-            return "transcription_failure"
-        case .openAIRequestRejected:
-            return "openai_request_rejected"
-        case .issueExtractionFailure:
-            return "issue_extraction_failure"
-        case .emptyTranscript:
-            return "empty_transcript"
-        case .networkTimeout:
-            return "network_timeout"
-        case .networkFailure:
-            return "network_failure"
-        case .rateLimited:
-            return "rate_limited"
-        case .screenshotCaptureFailure:
-            return "screenshot_capture_failure"
-        case .exportConfigurationMissing:
-            return "export_configuration_missing"
-        case .exportFailure:
-            return "export_failure"
-        case .storageFailure:
-            return "storage_failure"
-        case .noActiveSession:
-            return "no_active_session"
-        case .diagnosticsFailure:
-            return "diagnostics_failure"
+            prepareErrorPresentationSideEffects()
+            recordingSessionStopFailurePresenter.presentPreservationFailure(error)
         }
     }
 
     private var currentDebugSessionID: UUID? {
-        activeRecordingSession?.sessionID ?? displayedTranscript?.id ?? currentTranscript?.id
+        DebugSessionContextProvider.currentSessionID(
+            activeRecordingSession: activeRecordingSession,
+            displayedTranscript: displayedTranscript,
+            currentTranscript: currentTranscript
+        )
     }
 
     private func currentDebugSessionMetadata() -> DebugSessionMetadata {
-        DebugSessionMetadata.make(
+        DebugSessionContextProvider.metadata(
             currentTranscript: currentTranscript,
             displayedTranscript: displayedTranscript,
             activeRecordingSession: activeRecordingSession,
@@ -2558,132 +1296,6 @@ final class AppState: ObservableObject {
     }
 
     private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
-        microphonePermissionService.recoveryGuidance(
-            for: microphoneRecoveryStatus,
-            runtimeEnvironment: runtimeEnvironment
-        )
-    }
-
-    private var microphoneRecoveryStatus: MicrophonePermissionStatus {
-        switch currentError {
-        case .microphonePermissionDenied:
-            return .denied
-        case .microphonePermissionRestricted:
-            return .restricted
-        case .microphoneUnavailable:
-            return .captureSetupFailed
-        default:
-            return microphonePermissionService.currentStatus()
-        }
-    }
-
-    private func makeDebugBundleSnapshot() async -> DebugBundleSnapshot {
-        DebugBundleSnapshot(
-            debugInfo: debugInfoSnapshot,
-            sessionMetadata: currentDebugSessionMetadata(),
-            recentLogText: await BugNarratorDiagnostics.recentLogText()
-        )
-    }
-
-    private func validateRuntimeConfiguration() {
-        guard let microphoneUsageDescription = Bundle.main.object(
-            forInfoDictionaryKey: "NSMicrophoneUsageDescription"
-        ) as? String else {
-            permissionsLogger.error(
-                "runtime_configuration_missing_microphone_usage_description",
-                "BugNarrator is missing NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
-            )
-            return
-        }
-
-        if microphoneUsageDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            permissionsLogger.error(
-                "runtime_configuration_empty_microphone_usage_description",
-                "BugNarrator has an empty NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
-            )
-        }
-    }
-
-    private func logLaunchDiagnostics() {
-        permissionsLogger.info(
-            "launch_permission_snapshot",
-            "Captured the initial permission state snapshot for this BugNarrator app copy.",
-            metadata: [
-                "bundle_path": runtimeEnvironment.bundlePath,
-                "is_local_testing_build": runtimeEnvironment.isLocalTestingBuild ? "yes" : "no",
-                "microphone_status": microphonePermissionService.currentStatus().rawValue,
-                "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
-            ]
-        )
-
-        sessionLibraryLogger.info(
-            "launch_session_store_snapshot",
-            "Captured the initial session library state at launch.",
-            metadata: [
-                "stored_session_count": "\(transcriptStore.sessionCount)",
-                "selected_transcript_id": selectedTranscriptID?.uuidString ?? "none"
-            ]
-        )
-    }
-
-    private func importRecoveredRecordingsAtLaunch() {
-        do {
-            let importedCount = try recoveredRecordingImporter.importRecoverableRecordings(
-                into: transcriptStore,
-                artifactsService: artifactsService
-            )
-            recoveredRecordingImportCount = importedCount
-
-            guard importedCount > 0 else {
-                return
-            }
-
-            sessionLibrary.selectLatestPendingTranscriptionSession()
-            sessionLibraryLogger.warning(
-                "recovered_recordings_imported",
-                "Imported recovered recordings as retryable transcript sessions.",
-                metadata: ["imported_count": "\(importedCount)"]
-            )
-            setStatus(
-                .error(importedCount == 1
-                    ? "Recovered 1 recording after an unexpected quit. Open Session Library to transcribe it."
-                    : "Recovered \(importedCount) recordings after an unexpected quit. Open Session Library to transcribe them."),
-                error: .transcriptionFailure("Recovered recordings are waiting for transcription.")
-            )
-            showTranscriptWindow?()
-        } catch {
-            let normalizedError = normalizeError(
-                error,
-                operation: .recoveredRecordingImport,
-                fallback: { .storageFailure($0) }
-            )
-        let appError = normalizedError.appError
-        logAppError(normalizedError, context: "recovered_recording_import_failed")
-        sessionLibraryLogger.error(
-            "recovered_recording_import_failed",
-            providerAwareMessage(appError),
-            metadata: appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
-        )
-        setStatus(.error(providerAwareMessage(appError)), error: appError)
-    }
-}
-
-}
-
-
-private extension AppStatus.Phase {
-    var debugName: String {
-        switch self {
-        case .idle:
-            return "idle"
-        case .recording:
-            return "recording"
-        case .transcribing:
-            return "transcribing"
-        case .success:
-            return "success"
-        case .error:
-            return "error"
-        }
+        permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
     }
 }

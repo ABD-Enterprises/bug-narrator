@@ -221,7 +221,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         // Give the selection overlay a moment to leave the compositor before capture starts.
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        try await Task.sleep(nanoseconds: 150_000_000)
 
         screenshotLogger.info(
             "screenshot_capture_requested",
@@ -313,8 +313,9 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
             throw AppError.screenshotCaptureFailure("No display content was available to capture.")
         }
 
-        let width = Int(compositeBounds.width.rounded(.up))
-        let height = Int(compositeBounds.height.rounded(.up))
+        let scale = compositeScale(for: capturedDisplays)
+        let width = Int((compositeBounds.width * scale).rounded(.up))
+        let height = Int((compositeBounds.height * scale).rounded(.up))
         let colorSpace = capturedDisplays.first?.image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
 
         guard let context = CGContext(
@@ -330,6 +331,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         context.interpolationQuality = .high
+        context.scaleBy(x: scale, y: scale)
 
         for capturedDisplay in capturedDisplays {
             let frame = capturedDisplay.capturedFrame
@@ -347,6 +349,19 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         return image
+    }
+
+    private func compositeScale(for capturedDisplays: [CapturedDisplayImage]) -> CGFloat {
+        capturedDisplays.reduce(CGFloat(1)) { currentScale, capturedDisplay in
+            let frame = capturedDisplay.capturedFrame
+            guard frame.width > 0, frame.height > 0 else {
+                return currentScale
+            }
+
+            let scaleX = CGFloat(capturedDisplay.image.width) / frame.width
+            let scaleY = CGFloat(capturedDisplay.image.height) / frame.height
+            return max(currentScale, scaleX, scaleY)
+        }
     }
 
     private func validateCapturedScreenshotFile(at url: URL) throws {

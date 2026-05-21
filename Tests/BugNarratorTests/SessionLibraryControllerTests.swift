@@ -107,6 +107,128 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.artifactsService.removedDirectories, [artifactsDirectoryURL])
     }
 
+    func testSessionDeletionStatusPresenterMapsDeletedCounts() {
+        XCTAssertNil(SessionDeletionStatusPresenter.status(deletedCount: 0))
+        XCTAssertEqual(
+            SessionDeletionStatusPresenter.status(deletedCount: 1),
+            .success("Deleted 1 session.")
+        )
+        XCTAssertEqual(
+            SessionDeletionStatusPresenter.status(deletedCount: 3),
+            .success("Deleted 3 sessions.")
+        )
+    }
+
+    func testDisplayedTranscriptCopyStatusPresenterMapsResults() {
+        XCTAssertNil(DisplayedTranscriptCopyStatusPresenter.status(for: .noDisplayedTranscript))
+        XCTAssertEqual(
+            DisplayedTranscriptCopyStatusPresenter.status(for: .transcriptUnavailable),
+            .error("Transcription is not available yet. Retry the preserved session first.")
+        )
+        XCTAssertEqual(
+            DisplayedTranscriptCopyStatusPresenter.status(for: .copied),
+            .success("Transcript copied to the clipboard.")
+        )
+    }
+
+    func testTranscriptSaveStatusPresenterMapsResults() {
+        XCTAssertNil(TranscriptSaveStatusPresenter.status(savedSession: nil))
+        XCTAssertEqual(
+            TranscriptSaveStatusPresenter.status(savedSession: makeSession(index: 1)),
+            .success("Transcript saved to session history.")
+        )
+    }
+
+    func testSessionLibraryStatusPresenterSetsCopiedTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.copied)
+
+        XCTAssertEqual(harness.presentationState.status, .success("Transcript copied to the clipboard."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterSetsUnavailableTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.transcriptUnavailable)
+
+        XCTAssertEqual(
+            harness.presentationState.status,
+            .error("Transcription is not available yet. Retry the preserved session first.")
+        )
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForMissingDisplayedTranscript() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentDisplayedTranscriptCopyResult(.noDisplayedTranscript)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterSetsSavedTranscriptStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentSavedSession(makeSession(index: 1))
+
+        XCTAssertEqual(harness.presentationState.status, .success("Transcript saved to session history."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForNoSavedTranscript() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentSavedSession(nil)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterSetsDeletionStatus() {
+        let harness = makeSessionLibraryStatusPresenter()
+
+        harness.presenter.presentDeletedCount(3)
+
+        XCTAssertEqual(harness.presentationState.status, .success("Deleted 3 sessions."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterLeavesStatusForNoDeletedSessions() {
+        let harness = makeSessionLibraryStatusPresenter(status: .idle("Ready."))
+
+        harness.presenter.presentDeletedCount(0)
+
+        XCTAssertEqual(harness.presentationState.status, .idle("Ready."))
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testSessionLibraryStatusPresenterNormalizesFailures() {
+        let harness = makeSessionLibraryStatusPresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Disk full"]
+        )
+        let expectedError = AppError.storageFailure("Disk full")
+
+        harness.presenter.presentFailure(error)
+
+        XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
+        XCTAssertEqual(harness.presentationState.currentError, expectedError)
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+    }
+
     func testPersistCompletedTranscriptCopiesWhenRequested() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }
@@ -120,9 +242,108 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.clipboardService.copiedStrings, ["Copy me"])
     }
 
+    func testStageCurrentTranscriptCopiesWhenRequested() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = makeSession(index: 1, transcript: "Recovered transcript")
+
+        harness.controller.stageCurrentTranscript(session, autoCopyTranscript: true)
+
+        XCTAssertEqual(harness.controller.currentTranscript?.id, session.id)
+        XCTAssertEqual(harness.controller.selectedTranscriptID, session.id)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Recovered transcript"])
+    }
+
+    func testPersistUpdatedSessionCopiesWhenRequested() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = makeSession(index: 1, transcript: "Retried transcript")
+        try harness.transcriptStore.add(session)
+
+        try harness.controller.persistUpdatedSession(session, autoCopyTranscript: true)
+
+        XCTAssertEqual(harness.controller.currentTranscript?.id, session.id)
+        XCTAssertEqual(harness.controller.selectedTranscriptID, session.id)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Retried transcript"])
+    }
+
+    func testCopyDisplayedTranscriptWithoutDisplayedTranscriptDoesNothing() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .noDisplayedTranscript)
+        XCTAssertTrue(harness.clipboardService.copiedStrings.isEmpty)
+    }
+
+    func testCopyDisplayedTranscriptWithoutTranscriptContentReturnsUnavailable() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let pendingSession = makeSession(
+            index: 1,
+            transcript: "   ",
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        try harness.transcriptStore.add(pendingSession)
+        harness.controller.selectedTranscriptID = pendingSession.id
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .transcriptUnavailable)
+        XCTAssertTrue(harness.clipboardService.copiedStrings.isEmpty)
+    }
+
+    func testCopyDisplayedTranscriptCopiesDisplayedTranscript() throws {
+        let harness = try SessionLibraryControllerHarness()
+        defer { harness.cleanup() }
+
+        let older = makeSession(index: 1, transcript: "Older transcript")
+        let displayed = makeSession(index: 2, transcript: "Displayed transcript")
+        try harness.transcriptStore.add(older)
+        try harness.transcriptStore.add(displayed)
+        harness.controller.selectedTranscriptID = displayed.id
+
+        let result = harness.controller.copyDisplayedTranscript()
+
+        XCTAssertEqual(result, .copied)
+        XCTAssertEqual(harness.clipboardService.copiedStrings, ["Displayed transcript"])
+    }
+
+    private func makeSessionLibraryStatusPresenter(
+        status: AppStatus = .idle()
+    ) -> (
+        presenter: SessionLibraryStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
+        let presentationState = AppPresentationState(status: status)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = SessionLibraryStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+    }
+
     private func makeSession(
         index: Int,
         transcript: String? = nil,
+        pendingTranscription: PendingTranscription? = nil,
         artifactsDirectoryPath: String? = nil
     ) -> TranscriptSession {
         TranscriptSession(
@@ -133,6 +354,7 @@ final class SessionLibraryControllerTests: XCTestCase {
             model: "whisper-1",
             languageHint: nil,
             prompt: nil,
+            pendingTranscription: pendingTranscription,
             artifactsDirectoryPath: artifactsDirectoryPath
         )
     }

@@ -50,6 +50,85 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(statusMessage, session.transcriptionRecoveryMessage)
     }
 
+    func testPreservationPresenterPresentsPreservedSessionRecoveryStatus() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+        let session = try harness.addPendingSession(failureReason: .missingAPIKey)
+        let presentationState = AppPresentationState()
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        var showTranscriptCallCount = 0
+        var showSettingsCallCount = 0
+        let presenter = RetryableSessionPreservationPresenter(
+            errorPresenter: errorPresenter,
+            showTranscriptWindow: { showTranscriptCallCount += 1 },
+            showSettingsWindow: { showSettingsCallCount += 1 },
+            provider: { .openAI }
+        )
+
+        presenter.presentPreservedSession(session, appError: .missingAPIKey)
+
+        XCTAssertEqual(presentationState.status, .error(try XCTUnwrap(session.transcriptionRecoveryMessage)))
+        XCTAssertEqual(presentationState.currentError, .missingAPIKey)
+        XCTAssertEqual(showTranscriptCallCount, 1)
+        XCTAssertEqual(showSettingsCallCount, 1)
+
+        let telemetry = try XCTUnwrap(
+            telemetryRecorder.recordedEvents.last { $0.name == TelemetryEvent.appError.rawValue }
+        )
+        XCTAssertEqual(telemetry.metadata["context"], "preserve_retryable_session")
+        XCTAssertEqual(telemetry.metadata["operation"], "transcription")
+        XCTAssertEqual(telemetry.metadata["error_type"], "missing_api_key")
+    }
+
+    func testPreservationPresenterPresentsPersistenceFailureRecoveryStatus() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+        let session = try harness.addPendingSession(failureReason: .missingAPIKey)
+        let presentationState = AppPresentationState()
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let errorPresenter = AppErrorPresenter(
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+        var showTranscriptCallCount = 0
+        var showSettingsCallCount = 0
+        let presenter = RetryableSessionPreservationPresenter(
+            errorPresenter: errorPresenter,
+            showTranscriptWindow: { showTranscriptCallCount += 1 },
+            showSettingsWindow: { showSettingsCallCount += 1 },
+            provider: { .openAI }
+        )
+        let underlyingError = NSError(
+            domain: "TranscriptionRecoveryControllerTests",
+            code: 17,
+            userInfo: [NSLocalizedDescriptionKey: "Index path is a directory"]
+        )
+
+        presenter.presentPersistenceFailure(
+            underlyingError,
+            retryableSession: session,
+            recoveryAppError: .missingAPIKey
+        )
+
+        let appError = AppError.storageFailure("Index path is a directory")
+        XCTAssertEqual(presentationState.status, .error("Recording preserved, but \(appError.userMessage)"))
+        XCTAssertEqual(presentationState.currentError, appError)
+        XCTAssertEqual(showTranscriptCallCount, 1)
+        XCTAssertEqual(showSettingsCallCount, 1)
+
+        let telemetry = try XCTUnwrap(
+            telemetryRecorder.recordedEvents.last { $0.name == TelemetryEvent.appError.rawValue }
+        )
+        XCTAssertEqual(telemetry.metadata["context"], "retryable_session_persist_failed")
+        XCTAssertEqual(telemetry.metadata["operation"], "session_library")
+        XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "Index path is a directory")
+    }
+
     func testPreserveRetryableSessionCopiesAudioAndStoresPendingSession() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }
@@ -71,6 +150,55 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(harness.transcriptStore.session(with: session.id)?.pendingTranscription?.failureReason, .invalidAPIKey)
         XCTAssertEqual(harness.sessionLibrary.currentTranscript?.id, session.id)
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
+    }
+
+    func testPreserveRetryableSessionKeepsSamePathAudioAndStoresPendingSession() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let recordingSession = try harness.makeRecordingSession()
+        let audioURL = recordingSession.artifactsDirectoryURL
+            .appendingPathComponent("recording")
+            .appendingPathExtension("m4a")
+        let recordedAudio = try harness.makeRecordedAudio(fileURL: audioURL, contents: "audio")
+
+        let result = harness.controller.preserveRetryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: harness.request,
+            failureReason: .invalidAPIKey
+        )
+
+        guard case .preserved(let session, _) = result else {
+            return XCTFail("Expected retryable session preservation.")
+        }
+        XCTAssertEqual(session.pendingTranscriptionAudioURL?.standardizedFileURL, audioURL.standardizedFileURL)
+        XCTAssertEqual(try String(contentsOf: audioURL, encoding: .utf8), "audio")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: audioURL.path))
+    }
+
+    func testPreserveRetryableSessionRejectsEmptySamePathAudio() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let recordingSession = try harness.makeRecordingSession()
+        let audioURL = recordingSession.artifactsDirectoryURL
+            .appendingPathComponent("recording")
+            .appendingPathExtension("m4a")
+        let recordedAudio = try harness.makeRecordedAudio(fileURL: audioURL, contents: "")
+
+        let result = harness.controller.preserveRetryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: harness.request,
+            failureReason: .invalidAPIKey
+        )
+
+        guard case .preservationFailure(let error as AppError) = result else {
+            return XCTFail("Expected empty preserved audio to fail preservation.")
+        }
+        XCTAssertEqual(error, .recordingFailure("The preserved audio file was empty."))
+        XCTAssertNil(harness.transcriptStore.session(with: recordingSession.sessionID))
     }
 
     func testPreserveRetryableSessionPersistenceFailureStagesCurrentTranscript() throws {
@@ -205,6 +333,10 @@ private struct TranscriptionRecoveryControllerHarness {
 
     func makeRecordedAudio(fileName: String, contents: String) throws -> RecordedAudio {
         let fileURL = rootDirectoryURL.appendingPathComponent(fileName).appendingPathExtension("m4a")
+        return try makeRecordedAudio(fileURL: fileURL, contents: contents)
+    }
+
+    func makeRecordedAudio(fileURL: URL, contents: String) throws -> RecordedAudio {
         try Data(contents.utf8).write(to: fileURL)
         return RecordedAudio(fileURL: fileURL, duration: 3)
     }

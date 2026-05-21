@@ -110,6 +110,10 @@ final class MixedAudioRecorder: AudioRecording {
             systemAudio: systemAudio,
             outputURL: outputURL
         )
+        removeSourceAudioFiles(
+            [microphoneAudio.fileURL, systemAudio.fileURL],
+            preserving: mixedAudio.fileURL
+        )
 
         recordingLogger.info(
             "mixed_recording_stopped",
@@ -121,6 +125,13 @@ final class MixedAudioRecorder: AudioRecording {
         )
 
         return mixedAudio
+    }
+
+    private func removeSourceAudioFiles(_ sourceURLs: [URL], preserving outputURL: URL) {
+        let preservedURL = outputURL.standardizedFileURL
+        for sourceURL in sourceURLs where sourceURL.standardizedFileURL != preservedURL {
+            try? FileManager.default.removeItem(at: sourceURL)
+        }
     }
 
     func cancelRecording(preserveFile: Bool) async {

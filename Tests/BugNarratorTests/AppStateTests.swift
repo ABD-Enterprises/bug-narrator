@@ -144,6 +144,20 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testAppStateUpdatesRegisteredHotkeysWhenSettingsChange() {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let updatedShortcut = HotkeyShortcut(
+            keyCode: 7,
+            modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue
+        )
+
+        harness.settingsStore.startRecordingHotkeyShortcut = updatedShortcut
+
+        XCTAssertEqual(harness.hotkeyManager.registeredShortcuts[.startRecording], updatedShortcut)
+    }
+
     func testApplicationTerminationUnregistersHotkeys() {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
