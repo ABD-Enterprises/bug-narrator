@@ -54,12 +54,13 @@ jobs:
         shell: pwsh
         env:
           BUGNARRATOR_CERT_PASSWORD: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_PASSWORD }}
+          RELEASE_RUNTIME: ${{ inputs.runtime }}
         run: |
           if (-not $env:BUGNARRATOR_CERT_PASSWORD) {
             throw "Repository secret BUGNARRATOR_WINDOWS_CERT_PASSWORD is required for a real signed Windows tester release."
           }
           powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 `
-            -Runtime "${{ inputs.runtime }}"
+            -Runtime "$env:RELEASE_RUNTIME"
 
       - name: Upload signed package evidence
         uses: actions/upload-artifact@v4
@@ -75,19 +76,23 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
+          RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_RUNTIME: ${{ inputs.runtime }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           $args = @(
-            "release", "create", "${{ inputs.tag }}",
-            "windows/artifacts/packages/BugNarrator-windows-${{ inputs.runtime }}.zip",
-            "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-signature.json",
-            "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-validation.json",
-            "--title", "BugNarrator Windows tester ${{ inputs.tag }}",
-            "--notes-file", "windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-release-notes.md"
+            "release", "create", "$env:RELEASE_TAG",
+            "windows/artifacts/packages/BugNarrator-windows-$env:RELEASE_RUNTIME.zip",
+            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-signature.json",
+            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-validation.json",
+            "--title", "BugNarrator Windows tester $env:RELEASE_TAG",
+            "--notes-file", "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-release-notes.md"
           )
-          if ("${{ inputs.draft }}" -eq "true") {
+          if ("$env:RELEASE_DRAFT" -eq "true") {
             $args += "--draft"
           }
-          if ("${{ inputs.prerelease }}" -eq "true") {
+          if ("$env:RELEASE_PRERELEASE" -eq "true") {
             $args += "--prerelease"
           }
           gh @args
