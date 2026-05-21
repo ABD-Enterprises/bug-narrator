@@ -384,7 +384,7 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             transcriptionClient: transcriptionClient
         )
-        self.applicationTerminationController = ApplicationTerminationController(
+        let applicationTerminationController = ApplicationTerminationController(
             statusPhase: { presentationState.status.phase },
             activeRecordingSession: { recordingSessionController.activeRecordingSession },
             isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
@@ -411,6 +411,7 @@ final class AppState: ObservableObject {
                 recordingSessionController.endActivity()
             }
         )
+        self.applicationTerminationController = applicationTerminationController
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
@@ -451,8 +452,8 @@ final class AppState: ObservableObject {
             didBecomeActive: { [weak self] in
                 self?.refreshPermissionRecoveryState()
             },
-            willTerminate: { [weak self] in
-                self?.prepareForApplicationTermination()
+            willTerminate: {
+                applicationTerminationController.prepareForApplicationTermination()
             }
         )
 
@@ -1210,10 +1211,6 @@ final class AppState: ObservableObject {
                 await captureScreenshot()
             }
         }
-    }
-
-    private func prepareForApplicationTermination() {
-        applicationTerminationController.prepareForApplicationTermination()
     }
 
     private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
