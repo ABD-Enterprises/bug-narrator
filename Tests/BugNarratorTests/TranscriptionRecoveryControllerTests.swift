@@ -148,6 +148,55 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
     }
 
+    func testPreserveRetryableSessionKeepsSamePathAudioAndStoresPendingSession() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let recordingSession = try harness.makeRecordingSession()
+        let audioURL = recordingSession.artifactsDirectoryURL
+            .appendingPathComponent("recording")
+            .appendingPathExtension("m4a")
+        let recordedAudio = try harness.makeRecordedAudio(fileURL: audioURL, contents: "audio")
+
+        let result = harness.controller.preserveRetryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: harness.request,
+            failureReason: .invalidAPIKey
+        )
+
+        guard case .preserved(let session, _) = result else {
+            return XCTFail("Expected retryable session preservation.")
+        }
+        XCTAssertEqual(session.pendingTranscriptionAudioURL?.standardizedFileURL, audioURL.standardizedFileURL)
+        XCTAssertEqual(try String(contentsOf: audioURL, encoding: .utf8), "audio")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: audioURL.path))
+    }
+
+    func testPreserveRetryableSessionRejectsEmptySamePathAudio() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let recordingSession = try harness.makeRecordingSession()
+        let audioURL = recordingSession.artifactsDirectoryURL
+            .appendingPathComponent("recording")
+            .appendingPathExtension("m4a")
+        let recordedAudio = try harness.makeRecordedAudio(fileURL: audioURL, contents: "")
+
+        let result = harness.controller.preserveRetryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: harness.request,
+            failureReason: .invalidAPIKey
+        )
+
+        guard case .preservationFailure(let error as AppError) = result else {
+            return XCTFail("Expected empty preserved audio to fail preservation.")
+        }
+        XCTAssertEqual(error, .recordingFailure("The preserved audio file was empty."))
+        XCTAssertNil(harness.transcriptStore.session(with: recordingSession.sessionID))
+    }
+
     func testPreserveRetryableSessionPersistenceFailureStagesCurrentTranscript() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }
@@ -279,6 +328,10 @@ private struct TranscriptionRecoveryControllerHarness {
 
     func makeRecordedAudio(fileName: String, contents: String) throws -> RecordedAudio {
         let fileURL = rootDirectoryURL.appendingPathComponent(fileName).appendingPathExtension("m4a")
+        return try makeRecordedAudio(fileURL: fileURL, contents: contents)
+    }
+
+    func makeRecordedAudio(fileURL: URL, contents: String) throws -> RecordedAudio {
         try Data(contents.utf8).write(to: fileURL)
         return RecordedAudio(fileURL: fileURL, duration: 3)
     }
