@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     let errorPresenter: AppErrorPresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
+    let recordingSessionCancelStatusPresenter: RecordingSessionCancelStatusPresenter
     let recordingStatusMessages: RecordingStatusMessageProvider
     let sessionLibrary: SessionLibraryController
     let exportHistoryController: ExportHistoryController
@@ -236,6 +237,9 @@ final class AppState: ObservableObject {
             recordingTimer: recordingTimer
         )
         self.recordingSessionController = recordingSessionController
+        self.recordingSessionCancelStatusPresenter = RecordingSessionCancelStatusPresenter(
+            setStatus: { status in presentationState.setStatus(status, error: nil) }
+        )
         let recordingStatusMessages = RecordingStatusMessageProvider {
             RecordingStatusMessageSnapshot(
                 audioSource: settingsStore.recordingAudioSource,
@@ -717,21 +721,7 @@ final class AppState: ObservableObject {
             }
         )
 
-        switch outcome {
-        case .transitionInProgress:
-            recordingLogger.debug("session_cancel_ignored", "The cancel request was ignored because another recording transition is already in progress.")
-            return
-
-        case .cancelled(let activeRecordingSession):
-            if let activeRecordingSession {
-                recordingLogger.info(
-                    "session_cancelled",
-                    "The active feedback session was discarded.",
-                    metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
-                )
-            }
-            setStatus(.idle("Session discarded."))
-        }
+        recordingSessionCancelStatusPresenter.present(outcome)
     }
 
     func openTranscriptHistory() {
