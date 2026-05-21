@@ -63,6 +63,30 @@ final class TranscriptPersistenceFailurePresenter {
 }
 
 @MainActor
+final class PostTranscriptionFailurePresenter {
+    private let errorPresenter: AppErrorPresenter
+    private let showSettingsWindow: () -> Void
+
+    init(
+        errorPresenter: AppErrorPresenter,
+        showSettingsWindow: @escaping () -> Void
+    ) {
+        self.errorPresenter = errorPresenter
+        self.showSettingsWindow = showSettingsWindow
+    }
+
+    func present(
+        _ error: Error,
+        operation: AppErrorOperation = .postTranscription
+    ) {
+        let result = errorPresenter.presentPostTranscriptionError(error, operation: operation)
+        if result.shouldOpenSettingsWindow {
+            showSettingsWindow()
+        }
+    }
+}
+
+@MainActor
 final class AppErrorPresenter {
     private let presentationState: AppPresentationState
     private let telemetryRecorder: any OperationalTelemetryRecording

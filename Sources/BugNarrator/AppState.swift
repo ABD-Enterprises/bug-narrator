@@ -14,6 +14,7 @@ final class AppState: ObservableObject {
     let presentationState: AppPresentationState
     let errorPresenter: AppErrorPresenter
     let transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter
+    let postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter
     let transientToastController: TransientToastController
     let recordingSessionController: RecordingSessionController
     let recordingSessionStartStatusPresenter: RecordingSessionStartStatusPresenter
@@ -329,6 +330,10 @@ final class AppState: ObservableObject {
             recordingStatusMessages: recordingStatusMessages,
             setStatus: { status in presentationState.setStatus(status, error: nil) },
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
+        )
+        self.postTranscriptionFailurePresenter = PostTranscriptionFailurePresenter(
+            errorPresenter: self.errorPresenter,
+            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
         self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
             errorPresenter: self.errorPresenter,
@@ -965,7 +970,7 @@ final class AppState: ObservableObject {
                 )
                 transcriptionRecovery.finishRetry()
                 recordingSessionController.endActivity()
-                presentPostTranscriptionError(error, operation: .retryTranscription)
+                postTranscriptionFailurePresenter.present(error, operation: .retryTranscription)
             }
         } catch {
             if handlePendingTranscriptionRetryFailure(error, context: retryContext) {
@@ -1175,17 +1180,6 @@ final class AppState: ObservableObject {
         issueExportController.clearProgress()
     }
 
-    private func presentPostTranscriptionError(
-        _ error: Error,
-        operation: AppErrorOperation = .postTranscription
-    ) {
-        let result = errorPresenter.presentPostTranscriptionError(error, operation: operation)
-
-        if result.shouldOpenSettingsWindow {
-            showSettingsWindow?()
-        }
-    }
-
     private func cleanupPendingRecordedAudioIfNeeded() {
         recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
     }
@@ -1347,7 +1341,7 @@ final class AppState: ObservableObject {
         case .postTranscriptionFailure(let error):
             cleanupPendingRecordedAudioIfNeeded()
             recordingSessionController.endActivity()
-            presentPostTranscriptionError(error, operation: .postTranscription)
+            postTranscriptionFailurePresenter.present(error, operation: .postTranscription)
         }
     }
 
