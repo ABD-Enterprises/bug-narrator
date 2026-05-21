@@ -269,6 +269,27 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
+    func testParakeetProviderRequiresBaseURLButNotAPIKey() {
+        let suiteName = "BugNarrator-SettingsParakeet-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .parakeetLocal
+        store.openAIBaseURL = ""
+
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Choose the local Parakeet server URL before validating or transcribing."
+        )
+        XCTAssertTrue(store.hasUsableAIProviderCredential)
+
+        store.openAIBaseURL = "http://localhost:8422"
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+    }
+
     func testSettingsLoadFromLegacyDefaultsDomain() throws {
         let suiteName = "BugNarrator-SettingsLegacyDefaultsTests-\(UUID().uuidString)"
         let legacyDomainName = "com.abdenterprises.sessionmic.tests.\(UUID().uuidString)"

@@ -49,6 +49,7 @@ final class TranscriptionRecoveryController: ObservableObject {
     func retryContext(
         for sessionID: UUID,
         isRecording: Bool,
+        provider: AIProvider,
         hasUsableAIProviderCredential: Bool,
         aiProviderCompatibilityIssue: String?
     ) -> PendingTranscriptionRetryResolution {
@@ -87,7 +88,8 @@ final class TranscriptionRecoveryController: ObservableObject {
             return .failure(
                 .missingAPIKey,
                 opensSettings: true,
-                statusMessage: session.transcriptionRecoveryMessage ?? AppError.missingAPIKey.userMessage
+                statusMessage: session.transcriptionRecoveryMessage(for: provider)
+                    ?? AppError.missingAPIKey.userMessage(for: provider)
             )
         }
 
@@ -118,7 +120,8 @@ final class TranscriptionRecoveryController: ObservableObject {
 
     func recordRetryableFailure(
         _ error: Error,
-        context: PendingTranscriptionRetryContext
+        context: PendingTranscriptionRetryContext,
+        provider: AIProvider
     ) -> PendingTranscriptionRetryFailure? {
         guard let failureReason = recoverablePendingTranscriptionReason(for: error) else {
             return nil
@@ -147,7 +150,10 @@ final class TranscriptionRecoveryController: ObservableObject {
         return PendingTranscriptionRetryFailure(
             session: session,
             appError: failureReason.appError,
-            statusMessage: (session.transcriptionRecoveryMessage ?? failureReason.appError.userMessage) + attemptMessage
+            statusMessage: (
+                session.transcriptionRecoveryMessage(for: provider)
+                    ?? failureReason.appError.userMessage(for: provider)
+            ) + attemptMessage
         )
     }
 

@@ -33,4 +33,13 @@ final class AppErrorTests: XCTestCase {
         XCTAssertEqual(AppError.invalidAPIKey.statusTitle, "OpenAI Key Rejected")
         XCTAssertEqual(AppError.revokedAPIKey.statusTitle, "OpenAI Key Rejected")
     }
+
+    func testParakeetSetupErrorsUseProviderSpecificStatusPresentation() {
+        XCTAssertEqual(AppError.missingAPIKey.statusTitle(for: .parakeetLocal), "Local Parakeet Setup Needed")
+        XCTAssertEqual(AppError.invalidAPIKey.statusTitle(for: .parakeetLocal), "Local Parakeet Setup Rejected")
+        XCTAssertEqual(
+            AppError.missingAPIKey.recoveryHeadline(for: .parakeetLocal),
+            "Finish the Local (Parakeet) setup before continuing."
+        )
+    }
 }

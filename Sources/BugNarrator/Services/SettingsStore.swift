@@ -513,6 +513,9 @@ final class SettingsStore: ObservableObject {
             }
             return nil
         case .parakeetLocal:
+            if trimmedBaseURL.isEmpty {
+                return "Choose the local Parakeet server URL before validating or transcribing."
+            }
             return nil
         }
     }

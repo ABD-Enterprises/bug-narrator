@@ -12,6 +12,7 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         let resolution = harness.controller.retryContext(
             for: session.id,
             isRecording: false,
+            provider: .openAI,
             hasUsableAIProviderCredential: true,
             aiProviderCompatibilityIssue: nil
         )
@@ -36,6 +37,7 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         let resolution = harness.controller.retryContext(
             for: session.id,
             isRecording: false,
+            provider: .openAI,
             hasUsableAIProviderCredential: false,
             aiProviderCompatibilityIssue: nil
         )
@@ -103,6 +105,7 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         guard case .ready(let context) = harness.controller.retryContext(
             for: session.id,
             isRecording: false,
+            provider: .openAI,
             hasUsableAIProviderCredential: true,
             aiProviderCompatibilityIssue: nil
         ) else {
@@ -111,7 +114,7 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(harness.controller.beginRetry(for: session.id))
 
         let failure = try XCTUnwrap(
-            harness.controller.recordRetryableFailure(AppError.invalidAPIKey, context: context)
+            harness.controller.recordRetryableFailure(AppError.invalidAPIKey, context: context, provider: .openAI)
         )
 
         XCTAssertNil(harness.controller.retryingSessionID)

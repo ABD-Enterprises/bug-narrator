@@ -34,7 +34,7 @@ final class AIProviderSettingsController: ObservableObject {
         guard let providerCredential = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
             let provider = settingsStore.aiProvider
             let message = provider.requiresAPIKey
-                ? AppError.missingAPIKey.userMessage
+                ? AppError.missingAPIKey.userMessage(for: provider)
                 : "Choose a valid \(provider.displayName) base URL before validating the connection."
             apiKeyValidationState = .failure(message)
             showSettingsWindow?()
@@ -58,10 +58,10 @@ final class AIProviderSettingsController: ObservableObject {
             )
         } catch {
             let appError = (error as? AppError) ?? .transcriptionFailure(error.localizedDescription)
-            apiKeyValidationState = .failure(appError.userMessage)
+            apiKeyValidationState = .failure(appError.userMessage(for: settingsStore.aiProvider))
             logger.warning(
                 .validateAIProviderFailed,
-                appError.userMessage,
+                appError.userMessage(for: settingsStore.aiProvider),
                 metadata: ["provider": settingsStore.aiProvider.rawValue]
             )
         }

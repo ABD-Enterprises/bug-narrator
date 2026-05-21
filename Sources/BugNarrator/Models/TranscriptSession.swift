@@ -19,17 +19,33 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
         }
     }
 
-    var recoveryMessage: String {
+    func recoveryMessage(for provider: AIProvider) -> String {
         switch self {
         case .missingAPIKey:
-            return "Recording saved locally. Add your OpenAI API key in Settings, then retry transcription from this session."
+            if provider.requiresAPIKey {
+                return "Recording saved locally. Add your \(provider.displayName) API key in Settings, then retry transcription from this session."
+            }
+            return "Recording saved locally. Open Settings, confirm the \(provider.displayName) server setup, then retry transcription from this session."
         case .invalidAPIKey:
-            return "Recording saved locally. Replace the rejected OpenAI API key in Settings, then retry transcription from this session."
+            if provider.requiresAPIKey {
+                return "Recording saved locally. Replace the rejected \(provider.displayName) API key in Settings, then retry transcription from this session."
+            }
+            return "Recording saved locally. Open Settings, repair the \(provider.displayName) connection, then retry transcription from this session."
         case .revokedAPIKey:
-            return "Recording saved locally. Add a new OpenAI API key in Settings, then retry transcription from this session."
+            if provider.requiresAPIKey {
+                return "Recording saved locally. Add a new \(provider.displayName) API key in Settings, then retry transcription from this session."
+            }
+            return "Recording saved locally. Open Settings, refresh the \(provider.displayName) configuration, then retry transcription from this session."
         case .crashRecovery:
-            return "Recovered recording found after an unexpected quit. Add or confirm your OpenAI API key, then transcribe the recovered audio."
+            if provider.requiresAPIKey {
+                return "Recovered recording found after an unexpected quit. Add or confirm your \(provider.displayName) API key, then transcribe the recovered audio."
+            }
+            return "Recovered recording found after an unexpected quit. Confirm the \(provider.displayName) setup, then transcribe the recovered audio."
         }
+    }
+
+    var recoveryMessage: String {
+        recoveryMessage(for: .openAI)
     }
 
     var appError: AppError {
@@ -203,12 +219,16 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         return Self.displayTitle(from: transcript)
     }
 
-    var preview: String {
+    func preview(for provider: AIProvider) -> String {
         if let pendingTranscription {
-            return pendingTranscription.failureReason.recoveryMessage
+            return pendingTranscription.failureReason.recoveryMessage(for: provider)
         }
 
         return Self.previewText(from: transcript)
+    }
+
+    var preview: String {
+        preview(for: .openAI)
     }
 
     var metadataSummary: String {
@@ -240,8 +260,12 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         !Self.normalizedTranscriptBody(from: transcript).isEmpty
     }
 
+    func transcriptionRecoveryMessage(for provider: AIProvider) -> String? {
+        pendingTranscription?.failureReason.recoveryMessage(for: provider)
+    }
+
     var transcriptionRecoveryMessage: String? {
-        pendingTranscription?.failureReason.recoveryMessage
+        transcriptionRecoveryMessage(for: .openAI)
     }
 
     var summaryText: String {

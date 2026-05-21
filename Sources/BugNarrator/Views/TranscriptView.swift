@@ -193,9 +193,9 @@ struct TranscriptView: View {
                 transcriptDetail(for: selectedSession)
             } else if allSessions.isEmpty, appState.needsAPIKeySetup {
                 ContentUnavailableView {
-                    Label("OpenAI API Key Required", systemImage: "key.horizontal")
+                    Label(emptyLibrarySetupTitle, systemImage: emptyLibrarySetupSymbol)
                 } description: {
-                    Text("You can record without an OpenAI API key, but you need one in Settings before a session can be transcribed into the library.")
+                    Text(emptyLibrarySetupDescription)
                 } actions: {
                     Button("Open Settings") {
                         appState.openSettings()
@@ -272,7 +272,8 @@ struct TranscriptView: View {
         if transcriptStore.pendingTranscriptionSessionCount > 0 {
             PendingTranscriptionBanner(
                 count: transcriptStore.pendingTranscriptionSessionCount,
-                hasAPIKey: appState.settingsStore.hasAPIKey,
+                requiresProviderSetup: appState.needsAPIKeySetup,
+                provider: appState.settingsStore.aiProvider,
                 hasRecoveredRecording: appState.hasRecoveredRecordingPendingTranscription,
                 openLatest: openLatestPendingTranscriptionSession,
                 openSettings: appState.openSettings
@@ -618,7 +619,7 @@ struct TranscriptView: View {
                 Spacer()
             }
 
-            Text(entry.preview)
+            Text(sessionPreview(for: entry))
                 .font(.subheadline)
                 .foregroundStyle(.primary)
                 .lineLimit(3)
@@ -696,7 +697,7 @@ struct TranscriptView: View {
             if session.requiresTranscriptionRetry {
                 HStack(alignment: .center, spacing: 10) {
                     Label(
-                        session.transcriptionRecoveryMessage ?? "Retry transcription after restoring your OpenAI API key.",
+                        session.transcriptionRecoveryMessage(for: appState.settingsStore.aiProvider) ?? defaultRetryRecoveryMessage,
                         systemImage: "arrow.clockwise.circle"
                     )
                     .font(.footnote)
@@ -704,19 +705,18 @@ struct TranscriptView: View {
 
                     Spacer()
 
-                    if appState.settingsStore.hasAPIKey {
+                    if appState.needsAPIKeySetup {
+                        Button("Open Settings") {
+                            appState.openSettings()
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
                         Button("Retry Transcription") {
                             Task {
                                 await appState.retryPendingTranscription(for: session.id)
                             }
                         }
                         .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    } else {
-                        Button("Open Settings") {
-                            appState.openSettings()
-                        }
-                        .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
                 }
@@ -2377,7 +2377,7 @@ struct TranscriptView: View {
             components.append("Unsaved")
         }
 
-        let preview = entry.preview.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview = sessionPreview(for: entry).trimmingCharacters(in: .whitespacesAndNewlines)
         if !preview.isEmpty {
             components.append(preview)
         }
@@ -2388,6 +2388,41 @@ struct TranscriptView: View {
     private func screenshotActionLabel(for screenshot: SessionScreenshot, index: Int?, action: String) -> String {
         let ordinal = index.map { "Screenshot \($0 + 1)" } ?? "Screenshot"
         return "\(action) \(ordinal) at \(screenshot.timeLabel)"
+    }
+
+    private func sessionPreview(for entry: SessionLibraryEntry) -> String {
+        guard entry.isPendingTranscription,
+              let session = transcriptStore.session(with: entry.id) else {
+            return entry.preview
+        }
+
+        return session.preview(for: appState.settingsStore.aiProvider)
+    }
+
+    private var defaultRetryRecoveryMessage: String {
+        let provider = appState.settingsStore.aiProvider
+        if provider.requiresAPIKey {
+            return "Retry transcription after restoring your \(provider.displayName) API key."
+        }
+        return "Retry transcription after restoring the \(provider.displayName) setup."
+    }
+
+    private var emptyLibrarySetupTitle: String {
+        appState.settingsStore.aiProvider.requiresAPIKey
+            ? "\(appState.settingsStore.aiProvider.displayName) API Key Required"
+            : "\(appState.settingsStore.aiProvider.displayName) Setup Required"
+    }
+
+    private var emptyLibrarySetupDescription: String {
+        let provider = appState.settingsStore.aiProvider
+        if provider.requiresAPIKey {
+            return "You can record without a \(provider.displayName) API key, but you need one in Settings before a session can be transcribed into the library."
+        }
+        return "You can record without finishing \(provider.displayName) setup, but transcription will not complete until the local server and base URL work from this Mac."
+    }
+
+    private var emptyLibrarySetupSymbol: String {
+        appState.settingsStore.aiProvider.requiresAPIKey ? "key.horizontal" : "server.rack"
     }
 
 }

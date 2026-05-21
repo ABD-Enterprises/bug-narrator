@@ -697,6 +697,27 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
     }
 
+    func testStopSessionWithParakeetSetupIssuePreservesRetryableSessionWithProviderMessage() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "parakeet-setup-on-stop")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        harness.settingsStore.aiProvider = .parakeetLocal
+        harness.settingsStore.openAIBaseURL = ""
+
+        await harness.appState.startSession()
+        await harness.appState.stopSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Recording saved locally. Open Settings, confirm the Local (Parakeet) server setup, then retry transcription from this session."
+        )
+        XCTAssertTrue(harness.appState.needsAPIKeySetup)
+        XCTAssertEqual(harness.transcriptStore.sessions.first?.pendingTranscription?.failureReason, .missingAPIKey)
+    }
+
     func testStopSessionWithRejectedAPIKeyPreservesRetryableSession() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
