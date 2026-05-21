@@ -34,7 +34,7 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
         let audioFiles = try fileManager
             .contentsOfDirectory(
                 at: recoveryDirectoryURL,
-                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey],
                 options: [.skipsHiddenFiles]
             )
             .filter(Self.isImportableAudioFile)
@@ -135,7 +135,12 @@ struct RecoveredRecordingImporter: RecoveredRecordingImporting {
     }
 
     private static func isImportableAudioFile(_ url: URL) -> Bool {
-        isRecoverableAudioFile(url) && fileSize(for: url) > 0
+        isRecoverableAudioFile(url) && isRegularFile(url) && fileSize(for: url) > 0
+    }
+
+    private static func isRegularFile(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+        return values?.isRegularFile == true
     }
 
     private static func fileSize(for url: URL) -> Int {
