@@ -408,6 +408,35 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testNonAPIKeyProviderDoesNotForwardSavedOpenAIKey() {
+        let suiteName = "BugNarrator-SettingsNonAPIKeyProviderLeak-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .openAI
+        store.apiKey = "sk-saved-openai-key"
+        XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "sk-saved-openai-key")
+
+        store.aiProvider = .parakeetLocal
+        store.openAIBaseURL = "http://localhost:8422"
+
+        XCTAssertEqual(
+            store.aiProviderCredentialForUserInitiatedAccess(),
+            "",
+            "Switching to a non-requiresAPIKey provider must not return the saved OpenAI key."
+        )
+
+        store.aiProvider = .localCompatible
+        store.openAIBaseURL = "http://localhost:1234/v1"
+        XCTAssertEqual(
+            store.aiProviderCredentialForUserInitiatedAccess(),
+            "",
+            "A non-requiresAPIKey provider must never forward a saved OpenAI key."
+        )
+    }
+
     func testSettingsLoadFromLegacyDefaultsDomain() throws {
         let suiteName = "BugNarrator-SettingsLegacyDefaultsTests-\(UUID().uuidString)"
         let legacyDomainName = "com.abdenterprises.sessionmic.tests.\(UUID().uuidString)"
