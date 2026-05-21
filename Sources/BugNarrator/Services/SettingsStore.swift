@@ -621,18 +621,17 @@ final class SettingsStore: ObservableObject {
     }
 
     func aiProviderCredentialForUserInitiatedAccess() -> String? {
-        let resolvedKey = openAIAPIKeyForUserInitiatedAccess()
         let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if aiProvider.requiresAPIKey {
-            return resolvedKey
+            return openAIAPIKeyForUserInitiatedAccess()
         }
 
         guard !trimmedBaseURL.isEmpty else {
             return nil
         }
 
-        return resolvedKey ?? ""
+        return ""
     }
 
     var trimmedGitHubToken: String {
