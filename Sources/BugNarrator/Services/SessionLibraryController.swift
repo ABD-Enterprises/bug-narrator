@@ -41,6 +41,31 @@ enum SessionDeletionStatusPresenter {
 }
 
 @MainActor
+final class SessionLibraryStatusPresenter {
+    private let errorPresenter: AppErrorPresenter
+
+    init(errorPresenter: AppErrorPresenter) {
+        self.errorPresenter = errorPresenter
+    }
+
+    func presentSavedSession(_ savedSession: TranscriptSession?) {
+        if let status = TranscriptSaveStatusPresenter.status(savedSession: savedSession) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
+    func presentDeletedCount(_ deletedCount: Int) {
+        if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
+            errorPresenter.setStatus(status)
+        }
+    }
+
+    func presentFailure(_ error: Error) {
+        _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
+    }
+}
+
+@MainActor
 final class SessionLibraryController: ObservableObject {
     @Published var currentTranscript: TranscriptSession?
     @Published var selectedTranscriptID: UUID?
