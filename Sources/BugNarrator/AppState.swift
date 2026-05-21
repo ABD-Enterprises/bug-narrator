@@ -19,6 +19,7 @@ final class AppState: ObservableObject {
     let sessionLibrary: SessionLibraryController
     let exportHistoryController: ExportHistoryController
     let recoveredRecordingImportController: RecoveredRecordingImportController
+    private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
     let issueExtractionController: IssueExtractionController
     let issueExportController: IssueExportController
     let permissionRecoveryController: PermissionRecoveryController
@@ -274,12 +275,13 @@ final class AppState: ObservableObject {
         )
         self.sessionLibrary = sessionLibrary
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
-        self.recoveredRecordingImportController = RecoveredRecordingImportController(
+        let recoveredRecordingImportController = RecoveredRecordingImportController(
             transcriptStore: transcriptStore,
             sessionLibrary: sessionLibrary,
             recoveredRecordingImporter: recoveredRecordingImporter,
             artifactsService: artifactsService
         )
+        self.recoveredRecordingImportController = recoveredRecordingImportController
         let issueExtractionController = IssueExtractionController(
             sessionLibrary: sessionLibrary,
             issueExtractionService: issueExtractionService
@@ -307,6 +309,16 @@ final class AppState: ObservableObject {
             permissionRecoveryController: permissionRecoveryController
         )
         self.appUtilityActions = appUtilityActions
+        self.recoveredRecordingLaunchImporter = RecoveredRecordingLaunchImportPresenter(
+            importController: recoveredRecordingImportController,
+            errorPresenter: self.errorPresenter,
+            setStatus: { status, error in
+                presentationState.setStatus(status, error: error)
+            },
+            openTranscriptHistory: {
+                appUtilityActions.openTranscriptHistory()
+            }
+        )
         let appUtilityActionPresenter = AppUtilityActionResultPresenter(
             statusPhase: { presentationState.status.phase },
             setStatus: { status in
@@ -457,7 +469,7 @@ final class AppState: ObservableObject {
             ]
         )
         permissionRecoveryController.validateRuntimeConfiguration()
-        importRecoveredRecordingsAtLaunch()
+        recoveredRecordingLaunchImporter.importRecoveredRecordingsAtLaunch()
         Task { [weak self] in
             await self?.refreshExportHistory()
         }
@@ -1572,32 +1584,6 @@ final class AppState: ObservableObject {
 
     private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
         permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
-    }
-
-    private func importRecoveredRecordingsAtLaunch() {
-        do {
-            let outcome = try recoveredRecordingImportController.importRecoveredRecordingsAtLaunch()
-            guard case .imported(let message, let error) = outcome else {
-                return
-            }
-
-            setStatus(.error(message), error: error)
-            showTranscriptWindow?()
-        } catch {
-            let normalizedError = errorPresenter.normalizeError(
-                error,
-                operation: .recoveredRecordingImport,
-                fallback: { .storageFailure($0) }
-            )
-            let appError = normalizedError.appError
-            errorPresenter.logAppError(normalizedError, context: "recovered_recording_import_failed")
-            sessionLibraryLogger.error(
-                "recovered_recording_import_failed",
-                appError.userMessage,
-                metadata: errorPresenter.appErrorMetadata(for: normalizedError, context: "recovered_recording_import_failed")
-            )
-            setStatus(.error(appError.userMessage), error: appError)
-        }
     }
 
 }
