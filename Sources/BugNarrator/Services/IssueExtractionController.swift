@@ -1,6 +1,16 @@
 import Combine
 import Foundation
 
+enum IssueExtractionStatusPresenter {
+    static var manualProgressStatus: AppStatus {
+        .transcribing("Running issue extraction with a 10-second time limit...")
+    }
+
+    static func manualCompletionStatus(issueCount: Int) -> AppStatus {
+        .success("Extracted \(issueCount) review issues.")
+    }
+}
+
 @MainActor
 final class IssueExtractionController: ObservableObject {
     @Published private(set) var issueExtractionSessionID: UUID?

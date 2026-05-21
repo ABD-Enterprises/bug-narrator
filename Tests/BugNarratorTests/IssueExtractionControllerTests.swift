@@ -3,6 +3,17 @@ import XCTest
 
 @MainActor
 final class IssueExtractionControllerTests: XCTestCase {
+    func testStatusPresenterMapsManualExtractionStatuses() {
+        XCTAssertEqual(
+            IssueExtractionStatusPresenter.manualProgressStatus,
+            .transcribing("Running issue extraction with a 10-second time limit...")
+        )
+        XCTAssertEqual(
+            IssueExtractionStatusPresenter.manualCompletionStatus(issueCount: 3),
+            .success("Extracted 3 review issues.")
+        )
+    }
+
     func testPreflightMapsCredentialTranscriptAndRecordingFailures() throws {
         let harness = try IssueExtractionControllerHarness()
         defer { harness.cleanup() }
