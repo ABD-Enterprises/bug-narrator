@@ -107,6 +107,18 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.artifactsService.removedDirectories, [artifactsDirectoryURL])
     }
 
+    func testSessionDeletionStatusPresenterMapsDeletedCounts() {
+        XCTAssertNil(SessionDeletionStatusPresenter.status(deletedCount: 0))
+        XCTAssertEqual(
+            SessionDeletionStatusPresenter.status(deletedCount: 1),
+            .success("Deleted 1 session.")
+        )
+        XCTAssertEqual(
+            SessionDeletionStatusPresenter.status(deletedCount: 3),
+            .success("Deleted 3 sessions.")
+        )
+    }
+
     func testPersistCompletedTranscriptCopiesWhenRequested() throws {
         let harness = try SessionLibraryControllerHarness()
         defer { harness.cleanup() }
