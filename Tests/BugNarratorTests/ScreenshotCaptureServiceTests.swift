@@ -94,6 +94,39 @@ final class ScreenshotCaptureServiceTests: XCTestCase {
         XCTAssertEqual(provider.requestedSourceRects, [CGRect(x: 10, y: 20, width: 30, height: 40)])
     }
 
+    func testCaptureScreenshotPreservesRetinaPixelDimensions() async throws {
+        let temporaryRoot = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+
+        let display = ScreenCaptureDisplaySnapshot(
+            displayID: 1,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            pixelWidth: 200,
+            pixelHeight: 200
+        )
+
+        let provider = MockScreenCaptureImageProvider(
+            displays: [display],
+            imagesByDisplayID: [
+                1: try makeSolidImage(width: 60, height: 80, color: CGColor(red: 0, green: 1, blue: 0, alpha: 1))
+            ]
+        )
+
+        let service = ScreenshotCaptureService(
+            imageProvider: provider,
+            imageWriter: PNGScreenshotImageWriter()
+        )
+
+        let outputURL = temporaryRoot.appendingPathComponent("capture.png")
+        try await service.captureScreenshot(in: CGRect(x: 10, y: 20, width: 30, height: 40), to: outputURL)
+
+        let imageSource = try XCTUnwrap(CGImageSourceCreateWithURL(outputURL as CFURL, nil))
+        let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any])
+        XCTAssertEqual(properties[kCGImagePropertyPixelWidth] as? Int, 60)
+        XCTAssertEqual(properties[kCGImagePropertyPixelHeight] as? Int, 80)
+        XCTAssertEqual(provider.requestedSourceRects, [CGRect(x: 10, y: 20, width: 30, height: 40)])
+    }
+
     func testCaptureScreenshotFailsWhenNoDisplaysAreAvailable() async {
         let service = ScreenshotCaptureService(
             imageProvider: MockScreenCaptureImageProvider(displays: []),
