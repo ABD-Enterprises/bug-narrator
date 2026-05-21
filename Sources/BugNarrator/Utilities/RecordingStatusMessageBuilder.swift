@@ -99,6 +99,22 @@ final class RecordingStatusMessageProvider {
         )
     }
 
+    func transcriptionUploadProgressMessage() -> String {
+        transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")
+    }
+
+    func transcriptionRetryProgressMessage() -> String {
+        transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")
+    }
+
+    func transcriptionSavingProgressMessage(mode: PostTranscriptionPipelineMode) -> String {
+        transcriptionProgressMessage(step: 2, action: mode.savingAction)
+    }
+
+    func transcriptionIssueExtractionProgressMessage() -> String {
+        transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")
+    }
+
     func transcriptionSuccessMessage() -> String {
         let snapshot = snapshot()
         return RecordingStatusMessageBuilder.transcriptionSuccessMessage(

@@ -150,4 +150,46 @@ final class RecordingStatusMessageBuilderTests: XCTestCase {
         )
         XCTAssertEqual(provider.transcriptionSuccessMessage(), "Session saved. Transcript and extracted issues are ready.")
     }
+
+    func testProviderBuildsNamedTranscriptionProgressMessages() {
+        let providerWithoutIssueExtraction = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: .microphone,
+                hasUsableAIProviderCredential: true,
+                aiProviderCompatibilityIssue: nil,
+                autoExtractIssues: false,
+                autoCopyTranscript: false
+            )
+        }
+        let providerWithIssueExtraction = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: .microphone,
+                hasUsableAIProviderCredential: true,
+                aiProviderCompatibilityIssue: nil,
+                autoExtractIssues: true,
+                autoCopyTranscript: false
+            )
+        }
+
+        XCTAssertEqual(
+            providerWithoutIssueExtraction.transcriptionUploadProgressMessage(),
+            "Step 1 of 2: Uploading audio to OpenAI for transcription..."
+        )
+        XCTAssertEqual(
+            providerWithoutIssueExtraction.transcriptionRetryProgressMessage(),
+            "Step 1 of 2: Retrying transcription from the preserved recording..."
+        )
+        XCTAssertEqual(
+            providerWithoutIssueExtraction.transcriptionSavingProgressMessage(mode: .finishedRecording),
+            "Step 2 of 2: Saving the finished session locally..."
+        )
+        XCTAssertEqual(
+            providerWithIssueExtraction.transcriptionSavingProgressMessage(mode: .retry),
+            "Step 2 of 3: Saving the recovered session locally..."
+        )
+        XCTAssertEqual(
+            providerWithIssueExtraction.transcriptionIssueExtractionProgressMessage(),
+            "Step 3 of 3: Extracting reviewable issues..."
+        )
+    }
 }
