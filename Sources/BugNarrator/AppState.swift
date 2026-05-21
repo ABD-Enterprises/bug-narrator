@@ -1034,6 +1034,7 @@ final class AppState: ObservableObject {
                 recordingSessionController.endActivity()
                 manualIssueExtractionStatusPresenter.presentCompletion(issueCount: extraction.issues.count)
             } catch {
+                recordingSessionController.endActivity()
                 manualIssueExtractionStatusPresenter.presentFailure(error)
             }
 
