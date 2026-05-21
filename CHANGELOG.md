@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Hardened `Retry-After` parsing to floor at one second, accept RFC 7231 HTTP-date values, and look up the header case-insensitively, so a server-sent `Retry-After: 0` no longer produces a no-backoff retry loop and date-form responses no longer fall through to exponential backoff.
 - [CHANGE] Repointed the default GitHub export repository and in-app project links from `deffenda/bug-narrator` to `ABD-Enterprises/bug-narrator`. Fresh installs and UI-test seeded settings now resolve to the canonical organization repo; existing installs keep whatever owner/repo the user previously configured.
 - [FIX] Cleared in-flight issue-extraction/export progress when an issue mutation (toggle selection, edit) write fails, so the extraction progress spinner no longer keeps running on top of an unrelated error toast.
 - [FIX] Restored the auto-open of Settings on credential-failure recording starts and the in-flight progress cleanup on any recording-start failure, so a missing/invalid API key surface still directs the user to Settings and stale issue-extraction/export badges from a prior pipeline no longer linger.
