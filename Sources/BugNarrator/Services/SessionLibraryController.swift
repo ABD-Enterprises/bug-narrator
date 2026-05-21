@@ -1,6 +1,12 @@
 import Combine
 import Foundation
 
+enum DisplayedTranscriptCopyResult: Equatable {
+    case noDisplayedTranscript
+    case transcriptUnavailable
+    case copied
+}
+
 @MainActor
 final class SessionLibraryController: ObservableObject {
     @Published var currentTranscript: TranscriptSession?
@@ -169,6 +175,19 @@ final class SessionLibraryController: ObservableObject {
                 "auto_copied": autoCopyTranscript ? "yes" : "no"
             ]
         )
+    }
+
+    func copyDisplayedTranscript() -> DisplayedTranscriptCopyResult {
+        guard let transcript = displayedTranscript else {
+            return .noDisplayedTranscript
+        }
+
+        guard transcript.hasTranscriptContent else {
+            return .transcriptUnavailable
+        }
+
+        clipboardService.copy(transcript.transcript)
+        return .copied
     }
 
     func persistRetryableSession(_ session: TranscriptSession) throws {
