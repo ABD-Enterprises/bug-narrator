@@ -1154,24 +1154,6 @@ final class AppState: ObservableObject {
         appUtilityActionPresenter.present(appUtilityActions.openScreenshot(screenshot))
     }
 
-    private func setStatus(_ newStatus: AppStatus, error: AppError? = nil) {
-        errorPresenter.setStatus(newStatus, error: error)
-    }
-
-    private func presentError(
-        _ error: Error,
-        operation: AppErrorOperation = .generic,
-        fallback: (String) -> AppError = { .transcriptionFailure($0) }
-    ) {
-        prepareErrorPresentationSideEffects()
-
-        let result = errorPresenter.presentError(error, operation: operation, fallback: fallback)
-
-        if result.shouldOpenSettingsWindow {
-            showSettingsWindow?()
-        }
-    }
-
     private func prepareErrorPresentationSideEffects() {
         recordingSessionController.stopTimer(resetElapsed: status.phase == .recording)
         recordingSessionController.endActivity()
