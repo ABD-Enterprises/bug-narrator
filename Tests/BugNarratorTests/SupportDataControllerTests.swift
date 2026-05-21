@@ -110,6 +110,48 @@ final class SupportDataControllerTests: XCTestCase {
 
         XCTAssertEqual(harness.localPrivacyDataManager.clearCallCount, 1)
     }
+
+    func testActionPresenterAppliesStatusesAndRevealsExportedBundles() {
+        let harness = SupportDataControllerHarness()
+        defer { harness.cleanup() }
+        var statuses: [AppStatus] = []
+        var revealedURLs: [URL] = []
+        var presentedUtilityResults: [AppUtilityActionResult] = []
+        let presenter = SupportDataActionPresenter(
+            setStatus: { statuses.append($0) },
+            revealInFinder: { url in
+                revealedURLs.append(url)
+                return .opened
+            },
+            presentUtilityActionResult: { presentedUtilityResults.append($0) }
+        )
+        let debugBundleURL = URL(fileURLWithPath: "/tmp/bugnarrator-debug-bundle")
+        let privacyBundleURL = URL(fileURLWithPath: "/tmp/bugnarrator-privacy-export")
+
+        presenter.presentCopyDebugInfo(harness.controller.copyDebugInfo(sessionID: nil))
+        presenter.presentDebugBundleExport(
+            DebugBundleExportCompletion(bundleURL: debugBundleURL, statusMessage: "Debug bundle exported.")
+        )
+        presenter.presentPrivacyDataExport(
+            PrivacyDataExportCompletion(
+                bundleURL: privacyBundleURL,
+                statusMessage: "Data export created. API keys and tracker credentials were not included."
+            )
+        )
+        presenter.presentLocalDataDeletion(LocalDataDeletionOutcome(deletedSessionCount: 2))
+
+        XCTAssertEqual(
+            statuses,
+            [
+                .success("Debug info copied to the clipboard."),
+                .success("Debug bundle exported."),
+                .success("Data export created. API keys and tracker credentials were not included."),
+                .success("Deleted 2 local sessions and cleared local diagnostics.")
+            ]
+        )
+        XCTAssertEqual(revealedURLs, [debugBundleURL, privacyBundleURL])
+        XCTAssertEqual(presentedUtilityResults, [.opened, .opened])
+    }
 }
 
 @MainActor
