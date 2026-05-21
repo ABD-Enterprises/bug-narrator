@@ -5,7 +5,7 @@ enum AppSupportLocation {
     private static let legacyAppDirectoryNames = ["SessionMic"]
 
     static func appDirectory(fileManager: FileManager = .default) -> URL {
-        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let baseURL = applicationSupportBaseURL(fileManager: fileManager)
         let currentDirectoryURL = baseURL.appendingPathComponent(currentAppDirectoryName, isDirectory: true)
 
         migrateLegacyDirectoryIfNeeded(
@@ -19,6 +19,14 @@ enum AppSupportLocation {
         }
 
         return currentDirectoryURL
+    }
+
+    private static func applicationSupportBaseURL(fileManager: FileManager) -> URL {
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ??
+            fileManager.temporaryDirectory.appendingPathComponent(
+                "\(currentAppDirectoryName)-ApplicationSupportFallback",
+                isDirectory: true
+            )
     }
 
     private static func migrateLegacyDirectoryIfNeeded(

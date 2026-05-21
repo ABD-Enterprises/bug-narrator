@@ -50,6 +50,7 @@
 		119A00000000000000000002 /* LocalDataDeletionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */; };
 		121A00000000000000000001 /* AppUtilityActionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000003 /* AppUtilityActionController.swift */; };
 		121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121A00000000000000000004 /* AppUtilityActionControllerTests.swift */; };
+		253A00000000000000000001 /* AppSupportLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253A00000000000000000002 /* AppSupportLocationTests.swift */; };
 		125A00000000000000000001 /* ApplicationTerminationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000003 /* ApplicationTerminationController.swift */; };
 		125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */; };
 		127A00000000000000000001 /* ScreenshotCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127A00000000000000000003 /* ScreenshotCaptureController.swift */; };
@@ -244,6 +245,7 @@
 		119A00000000000000000004 /* LocalDataDeletionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionControllerTests.swift; sourceTree = "<group>"; };
 		121A00000000000000000003 /* AppUtilityActionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionController.swift; sourceTree = "<group>"; };
 		121A00000000000000000004 /* AppUtilityActionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionControllerTests.swift; sourceTree = "<group>"; };
+		253A00000000000000000002 /* AppSupportLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupportLocationTests.swift; sourceTree = "<group>"; };
 		125A00000000000000000003 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
 		125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
 		127A00000000000000000003 /* ScreenshotCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureController.swift; sourceTree = "<group>"; };
@@ -382,6 +384,7 @@
 				117A00000000000000000004 /* AppErrorPresenterTests.swift */,
 				554387017B49D9CD63967BE3 /* AppStateTests.swift */,
 				121A00000000000000000004 /* AppUtilityActionControllerTests.swift */,
+				253A00000000000000000002 /* AppSupportLocationTests.swift */,
 				125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */,
 				F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */,
 				131A00000000000000000004 /* DebugSessionContextProviderTests.swift */,
@@ -746,6 +749,7 @@
 				117A00000000000000000002 /* AppErrorPresenterTests.swift in Sources */,
 				334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */,
 				121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */,
+				253A00000000000000000001 /* AppSupportLocationTests.swift in Sources */,
 				125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */,
 				5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */,
 				131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */,
