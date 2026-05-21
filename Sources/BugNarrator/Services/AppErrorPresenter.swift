@@ -56,7 +56,10 @@ final class TranscriptPersistenceFailurePresenter {
             "Transcription succeeded, but saving the transcript locally failed.",
             metadata: metadata
         )
-        errorPresenter.setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
+        errorPresenter.setStatus(
+            .error("Transcript ready, but \(appError.userMessage(for: errorPresenter.activeProvider))"),
+            error: appError
+        )
         showTranscriptWindow()
     }
 }
@@ -89,6 +92,7 @@ final class PostTranscriptionFailurePresenter {
 final class AppErrorPresenter {
     private let presentationState: AppPresentationState
     private let telemetryRecorder: any OperationalTelemetryRecording
+    private let provider: () -> AIProvider
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
     private let sessionLibraryLogger = DiagnosticsLogger(category: .sessionLibrary)
@@ -99,10 +103,16 @@ final class AppErrorPresenter {
 
     init(
         presentationState: AppPresentationState,
-        telemetryRecorder: any OperationalTelemetryRecording
+        telemetryRecorder: any OperationalTelemetryRecording,
+        provider: @escaping () -> AIProvider = { .openAI }
     ) {
         self.presentationState = presentationState
         self.telemetryRecorder = telemetryRecorder
+        self.provider = provider
+    }
+
+    var activeProvider: AIProvider {
+        provider()
     }
 
     func setStatus(_ status: AppStatus, error: AppError? = nil) {
@@ -116,8 +126,9 @@ final class AppErrorPresenter {
     ) -> AppErrorPresentationResult {
         let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
         let appError = normalizedError.appError
+        let currentProvider = provider()
         logAppError(normalizedError, context: "present_error")
-        setStatus(.error(appError.userMessage), error: appError)
+        setStatus(.error(appError.userMessage(for: currentProvider)), error: appError)
         return AppErrorPresentationResult(
             appError: appError,
             shouldOpenSettingsWindow: shouldOpenSettingsWindowAfterPresenting(appError)
@@ -134,11 +145,15 @@ final class AppErrorPresenter {
             fallback: { .issueExtractionFailure($0) }
         )
         let appError = normalizedError.appError
+        let currentProvider = provider()
         logAppError(normalizedError, context: "present_post_transcription_error")
-        setStatus(.error("Transcript ready, but \(appError.userMessage)"), error: appError)
+        setStatus(
+            .error("Transcript ready, but \(appError.userMessage(for: currentProvider))"),
+            error: appError
+        )
         return AppErrorPresentationResult(
             appError: appError,
-            shouldOpenSettingsWindow: appError.suggestsOpenAISettings
+            shouldOpenSettingsWindow: appError.suggestsProviderSettings(for: currentProvider)
         )
     }
 
@@ -181,6 +196,7 @@ final class AppErrorPresenter {
     func logAppError(_ normalizedError: AppErrorNormalization, context: String) {
         let error = normalizedError.appError
         let metadata = appErrorMetadata(for: normalizedError, context: context)
+        let message = error.userMessage(for: provider())
 
         telemetryRecorder.record(.appError, metadata: metadata)
 
@@ -192,23 +208,23 @@ final class AppErrorPresenter {
              .systemAudioConsentRequired,
              .systemAudioUnavailable,
              .screenRecordingPermissionDenied:
-            permissionsLogger.warning(.appError, error.userMessage, metadata: metadata)
+            permissionsLogger.warning(.appError, message, metadata: metadata)
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
-            settingsLogger.warning(.appError, error.userMessage, metadata: metadata)
+            settingsLogger.warning(.appError, message, metadata: metadata)
         case .recordingFailure:
-            recordingLogger.error(.appError, error.userMessage, metadata: metadata)
+            recordingLogger.error(.appError, message, metadata: metadata)
         case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited:
-            transcriptionLogger.error(.appError, error.userMessage, metadata: metadata)
+            transcriptionLogger.error(.appError, message, metadata: metadata)
         case .screenshotCaptureFailure:
-            screenshotLogger.error(.appError, error.userMessage, metadata: metadata)
+            screenshotLogger.error(.appError, message, metadata: metadata)
         case .exportConfigurationMissing, .exportFailure:
-            exportLogger.error(.appError, error.userMessage, metadata: metadata)
+            exportLogger.error(.appError, message, metadata: metadata)
         case .storageFailure:
-            sessionLibraryLogger.error(.appError, error.userMessage, metadata: metadata)
+            sessionLibraryLogger.error(.appError, message, metadata: metadata)
         case .noActiveSession:
-            recordingLogger.warning(.appError, error.userMessage, metadata: metadata)
+            recordingLogger.warning(.appError, message, metadata: metadata)
         case .diagnosticsFailure:
-            settingsLogger.error(.appError, error.userMessage, metadata: metadata)
+            settingsLogger.error(.appError, message, metadata: metadata)
         }
     }
 
