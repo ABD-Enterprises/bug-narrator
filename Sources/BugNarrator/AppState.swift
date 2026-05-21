@@ -882,10 +882,7 @@ final class AppState: ObservableObject {
     }
 
     func copyDisplayedTranscript() {
-        let result = sessionLibrary.copyDisplayedTranscript()
-        if let status = DisplayedTranscriptCopyStatusPresenter.status(for: result) {
-            setStatus(status)
-        }
+        sessionLibraryStatusPresenter.presentDisplayedTranscriptCopyResult(sessionLibrary.copyDisplayedTranscript())
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
