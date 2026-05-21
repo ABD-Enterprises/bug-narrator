@@ -72,6 +72,55 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["error_type"], "invalid_api_key")
     }
 
+    func testPostTranscriptionFailurePresenterNormalizesFailureWithOperationMetadata() throws {
+        let harness = AppErrorPresenterHarness()
+        let error = NSError(
+            domain: "AppErrorPresenterTests",
+            code: 12,
+            userInfo: [NSLocalizedDescriptionKey: "Issue extraction service unavailable"]
+        )
+        let presenter = PostTranscriptionFailurePresenter(
+            errorPresenter: harness.presenter,
+            showSettingsWindow: {}
+        )
+
+        presenter.present(error, operation: .postTranscription)
+
+        let appError = AppError.issueExtractionFailure("Issue extraction service unavailable")
+        XCTAssertEqual(harness.presentationState.status, .error("Transcript ready, but \(appError.userMessage)"))
+        XCTAssertEqual(harness.presentationState.currentError, appError)
+
+        let telemetry = try harness.lastAppErrorTelemetry()
+        XCTAssertEqual(telemetry.metadata["context"], "present_post_transcription_error")
+        XCTAssertEqual(telemetry.metadata["operation"], "post_transcription")
+        XCTAssertEqual(telemetry.metadata["error_type"], "issue_extraction_failure")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "Issue extraction service unavailable")
+    }
+
+    func testPostTranscriptionFailurePresenterOpensSettingsForCredentialFailure() throws {
+        let harness = AppErrorPresenterHarness()
+        var showSettingsCallCount = 0
+        let presenter = PostTranscriptionFailurePresenter(
+            errorPresenter: harness.presenter,
+            showSettingsWindow: {
+                showSettingsCallCount += 1
+            }
+        )
+
+        presenter.present(AppError.invalidAPIKey, operation: .retryTranscription)
+
+        XCTAssertEqual(showSettingsCallCount, 1)
+        XCTAssertEqual(
+            harness.presentationState.status,
+            .error("Transcript ready, but \(AppError.invalidAPIKey.userMessage)")
+        )
+
+        let telemetry = try harness.lastAppErrorTelemetry()
+        XCTAssertEqual(telemetry.metadata["context"], "present_post_transcription_error")
+        XCTAssertEqual(telemetry.metadata["operation"], "retry_transcription")
+        XCTAssertEqual(telemetry.metadata["error_type"], "invalid_api_key")
+    }
+
     func testTranscriptPersistenceFailurePresenterPrefixesStatusAndOpensTranscript() throws {
         let harness = AppErrorPresenterHarness()
         let underlyingError = NSError(
