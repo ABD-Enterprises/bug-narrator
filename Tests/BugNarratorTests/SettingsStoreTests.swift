@@ -882,4 +882,26 @@ final class SettingsStoreTests: XCTestCase {
             "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
         )
     }
+
+    func testProviderFallbackBaseURLsCoverEveryAIProviderCase() {
+        for provider in AIProvider.allCases {
+            XCTAssertNotNil(
+                SettingsStore.providerFallbackBaseURLs[provider],
+                "Missing fallback URL for AIProvider.\(provider.rawValue); update SettingsStore.providerFallbackBaseURLs."
+            )
+        }
+        XCTAssertEqual(
+            SettingsStore.providerFallbackBaseURLs.count,
+            AIProvider.allCases.count,
+            "providerFallbackBaseURLs must contain exactly one entry per AIProvider case."
+        )
+    }
+
+    func testFallbackBaseURLReturnsParseableURLForEveryProvider() {
+        for provider in AIProvider.allCases {
+            let url = SettingsStore.fallbackBaseURL(for: provider)
+            XCTAssertFalse(url.absoluteString.isEmpty, "fallbackBaseURL produced an empty URL for \(provider.rawValue).")
+            XCTAssertNotNil(url.host, "fallbackBaseURL for \(provider.rawValue) has no host: \(url.absoluteString).")
+        }
+    }
 }
