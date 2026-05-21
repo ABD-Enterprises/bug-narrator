@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
-    @Published private(set) var issueExtractionSessionID: UUID?
     @Published private(set) var exportDestinationInProgress: ExportDestination?
     @Published private(set) var pendingExportReview: IssueExportReview?
     @Published private(set) var exportHistory: [ExportReceipt] = []
@@ -19,6 +18,7 @@ final class AppState: ObservableObject {
     let presentationState: AppPresentationState
     let recordingSessionController: RecordingSessionController
     let sessionLibrary: SessionLibraryController
+    let issueExtractionController: IssueExtractionController
     let transcriptionRecovery: TranscriptionRecoveryController
     let screenshotCoordinator: ScreenshotCoordinator
 
@@ -36,7 +36,6 @@ final class AppState: ObservableObject {
     private let screenCapturePermissionService: any ScreenCapturePermissionServicing
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
-    private let issueExtractionService: any IssueExtracting
     private let exportService: any IssueExporting
     private let recoveredRecordingImporter: any RecoveredRecordingImporting
     private let artifactsService: any SessionArtifactsManaging
@@ -256,6 +255,10 @@ final class AppState: ObservableObject {
             artifactsService: artifactsService,
             clipboardService: clipboardService
         )
+        self.issueExtractionController = IssueExtractionController(
+            sessionLibrary: self.sessionLibrary,
+            issueExtractionService: issueExtractionService
+        )
         self.transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: self.sessionLibrary,
             artifactsService: artifactsService
@@ -271,7 +274,6 @@ final class AppState: ObservableObject {
         self.screenCapturePermissionService = screenCapturePermissionService
         self.transcriptionClient = transcriptionClient
         self.hotkeyManager = hotkeyManager
-        self.issueExtractionService = issueExtractionService
         self.exportService = exportService
         self.recoveredRecordingImporter = recoveredRecordingImporter
         self.artifactsService = artifactsService
@@ -331,6 +333,12 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         sessionLibrary.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        issueExtractionController.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -474,7 +482,7 @@ final class AppState: ObservableObject {
     }
 
     func isExtractingIssues(for session: TranscriptSession) -> Bool {
-        issueExtractionSessionID == session.id
+        issueExtractionController.isExtractingIssues(for: session)
     }
 
     func isExporting(to destination: ExportDestination) -> Bool {
@@ -1310,8 +1318,12 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard let preflightError = preflightForIssueExtraction(transcriptSession) else {
-            issueExtractionSessionID = transcriptSession.id
+        guard let preflightError = issueExtractionController.preflightIssueExtraction(
+            for: transcriptSession,
+            hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+            aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
+            statusPhase: status.phase
+        ) else {
             setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
             beginActivity(reason: "Extracting review issues")
             transcriptionLogger.info(
@@ -1325,31 +1337,18 @@ final class AppState: ObservableObject {
                     throw AppError.missingAPIKey
                 }
 
-                let extraction = try await issueExtractionService.extractIssues(
-                    from: transcriptSession,
+                let extraction = try await issueExtractionController.extractIssues(
+                    for: transcriptSession,
                     apiKey: apiKey,
                     model: settingsStore.issueExtractionModelValue,
-                    apiBaseURL: settingsStore.openAIBaseURLValue
+                    apiBaseURL: settingsStore.openAIBaseURLValue,
+                    completionLog: .manual
                 )
 
-                var updatedSession = transcriptSession
-                updatedSession.issueExtraction = extraction
-                try persistUpdatedSession(updatedSession)
-
-                issueExtractionSessionID = nil
                 endActivity()
-                transcriptionLogger.info(
-                    "issue_extraction_completed",
-                    "Issue extraction finished successfully.",
-                    metadata: [
-                        "session_id": transcriptSession.id.uuidString,
-                        "issue_count": "\(extraction.issues.count)"
-                    ]
-                )
                 setStatus(.success("Extracted \(extraction.issues.count) review issues."))
                 showTranscriptWindow?()
             } catch {
-                issueExtractionSessionID = nil
                 presentError(error, operation: .postTranscription, fallback: { .issueExtractionFailure($0) })
             }
 
@@ -1365,54 +1364,24 @@ final class AppState: ObservableObject {
     }
 
     func updateExtractedIssue(_ updatedIssue: ExtractedIssue, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction,
-              let issueIndex = extraction.issues.firstIndex(where: { $0.id == updatedIssue.id }) else {
-            return
-        }
-
-        extraction.issues[issueIndex] = updatedIssue
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.updateExtractedIssue(updatedIssue, in: sessionID)
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
     func setIssueSelection(_ isSelected: Bool, issueID: UUID, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction,
-              let issueIndex = extraction.issues.firstIndex(where: { $0.id == issueID }) else {
-            return
-        }
-
-        extraction.issues[issueIndex].isSelectedForExport = isSelected
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.setIssueSelection(isSelected, issueID: issueID, in: sessionID)
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
     }
 
     func setAllIssuesSelected(_ isSelected: Bool, in sessionID: UUID) {
-        guard var session = editableSession(with: sessionID),
-              var extraction = session.issueExtraction else {
-            return
-        }
-
-        extraction.issues = extraction.issues.map { issue in
-            var updatedIssue = issue
-            updatedIssue.isSelectedForExport = isSelected
-            return updatedIssue
-        }
-        session.issueExtraction = extraction
-
         do {
-            try persistUpdatedSession(session)
+            try issueExtractionController.setAllIssuesSelected(isSelected, in: sessionID)
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
@@ -1721,7 +1690,7 @@ final class AppState: ObservableObject {
             metadata: [
                 "status_phase": status.phase.debugName,
                 "has_active_recording_session": activeRecordingSession == nil ? "no" : "yes",
-                "is_extracting_issues": issueExtractionSessionID == nil ? "no" : "yes",
+                "is_extracting_issues": issueExtractionController.issueExtractionSessionID == nil ? "no" : "yes",
                 "is_exporting": exportDestinationInProgress == nil ? "no" : "yes"
             ]
         )
@@ -1753,7 +1722,7 @@ final class AppState: ObservableObject {
         stopTimer(resetElapsed: status.phase == .recording)
         endActivity()
         cleanupPendingRecordedAudioIfNeeded()
-        issueExtractionSessionID = nil
+        issueExtractionController.clearProgress()
         exportDestinationInProgress = nil
 
         let normalizedError = normalizeError(error, operation: operation, fallback: fallback)
@@ -1990,28 +1959,17 @@ final class AppState: ObservableObject {
         apiKey: String
     ) async throws -> TranscriptSession {
         var session = session
-        issueExtractionSessionID = session.id
-        defer { issueExtractionSessionID = nil }
-
         setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
         swapActivity(reason: "Extracting review issues")
 
-        let extraction = try await issueExtractionService.extractIssues(
-            from: session,
+        let extraction = try await issueExtractionController.extractIssues(
+            for: session,
             apiKey: apiKey,
             model: settingsStore.issueExtractionModelValue,
-            apiBaseURL: settingsStore.openAIBaseURLValue
+            apiBaseURL: settingsStore.openAIBaseURLValue,
+            completionLog: .postTranscription
         )
         session.issueExtraction = extraction
-        try persistUpdatedSession(session)
-        transcriptionLogger.info(
-            "issue_extraction_completed_after_transcription",
-            "Automatic issue extraction completed after transcription.",
-            metadata: [
-                "session_id": session.id.uuidString,
-                "issue_count": "\(extraction.issues.count)"
-            ]
-        )
         return session
     }
 
@@ -2214,27 +2172,6 @@ final class AppState: ObservableObject {
         try sessionLibrary.persistUpdatedSession(session)
     }
 
-    private func preflightForIssueExtraction(_ session: TranscriptSession) -> AppError? {
-        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
-            return .transcriptionFailure(compatibilityIssue)
-        }
-
-        guard settingsStore.hasUsableAIProviderCredential else {
-            return .missingAPIKey
-        }
-
-        let transcript = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !transcript.isEmpty else {
-            return .emptyTranscript
-        }
-
-        guard status.phase != .recording else {
-            return .recordingFailure("Stop the current recording before extracting issues.")
-        }
-
-        return nil
-    }
-
     private func validateExportConfiguration(for destination: ExportDestination) throws {
         switch destination {
         case .github:
@@ -2334,10 +2271,6 @@ final class AppState: ObservableObject {
             issueTypeID: target.issueTypeID,
             issueTypeName: target.issueTypeName
         )
-    }
-
-    private func editableSession(with sessionID: UUID) -> TranscriptSession? {
-        sessionLibrary.editableSession(with: sessionID)
     }
 
     private func sessionSnapshot(with sessionID: UUID) -> TranscriptSession? {
