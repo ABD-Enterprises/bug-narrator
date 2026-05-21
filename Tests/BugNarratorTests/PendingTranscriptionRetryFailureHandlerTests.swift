@@ -22,6 +22,24 @@ final class PendingTranscriptionRetryFailureHandlerTests: XCTestCase {
         XCTAssertTrue(harness.settingsWindowSpy.didShow)
     }
 
+    func testRecoverableFailurePreservesRecoveredSourceFileName() throws {
+        let harness = try PendingTranscriptionRetryFailureHandlerHarness()
+        defer { harness.cleanup() }
+        let context = try harness.makeRetryContext(
+            failureReason: .crashRecovery,
+            recoveredSourceFileName: "recovered-system-audio.wav"
+        )
+
+        XCTAssertTrue(harness.transcriptionRecovery.beginRetry(for: context.session.id))
+
+        harness.handler.handle(AppError.invalidAPIKey, context: context)
+
+        let updatedSession = try XCTUnwrap(harness.transcriptStore.session(with: context.session.id))
+        XCTAssertEqual(updatedSession.pendingTranscription?.failureReason, .invalidAPIKey)
+        XCTAssertEqual(updatedSession.pendingTranscription?.recoveredSourceFileName, "recovered-system-audio.wav")
+        XCTAssertEqual(updatedSession.pendingTranscription?.attemptCount, 1)
+    }
+
     func testNonrecoverableFailureFinishesRetryAndPresentsFailure() throws {
         let harness = try PendingTranscriptionRetryFailureHandlerHarness()
         defer { harness.cleanup() }
@@ -105,7 +123,11 @@ private final class PendingTranscriptionRetryFailureHandlerHarness {
         )
     }
 
-    func makeRetryContext(attemptCount: Int = 0) throws -> PendingTranscriptionRetryContext {
+    func makeRetryContext(
+        failureReason: PendingTranscriptionFailureReason = .missingAPIKey,
+        recoveredSourceFileName: String? = nil,
+        attemptCount: Int = 0
+    ) throws -> PendingTranscriptionRetryContext {
         let sessionID = UUID()
         let artifactsDirectoryURL = rootDirectoryURL
             .appendingPathComponent("retry-session-\(sessionID.uuidString)", isDirectory: true)
@@ -114,8 +136,9 @@ private final class PendingTranscriptionRetryFailureHandlerHarness {
         try Data("audio".utf8).write(to: audioFileURL)
         let pendingTranscription = PendingTranscription(
             audioFileName: audioFileURL.lastPathComponent,
-            failureReason: .missingAPIKey,
+            failureReason: failureReason,
             preservedAt: Date(timeIntervalSince1970: 1),
+            recoveredSourceFileName: recoveredSourceFileName,
             attemptCount: attemptCount
         )
         let session = TranscriptSession(

@@ -277,6 +277,7 @@ final class TranscriptionRecoveryController: ObservableObject {
             audioFileName: pendingTranscription.audioFileName,
             failureReason: failureReason,
             preservedAt: pendingTranscription.preservedAt,
+            recoveredSourceFileName: pendingTranscription.recoveredSourceFileName,
             attemptCount: pendingTranscription.attemptCount + 1
         )
 
