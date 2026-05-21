@@ -718,7 +718,7 @@ final class AppState: ObservableObject {
             }
 
             setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")))
-            swapActivity(reason: "Uploading audio for transcription")
+            recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
 
             let transcriptionResult = try await transcribeAudio(
                 at: recordedAudio.fileURL,
@@ -985,7 +985,7 @@ final class AppState: ObservableObject {
         let request = settingsStore.transcriptionRequest
         sessionLibrary.stageCurrentTranscript(retryContext.session)
         setStatus(.transcribing(transcriptionProgressMessage(step: 1, action: "Retrying transcription from the preserved recording...")))
-        swapActivity(reason: "Retrying transcription from preserved audio")
+        recordingSessionController.swapActivity(reason: "Retrying transcription from preserved audio")
         logPendingTranscriptionRetryRequested(retryContext)
 
         do {
@@ -1025,7 +1025,7 @@ final class AppState: ObservableObject {
                     debugMode: settingsStore.debugMode
                 )
                 transcriptionRecovery.finishRetry()
-                endActivity()
+                recordingSessionController.endActivity()
                 presentPostTranscriptionError(error, operation: .retryTranscription)
             }
         } catch {
@@ -1094,7 +1094,7 @@ final class AppState: ObservableObject {
             statusPhase: status.phase
         ) else {
             setStatus(.transcribing("Running issue extraction with a 10-second time limit..."))
-            beginActivity(reason: "Extracting review issues")
+            recordingSessionController.beginActivity(reason: "Extracting review issues")
             transcriptionLogger.info(
                 "issue_extraction_requested",
                 "Issue extraction was requested for the selected transcript.",
@@ -1114,7 +1114,7 @@ final class AppState: ObservableObject {
                     completionLog: .manual
                 )
 
-                endActivity()
+                recordingSessionController.endActivity()
                 setStatus(.success("Extracted \(extraction.issues.count) review issues."))
                 showTranscriptWindow?()
             } catch {
@@ -1174,7 +1174,7 @@ final class AppState: ObservableObject {
         }
 
         setStatus(.transcribing("Checking \(destination.rawValue) for similar open issues..."))
-        beginActivity(reason: "Reviewing similar issues before export")
+        recordingSessionController.beginActivity(reason: "Reviewing similar issues before export")
 
         do {
             let review = try await issueExportController.prepareIssueExportReview(
@@ -1182,7 +1182,7 @@ final class AppState: ObservableObject {
                 model: settingsStore.issueExtractionModelValue,
                 apiBaseURL: settingsStore.openAIBaseURLValue
             )
-            endActivity()
+            recordingSessionController.endActivity()
 
             if review.hasMatches {
                 setStatus(.success("Review the similar \(destination.rawValue) issues before export."))
@@ -1190,7 +1190,7 @@ final class AppState: ObservableObject {
                 await finalizeIssueExport(using: review)
             }
         } catch {
-            endActivity()
+            recordingSessionController.endActivity()
             presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
     }
@@ -1220,18 +1220,18 @@ final class AppState: ObservableObject {
             let requiresRemoteExport = try issueExportController.pendingReviewRequiresRemoteExport(review)
             if requiresRemoteExport {
                 setStatus(.transcribing("Exporting reviewed issues to \(review.destination.rawValue)..."))
-                beginActivity(reason: "Exporting extracted issues")
+                recordingSessionController.beginActivity(reason: "Exporting extracted issues")
             }
 
             let completion = try await issueExportController.finalizeIssueExport(using: review)
             if completion.performedRemoteExport {
-                endActivity()
+                recordingSessionController.endActivity()
             }
 
             setStatus(.success(completion.summary))
             await refreshExportHistory()
         } catch {
-            endActivity()
+            recordingSessionController.endActivity()
             presentError(error, operation: .export, fallback: { .exportFailure($0) })
         }
     }
@@ -1294,26 +1294,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func startTimer() {
-        recordingSessionController.startTimer()
-    }
-
-    private func stopTimer(resetElapsed: Bool) {
-        recordingSessionController.stopTimer(resetElapsed: resetElapsed)
-    }
-
-    private func beginActivity(reason: String) {
-        recordingSessionController.beginActivity(reason: reason)
-    }
-
-    private func swapActivity(reason: String) {
-        recordingSessionController.swapActivity(reason: reason)
-    }
-
-    private func endActivity() {
-        recordingSessionController.endActivity()
-    }
-
     private func prepareForApplicationTermination() {
         applicationTerminationController.prepareForApplicationTermination()
     }
@@ -1327,8 +1307,8 @@ final class AppState: ObservableObject {
         operation: AppErrorOperation = .generic,
         fallback: (String) -> AppError = { .transcriptionFailure($0) }
     ) {
-        stopTimer(resetElapsed: status.phase == .recording)
-        endActivity()
+        recordingSessionController.stopTimer(resetElapsed: status.phase == .recording)
+        recordingSessionController.endActivity()
         cleanupPendingRecordedAudioIfNeeded()
         issueExtractionController.clearProgress()
         issueExportController.clearProgress()
@@ -1480,7 +1460,7 @@ final class AppState: ObservableObject {
     ) async throws -> TranscriptSession {
         var session = session
         setStatus(.transcribing(transcriptionProgressMessage(step: 3, action: "Extracting reviewable issues...")))
-        swapActivity(reason: "Extracting review issues")
+        recordingSessionController.swapActivity(reason: "Extracting review issues")
 
         let extraction = try await issueExtractionController.extractIssues(
             for: session,
@@ -1498,7 +1478,7 @@ final class AppState: ObservableObject {
             self.showTranscriptWindow?()
         }
 
-        endActivity()
+        recordingSessionController.endActivity()
         setStatus(.success(transcriptionSuccessMessage()))
     }
 
@@ -1520,7 +1500,7 @@ final class AppState: ObservableObject {
         recordingSessionController.clearActiveRecordingSession()
 
         cleanupPendingRecordedAudioIfNeeded()
-        endActivity()
+        recordingSessionController.endActivity()
 
         let normalizedError = errorPresenter.normalizeError(
             error,
@@ -1551,7 +1531,7 @@ final class AppState: ObservableObject {
             handleCompletedTranscriptPersistenceFailure(error, session: session)
         case .postTranscriptionFailure(let error):
             cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
+            recordingSessionController.endActivity()
             presentPostTranscriptionError(error, operation: .postTranscription)
         }
     }
@@ -1605,7 +1585,7 @@ final class AppState: ObservableObject {
             return false
         }
 
-        endActivity()
+        recordingSessionController.endActivity()
 
         let appError = retryFailure.appError
         errorPresenter.logAppError(appError, context: "retry_pending_transcription", operation: .retryTranscription)
@@ -1630,7 +1610,7 @@ final class AppState: ObservableObject {
         case .preserved(let retryableSession, let appError):
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
+            recordingSessionController.endActivity()
             errorPresenter.logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
             setStatus(.error(retryableSession.transcriptionRecoveryMessage ?? appError.userMessage), error: appError)
             showTranscriptWindow?()
@@ -1641,7 +1621,7 @@ final class AppState: ObservableObject {
         case .persistenceFailure(let retryableSession, let error):
             recordingSessionController.clearActiveRecordingSession()
             cleanupPendingRecordedAudioIfNeeded()
-            endActivity()
+            recordingSessionController.endActivity()
 
             let normalizedError = errorPresenter.normalizeError(
                 error,
