@@ -182,12 +182,13 @@ actor TranscriptionClient: TranscriptionServing {
             do {
                 return try await attemptTranscription(fileURL: fileURL, apiKey: apiKey, request: request, attempt: attempt)
             } catch let error as AppError {
-                if case .rateLimited(let retryAfter) = error, attempt < Self.maxRetryAttempts - 1 {
-                    let delay = retryAfter ?? (Self.initialBackoffSeconds * pow(2, Double(attempt)))
+                let isLastAttempt = attempt >= Self.maxRetryAttempts - 1
+                if case .rateLimited(let retryAfter) = error, !isLastAttempt {
+                    let delay = retryAfter ?? Self.exponentialBackoff(for: attempt)
                     let clampedDelay = min(delay, 60)
                     logger.warning(
                         "transcription_rate_limited_retrying",
-                        "OpenAI rate limit hit. Backing off before retry.",
+                        "Rate limit hit. Backing off before retry.",
                         metadata: [
                             "attempt": "\(attempt + 1)",
                             "backoff_seconds": String(format: "%.1f", clampedDelay)
@@ -197,13 +198,51 @@ actor TranscriptionClient: TranscriptionServing {
                     lastError = error
                     continue
                 }
+                if Self.shouldRetryTransientFailure(error), !isLastAttempt {
+                    let delay = Self.exponentialBackoff(for: attempt)
+                    logger.warning(
+                        "transcription_transient_failure_retrying",
+                        "Transient transport failure. Backing off before retry.",
+                        metadata: [
+                            "attempt": "\(attempt + 1)",
+                            "backoff_seconds": String(format: "%.1f", delay),
+                            "error_type": Self.errorTypeForLogging(error)
+                        ]
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    lastError = error
+                    continue
+                }
                 throw error
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 throw error
             }
         }
 
         throw lastError ?? AppError.transcriptionFailure("Transcription failed after retries.")
+    }
+
+    private static func exponentialBackoff(for attempt: Int) -> TimeInterval {
+        initialBackoffSeconds * pow(2, Double(attempt))
+    }
+
+    private static func shouldRetryTransientFailure(_ error: AppError) -> Bool {
+        switch error {
+        case .networkTimeout, .networkFailure:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func errorTypeForLogging(_ error: AppError) -> String {
+        switch error {
+        case .networkTimeout: return "network_timeout"
+        case .networkFailure: return "network_failure"
+        default: return "other"
+        }
     }
 
     private func attemptTranscription(
