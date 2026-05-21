@@ -221,7 +221,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         // Give the selection overlay a moment to leave the compositor before capture starts.
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        try await Task.sleep(nanoseconds: 150_000_000)
 
         screenshotLogger.info(
             "screenshot_capture_requested",
