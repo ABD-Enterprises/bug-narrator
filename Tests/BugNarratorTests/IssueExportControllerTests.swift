@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class IssueExportControllerTests: XCTestCase {
+    func testStatusPresenterMapsIssueExportStatuses() {
+        let completion = IssueExportCompletion(
+            destination: .github,
+            sessionID: UUID(),
+            results: [],
+            duplicateCount: 1,
+            performedRemoteExport: false
+        )
+
+        XCTAssertEqual(
+            IssueExportStatusPresenter.reviewPreparationStatus(destination: .github),
+            .transcribing("Checking GitHub for similar open issues...")
+        )
+        XCTAssertEqual(
+            IssueExportStatusPresenter.reviewReadyStatus(destination: .jira),
+            .success("Review the similar Jira issues before export.")
+        )
+        XCTAssertEqual(
+            IssueExportStatusPresenter.remoteExportStatus(destination: .github),
+            .transcribing("Exporting reviewed issues to GitHub...")
+        )
+        XCTAssertEqual(
+            IssueExportStatusPresenter.completionStatus(completion),
+            .success(completion.summary)
+        )
+    }
+
     func testReadinessAndDefaultGitHubRouting() throws {
         let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
