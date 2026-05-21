@@ -1057,7 +1057,10 @@ final class AppState: ObservableObject {
 
     func deleteDisplayedTranscript() {
         do {
-            presentDeletedSessionStatus(try sessionLibrary.deleteDisplayedTranscript())
+            let deletedCount = try sessionLibrary.deleteDisplayedTranscript()
+            if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
+                setStatus(status)
+            }
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
         }
@@ -1065,15 +1068,12 @@ final class AppState: ObservableObject {
 
     func deleteSessions(withIDs ids: Set<UUID>) {
         do {
-            presentDeletedSessionStatus(try sessionLibrary.deleteSessions(withIDs: ids))
+            let deletedCount = try sessionLibrary.deleteSessions(withIDs: ids)
+            if let status = SessionDeletionStatusPresenter.status(deletedCount: deletedCount) {
+                setStatus(status)
+            }
         } catch {
             presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
-        }
-    }
-
-    private func presentDeletedSessionStatus(_ deletedCount: Int) {
-        if deletedCount > 0 {
-            setStatus(.success(deletedCount == 1 ? "Deleted 1 session." : "Deleted \(deletedCount) sessions."))
         }
     }
 
