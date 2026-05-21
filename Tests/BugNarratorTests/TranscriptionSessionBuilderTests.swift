@@ -147,4 +147,65 @@ final class TranscriptionSessionBuilderTests: XCTestCase {
         XCTAssertNil(session.pendingTranscription)
         XCTAssertEqual(session.sections.last?.title, marker.title)
     }
+
+    func testRetryableSessionPreservesRecordingContextAndPendingTranscriptionMetadata() {
+        let screenshotID = UUID()
+        let marker = SessionMarker(
+            index: 1,
+            elapsedTime: 3,
+            title: "Failure point",
+            screenshotID: screenshotID
+        )
+        let screenshot = SessionScreenshot(
+            id: screenshotID,
+            elapsedTime: 3,
+            filePath: "/tmp/failure-point.png",
+            associatedMarkerID: marker.id
+        )
+        let recordingSession = RecordingSessionDraft(
+            sessionID: UUID(),
+            artifactsDirectoryURL: URL(fileURLWithPath: "/tmp/retry-artifacts", isDirectory: true),
+            markers: [marker],
+            screenshots: [screenshot]
+        )
+        let recordedAudio = RecordedAudio(
+            fileURL: URL(fileURLWithPath: "/tmp/original-recording.m4a"),
+            duration: 12
+        )
+        let request = TranscriptionRequest(
+            model: "whisper-1",
+            languageHint: "en",
+            prompt: "Retry later"
+        )
+        let preservedAudioURL = URL(fileURLWithPath: "/tmp/retry-artifacts/preserved-recording.m4a")
+        let createdAt = Date(timeIntervalSince1970: 200)
+        let preservedAt = Date(timeIntervalSince1970: 205)
+
+        let session = TranscriptionSessionBuilder.retryableSession(
+            from: recordingSession,
+            recordedAudio: recordedAudio,
+            request: request,
+            failureReason: .missingAPIKey,
+            preservedAudioURL: preservedAudioURL,
+            createdAt: createdAt,
+            preservedAt: preservedAt
+        )
+
+        XCTAssertEqual(session.id, recordingSession.sessionID)
+        XCTAssertEqual(session.createdAt, createdAt)
+        XCTAssertEqual(session.updatedAt, createdAt)
+        XCTAssertEqual(session.transcript, "")
+        XCTAssertEqual(session.duration, recordedAudio.duration)
+        XCTAssertEqual(session.model, request.model)
+        XCTAssertEqual(session.languageHint, request.languageHint)
+        XCTAssertEqual(session.prompt, request.prompt)
+        XCTAssertEqual(session.markers, [marker])
+        XCTAssertEqual(session.screenshots, [screenshot])
+        XCTAssertTrue(session.sections.isEmpty)
+        XCTAssertNil(session.issueExtraction)
+        XCTAssertEqual(session.pendingTranscription?.audioFileName, preservedAudioURL.lastPathComponent)
+        XCTAssertEqual(session.pendingTranscription?.failureReason, .missingAPIKey)
+        XCTAssertEqual(session.pendingTranscription?.preservedAt, preservedAt)
+        XCTAssertEqual(session.artifactsDirectoryPath, recordingSession.artifactsDirectoryURL.path)
+    }
 }
