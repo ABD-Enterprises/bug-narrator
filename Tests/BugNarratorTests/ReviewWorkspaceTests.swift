@@ -163,6 +163,32 @@ final class ReviewWorkspaceTests: XCTestCase {
         )
     }
 
+    func testPendingTranscriptionSessionUsesProviderSpecificRecoveryTimelineEntry() throws {
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            transcript: "",
+            duration: 5,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .missingAPIKey,
+                preservedAt: Date(timeIntervalSince1970: 1_700_000_010)
+            )
+        )
+
+        let entries = ReviewWorkspace.timelineEntries(for: session, provider: .parakeetLocal)
+
+        XCTAssertEqual(entries.first?.title, "Transcription Pending")
+        let pendingText = try XCTUnwrap(entries.first?.text)
+        XCTAssertFalse(pendingText.contains("OpenAI"), "Parakeet-mode pending text should not mention OpenAI: \(pendingText)")
+        XCTAssertTrue(
+            pendingText.contains(AIProvider.parakeetLocal.displayName),
+            "Parakeet-mode pending text should reference the active provider: \(pendingText)"
+        )
+    }
+
     func testSelectedIssueSummaryCountsOnlySelectedIssues() {
         let issues = [
             ExtractedIssue(
