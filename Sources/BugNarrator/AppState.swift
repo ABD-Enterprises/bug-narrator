@@ -276,7 +276,11 @@ final class AppState: ObservableObject {
                     "ai_provider": settingsStore.aiProvider.rawValue
                 ]
             },
-            telemetryRecorder: telemetryRecorder
+            telemetryRecorder: telemetryRecorder,
+            showSettingsWindow: { [weak self] in self?.showSettingsWindow?() },
+            prepareErrorPresentationSideEffects: { [weak self] in
+                self?.prepareErrorPresentationSideEffects()
+            }
         )
         let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,

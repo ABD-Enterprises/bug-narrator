@@ -6,6 +6,8 @@ final class RecordingSessionStartStatusPresenter {
     private let recordingStatusMessages: RecordingStatusMessageProvider
     private let startDiagnosticsMetadata: () -> [String: String]
     private let telemetryRecorder: any OperationalTelemetryRecording
+    private let showSettingsWindow: () -> Void
+    private let prepareErrorPresentationSideEffects: () -> Void
     private let recordingLogger: DiagnosticsLogger
     private let permissionsLogger: DiagnosticsLogger
 
@@ -14,6 +16,8 @@ final class RecordingSessionStartStatusPresenter {
         recordingStatusMessages: RecordingStatusMessageProvider,
         startDiagnosticsMetadata: @escaping () -> [String: String],
         telemetryRecorder: any OperationalTelemetryRecording,
+        showSettingsWindow: @escaping () -> Void = {},
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {},
         recordingLogger: DiagnosticsLogger = DiagnosticsLogger(category: .recording),
         permissionsLogger: DiagnosticsLogger = DiagnosticsLogger(category: .permissions)
     ) {
@@ -21,6 +25,8 @@ final class RecordingSessionStartStatusPresenter {
         self.recordingStatusMessages = recordingStatusMessages
         self.startDiagnosticsMetadata = startDiagnosticsMetadata
         self.telemetryRecorder = telemetryRecorder
+        self.showSettingsWindow = showSettingsWindow
+        self.prepareErrorPresentationSideEffects = prepareErrorPresentationSideEffects
         self.recordingLogger = recordingLogger
         self.permissionsLogger = permissionsLogger
     }
@@ -43,10 +49,22 @@ final class RecordingSessionStartStatusPresenter {
 
         case .preflightFailure(let preflightError):
             permissionsLogger.warning(.sessionStartPreflightFailed, preflightError.userMessage)
-            _ = errorPresenter.presentError(preflightError, operation: .recordingStart)
+            prepareErrorPresentationSideEffects()
+            let result = errorPresenter.presentError(preflightError, operation: .recordingStart)
+            if result.shouldOpenSettingsWindow {
+                showSettingsWindow()
+            }
 
         case .failure(let error):
-            _ = errorPresenter.presentError(error, operation: .recordingStart, fallback: { .recordingFailure($0) })
+            prepareErrorPresentationSideEffects()
+            let result = errorPresenter.presentError(
+                error,
+                operation: .recordingStart,
+                fallback: { .recordingFailure($0) }
+            )
+            if result.shouldOpenSettingsWindow {
+                showSettingsWindow()
+            }
 
         case .started(let recordingSession):
             errorPresenter.setStatus(.recording(recordingStatusMessages.recordingDetailMessage()))
