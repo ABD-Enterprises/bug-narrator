@@ -36,6 +36,70 @@ final class MixedAudioRecorderTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: systemAudioURL.path))
     }
 
+    func testStopRecordingRemovesMicrophoneFileWhenSystemAudioStopFails() async throws {
+        let rootDirectoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let microphoneURL = rootDirectoryURL.appendingPathComponent("microphone.wav")
+        try writeSilentAudioFile(to: microphoneURL)
+
+        let microphoneRecorder = MockAudioRecorder()
+        microphoneRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: microphoneURL, duration: 0.1))
+        ]
+        let systemAudioRecorder = MockAudioRecorder()
+        systemAudioRecorder.stopResults = [
+            .failure(AppError.recordingFailure("System audio failed to stop."))
+        ]
+        let recorder = MixedAudioRecorder(
+            microphoneRecorder: microphoneRecorder,
+            systemAudioRecorder: systemAudioRecorder,
+            outputDirectoryURL: rootDirectoryURL
+        )
+
+        try await recorder.startRecording()
+        do {
+            _ = try await recorder.stopRecording()
+            XCTFail("Expected stop to throw when system audio failed.")
+        } catch {
+            // Expected
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: microphoneURL.path))
+    }
+
+    func testStopRecordingRemovesSystemAudioFileWhenMicrophoneStopFails() async throws {
+        let rootDirectoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let systemAudioURL = rootDirectoryURL.appendingPathComponent("system.wav")
+        try writeSilentAudioFile(to: systemAudioURL)
+
+        let microphoneRecorder = MockAudioRecorder()
+        microphoneRecorder.stopResults = [
+            .failure(AppError.recordingFailure("Microphone failed to stop."))
+        ]
+        let systemAudioRecorder = MockAudioRecorder()
+        systemAudioRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: systemAudioURL, duration: 0.1))
+        ]
+        let recorder = MixedAudioRecorder(
+            microphoneRecorder: microphoneRecorder,
+            systemAudioRecorder: systemAudioRecorder,
+            outputDirectoryURL: rootDirectoryURL
+        )
+
+        try await recorder.startRecording()
+        do {
+            _ = try await recorder.stopRecording()
+            XCTFail("Expected stop to throw when microphone failed.")
+        } catch {
+            // Expected
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: systemAudioURL.path))
+    }
+
     private func temporaryDirectoryURL() -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
