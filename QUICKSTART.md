@@ -2,7 +2,7 @@
 
 ## Install From The DMG
 
-1. Download the latest macOS DMG from [GitHub Releases](https://github.com/deffenda/bugnarrator/releases/latest).
+1. Download the latest macOS DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
