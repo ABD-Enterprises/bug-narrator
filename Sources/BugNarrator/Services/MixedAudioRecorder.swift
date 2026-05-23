@@ -101,6 +101,15 @@ final class MixedAudioRecorder: AudioRecording {
             throw AppError.recordingFailure("Microphone recording was unavailable.")
         }
 
+        switch (systemResult, microphoneResult) {
+        case (.failure, .success(let microphoneAudio)):
+            try? FileManager.default.removeItem(at: microphoneAudio.fileURL)
+        case (.success(let systemAudio), .failure):
+            try? FileManager.default.removeItem(at: systemAudio.fileURL)
+        default:
+            break
+        }
+
         let systemAudio = try systemResult.get()
         let microphoneAudio = try microphoneResult.get()
 
