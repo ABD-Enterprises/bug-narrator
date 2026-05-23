@@ -411,6 +411,7 @@ final class TranscriptionRecoveryController: ObservableObject {
         let attributes = try fileManager.attributesOfItem(atPath: preservedAudioURL.path)
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
         guard fileSize > 0 else {
+            try? fileManager.removeItem(at: preservedAudioURL)
             throw AppError.recordingFailure("The preserved audio file was empty.")
         }
     }
