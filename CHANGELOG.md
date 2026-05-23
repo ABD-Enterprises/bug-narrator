@@ -6,6 +6,7 @@
 - [FIX] Restored the auto-open of Settings on credential-failure recording starts and the in-flight progress cleanup on any recording-start failure, so a missing/invalid API key surface still directs the user to Settings and stale issue-extraction/export badges from a prior pipeline no longer linger.
 - [FIX] Rendered the "Transcription Pending" timeline entry in the review workspace using the active AI provider's recovery guidance, so Local (Parakeet) sessions no longer surface OpenAI-specific text in the review surface.
 - [FIX] Removed the successful side's leftover audio file when only one of the microphone or system-audio recorders fails to stop a mixed recording, so the abandoned file is no longer picked up as a crash-recovery candidate on the next launch.
+- [FIX] Removed the zero-byte preserved retry audio file when transcription preservation rejects an empty recording, so the session artifacts directory no longer keeps an unusable audio file behind.
 
 ## 1.0.35 - 2026-05-19
 
