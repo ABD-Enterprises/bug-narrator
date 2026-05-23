@@ -86,6 +86,53 @@ final class RecordingSessionControllerTests: XCTestCase {
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "recording_start")
     }
 
+    func testStartStatusPresenterOpensSettingsAndCleansUpOnCredentialPreflightFailure() {
+        var showSettingsCallCount = 0
+        var prepareCleanupCallCount = 0
+        let harness = makeStartStatusPresenter(
+            showSettingsWindow: { showSettingsCallCount += 1 },
+            prepareErrorPresentationSideEffects: { prepareCleanupCallCount += 1 }
+        )
+
+        harness.presenter.present(.preflightFailure(.missingAPIKey))
+
+        XCTAssertEqual(showSettingsCallCount, 1, "missingAPIKey preflight failure should open Settings.")
+        XCTAssertEqual(prepareCleanupCallCount, 1, "missingAPIKey preflight failure should run cleanup hook.")
+    }
+
+    func testStartStatusPresenterDoesNotOpenSettingsForMicrophoneFailure() {
+        var showSettingsCallCount = 0
+        var prepareCleanupCallCount = 0
+        let harness = makeStartStatusPresenter(
+            showSettingsWindow: { showSettingsCallCount += 1 },
+            prepareErrorPresentationSideEffects: { prepareCleanupCallCount += 1 }
+        )
+
+        harness.presenter.present(.preflightFailure(.microphonePermissionDenied))
+
+        XCTAssertEqual(showSettingsCallCount, 0, "Microphone permission failure should not open Settings.")
+        XCTAssertEqual(prepareCleanupCallCount, 1, "Cleanup hook should still run for non-credential failures.")
+    }
+
+    func testStartStatusPresenterRunsCleanupOnGenericStartFailure() {
+        var showSettingsCallCount = 0
+        var prepareCleanupCallCount = 0
+        let harness = makeStartStatusPresenter(
+            showSettingsWindow: { showSettingsCallCount += 1 },
+            prepareErrorPresentationSideEffects: { prepareCleanupCallCount += 1 }
+        )
+
+        let underlyingError = NSError(
+            domain: "RecordingSessionControllerTests",
+            code: 13,
+            userInfo: [NSLocalizedDescriptionKey: "Recorder crashed."]
+        )
+        harness.presenter.present(.failure(underlyingError))
+
+        XCTAssertEqual(prepareCleanupCallCount, 1, "Generic start failure should run cleanup hook.")
+        XCTAssertEqual(showSettingsCallCount, 0, "Generic start failure should not open Settings.")
+    }
+
     func testStartStatusPresenterNormalizesGenericStartFailure() {
         let harness = makeStartStatusPresenter()
         let error = NSError(
@@ -393,7 +440,9 @@ final class RecordingSessionControllerTests: XCTestCase {
     }
 
     private func makeStartStatusPresenter(
-        status: AppStatus = .idle()
+        status: AppStatus = .idle(),
+        showSettingsWindow: @escaping () -> Void = {},
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {}
     ) -> (
         presenter: RecordingSessionStartStatusPresenter,
         presentationState: AppPresentationState,
@@ -424,7 +473,9 @@ final class RecordingSessionControllerTests: XCTestCase {
             ),
             recordingStatusMessages: statusMessages,
             startDiagnosticsMetadata: { diagnosticsMetadata },
-            telemetryRecorder: telemetryRecorder
+            telemetryRecorder: telemetryRecorder,
+            showSettingsWindow: showSettingsWindow,
+            prepareErrorPresentationSideEffects: prepareErrorPresentationSideEffects
         )
 
         return (
