@@ -71,12 +71,18 @@ final class ManualIssueExtractionStatusPresenter {
 @MainActor
 final class IssueMutationFailurePresenter {
     private let errorPresenter: AppErrorPresenter
+    private let prepareErrorPresentationSideEffects: () -> Void
 
-    init(errorPresenter: AppErrorPresenter) {
+    init(
+        errorPresenter: AppErrorPresenter,
+        prepareErrorPresentationSideEffects: @escaping () -> Void = {}
+    ) {
         self.errorPresenter = errorPresenter
+        self.prepareErrorPresentationSideEffects = prepareErrorPresentationSideEffects
     }
 
     func presentFailure(_ error: Error) {
+        prepareErrorPresentationSideEffects()
         _ = errorPresenter.presentError(error, operation: .sessionLibrary, fallback: { .storageFailure($0) })
     }
 }
