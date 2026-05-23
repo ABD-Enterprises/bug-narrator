@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] Cleared in-flight issue-extraction/export progress when an issue mutation (toggle selection, edit) write fails, so the extraction progress spinner no longer keeps running on top of an unrelated error toast.
+
 ## 1.0.35 - 2026-05-19
 
 - Added local Parakeet transcription server for offline, zero-cost speech-to-text on Apple Silicon via MLX.

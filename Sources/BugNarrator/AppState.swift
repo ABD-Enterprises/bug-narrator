@@ -353,7 +353,10 @@ final class AppState: ObservableObject {
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
         self.issueMutationFailurePresenter = IssueMutationFailurePresenter(
-            errorPresenter: self.errorPresenter
+            errorPresenter: self.errorPresenter,
+            prepareErrorPresentationSideEffects: { [weak self] in
+                self?.prepareErrorPresentationSideEffects()
+            }
         )
         self.issueExportPresentationController = IssueExportPresentationController(
             errorPresenter: self.errorPresenter,
