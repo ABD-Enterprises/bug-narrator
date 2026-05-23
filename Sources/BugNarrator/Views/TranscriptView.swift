@@ -883,7 +883,10 @@ struct TranscriptView: View {
     }
 
     private func rawTranscriptSection(_ session: TranscriptSession, availableWidth: CGFloat) -> some View {
-        let entries = ReviewWorkspace.timelineEntries(for: session)
+        let entries = ReviewWorkspace.timelineEntries(
+            for: session,
+            provider: appState.settingsStore.aiProvider
+        )
 
         return LazyVStack(alignment: .leading, spacing: 12) {
             ForEach(entries) { entry in

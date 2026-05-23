@@ -32,7 +32,10 @@ enum ReviewWorkspace {
         return .rawTranscript
     }
 
-    static func timelineEntries(for session: TranscriptSession) -> [ReviewWorkspaceTimelineEntry] {
+    static func timelineEntries(
+        for session: TranscriptSession,
+        provider: AIProvider = .openAI
+    ) -> [ReviewWorkspaceTimelineEntry] {
         var entries: [ReviewWorkspaceTimelineEntry] = []
 
         if session.requiresTranscriptionRetry {
@@ -42,7 +45,8 @@ enum ReviewWorkspace {
                     timestamp: 0,
                     kind: .transcript,
                     title: "Transcription Pending",
-                    text: session.transcriptionRecoveryMessage ?? "Retry transcription after restoring the provider setup.",
+                    text: session.transcriptionRecoveryMessage(for: provider)
+                        ?? "Retry transcription after restoring the provider setup.",
                     secondaryText: "The finished audio was preserved with this session.",
                     index: nil,
                     screenshotID: nil
