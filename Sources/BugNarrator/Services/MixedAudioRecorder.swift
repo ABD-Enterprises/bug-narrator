@@ -161,6 +161,13 @@ final class MixedAudioRecorder: AudioRecording {
         try FileManager.default.createDirectory(at: outputDirectoryURL, withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: outputURL)
 
+        var mixSucceeded = false
+        defer {
+            if !mixSucceeded {
+                try? FileManager.default.removeItem(at: outputURL)
+            }
+        }
+
         let composition = AVMutableComposition()
         var mixParameters: [AVAudioMixInputParameters] = []
 
@@ -212,6 +219,7 @@ final class MixedAudioRecorder: AudioRecording {
             throw AppError.recordingFailure("The mixed audio file was empty.")
         }
 
+        mixSucceeded = true
         return RecordedAudio(
             fileURL: outputURL,
             duration: max(microphoneAudio.duration, systemAudio.duration)
