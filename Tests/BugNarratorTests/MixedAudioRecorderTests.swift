@@ -50,6 +50,20 @@ final class MixedAudioRecorderTests: XCTestCase {
         let systemAudioRecorder = MockAudioRecorder()
         systemAudioRecorder.stopResults = [
             .failure(AppError.recordingFailure("System audio failed to stop."))
+    func testStopRecordingLeavesNoMixOutputBehindWhenMixingFails() async throws {
+        let rootDirectoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let corruptURL = rootDirectoryURL.appendingPathComponent("corrupt.wav")
+        try Data("not audio".utf8).write(to: corruptURL)
+
+        let microphoneRecorder = MockAudioRecorder()
+        microphoneRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: corruptURL, duration: 0.1))
+        ]
+        let systemAudioRecorder = MockAudioRecorder()
+        systemAudioRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: corruptURL, duration: 0.1))
         ]
         let recorder = MixedAudioRecorder(
             microphoneRecorder: microphoneRecorder,
@@ -98,6 +112,20 @@ final class MixedAudioRecorderTests: XCTestCase {
         }
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: systemAudioURL.path))
+            XCTFail("Expected mixed recording stop to throw on a corrupt source.")
+        } catch {
+            // Expected — mixing should not succeed on a corrupt source.
+        }
+
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: rootDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        let leftoverMixFiles = contents.filter { $0.pathExtension == "m4a" }
+        XCTAssertTrue(
+            leftoverMixFiles.isEmpty,
+            "Expected no mixed-recording artifact after a failed stop, found: \(leftoverMixFiles)"
+        )
     }
 
     private func temporaryDirectoryURL() -> URL {
