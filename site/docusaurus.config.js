@@ -46,7 +46,7 @@ const config = {
           position: 'left'
         },
         {
-          href: 'https://github.com/deffenda/bug-narrator',
+          href: 'https://github.com/ABD-Enterprises/bug-narrator',
           label: 'GitHub',
           position: 'right'
         }
@@ -67,8 +67,8 @@ const config = {
         {
           title: 'Maintainers',
           items: [
-            { label: 'Release Process (Repo)', href: 'https://github.com/deffenda/bug-narrator/blob/main/docs/release/release-process.md' },
-            { label: 'Roadmap History (Repo)', href: 'https://github.com/deffenda/bug-narrator/blob/main/docs/roadmap/roadmap.md' }
+            { label: 'Release Process (Repo)', href: 'https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/release/release-process.md' },
+            { label: 'Roadmap History (Repo)', href: 'https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/roadmap/roadmap.md' }
           ]
         }
       ],

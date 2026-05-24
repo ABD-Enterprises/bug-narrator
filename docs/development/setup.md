@@ -26,7 +26,7 @@ Optional local tools:
 ## Clone And Inspect
 
 ```bash
-git clone https://github.com/deffenda/bug-narrator.git
+git clone https://github.com/ABD-Enterprises/bug-narrator.git
 cd bug-narrator
 git status
 ```

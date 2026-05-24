@@ -8,9 +8,9 @@ BugNarrator intentionally runs as a single-instance app. If you open it again wh
 
 ## Getting Help
 
-- [Download the latest macOS release](https://github.com/deffenda/bug-narrator/releases/latest)
-- [Report a Bug](https://github.com/deffenda/bug-narrator/issues/new)
-- [Request a Feature](https://github.com/deffenda/bug-narrator/issues/new)
+- [Download the latest macOS release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest)
+- [Report a Bug](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
+- [Request a Feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
 - [Support Development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
 ## What BugNarrator Is
@@ -31,7 +31,7 @@ It helps you:
 
 ### Install From The DMG
 
-1. Download the latest macOS release from [GitHub Releases](https://github.com/deffenda/bug-narrator/releases/latest).
+1. Download the latest macOS release from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the downloaded DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
