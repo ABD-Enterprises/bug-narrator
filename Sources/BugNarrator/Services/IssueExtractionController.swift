@@ -71,7 +71,7 @@ final class ManualIssueExtractionStatusPresenter {
 @MainActor
 final class IssueMutationFailurePresenter {
     private let errorPresenter: AppErrorPresenter
-    private let prepareErrorPresentationSideEffects: () -> Void
+    var prepareErrorPresentationSideEffects: () -> Void
 
     init(
         errorPresenter: AppErrorPresenter,

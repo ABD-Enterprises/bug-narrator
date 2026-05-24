@@ -276,11 +276,7 @@ final class AppState: ObservableObject {
                     "ai_provider": settingsStore.aiProvider.rawValue
                 ]
             },
-            telemetryRecorder: telemetryRecorder,
-            showSettingsWindow: { [weak self] in self?.showSettingsWindow?() },
-            prepareErrorPresentationSideEffects: { [weak self] in
-                self?.prepareErrorPresentationSideEffects()
-            }
+            telemetryRecorder: telemetryRecorder
         )
         let sessionLibrary = SessionLibraryController(
             transcriptStore: transcriptStore,
@@ -357,10 +353,7 @@ final class AppState: ObservableObject {
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
         self.issueMutationFailurePresenter = IssueMutationFailurePresenter(
-            errorPresenter: self.errorPresenter,
-            prepareErrorPresentationSideEffects: { [weak self] in
-                self?.prepareErrorPresentationSideEffects()
-            }
+            errorPresenter: self.errorPresenter
         )
         self.issueExportPresentationController = IssueExportPresentationController(
             errorPresenter: self.errorPresenter,
@@ -543,6 +536,16 @@ final class AppState: ObservableObject {
 
         aiProviderSettings.showSettingsWindow = { [weak self] in
             self?.showSettingsWindow?()
+        }
+
+        recordingSessionStartStatusPresenter.showSettingsWindow = { [weak self] in
+            self?.showSettingsWindow?()
+        }
+        recordingSessionStartStatusPresenter.prepareErrorPresentationSideEffects = { [weak self] in
+            self?.prepareErrorPresentationSideEffects()
+        }
+        issueMutationFailurePresenter.prepareErrorPresentationSideEffects = { [weak self] in
+            self?.prepareErrorPresentationSideEffects()
         }
 
         objectChangeForwarder.forward(

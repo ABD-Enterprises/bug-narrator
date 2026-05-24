@@ -1,1 +1,1 @@
-NOT RUN: Docker is unavailable in this environment
+PASS: no scannable changed files for semgrep
