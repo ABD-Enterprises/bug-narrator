@@ -15,6 +15,19 @@
 		0952565F78B2C3C544A8B4FC /* MenuBarStatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */; };
 		099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */; };
 		0C27546CA8851DF57ECF8C6E /* TranscriptionClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */; };
+		300B00000000000000000001 /* APIKeyValidationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000001 /* APIKeyValidationStateTests.swift */; };
+		300B00000000000000000002 /* AppRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000002 /* AppRuntimeEnvironmentTests.swift */; };
+		300B00000000000000000003 /* AppStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000003 /* AppStatusTests.swift */; };
+		300B00000000000000000004 /* ChangelogDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000004 /* ChangelogDocumentTests.swift */; };
+		300B00000000000000000005 /* ElapsedTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000005 /* ElapsedTimeFormatterTests.swift */; };
+		300B00000000000000000006 /* HotkeyShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000006 /* HotkeyShortcutTests.swift */; };
+		300B00000000000000000007 /* RecordingAudioSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000007 /* RecordingAudioSourceTests.swift */; };
+		300B00000000000000000008 /* RecordingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000008 /* RecordingSessionDraftTests.swift */; };
+		300B00000000000000000009 /* SessionMarkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F00000000000000000009 /* SessionMarkerTests.swift */; };
+		300B0000000000000000000A /* SessionScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F0000000000000000000A /* SessionScreenshotTests.swift */; };
+		300B0000000000000000000B /* TranscriptQualityFindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F0000000000000000000B /* TranscriptQualityFindingTests.swift */; };
+		300B0000000000000000000C /* TranscriptSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F0000000000000000000C /* TranscriptSectionTests.swift */; };
+		300B0000000000000000000D /* TransientToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F0000000000000000000D /* TransientToastTests.swift */; };
 		134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6131EA189B853D1B456A8D26 /* SettingsView.swift */; };
 		14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */; };
 		255A00000000000000000001 /* MixedAudioRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255A00000000000000000002 /* MixedAudioRecorderTests.swift */; };
@@ -198,6 +211,19 @@
 		04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspector.swift; sourceTree = "<group>"; };
 		0599934D564C87030D294589 /* BugNarratorDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorDiagnostics.swift; sourceTree = "<group>"; };
 		084D11633172FCB62C674D40 /* APIKeyValidationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyValidationState.swift; sourceTree = "<group>"; };
+		300F00000000000000000001 /* APIKeyValidationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyValidationStateTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000002 /* AppRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000003 /* AppStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatusTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000004 /* ChangelogDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangelogDocumentTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000005 /* ElapsedTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatterTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000006 /* HotkeyShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyShortcutTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000007 /* RecordingAudioSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioSourceTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000008 /* RecordingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraftTests.swift; sourceTree = "<group>"; };
+		300F00000000000000000009 /* SessionMarkerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMarkerTests.swift; sourceTree = "<group>"; };
+		300F0000000000000000000A /* SessionScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreenshotTests.swift; sourceTree = "<group>"; };
+		300F0000000000000000000B /* TranscriptQualityFindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityFindingTests.swift; sourceTree = "<group>"; };
+		300F0000000000000000000C /* TranscriptSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSectionTests.swift; sourceTree = "<group>"; };
+		300F0000000000000000000D /* TransientToastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastTests.swift; sourceTree = "<group>"; };
 		0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControlPanelView.swift; sourceTree = "<group>"; };
 		0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioRecorder.swift; sourceTree = "<group>"; };
 		0DF81E6E8D3A702691797E56 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
@@ -381,20 +407,26 @@
 		2365FC0566C298691506FFDF /* BugNarratorTests */ = {
 			isa = PBXGroup;
 			children = (
+				300F00000000000000000001 /* APIKeyValidationStateTests.swift */,
 				553973ADCABF1FC298D834A1 /* AppBootstrapTests.swift */,
 				C9A627A3D91ED77FE7657BAD /* AppErrorTests.swift */,
 				117A00000000000000000004 /* AppErrorPresenterTests.swift */,
+				300F00000000000000000002 /* AppRuntimeEnvironmentTests.swift */,
 				554387017B49D9CD63967BE3 /* AppStateTests.swift */,
+				300F00000000000000000003 /* AppStatusTests.swift */,
 				121A00000000000000000004 /* AppUtilityActionControllerTests.swift */,
 				253A00000000000000000002 /* AppSupportLocationTests.swift */,
 				125A00000000000000000004 /* ApplicationTerminationControllerTests.swift */,
+				300F00000000000000000004 /* ChangelogDocumentTests.swift */,
 				F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */,
 				131A00000000000000000004 /* DebugSessionContextProviderTests.swift */,
 				40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */,
+				300F00000000000000000005 /* ElapsedTimeFormatterTests.swift */,
 				113A00000000000000000004 /* ExportHistoryControllerTests.swift */,
 				229A00000000000000000003 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */,
 				231A00000000000000000003 /* RetryPostTranscriptionResultHandlerTests.swift */,
 				AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */,
+				300F00000000000000000006 /* HotkeyShortcutTests.swift */,
 				107A00000000000000000004 /* IssueExportControllerTests.swift */,
 				105A00000000000000000004 /* IssueExtractionControllerTests.swift */,
 				33C72E7D77CE5A2F8560651F /* IssueExtractionServiceTests.swift */,
@@ -412,8 +444,10 @@
 				227A00000000000000000004 /* PostTranscriptionPipelineControllerTests.swift */,
 				FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */,
 				6F9B1D06622F36D479935B7D /* ProductInfoTests.swift */,
+				300F00000000000000000007 /* RecordingAudioSourceTests.swift */,
 				129A00000000000000000004 /* RecordingStatusMessageBuilderTests.swift */,
 				3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */,
+				300F00000000000000000008 /* RecordingSessionDraftTests.swift */,
 				115A00000000000000000004 /* RecoveredRecordingImportControllerTests.swift */,
 				2DE808CBBBE2F1EEE4FF5BEC /* RecoveredRecordingImporterTests.swift */,
 				189A00000000000000000002 /* RetryTranscriptionStatusPresenterTests.swift */,
@@ -429,12 +463,17 @@
 				D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */,
 				E59F6509D79E57A86ED795CA /* SessionLibraryControllerTests.swift */,
 				67770387C5BA986EEB40382E /* SessionLibraryTests.swift */,
+				300F00000000000000000009 /* SessionMarkerTests.swift */,
+				300F0000000000000000000A /* SessionScreenshotTests.swift */,
 				1ACC8A426CF0E64809970F2A /* SettingsStoreTests.swift */,
 				3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */,
 				111A00000000000000000004 /* SupportDataControllerTests.swift */,
 				22447E5581818B8003AA49F8 /* TestSupport.swift */,
+				300F0000000000000000000D /* TransientToastTests.swift */,
 				123A00000000000000000004 /* TransientToastControllerTests.swift */,
 				7EF4558D78ECC185ECA6ED10 /* TranscriptExporterTests.swift */,
+				300F0000000000000000000B /* TranscriptQualityFindingTests.swift */,
+				300F0000000000000000000C /* TranscriptSectionTests.swift */,
 				F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */,
 				137A00000000000000000004 /* TranscriptionSessionBuilderTests.swift */,
 				A31B0939DF668FFC71CD64FD /* TranscriptionRecoveryControllerTests.swift */,
@@ -747,20 +786,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				300B00000000000000000001 /* APIKeyValidationStateTests.swift in Sources */,
 				A514C06B61A203200CF118A1 /* AppBootstrapTests.swift in Sources */,
 				7094EC90F13C99BA56871010 /* AppErrorTests.swift in Sources */,
 				117A00000000000000000002 /* AppErrorPresenterTests.swift in Sources */,
+				300B00000000000000000002 /* AppRuntimeEnvironmentTests.swift in Sources */,
 				334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */,
+				300B00000000000000000003 /* AppStatusTests.swift in Sources */,
 				121A00000000000000000002 /* AppUtilityActionControllerTests.swift in Sources */,
 				253A00000000000000000001 /* AppSupportLocationTests.swift in Sources */,
 				125A00000000000000000002 /* ApplicationTerminationControllerTests.swift in Sources */,
+				300B00000000000000000004 /* ChangelogDocumentTests.swift in Sources */,
 				5347CDF5BF237A76998D261A /* DebugBundleExporterTests.swift in Sources */,
 				131A00000000000000000002 /* DebugSessionContextProviderTests.swift in Sources */,
 				FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */,
+				300B00000000000000000005 /* ElapsedTimeFormatterTests.swift in Sources */,
 				113A00000000000000000002 /* ExportHistoryControllerTests.swift in Sources */,
 				229A00000000000000000001 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift in Sources */,
 				231A00000000000000000001 /* RetryPostTranscriptionResultHandlerTests.swift in Sources */,
 				594983777A69A4D70F71653D /* GitHubExportProviderTests.swift in Sources */,
+				300B00000000000000000006 /* HotkeyShortcutTests.swift in Sources */,
 				107A00000000000000000002 /* IssueExportControllerTests.swift in Sources */,
 				105A00000000000000000002 /* IssueExtractionControllerTests.swift in Sources */,
 				F8BF8DC6CA90989293D790EF /* IssueExtractionServiceTests.swift in Sources */,
@@ -778,8 +823,10 @@
 				227A00000000000000000002 /* PostTranscriptionPipelineControllerTests.swift in Sources */,
 				7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */,
 				8F3D88D73F1560365347F711 /* ProductInfoTests.swift in Sources */,
+				300B00000000000000000007 /* RecordingAudioSourceTests.swift in Sources */,
 				129A00000000000000000002 /* RecordingStatusMessageBuilderTests.swift in Sources */,
 				2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */,
+				300B00000000000000000008 /* RecordingSessionDraftTests.swift in Sources */,
 				115A00000000000000000002 /* RecoveredRecordingImportControllerTests.swift in Sources */,
 				62313F663336184217D1020B /* RecoveredRecordingImporterTests.swift in Sources */,
 				189A00000000000000000001 /* RetryTranscriptionStatusPresenterTests.swift in Sources */,
@@ -795,12 +842,17 @@
 				8E0DE1B3EABFCECD46EF5ED0 /* SessionDataProtectorTests.swift in Sources */,
 				01CEE47A97CA8B7ED6B6E1B5 /* SessionLibraryControllerTests.swift in Sources */,
 				8896B923DAB4B25053694061 /* SessionLibraryTests.swift in Sources */,
+				300B00000000000000000009 /* SessionMarkerTests.swift in Sources */,
+				300B0000000000000000000A /* SessionScreenshotTests.swift in Sources */,
 				D8C580D925E807323208366D /* SettingsStoreTests.swift in Sources */,
 				8419388E08492DBAC01BEEE8 /* SingleInstanceControllerTests.swift in Sources */,
 				111A00000000000000000002 /* SupportDataControllerTests.swift in Sources */,
 				5090A54144CACF59295F137C /* TestSupport.swift in Sources */,
+				300B0000000000000000000D /* TransientToastTests.swift in Sources */,
 				123A00000000000000000002 /* TransientToastControllerTests.swift in Sources */,
 				683F3BD6F8192C53766A10DC /* TranscriptExporterTests.swift in Sources */,
+				300B0000000000000000000B /* TranscriptQualityFindingTests.swift in Sources */,
+				300B0000000000000000000C /* TranscriptSectionTests.swift in Sources */,
 				3F4178877259A14D87101CE5 /* TranscriptQualityInspectorTests.swift in Sources */,
 				38B00E4AA8B374646877FBFB /* TranscriptStoreTests.swift in Sources */,
 				0C27546CA8851DF57ECF8C6E /* TranscriptionClientTests.swift in Sources */,
