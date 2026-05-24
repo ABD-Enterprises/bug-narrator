@@ -4,8 +4,8 @@ BugNarrator is not currently accepting outside code contributions or pull reques
 
 ## What Is Welcome
 
-- bug reports through [GitHub Issues](https://github.com/deffenda/bugnarrator/issues/new)
-- focused feature requests through [GitHub Issues](https://github.com/deffenda/bugnarrator/issues/new)
+- bug reports through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
+- focused feature requests through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
 - reproducible diagnostics such as debug bundles, session bundles, and screenshots when relevant
 
 ## Current Policy

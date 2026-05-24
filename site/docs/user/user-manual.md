@@ -56,6 +56,6 @@ BugNarrator supports keyboard-first use across the menu bar window, recording co
 
 ## More Detail
 
-- [Canonical user manual in the repo](https://github.com/deffenda/bug-narrator/blob/main/docs/user/user-manual.md)
-- [Detailed user guide](https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md)
-- [Tester Narration Guide](https://github.com/deffenda/bug-narrator/blob/main/docs/UserGuide.md#tester-narration-guide)
+- [Canonical user manual in the repo](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/user/user-manual.md)
+- [Detailed user guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
+- [Tester Narration Guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md#tester-narration-guide)

@@ -23,8 +23,8 @@ This docs site now mirrors the canonical onboarding, user, and product-spec page
 
 The repository remains the source of truth for the full documentation set:
 
-- [Onboarding](https://github.com/deffenda/bug-narrator/blob/main/docs/onboarding/getting-started.md)
-- [User Manual](https://github.com/deffenda/bug-narrator/blob/main/docs/user/user-manual.md)
-- [Release Process](https://github.com/deffenda/bug-narrator/blob/main/docs/release/release-process.md)
-- [GitHub Issues](https://github.com/deffenda/bug-narrator/issues)
-- [Roadmap History](https://github.com/deffenda/bug-narrator/blob/main/docs/roadmap/roadmap.md)
+- [Onboarding](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/onboarding/getting-started.md)
+- [User Manual](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/user/user-manual.md)
+- [Release Process](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/release/release-process.md)
+- [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues)
+- [Roadmap History](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/roadmap/roadmap.md)
