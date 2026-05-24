@@ -76,7 +76,12 @@ jobs:
         run: npm run build --prefix site
 
   macos-build-and-test:
-    runs-on: macos-26
+    # Self-hosted ABD-Enterprises org runner with Xcode 26.5; declared
+    # in deffenda/brew-sync manifests/github-runners.yaml. Falls back to
+    # macos-26 (GitHub-hosted, with the 10x minute multiplier) by manual
+    # workflow re-run if the self-hosted runner is offline. See the
+    # `Select Xcode` step for how this job tolerates both layouts.
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -98,16 +103,36 @@ jobs:
       - name: Select Xcode (project file requires Xcode 26)
         if: steps.swift_changes.outputs.changed == 'true'
         run: |
-          # The .xcodeproj is in objectVersion 77, which only Xcode 26+ can read.
-          # macos-26 default Xcode is 26.4.1; prefer the newest 26.x available.
+          # The .xcodeproj is in objectVersion 77, which only Xcode 26+
+          # can read. Two valid layouts:
+          #   1. GitHub-hosted macos-26 runners: /Applications/Xcode_26*.app
+          #      (multiple side-by-side versions are present; pick newest)
+          #   2. Self-hosted runners (the brew-sync fleet Mac): just
+          #      /Applications/Xcode.app, which we accept if its
+          #      CFBundleShortVersionString starts with `26`.
           XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+
+          if [[ -z "$XCODE_APP" && -d /Applications/Xcode.app ]]; then
+            VERSION=$(defaults read /Applications/Xcode.app/Contents/Info CFBundleShortVersionString 2>/dev/null || echo "")
+            if [[ "$VERSION" == 26* ]]; then
+              XCODE_APP=/Applications/Xcode.app
+              echo "Accepting /Applications/Xcode.app (version $VERSION) — likely self-hosted runner."
+            fi
+          fi
+
           if [[ -z "$XCODE_APP" ]]; then
-            echo "::error::No Xcode 26.x found. Installed Xcode apps:"
+            echo "::error::No Xcode 26.x found. Looked for /Applications/Xcode_26*.app and /Applications/Xcode.app. Installed Xcode apps:"
             ls -d /Applications/Xcode*.app || true
             exit 1
           fi
+
           echo "Selected $XCODE_APP"
-          sudo xcode-select -s "$XCODE_APP"
+          # Self-hosted runners may not allow passwordless sudo; only
+          # invoke `sudo xcode-select` when running as a non-root user on
+          # a hosted runner. DEVELOPER_DIR works on both.
+          if [[ -n "$RUNNER_ENVIRONMENT" && "$RUNNER_ENVIRONMENT" == "github-hosted" ]]; then
+            sudo xcode-select -s "$XCODE_APP"
+          fi
           echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
 
       - name: Show toolchain
