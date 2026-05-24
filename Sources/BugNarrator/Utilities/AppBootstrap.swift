@@ -125,8 +125,8 @@ enum UITestRuntimeSupport {
 
         settingsStore.apiKey = "sk-ui-test"
         settingsStore.githubToken = "github_pat_ui_test"
-        settingsStore.githubRepositoryID = "deffenda/bug-narrator"
-        settingsStore.githubRepositoryOwner = "deffenda"
+        settingsStore.githubRepositoryID = "ABD-Enterprises/bug-narrator"
+        settingsStore.githubRepositoryOwner = "ABD-Enterprises"
         settingsStore.githubRepositoryName = "bug-narrator"
         settingsStore.githubDefaultLabels = "bug, ui-test"
         settingsStore.jiraBaseURL = "https://example.atlassian.net"
@@ -383,8 +383,8 @@ private actor UITestIssueExportService: IssueExporting {
     func fetchGitHubRepositories(token: String) async throws -> [GitHubRepositoryOption] {
         [
             GitHubRepositoryOption(
-                repositoryID: "deffenda/bug-narrator",
-                owner: "deffenda",
+                repositoryID: "ABD-Enterprises/bug-narrator",
+                owner: "ABD-Enterprises",
                 name: "bug-narrator",
                 description: "BugNarrator"
             ),

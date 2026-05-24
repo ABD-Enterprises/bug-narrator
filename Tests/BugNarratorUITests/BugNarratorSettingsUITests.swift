@@ -121,7 +121,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let gitHubOwnerField = app.textFields["GitHub repository owner"]
         XCTAssertTrue(waitForSettingsElement(gitHubOwnerField, in: settingsWindow))
-        replaceText(in: gitHubOwnerField, with: "deffenda")
+        replaceText(in: gitHubOwnerField, with: "ABD-Enterprises")
 
         let gitHubRepoField = app.textFields["GitHub repository name"]
         XCTAssertTrue(waitForSettingsElement(gitHubRepoField, in: settingsWindow))
@@ -192,7 +192,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let gitHubOwner = app.textFields["GitHub repository owner for Settings export smoke issue updated"]
         XCTAssertTrue(waitForElement(gitHubOwner, in: sessionsWindow))
-        replaceText(in: gitHubOwner, with: "deffenda")
+        replaceText(in: gitHubOwner, with: "ABD-Enterprises")
 
         let gitHubRepo = app.textFields["GitHub repository name for Settings export smoke issue updated"]
         XCTAssertTrue(waitForElement(gitHubRepo, in: sessionsWindow))

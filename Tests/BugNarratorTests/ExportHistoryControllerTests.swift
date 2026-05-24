@@ -31,10 +31,10 @@ final class ExportHistoryControllerTests: XCTestCase {
             fingerprint: fingerprint,
             sourceIssueID: UUID(),
             destination: .github,
-            targetIdentity: "deffenda/bug-narrator",
+            targetIdentity: "ABD-Enterprises/bug-narrator",
             state: .succeeded,
             remoteIdentifier: "#42",
-            remoteURL: URL(string: "https://github.com/deffenda/bug-narrator/issues/42"),
+            remoteURL: URL(string: "https://github.com/ABD-Enterprises/bug-narrator/issues/42"),
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
     }
