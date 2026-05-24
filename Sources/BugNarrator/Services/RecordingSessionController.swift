@@ -6,8 +6,8 @@ final class RecordingSessionStartStatusPresenter {
     private let recordingStatusMessages: RecordingStatusMessageProvider
     private let startDiagnosticsMetadata: () -> [String: String]
     private let telemetryRecorder: any OperationalTelemetryRecording
-    private let showSettingsWindow: () -> Void
-    private let prepareErrorPresentationSideEffects: () -> Void
+    var showSettingsWindow: () -> Void
+    var prepareErrorPresentationSideEffects: () -> Void
     private let recordingLogger: DiagnosticsLogger
     private let permissionsLogger: DiagnosticsLogger
 
