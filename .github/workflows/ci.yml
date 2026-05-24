@@ -74,3 +74,54 @@ jobs:
       - name: Build docs site
         if: steps.docs_changes.outputs.changed == 'true'
         run: npm run build --prefix site
+
+  macos-build-and-test:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect Swift / project changes
+        id: swift_changes
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
+          if grep -Eq '(\.swift$|\.plist$|\.entitlements$|\.xcodeproj/|\.xcworkspace/|\.xcconfig$|^Resources/|^Sources/|^Tests/|^\.github/workflows/ci\.yml$|^Package\.swift$|^Package\.resolved$)' <<< "$changed_files"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show toolchain
+        if: steps.swift_changes.outputs.changed == 'true'
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build (Debug, macOS)
+        if: steps.swift_changes.outputs.changed == 'true'
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BugNarrator.xcodeproj \
+            -scheme BugNarrator \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Run unit tests (BugNarratorTests only; UITests need a window server)
+        if: steps.swift_changes.outputs.changed == 'true'
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BugNarrator.xcodeproj \
+            -scheme BugNarrator \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -only-testing:BugNarratorTests \
+            CODE_SIGNING_ALLOWED=NO \
+            test
