@@ -19,7 +19,7 @@ final class PrivacyDataExporterTests: XCTestCase {
         settingsStore.githubToken = "github_pat_secret"
         settingsStore.jiraAPIToken = "jira-secret"
         settingsStore.jiraEmail = "person@example.com"
-        settingsStore.githubRepositoryOwner = "deffenda"
+        settingsStore.githubRepositoryOwner = "ABD-Enterprises"
         settingsStore.githubRepositoryName = "bug-narrator"
         settingsStore.githubDefaultLabels = "bug,export"
         settingsStore.jiraBaseURL = "https://example.atlassian.net"
@@ -63,7 +63,7 @@ final class PrivacyDataExporterTests: XCTestCase {
         XCTAssertEqual(manifest?["includesSecrets"] as? Bool, false)
         XCTAssertEqual(manifest?["sessionCount"] as? Int, 1)
         XCTAssertEqual(sessions, [session])
-        XCTAssertEqual(writtenSettings.gitHubRepositoryOwner, "deffenda")
+        XCTAssertEqual(writtenSettings.gitHubRepositoryOwner, "ABD-Enterprises")
         XCTAssertEqual(writtenSettings.jiraProjectKey, "UCAP")
         XCTAssertEqual(writtenDiagnostics.recentTelemetryEvents.count, 1)
         let combinedText = String(data: manifestData + sessionsData + settingsData + diagnosticsData, encoding: .utf8) ?? ""
