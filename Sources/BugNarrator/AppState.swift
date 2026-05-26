@@ -278,10 +278,7 @@ final class AppState: ObservableObject {
         )
         self.sessionLibrary = sessionLibrary
         self.sessionLibraryStatusPresenter = SessionLibraryStatusPresenter(
-            errorPresenter: self.errorPresenter,
-            prepareErrorPresentationSideEffects: { [weak self] in
-                self?.prepareErrorPresentationSideEffects()
-            }
+            errorPresenter: self.errorPresenter
         )
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
         let issueExtractionController = IssueExtractionController(
@@ -524,6 +521,9 @@ final class AppState: ObservableObject {
             self?.prepareErrorPresentationSideEffects()
         }
         issueMutationFailurePresenter.prepareErrorPresentationSideEffects = { [weak self] in
+            self?.prepareErrorPresentationSideEffects()
+        }
+        sessionLibraryStatusPresenter.prepareErrorPresentationSideEffects = { [weak self] in
             self?.prepareErrorPresentationSideEffects()
         }
 

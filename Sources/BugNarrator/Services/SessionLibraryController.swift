@@ -43,7 +43,7 @@ enum SessionDeletionStatusPresenter {
 @MainActor
 final class SessionLibraryStatusPresenter {
     private let errorPresenter: AppErrorPresenter
-    private let prepareErrorPresentationSideEffects: () -> Void
+    var prepareErrorPresentationSideEffects: () -> Void
 
     init(
         errorPresenter: AppErrorPresenter,
