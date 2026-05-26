@@ -254,6 +254,52 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "whisper-1")
     }
 
+    func testOpenAIProviderUsesCuratedTranscriptionModelChoices() {
+        let suiteName = "BugNarrator-SettingsOpenAIModelChoicesTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(
+            store.transcriptionModelChoices.map(\.id),
+            [
+                "whisper-1",
+                "gpt-4o-mini-transcribe",
+                "gpt-4o-transcribe",
+                "gpt-4o-transcribe-diarize"
+            ]
+        )
+
+        store.preferredModel = "not-an-openai-transcription-model"
+
+        XCTAssertEqual(store.transcriptionRequest.model, "whisper-1")
+    }
+
+    func testOpenAIProviderUsesCuratedIssueExtractionModelChoices() {
+        let suiteName = "BugNarrator-SettingsOpenAIIssueModelChoicesTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(AIProvider.openAI.rawValue, forKey: "settings.aiProvider")
+        defaults.set("not-a-chat-model", forKey: "settings.issueExtractionModel")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(
+            store.issueExtractionModelChoices.map(\.id),
+            [
+                "gpt-4.1-mini",
+                "gpt-4.1-nano",
+                "gpt-4.1"
+            ]
+        )
+        XCTAssertEqual(store.issueExtractionModel, "gpt-4.1-mini")
+        XCTAssertEqual(defaults.string(forKey: "settings.issueExtractionModel"), "gpt-4.1-mini")
+    }
+
     func testSwitchingBackToOpenAIResetsParakeetTranscriptionModel() {
         let suiteName = "BugNarrator-SettingsProviderModelSwitchTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -342,6 +388,24 @@ final class SettingsStoreTests: XCTestCase {
         store.openAIBaseURL = "http://localhost:8422"
         XCTAssertNil(store.aiProviderCompatibilityIssue)
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+    }
+
+    func testParakeetProviderRejectsAutomaticIssueExtraction() {
+        let suiteName = "BugNarrator-SettingsParakeetAutoExtraction-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .parakeetLocal
+        store.openAIBaseURL = "http://localhost:8422"
+        store.autoExtractIssues = true
+
+        XCTAssertFalse(store.supportsIssueExtraction)
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "Turn off automatic issue extraction or choose a provider with a chat completion model."
+        )
     }
 
     func testSettingsLoadFromLegacyDefaultsDomain() throws {
