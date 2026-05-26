@@ -12,7 +12,6 @@ enum AppErrorOperation: String {
     case privacyExport = "privacy_export"
     case export
     case sessionLibrary = "session_library"
-    case recoveredRecordingImport = "recovered_recording_import"
 }
 
 struct AppErrorNormalization: Equatable {

@@ -37,10 +37,7 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             }
             return "Recording saved locally. Open Settings, refresh the \(provider.displayName) configuration, then retry transcription from this session."
         case .crashRecovery:
-            if provider.requiresAPIKey {
-                return "Recovered recording found after an unexpected quit. Add or confirm your \(provider.displayName) API key, then transcribe the recovered audio."
-            }
-            return "Recovered recording found after an unexpected quit. Confirm the \(provider.displayName) setup, then transcribe the recovered audio."
+            return "This older unexpected-quit recovery item is no longer supported. Delete it and start a new recording."
         }
     }
 
@@ -57,7 +54,7 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
         case .revokedAPIKey:
             return .revokedAPIKey
         case .crashRecovery:
-            return .transcriptionFailure("A recovered recording is waiting for transcription.")
+            return .transcriptionFailure("Unexpected-quit recording recovery is no longer supported.")
         }
     }
 }

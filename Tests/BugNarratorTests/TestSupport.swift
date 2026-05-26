@@ -559,20 +559,6 @@ final class MockArtifactsService: SessionArtifactsManaging {
     }
 }
 
-@MainActor
-final class MockRecoveredRecordingImporter: RecoveredRecordingImporting {
-    var importResult: Result<Int, Error> = .success(0)
-    private(set) var importCallCount = 0
-
-    func importRecoverableRecordings(
-        into transcriptStore: TranscriptStore,
-        artifactsService: any SessionArtifactsManaging
-    ) throws -> Int {
-        importCallCount += 1
-        return try importResult.get()
-    }
-}
-
 final class MockClipboardService: ClipboardWriting {
     private(set) var copiedStrings: [String] = []
 
@@ -764,7 +750,6 @@ struct AppStateHarness {
     let localPrivacyDataManager: MockLocalPrivacyDataManager
     let issueExtractionService: MockIssueExtractionService
     let exportService: MockExportService
-    let recoveredRecordingImporter: MockRecoveredRecordingImporter
     let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
     let screenshotSelectionService: MockScreenshotSelectionService
     let appState: AppState
@@ -782,7 +767,6 @@ struct AppStateHarness {
         privacyDataExporter: MockPrivacyDataExporter = MockPrivacyDataExporter(),
         telemetryRecorder: MockOperationalTelemetryRecorder = MockOperationalTelemetryRecorder(),
         localPrivacyDataManager: MockLocalPrivacyDataManager = MockLocalPrivacyDataManager(),
-        recoveredImportResult: Result<Int, Error> = .success(0),
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
     ) {
         let fileManager = FileManager.default
@@ -819,8 +803,6 @@ struct AppStateHarness {
         let urlHandler = MockURLHandler()
         let issueExtractionService = MockIssueExtractionService()
         let exportService = MockExportService()
-        let recoveredRecordingImporter = MockRecoveredRecordingImporter()
-        recoveredRecordingImporter.importResult = recoveredImportResult
         let screenCapturePermissionAccess = MockScreenCapturePermissionAccess()
 
         self.rootDirectoryURL = rootDirectoryURL
@@ -841,7 +823,6 @@ struct AppStateHarness {
         self.localPrivacyDataManager = localPrivacyDataManager
         self.issueExtractionService = issueExtractionService
         self.exportService = exportService
-        self.recoveredRecordingImporter = recoveredRecordingImporter
         self.screenCapturePermissionAccess = screenCapturePermissionAccess
         self.screenshotSelectionService = screenshotSelectionService
         self.appState = AppState(
@@ -856,7 +837,6 @@ struct AppStateHarness {
             screenshotSelectionService: screenshotSelectionService,
             issueExtractionService: issueExtractionService,
             exportService: exportService,
-            recoveredRecordingImporter: recoveredRecordingImporter,
             artifactsService: artifactsService,
             clipboardService: clipboardService,
             urlHandler: urlHandler,

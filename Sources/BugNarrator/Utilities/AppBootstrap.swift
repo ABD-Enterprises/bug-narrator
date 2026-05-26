@@ -100,7 +100,6 @@ enum UITestRuntimeSupport {
             screenshotSelectionService: UITestScreenshotSelectionService(),
             issueExtractionService: UITestIssueExtractionService(),
             exportService: UITestIssueExportService(),
-            recoveredRecordingImporter: UITestRecoveredRecordingImporter(),
             artifactsService: SessionArtifactsService(rootDirectoryURL: artifactsRootURL),
             clipboardService: UITestClipboardService(),
             urlHandler: UITestURLHandler(),
@@ -482,16 +481,6 @@ private actor UITestIssueExportService: IssueExporting {
 
     func exportHistory() async throws -> [ExportReceipt] {
         []
-    }
-}
-
-@MainActor
-private final class UITestRecoveredRecordingImporter: RecoveredRecordingImporting {
-    func importRecoverableRecordings(
-        into transcriptStore: TranscriptStore,
-        artifactsService: any SessionArtifactsManaging
-    ) throws -> Int {
-        0
     }
 }
 

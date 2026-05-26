@@ -50,6 +50,34 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(statusMessage, session.transcriptionRecoveryMessage)
     }
 
+    func testRetryContextRejectsLegacyCrashRecoverySessions() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = try harness.addPendingSession(failureReason: .crashRecovery)
+
+        let resolution = harness.controller.retryContext(
+            for: session.id,
+            isRecording: false,
+            provider: .openAI,
+            hasUsableAIProviderCredential: true,
+            aiProviderCompatibilityIssue: nil
+        )
+
+        guard case .failure(let appError, let opensSettings, let statusMessage) = resolution else {
+            return XCTFail("Expected crash recovery failure.")
+        }
+        XCTAssertEqual(
+            appError,
+            .transcriptionFailure("Unexpected-quit recording recovery is no longer supported. Delete this session and start a new recording.")
+        )
+        XCTAssertFalse(opensSettings)
+        XCTAssertEqual(
+            statusMessage,
+            "Unexpected-quit recording recovery is no longer supported. Delete this session and start a new recording."
+        )
+    }
+
     func testPreservationPresenterPresentsPreservedSessionRecoveryStatus() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }

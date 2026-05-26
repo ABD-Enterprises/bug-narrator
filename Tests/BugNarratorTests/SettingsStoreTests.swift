@@ -238,6 +238,40 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(request.apiBaseURL.absoluteString, "https://gateway.example.com/openai")
     }
 
+    func testOpenAIProviderDoesNotUsePersistedParakeetTranscriptionModel() {
+        let suiteName = "BugNarrator-SettingsOpenAIParakeetModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(AIProvider.openAI.rawValue, forKey: "settings.aiProvider")
+        defaults.set("parakeet-tdt-0.6b-v3", forKey: "settings.preferredModel")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(store.preferredModel, "whisper-1")
+        XCTAssertEqual(store.transcriptionRequest.model, "whisper-1")
+        XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "whisper-1")
+    }
+
+    func testSwitchingBackToOpenAIResetsParakeetTranscriptionModel() {
+        let suiteName = "BugNarrator-SettingsProviderModelSwitchTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .parakeetLocal
+
+        XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
+
+        store.aiProvider = .openAI
+
+        XCTAssertEqual(store.preferredModel, "whisper-1")
+        XCTAssertEqual(store.transcriptionRequest.model, "whisper-1")
+        XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "whisper-1")
+    }
+
     func testLocalCompatibleProviderRequiresExplicitBaseURLAndModels() {
         let suiteName = "BugNarrator-SettingsProviderCompatibility-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

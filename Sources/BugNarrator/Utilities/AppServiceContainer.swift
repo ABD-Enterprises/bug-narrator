@@ -11,7 +11,6 @@ struct AppServiceContainer {
     let screenshotSelectionService: any ScreenshotSelecting
     let issueExtractionService: any IssueExtracting
     let exportService: any IssueExporting
-    let recoveredRecordingImporter: any RecoveredRecordingImporting
     let artifactsService: any SessionArtifactsManaging
     let clipboardService: any ClipboardWriting
     let urlHandler: any URLOpening
@@ -32,7 +31,6 @@ struct AppServiceContainer {
             screenshotSelectionService: ScreenshotSelectionService(),
             issueExtractionService: IssueExtractionService(),
             exportService: ExportService(),
-            recoveredRecordingImporter: RecoveredRecordingImporter(),
             artifactsService: SessionArtifactsService(),
             clipboardService: SystemClipboardService(),
             urlHandler: WorkspaceURLHandler(),

@@ -237,14 +237,6 @@ protocol SessionArtifactsManaging {
     func removeArtifactsDirectory(at directoryURL: URL)
 }
 
-protocol RecoveredRecordingImporting {
-    @MainActor
-    func importRecoverableRecordings(
-        into transcriptStore: TranscriptStore,
-        artifactsService: any SessionArtifactsManaging
-    ) throws -> Int
-}
-
 protocol ClipboardWriting {
     func copy(_ string: String)
 }

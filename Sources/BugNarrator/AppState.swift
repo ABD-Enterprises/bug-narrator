@@ -29,8 +29,6 @@ final class AppState: ObservableObject {
     let sessionLibrary: SessionLibraryController
     let sessionLibraryStatusPresenter: SessionLibraryStatusPresenter
     let exportHistoryController: ExportHistoryController
-    let recoveredRecordingImportController: RecoveredRecordingImportController
-    private let recoveredRecordingLaunchImporter: RecoveredRecordingLaunchImportPresenter
     let issueExtractionController: IssueExtractionController
     let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
     let issueMutationFailurePresenter: IssueMutationFailurePresenter
@@ -85,10 +83,6 @@ final class AppState: ObservableObject {
 
     var currentError: AppError? {
         presentationState.currentError
-    }
-
-    var recoveredRecordingImportCount: Int {
-        recoveredRecordingImportController.recoveredRecordingImportCount
     }
 
     var exportHistory: [ExportReceipt] {
@@ -196,7 +190,6 @@ final class AppState: ObservableObject {
             screenshotSelectionService: services.screenshotSelectionService,
             issueExtractionService: services.issueExtractionService,
             exportService: services.exportService,
-            recoveredRecordingImporter: services.recoveredRecordingImporter,
             artifactsService: services.artifactsService,
             clipboardService: services.clipboardService,
             urlHandler: services.urlHandler,
@@ -221,7 +214,6 @@ final class AppState: ObservableObject {
         screenshotSelectionService: any ScreenshotSelecting,
         issueExtractionService: any IssueExtracting,
         exportService: any IssueExporting,
-        recoveredRecordingImporter: any RecoveredRecordingImporting,
         artifactsService: any SessionArtifactsManaging,
         clipboardService: any ClipboardWriting,
         urlHandler: any URLOpening,
@@ -288,13 +280,6 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter
         )
         self.exportHistoryController = ExportHistoryController(exportService: exportService)
-        let recoveredRecordingImportController = RecoveredRecordingImportController(
-            transcriptStore: transcriptStore,
-            sessionLibrary: sessionLibrary,
-            recoveredRecordingImporter: recoveredRecordingImporter,
-            artifactsService: artifactsService
-        )
-        self.recoveredRecordingImportController = recoveredRecordingImportController
         let issueExtractionController = IssueExtractionController(
             sessionLibrary: sessionLibrary,
             issueExtractionService: issueExtractionService
@@ -372,16 +357,6 @@ final class AppState: ObservableObject {
             autoCopyTranscript: { settingsStore.autoCopyTranscript },
             cleanupPendingRecordedAudio: {
                 recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
-            }
-        )
-        self.recoveredRecordingLaunchImporter = RecoveredRecordingLaunchImportPresenter(
-            importController: recoveredRecordingImportController,
-            errorPresenter: self.errorPresenter,
-            setStatus: { status, error in
-                presentationState.setStatus(status, error: error)
-            },
-            openTranscriptHistory: {
-                appUtilityActions.openTranscriptHistory()
             }
         )
         let appUtilityActionPresenter = AppUtilityActionResultPresenter(
@@ -556,7 +531,6 @@ final class AppState: ObservableObject {
                 recordingSessionController.objectWillChange,
                 sessionLibrary.objectWillChange,
                 exportHistoryController.objectWillChange,
-                recoveredRecordingImportController.objectWillChange,
                 issueExtractionController.objectWillChange,
                 issueExportController.objectWillChange,
                 transcriptionRecovery.objectWillChange,
@@ -589,7 +563,6 @@ final class AppState: ObservableObject {
             ]
         )
         permissionRecoveryController.validateRuntimeConfiguration()
-        recoveredRecordingLaunchImporter.importRecoveredRecordingsAtLaunch()
         Task { [weak self] in
             await self?.refreshExportHistory()
         }
@@ -647,12 +620,6 @@ final class AppState: ObservableObject {
 
     var storageRecoveryMessage: String? {
         transcriptStore.lastLoadRecoveryEvent?.userMessage
-    }
-
-    var hasRecoveredRecordingPendingTranscription: Bool {
-        transcriptStore.pendingTranscriptionSessions.contains {
-            $0.pendingTranscription?.failureReason == .crashRecovery
-        }
     }
 
     var activeRecordingSession: RecordingSessionDraft? {
