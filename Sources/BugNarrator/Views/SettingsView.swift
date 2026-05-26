@@ -1034,6 +1034,7 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .accessibilityLabel(accessibilityLabel)
+                .accessibilityIdentifier(accessibilityLabel)
 
                 if let selectedChoice = choices.first(where: { $0.id == selection.wrappedValue }) {
                     Text("\(selectedChoice.id) - \(selectedChoice.detail)")
