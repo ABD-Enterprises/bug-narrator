@@ -83,9 +83,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
         replaceText(in: openAIKeyField, with: "sk-ui-test")
         XCTAssertTrue(button(matchingAnyOf: ["Save & Validate Key", "Validate Key"], in: app).exists)
 
-        let modelField = app.textFields["Transcription model"]
-        XCTAssertTrue(waitForSettingsElement(modelField, in: settingsWindow))
-        replaceText(in: modelField, with: "whisper-1")
+        let modelSelector = modelControl(named: "Transcription model", in: app)
+        XCTAssertTrue(waitForSettingsElement(modelSelector, in: settingsWindow))
+        XCTAssertTrue(modelSelector.isEnabled)
 
         let languageField = app.textFields["Transcription language hint"]
         XCTAssertTrue(waitForSettingsElement(languageField, in: settingsWindow))
@@ -95,9 +95,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(waitForSettingsElement(promptEditor, in: settingsWindow))
         replaceText(in: promptEditor, with: "Capture product defects and exact reproduction steps.")
 
-        let extractionModelField = app.textFields["Issue extraction model"]
-        XCTAssertTrue(waitForSettingsElement(extractionModelField, in: settingsWindow))
-        replaceText(in: extractionModelField, with: "gpt-4.1-mini")
+        let extractionModelSelector = modelControl(named: "Issue extraction model", in: app)
+        XCTAssertTrue(waitForSettingsElement(extractionModelSelector, in: settingsWindow))
+        XCTAssertTrue(extractionModelSelector.isEnabled)
 
         for checkboxLabel in [
             "Run issue extraction automatically after transcription",
@@ -313,6 +313,21 @@ final class BugNarratorSettingsUITests: XCTestCase {
         app.launchEnvironment["BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS"] = launchAtLoginStatus
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func modelControl(named label: String, in app: XCUIApplication) -> XCUIElement {
+        let popUpButton = app.popUpButtons[label].firstMatch
+        if popUpButton.exists {
+            return popUpButton
+        }
+
+        let button = app.buttons[label].firstMatch
+        if button.exists {
+            return button
+        }
+
+        return app.descendants(matching: .any)[label].firstMatch
     }
 
     @MainActor
