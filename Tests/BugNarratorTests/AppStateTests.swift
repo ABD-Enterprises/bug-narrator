@@ -75,16 +75,6 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testLaunchImportsRecoveredRecordingsAndSurfacesRecoveryStatus() {
-        let harness = AppStateHarness(recoveredImportResult: .success(1))
-        defer { harness.cleanup() }
-
-        XCTAssertEqual(harness.recoveredRecordingImporter.importCallCount, 1)
-        XCTAssertEqual(harness.appState.recoveredRecordingImportCount, 1)
-        XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertTrue(harness.appState.status.detail?.contains("Recovered 1 recording") == true)
-    }
-
     func testRefreshExportHistoryLoadsReceiptsForReviewSurface() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

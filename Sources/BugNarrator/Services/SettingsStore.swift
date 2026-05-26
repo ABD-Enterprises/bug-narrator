@@ -126,6 +126,12 @@ final class SettingsStore: ObservableObject {
         "com.abdenterprises.sessionmic"
     ]
 
+    private static let openAITranscriptionModel = "whisper-1"
+    private static let parakeetTranscriptionModel = "parakeet-tdt-0.6b-v3"
+    private static let localOnlyTranscriptionModels: Set<String> = [
+        parakeetTranscriptionModel
+    ]
+
     private let logger = DiagnosticsLogger(category: .settings)
 
     var apiKey: String = "" {
@@ -152,9 +158,7 @@ final class SettingsStore: ObservableObject {
         didSet {
             guard hasLoaded else { return }
             defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
-            if aiProvider == .parakeetLocal && (preferredModel.isEmpty || preferredModel == "whisper-1") {
-                preferredModel = "parakeet-tdt-0.6b-v3"
-            }
+            normalizeTranscriptionModelForCurrentProvider(persist: true)
         }
     }
 
@@ -459,11 +463,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var preferredModelValue: String {
-        let value = preferredModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.isEmpty || (value == "whisper-1" && aiProvider == .parakeetLocal) {
-            return aiProvider == .parakeetLocal ? "parakeet-tdt-0.6b-v3" : "whisper-1"
-        }
-        return value
+        Self.normalizedTranscriptionModel(preferredModel, for: aiProvider)
     }
 
     var normalizedLanguageHint: String? {
@@ -772,6 +772,35 @@ final class SettingsStore: ObservableObject {
         hasLoaded = true
     }
 
+    private static func normalizedTranscriptionModel(_ rawValue: String, for provider: AIProvider) -> String {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch provider {
+        case .openAI:
+            if value.isEmpty || localOnlyTranscriptionModels.contains(value) {
+                return openAITranscriptionModel
+            }
+            return value
+        case .parakeetLocal:
+            if value.isEmpty || value == openAITranscriptionModel {
+                return parakeetTranscriptionModel
+            }
+            return value
+        case .openAICompatible, .localCompatible:
+            return value.isEmpty ? openAITranscriptionModel : value
+        }
+    }
+
+    private func normalizeTranscriptionModelForCurrentProvider(persist: Bool) {
+        let normalizedModel = Self.normalizedTranscriptionModel(preferredModel, for: aiProvider)
+        guard normalizedModel != preferredModel else { return }
+
+        preferredModel = normalizedModel
+        if persist {
+            defaults.set(normalizedModel, forKey: Keys.preferredModel)
+        }
+    }
+
     func refreshSecretsForUserInitiatedAccess() {
         logger.debug("refresh_all_secrets", "Refreshing stored secrets after a user-initiated action.")
         prepareSecretsForUserInitiatedAccess(
@@ -848,6 +877,7 @@ final class SettingsStore: ObservableObject {
             legacyKeys: [Keys.legacyIssueExtractionModel]
         )
             ?? "gpt-4.1-mini"
+        normalizeTranscriptionModelForCurrentProvider(persist: true)
 
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true

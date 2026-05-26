@@ -589,7 +589,7 @@ struct SettingsView: View {
                             }
                             .disabled(secureControlsDisabled)
 
-                            Text("Removes locally stored sessions, recovered recordings, export history, and diagnostics files. Saved credentials in the macOS Keychain are not deleted.")
+                            Text("Removes locally stored sessions, temporary recording files, export history, and diagnostics files. Saved credentials in the macOS Keychain are not deleted.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }

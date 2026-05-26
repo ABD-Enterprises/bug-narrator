@@ -239,6 +239,14 @@ final class TranscriptionRecoveryController: ObservableObject {
             )
         }
 
+        guard pendingTranscription.failureReason != .crashRecovery else {
+            return .failure(
+                .transcriptionFailure("Unexpected-quit recording recovery is no longer supported. Delete this session and start a new recording."),
+                opensSettings: false,
+                statusMessage: "Unexpected-quit recording recovery is no longer supported. Delete this session and start a new recording."
+            )
+        }
+
         if let aiProviderCompatibilityIssue {
             return .failure(
                 .transcriptionFailure(aiProviderCompatibilityIssue),

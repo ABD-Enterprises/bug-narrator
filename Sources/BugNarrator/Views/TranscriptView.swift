@@ -274,7 +274,6 @@ struct TranscriptView: View {
                 count: transcriptStore.pendingTranscriptionSessionCount,
                 requiresProviderSetup: appState.needsAPIKeySetup,
                 provider: appState.settingsStore.aiProvider,
-                hasRecoveredRecording: appState.hasRecoveredRecordingPendingTranscription,
                 openLatest: openLatestPendingTranscriptionSession,
                 openSettings: appState.openSettings
             )

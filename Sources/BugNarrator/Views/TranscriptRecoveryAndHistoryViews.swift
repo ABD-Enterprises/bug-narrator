@@ -4,13 +4,12 @@ struct PendingTranscriptionBanner: View {
     let count: Int
     let requiresProviderSetup: Bool
     let provider: AIProvider
-    let hasRecoveredRecording: Bool
     let openLatest: () -> Void
     let openSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: hasRecoveredRecording ? "waveform.badge.magnifyingglass" : "arrow.clockwise.circle")
+            Label(title, systemImage: "arrow.clockwise.circle")
                 .font(.subheadline.weight(.semibold))
 
             Text(message)
@@ -18,7 +17,7 @@ struct PendingTranscriptionBanner: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                Button(hasRecoveredRecording ? "Open Latest Recovered Recording" : "Open Latest Retry Needed Session") {
+                Button("Open Latest Retry Needed Session") {
                     openLatest()
                 }
                 .buttonStyle(.borderedProminent)
@@ -40,17 +39,13 @@ struct PendingTranscriptionBanner: View {
 
     private var title: String {
         if count == 1 {
-            return hasRecoveredRecording ? "1 recovered recording needs transcription" : "1 session needs transcription retry"
+            return "1 session needs transcription retry"
         }
 
-        return hasRecoveredRecording ? "\(count) sessions include recovered recordings" : "\(count) sessions need transcription retry"
+        return "\(count) sessions need transcription retry"
     }
 
     private var message: String {
-        if hasRecoveredRecording {
-            return "BugNarrator found audio from an unexpected quit and imported it into the session library. Open the latest recovered item to transcribe it."
-        }
-
         if provider.requiresAPIKey {
             return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your \(provider.displayName) API key."
         }
