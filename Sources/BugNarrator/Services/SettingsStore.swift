@@ -121,6 +121,12 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+struct AIModelChoice: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let detail: String
+}
+
 final class SettingsStore: ObservableObject {
     static let defaultLegacyDefaultsDomains = [
         "com.abdenterprises.sessionmic"
@@ -128,8 +134,52 @@ final class SettingsStore: ObservableObject {
 
     private static let openAITranscriptionModel = "whisper-1"
     private static let parakeetTranscriptionModel = "parakeet-tdt-0.6b-v3"
-    private static let localOnlyTranscriptionModels: Set<String> = [
-        parakeetTranscriptionModel
+    private static let openAIIssueExtractionModel = "gpt-4.1-mini"
+    private static let openAITranscriptionModelChoices = [
+        AIModelChoice(
+            id: "whisper-1",
+            title: "Whisper",
+            detail: "Stable default"
+        ),
+        AIModelChoice(
+            id: "gpt-4o-mini-transcribe",
+            title: "GPT-4o mini Transcribe",
+            detail: "Lower cost, newer speech-to-text"
+        ),
+        AIModelChoice(
+            id: "gpt-4o-transcribe",
+            title: "GPT-4o Transcribe",
+            detail: "Higher accuracy speech-to-text"
+        ),
+        AIModelChoice(
+            id: "gpt-4o-transcribe-diarize",
+            title: "GPT-4o Transcribe Diarize",
+            detail: "Adds speaker labels"
+        )
+    ]
+    private static let parakeetTranscriptionModelChoices = [
+        AIModelChoice(
+            id: parakeetTranscriptionModel,
+            title: "Parakeet TDT 0.6B v3",
+            detail: "Local transcription server"
+        )
+    ]
+    private static let openAIIssueExtractionModelChoices = [
+        AIModelChoice(
+            id: "gpt-4.1-mini",
+            title: "GPT-4.1 mini",
+            detail: "Recommended default"
+        ),
+        AIModelChoice(
+            id: "gpt-4.1-nano",
+            title: "GPT-4.1 nano",
+            detail: "Fastest and lowest cost"
+        ),
+        AIModelChoice(
+            id: "gpt-4.1",
+            title: "GPT-4.1",
+            detail: "Higher quality issue extraction"
+        )
     ]
 
     private let logger = DiagnosticsLogger(category: .settings)
@@ -159,6 +209,7 @@ final class SettingsStore: ObservableObject {
             guard hasLoaded else { return }
             defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
             normalizeTranscriptionModelForCurrentProvider(persist: true)
+            normalizeIssueExtractionModelForCurrentProvider(persist: true)
         }
     }
 
@@ -484,8 +535,45 @@ final class SettingsStore: ObservableObject {
     }
 
     var issueExtractionModelValue: String {
-        let value = issueExtractionModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? "gpt-4.1-mini" : value
+        Self.normalizedIssueExtractionModel(issueExtractionModel, for: aiProvider)
+    }
+
+    var transcriptionModelChoices: [AIModelChoice] {
+        Self.transcriptionModelChoices(for: aiProvider)
+    }
+
+    var issueExtractionModelChoices: [AIModelChoice] {
+        Self.issueExtractionModelChoices(for: aiProvider)
+    }
+
+    var supportsIssueExtraction: Bool {
+        aiProvider != .parakeetLocal
+    }
+
+    var transcriptionModelPlaceholder: String {
+        switch aiProvider {
+        case .openAI:
+            return Self.openAITranscriptionModel
+        case .openAICompatible:
+            return "Provider transcription model"
+        case .localCompatible:
+            return "Local transcription model"
+        case .parakeetLocal:
+            return Self.parakeetTranscriptionModel
+        }
+    }
+
+    var issueExtractionModelPlaceholder: String {
+        switch aiProvider {
+        case .openAI:
+            return Self.openAIIssueExtractionModel
+        case .openAICompatible:
+            return "Provider chat model"
+        case .localCompatible:
+            return "Local chat model"
+        case .parakeetLocal:
+            return "Not available"
+        }
     }
 
     var hasAPIKey: Bool {
@@ -524,6 +612,9 @@ final class SettingsStore: ObservableObject {
         case .parakeetLocal:
             if trimmedBaseURL.isEmpty {
                 return "Choose the local Parakeet server URL before validating or transcribing."
+            }
+            if autoExtractIssues {
+                return "Turn off automatic issue extraction or choose a provider with a chat completion model."
             }
             return nil
         }
@@ -772,22 +863,49 @@ final class SettingsStore: ObservableObject {
         hasLoaded = true
     }
 
+    private static func transcriptionModelChoices(for provider: AIProvider) -> [AIModelChoice] {
+        switch provider {
+        case .openAI:
+            return openAITranscriptionModelChoices
+        case .parakeetLocal:
+            return parakeetTranscriptionModelChoices
+        case .openAICompatible, .localCompatible:
+            return []
+        }
+    }
+
+    private static func issueExtractionModelChoices(for provider: AIProvider) -> [AIModelChoice] {
+        switch provider {
+        case .openAI:
+            return openAIIssueExtractionModelChoices
+        case .openAICompatible, .localCompatible, .parakeetLocal:
+            return []
+        }
+    }
+
     private static func normalizedTranscriptionModel(_ rawValue: String, for provider: AIProvider) -> String {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch provider {
         case .openAI:
-            if value.isEmpty || localOnlyTranscriptionModels.contains(value) {
-                return openAITranscriptionModel
-            }
-            return value
+            let allowedModels = Set(openAITranscriptionModelChoices.map(\.id))
+            return allowedModels.contains(value) ? value : openAITranscriptionModel
         case .parakeetLocal:
-            if value.isEmpty || value == openAITranscriptionModel {
-                return parakeetTranscriptionModel
-            }
-            return value
+            return parakeetTranscriptionModel
         case .openAICompatible, .localCompatible:
             return value.isEmpty ? openAITranscriptionModel : value
+        }
+    }
+
+    private static func normalizedIssueExtractionModel(_ rawValue: String, for provider: AIProvider) -> String {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch provider {
+        case .openAI:
+            let allowedModels = Set(openAIIssueExtractionModelChoices.map(\.id))
+            return allowedModels.contains(value) ? value : openAIIssueExtractionModel
+        case .openAICompatible, .localCompatible, .parakeetLocal:
+            return value.isEmpty ? openAIIssueExtractionModel : value
         }
     }
 
@@ -798,6 +916,16 @@ final class SettingsStore: ObservableObject {
         preferredModel = normalizedModel
         if persist {
             defaults.set(normalizedModel, forKey: Keys.preferredModel)
+        }
+    }
+
+    private func normalizeIssueExtractionModelForCurrentProvider(persist: Bool) {
+        let normalizedModel = Self.normalizedIssueExtractionModel(issueExtractionModel, for: aiProvider)
+        guard normalizedModel != issueExtractionModel else { return }
+
+        issueExtractionModel = normalizedModel
+        if persist {
+            defaults.set(normalizedModel, forKey: Keys.issueExtractionModel)
         }
     }
 
@@ -876,8 +1004,9 @@ final class SettingsStore: ObservableObject {
             forKey: Keys.issueExtractionModel,
             legacyKeys: [Keys.legacyIssueExtractionModel]
         )
-            ?? "gpt-4.1-mini"
+            ?? Self.openAIIssueExtractionModel
         normalizeTranscriptionModelForCurrentProvider(persist: true)
+        normalizeIssueExtractionModelForCurrentProvider(persist: true)
 
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
