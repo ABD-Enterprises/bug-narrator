@@ -609,6 +609,43 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
     }
 
+    func testSwitchingToParakeetDisablesAutomaticIssueExtraction() {
+        let suiteName = "BugNarrator-SettingsParakeetDisablesAutoExtraction-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .openAI
+        store.autoExtractIssues = true
+
+        store.aiProvider = .parakeetLocal
+
+        XCTAssertFalse(store.autoExtractIssues)
+        XCTAssertFalse(store.supportsIssueExtraction)
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+        XCTAssertFalse(defaults.bool(forKey: "settings.autoExtractIssues"))
+    }
+
+    func testLoadingParakeetDisablesPersistedAutomaticIssueExtraction() {
+        let suiteName = "BugNarrator-SettingsParakeetLoadAutoExtraction-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
+        defaults.set(true, forKey: "settings.autoExtractIssues")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertFalse(store.autoExtractIssues)
+        XCTAssertFalse(store.supportsIssueExtraction)
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+        XCTAssertFalse(defaults.bool(forKey: "settings.autoExtractIssues"))
+    }
+
     func testNonAPIKeyProviderDoesNotForwardSavedOpenAIKey() {
         let suiteName = "BugNarrator-SettingsNonAPIKeyProviderLeak-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

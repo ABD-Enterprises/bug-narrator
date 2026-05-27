@@ -210,6 +210,7 @@ final class SettingsStore: ObservableObject {
             defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
             normalizeTranscriptionModelForCurrentProvider(persist: true)
             normalizeIssueExtractionModelForCurrentProvider(persist: true)
+            normalizeIssueExtractionAvailabilityForCurrentProvider(persist: true)
         }
     }
 
@@ -1037,6 +1038,15 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    private func normalizeIssueExtractionAvailabilityForCurrentProvider(persist: Bool) {
+        guard !supportsIssueExtraction, autoExtractIssues else { return }
+
+        autoExtractIssues = false
+        if persist {
+            defaults.set(false, forKey: Keys.autoExtractIssues)
+        }
+    }
+
     func refreshSecretsForUserInitiatedAccess() {
         logger.debug("refresh_all_secrets", "Refreshing stored secrets after a user-initiated action.")
         prepareSecretsForUserInitiatedAccess(
@@ -1119,6 +1129,7 @@ final class SettingsStore: ObservableObject {
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
+        normalizeIssueExtractionAvailabilityForCurrentProvider(persist: true)
         systemAudioCaptureEnabled = boolValue(forKey: Keys.systemAudioCaptureEnabled) ?? false
         let storedAudioSource = stringValue(forKey: Keys.recordingAudioSource)
         recordingAudioSource = storedAudioSource
