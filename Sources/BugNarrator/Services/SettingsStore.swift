@@ -609,6 +609,10 @@ final class SettingsStore: ObservableObject {
         aiProvider.requiresAPIKey ? hasAPIKey : true
     }
 
+    var aiProviderConfigurationIsReady: Bool {
+        aiProviderCompatibilityIssue == nil && hasUsableAIProviderCredential
+    }
+
     var aiProviderCompatibilityIssue: String? {
         switch aiProvider {
         case .openAI:

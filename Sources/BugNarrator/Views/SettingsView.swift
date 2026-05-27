@@ -798,8 +798,12 @@ struct SettingsView: View {
     }
 
     private var openAIReadiness: SettingsReadinessStatus {
-        credentialStatus(
-            valueIsPresent: settingsStore.hasUsableAIProviderCredential && settingsStore.aiProviderCompatibilityIssue == nil,
+        if !settingsStore.aiProvider.requiresAPIKey {
+            return settingsStore.aiProviderConfigurationIsReady ? .ready : .needsSetup
+        }
+
+        return credentialStatus(
+            valueIsPresent: settingsStore.aiProviderConfigurationIsReady,
             persistenceState: settingsStore.apiKeyPersistenceState
         )
     }
