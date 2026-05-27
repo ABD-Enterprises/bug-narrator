@@ -28,8 +28,14 @@ fi
 VALIDATION_ARTIFACT_DIR="artifacts/validation"
 SEMGREP_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/semgrep-status.txt"
 SEMGREP_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/semgrep-output.txt"
+LOCAL_TRANSCRIPTION_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-status.txt"
+LOCAL_TRANSCRIPTION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
-rm -f "$SEMGREP_STATUS_FILE" "$SEMGREP_OUTPUT_FILE"
+rm -f \
+  "$SEMGREP_STATUS_FILE" \
+  "$SEMGREP_OUTPUT_FILE" \
+  "$LOCAL_TRANSCRIPTION_STATUS_FILE" \
+  "$LOCAL_TRANSCRIPTION_OUTPUT_FILE"
 
 should_skip_semgrep_target() {
   local target="$1"
@@ -131,3 +137,33 @@ fi
 # exit when no Swift toolchain is available, and fails the build only on
 # syntax errors — never on missing toolchains or missing imports.
 "${ROOT}/scripts/swift-parse-check.sh"
+
+if [[ -f "$ROOT/local-transcription/server.py" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -m py_compile \
+      "$ROOT/local-transcription/server.py" \
+      "$ROOT/local-transcription/test_server.py" \
+      >"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1
+  else
+    printf 'NOT RUN: python3 is not available for local transcription syntax checks\n' \
+      >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
+    exit 0
+  fi
+
+  local_transcription_python="$ROOT/local-transcription/venv/bin/python"
+  if [[ -x "$local_transcription_python" ]]; then
+    if "$local_transcription_python" -m unittest discover \
+      -s "$ROOT/local-transcription" \
+      -p 'test_*.py' \
+      >>"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1; then
+      printf 'PASS: local transcription server syntax and unit checks passed\n' \
+        >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
+    else
+      cat "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" >&2
+      exit 1
+    fi
+  else
+    printf 'PASS: local transcription server syntax checks passed; unit checks not run because local-transcription/venv is missing\n' \
+      >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
+  fi
+fi
