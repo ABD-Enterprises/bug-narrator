@@ -483,16 +483,22 @@ final class SettingsStore: ObservableObject {
     }
 
     var hasSelectedAIProviderCredential: Bool {
-        credentialIsAvailableForUserAction(
+        let persistenceState = selectedAIProviderCredentialPersistenceState
+        guard persistenceState != .empty else {
+            return false
+        }
+
+        return credentialIsAvailableForUserAction(
             value: trimmedAPIKey,
-            persistenceState: selectedAIProviderCredentialPersistenceState
+            persistenceState: persistenceState
         )
     }
 
     var maskedSelectedAIProviderCredential: String {
-        mask(
-            secret: trimmedAPIKey,
-            persistenceState: selectedAIProviderCredentialPersistenceState,
+        let persistenceState = selectedAIProviderCredentialPersistenceState
+        return mask(
+            secret: persistenceState == .empty ? "" : trimmedAPIKey,
+            persistenceState: persistenceState,
             emptyPlaceholder: "No key saved",
             lockedPlaceholder: "Saved key locked"
         )

@@ -571,6 +571,21 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(secondStore.maskedSelectedAIProviderCredential, "Saved key")
     }
 
+    func testSelectedProviderCredentialStatusIgnoresDraftCredentialForParakeetProvider() {
+        let suiteName = "BugNarrator-SettingsSelectedParakeetProviderCredentialStatus-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.apiKey = "sk-draft-openai-key"
+        store.aiProvider = .parakeetLocal
+
+        XCTAssertEqual(store.selectedAIProviderCredentialPersistenceState, .empty)
+        XCTAssertFalse(store.hasSelectedAIProviderCredential)
+        XCTAssertEqual(store.maskedSelectedAIProviderCredential, "No key saved")
+    }
+
     func testParakeetProviderRejectsAutomaticIssueExtraction() {
         let suiteName = "BugNarrator-SettingsParakeetAutoExtraction-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
