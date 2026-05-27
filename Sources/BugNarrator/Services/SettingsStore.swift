@@ -606,7 +606,14 @@ final class SettingsStore: ObservableObject {
     }
 
     var hasUsableAIProviderCredential: Bool {
-        aiProvider.requiresAPIKey ? hasAPIKey : true
+        switch aiProvider {
+        case .openAI:
+            return aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: true)
+        case .openAICompatible:
+            return aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: false)
+        case .localCompatible, .parakeetLocal:
+            return true
+        }
     }
 
     var aiProviderConfigurationIsReady: Bool {
@@ -641,14 +648,24 @@ final class SettingsStore: ObservableObject {
 
     func aiProviderCredentialForUserInitiatedAccess() -> String? {
         switch aiProvider {
-        case .openAI, .openAICompatible:
+        case .openAI:
+            guard aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: true) else {
+                return nil
+            }
+
+            return openAIAPIKeyForUserInitiatedAccess()
+        case .openAICompatible:
+            guard aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: false) else {
+                return nil
+            }
+
             return openAIAPIKeyForUserInitiatedAccess()
         case .localCompatible:
             if hasPendingSecretChanges(for: .openAI) {
                 return openAIAPIKeyForUserInitiatedAccess() ?? ""
             }
 
-            guard savedAIProviderCredentialProvider == .localCompatible else {
+            guard aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: false) else {
                 return ""
             }
 
@@ -1604,6 +1621,27 @@ final class SettingsStore: ObservableObject {
         }
 
         return AIProvider(rawValue: rawValue)
+    }
+
+    private func aiProviderCredentialIsAvailableForCurrentProvider(
+        allowsLegacyOpenAICredential: Bool
+    ) -> Bool {
+        if hasPendingSecretChanges(for: .openAI) {
+            return !trimmedAPIKey.isEmpty
+        }
+
+        guard credentialIsAvailableForUserAction(
+            value: trimmedAPIKey,
+            persistenceState: apiKeyPersistenceState
+        ) else {
+            return false
+        }
+
+        guard let savedProvider = savedAIProviderCredentialProvider else {
+            return allowsLegacyOpenAICredential && aiProvider == .openAI
+        }
+
+        return savedProvider == aiProvider
     }
 
     private func currentSecretValue(for slot: SecretSlot) -> String {
