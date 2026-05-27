@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 
 import server
@@ -77,6 +78,19 @@ class ServerModelConfigurationTests(unittest.TestCase):
             response["data"][0]["id"],
             "mlx-community/loaded-parakeet",
         )
+
+    def test_transcription_failure_response_hides_exception_details(self):
+        response = server._transcription_failure_response()
+        body = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(body["error"]["type"], "server_error")
+        self.assertEqual(
+            body["error"]["message"],
+            "Local transcription failed. Check the local transcription server logs for details.",
+        )
+        self.assertNotIn("Traceback", body["error"]["message"])
+        self.assertNotIn("Exception", body["error"]["message"])
 
 
 if __name__ == "__main__":
