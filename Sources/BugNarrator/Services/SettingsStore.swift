@@ -461,6 +461,43 @@ final class SettingsStore: ObservableObject {
         )
     }
 
+    var selectedAIProviderCredentialPersistenceState: APIKeyPersistenceState {
+        guard aiProvider != .parakeetLocal else {
+            return .empty
+        }
+
+        if hasPendingSecretChanges(for: .openAI) {
+            return apiKeyPersistenceState
+        }
+
+        guard credentialIsAvailableForUserAction(
+            value: trimmedAPIKey,
+            persistenceState: apiKeyPersistenceState
+        ) else {
+            return .empty
+        }
+
+        return aiProviderCredentialMatchesCurrentProvider(
+            allowsLegacyOpenAICredential: aiProvider == .openAI
+        ) ? apiKeyPersistenceState : .empty
+    }
+
+    var hasSelectedAIProviderCredential: Bool {
+        credentialIsAvailableForUserAction(
+            value: trimmedAPIKey,
+            persistenceState: selectedAIProviderCredentialPersistenceState
+        )
+    }
+
+    var maskedSelectedAIProviderCredential: String {
+        mask(
+            secret: trimmedAPIKey,
+            persistenceState: selectedAIProviderCredentialPersistenceState,
+            emptyPlaceholder: "No key saved",
+            lockedPlaceholder: "Saved key locked"
+        )
+    }
+
     var apiKeyStorageDescription: String {
         if aiProvider.requiresAPIKey {
             return storageDescription(
@@ -475,6 +512,27 @@ final class SettingsStore: ObservableObject {
         default:
             return storageDescription(
                 for: apiKeyPersistenceState,
+                empty: "Optional for local-compatible providers."
+            )
+        }
+    }
+
+    var selectedAIProviderCredentialStorageDescription: String {
+        let persistenceState = selectedAIProviderCredentialPersistenceState
+
+        if aiProvider.requiresAPIKey {
+            return storageDescription(
+                for: persistenceState,
+                empty: "BugNarrator never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
+            )
+        }
+
+        switch persistenceState {
+        case .empty:
+            return "Optional for local-compatible providers. Leave it blank if your endpoint does not require authentication."
+        default:
+            return storageDescription(
+                for: persistenceState,
                 empty: "Optional for local-compatible providers."
             )
         }
@@ -1637,6 +1695,14 @@ final class SettingsStore: ObservableObject {
             return false
         }
 
+        return aiProviderCredentialMatchesCurrentProvider(
+            allowsLegacyOpenAICredential: allowsLegacyOpenAICredential
+        )
+    }
+
+    private func aiProviderCredentialMatchesCurrentProvider(
+        allowsLegacyOpenAICredential: Bool
+    ) -> Bool {
         guard let savedProvider = savedAIProviderCredentialProvider else {
             return allowsLegacyOpenAICredential && aiProvider == .openAI
         }
