@@ -479,6 +479,53 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testHostedProvidersDoNotReuseCredentialSavedForLocalProvider() {
+        let suiteName = "BugNarrator-SettingsHostedProviderCredentialIsolation-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .localCompatible
+        firstStore.preferredModel = "whisper-large-v3"
+        firstStore.issueExtractionModel = "llama3.1:8b"
+        firstStore.apiKey = "local-provider-token"
+        _ = firstStore.aiProviderCredentialForUserInitiatedAccess()
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        secondStore.aiProvider = .openAI
+
+        XCTAssertFalse(secondStore.hasUsableAIProviderCredential)
+        XCTAssertNil(secondStore.aiProviderCredentialForUserInitiatedAccess())
+
+        secondStore.aiProvider = .openAICompatible
+        secondStore.openAIBaseURL = "https://gateway.example.com/openai"
+
+        XCTAssertFalse(secondStore.hasUsableAIProviderCredential)
+        XCTAssertNil(secondStore.aiProviderCredentialForUserInitiatedAccess())
+    }
+
+    func testOpenAICompatibleProviderDoesNotReuseSavedOpenAICredential() {
+        let suiteName = "BugNarrator-SettingsCompatibleProviderCredentialIsolation-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .openAI
+        firstStore.apiKey = "sk-openai-token"
+        firstStore.refreshOpenAISecretForUserInitiatedAccess()
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        secondStore.aiProvider = .openAICompatible
+        secondStore.openAIBaseURL = "https://gateway.example.com/openai"
+
+        XCTAssertFalse(secondStore.hasUsableAIProviderCredential)
+        XCTAssertNil(secondStore.aiProviderCredentialForUserInitiatedAccess())
+    }
+
     func testParakeetProviderRejectsAutomaticIssueExtraction() {
         let suiteName = "BugNarrator-SettingsParakeetAutoExtraction-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
