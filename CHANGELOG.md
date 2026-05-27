@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.36 - 2026-05-27
+
+- [FIX] Isolated AI provider credentials so OpenAI-compatible, local-compatible, and Local (Parakeet) setup states no longer reuse or display credentials saved for another provider.
+- [FIX] Clarified Local (Parakeet) setup status to show that no API key is required, and automatically disabled automatic issue extraction when switching to or loading the transcription-only Parakeet provider.
+- [FIX] Hid local transcription server exception details from HTTP error responses while keeping full diagnostics in the server logs, resolving the open CodeQL stack-trace exposure alert.
+- [FIX] Cleared the docs-site `ws` dependency advisory by updating the locked `webpack-dev-server` dependency path.
+- [FIX] Replaced a shellcheck-flagged Xcode discovery pattern in CI with `find` while preserving the existing Xcode 26 selection behavior.
 - [CHANGE] Removed the launch-time unexpected-quit recording recovery importer and its recovered-recording prompts; leftover crash audio is no longer surfaced as a persistent transcription failure or retry action.
 - [FIX] Logged a diagnostics error when the transcription retry attempt count cannot be saved durably, so operators can see when recovery state is in memory only instead of silently disappearing on the next launch.
 - [FIX] Respected task cancellation between resolving displays and writing the screenshot file, so cancelling a region screenshot mid-flight no longer drops a PNG on disk after the user dismissed the selection.
