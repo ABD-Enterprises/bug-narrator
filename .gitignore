@@ -15,6 +15,9 @@ BugNarrator.xcodeproj/project.xcworkspace/xcuserdata/
 
 .swiftpm/
 
+__pycache__/
+*.py[cod]
+
 .env
 .env.*
 *.local
