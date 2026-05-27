@@ -583,7 +583,11 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.selectedAIProviderCredentialPersistenceState, .empty)
         XCTAssertFalse(store.hasSelectedAIProviderCredential)
-        XCTAssertEqual(store.maskedSelectedAIProviderCredential, "No key saved")
+        XCTAssertEqual(store.maskedSelectedAIProviderCredential, "No key required")
+        XCTAssertEqual(
+            store.selectedAIProviderCredentialStorageDescription,
+            "Local Parakeet does not use an API key. Check the local server connection before transcribing."
+        )
     }
 
     func testParakeetProviderRejectsAutomaticIssueExtraction() {

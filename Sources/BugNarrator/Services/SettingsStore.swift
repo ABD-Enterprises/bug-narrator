@@ -499,7 +499,7 @@ final class SettingsStore: ObservableObject {
         return mask(
             secret: persistenceState == .empty ? "" : trimmedAPIKey,
             persistenceState: persistenceState,
-            emptyPlaceholder: "No key saved",
+            emptyPlaceholder: aiProvider == .parakeetLocal ? "No key required" : "No key saved",
             lockedPlaceholder: "Saved key locked"
         )
     }
@@ -525,6 +525,10 @@ final class SettingsStore: ObservableObject {
 
     var selectedAIProviderCredentialStorageDescription: String {
         let persistenceState = selectedAIProviderCredentialPersistenceState
+
+        if aiProvider == .parakeetLocal {
+            return "Local Parakeet does not use an API key. Check the local server connection before transcribing."
+        }
 
         if aiProvider.requiresAPIKey {
             return storageDescription(
