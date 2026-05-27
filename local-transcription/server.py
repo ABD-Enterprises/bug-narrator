@@ -21,6 +21,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile
@@ -36,21 +37,40 @@ app = FastAPI(title="BugNarrator Local Transcription Server")
 
 _model = None
 _model_name = None
+_canonical_model_name = "mlx-community/parakeet-tdt-0.6b-v3"
+_model_aliases = {
+    "parakeet-tdt-0.6b-v3",
+    "parakeet",
+    "whisper-1",
+}
+_default_model_name = _canonical_model_name
 
 
-def get_model(model_name: str = "mlx-community/parakeet-tdt-0.6b-v3"):
+def configure_default_model(model_name: str):
+    """Set the server-wide default model used for lazy-loaded requests."""
+    global _default_model_name
+    value = model_name.strip()
+    _default_model_name = (
+        _canonical_model_name
+        if not value or value in _model_aliases
+        else value
+    )
+
+
+def get_model(model_name: Optional[str] = None):
     """Lazy-load the Parakeet model. Keeps it warm after first load."""
     global _model, _model_name
-    if _model is not None and _model_name == model_name:
+    resolved_model_name = _resolve_model_id(model_name)
+    if _model is not None and _model_name == resolved_model_name:
         return _model
 
-    logger.info(f"Loading model: {model_name}")
+    logger.info(f"Loading model: {resolved_model_name}")
     start = time.time()
 
     from parakeet_mlx import from_pretrained
 
-    _model = from_pretrained(model_name)
-    _model_name = model_name
+    _model = from_pretrained(resolved_model_name)
+    _model_name = resolved_model_name
     elapsed = time.time() - start
     logger.info(f"Model loaded in {elapsed:.1f}s")
     return _model
@@ -73,7 +93,7 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                "id": _model_name or "parakeet-tdt-0.6b-v3",
+                "id": _model_name or _default_model_name,
                 "object": "model",
                 "owned_by": "local",
             }
@@ -84,11 +104,11 @@ async def list_models():
 @app.post("/v1/audio/transcriptions")
 async def transcribe(
     file: UploadFile = File(...),
-    model: str = Form("parakeet-tdt-0.6b-v3"),
+    model: Optional[str] = Form(None),
     response_format: str = Form("verbose_json"),
     temperature: str = Form("0"),
-    language: str = Form(None),
-    prompt: str = Form(None),
+    language: Optional[str] = Form(None),
+    prompt: Optional[str] = Form(None),
 ):
     """
     OpenAI-compatible transcription endpoint.
@@ -175,17 +195,19 @@ async def transcribe(
             pass
 
 
-def _resolve_model_id(model: str) -> str:
+def _resolve_model_id(model: Optional[str]) -> str:
     """
     Map model names from BugNarrator's settings to parakeet-mlx model IDs.
     Passes through any value that already looks like a HuggingFace model ID.
     """
-    aliases = {
-        "parakeet-tdt-0.6b-v3": "mlx-community/parakeet-tdt-0.6b-v3",
-        "parakeet": "mlx-community/parakeet-tdt-0.6b-v3",
-        "whisper-1": "mlx-community/parakeet-tdt-0.6b-v3",
-    }
-    return aliases.get(model, model)
+    if model is None or not model.strip():
+        return _default_model_name
+
+    value = model.strip()
+    if value in _model_aliases:
+        return _default_model_name
+
+    return value
 
 
 def _shutdown_handler(signum, frame):
@@ -219,6 +241,7 @@ def main():
         help="Load the model at startup instead of on first request",
     )
     args = parser.parse_args()
+    configure_default_model(args.model)
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
