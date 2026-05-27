@@ -413,6 +413,25 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
     }
 
+    func testOpenAIProviderConfigurationTreatsSavedKeychainCredentialAsReady() {
+        let suiteName = "BugNarrator-SettingsOpenAIKeychainReadiness-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.apiKey = "sk-fixture"
+        firstStore.refreshOpenAISecretForUserInitiatedAccess()
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(secondStore.apiKey, "")
+        XCTAssertEqual(secondStore.apiKeyPersistenceState, .keychain)
+        XCTAssertTrue(secondStore.hasAPIKey)
+        XCTAssertTrue(secondStore.aiProviderConfigurationIsReady)
+    }
+
     func testLocalProviderConfigurationReadinessDoesNotRequireAPIKeyState() {
         let suiteName = "BugNarrator-SettingsLocalProviderReadiness-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -431,6 +450,33 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(store.aiProviderCompatibilityIssue)
         XCTAssertTrue(store.hasUsableAIProviderCredential)
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
+    }
+
+    func testLocalCompatibleProviderForwardsCredentialSavedForLocalProvider() {
+        let suiteName = "BugNarrator-SettingsLocalProviderCredential-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .localCompatible
+        firstStore.preferredModel = "whisper-large-v3"
+        firstStore.issueExtractionModel = "llama3.1:8b"
+        firstStore.apiKey = "local-provider-token"
+
+        XCTAssertEqual(
+            firstStore.aiProviderCredentialForUserInitiatedAccess(),
+            "local-provider-token"
+        )
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+
+        XCTAssertEqual(secondStore.aiProvider, .localCompatible)
+        XCTAssertEqual(
+            secondStore.aiProviderCredentialForUserInitiatedAccess(),
+            "local-provider-token"
+        )
     }
 
     func testParakeetProviderRejectsAutomaticIssueExtraction() {
