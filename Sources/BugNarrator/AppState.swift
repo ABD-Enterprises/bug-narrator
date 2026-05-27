@@ -702,6 +702,16 @@ final class AppState: ObservableObject {
             logSessionStopRequested(recordingSession)
             let recordedAudio = try await recordingSessionController.stopRecording()
 
+            if settingsStore.aiProviderCompatibilityIssue != nil {
+                preserveRetryableSession(
+                    from: recordingSession,
+                    recordedAudio: recordedAudio,
+                    request: request,
+                    failureReason: .missingAPIKey
+                )
+                return
+            }
+
             guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 preserveRetryableSession(
                     from: recordingSession,
@@ -953,6 +963,10 @@ final class AppState: ObservableObject {
         logPendingTranscriptionRetryRequested(retryContext)
 
         do {
+            guard settingsStore.aiProviderCompatibilityIssue == nil else {
+                throw AppError.missingAPIKey
+            }
+
             guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
                 throw AppError.missingAPIKey
             }

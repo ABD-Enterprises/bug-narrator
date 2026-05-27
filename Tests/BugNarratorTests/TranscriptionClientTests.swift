@@ -187,6 +187,31 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://proxy.example.com/openai/v1/audio/transcriptions")
     }
 
+    func testCustomAPIBaseURLWithVersionPathDoesNotDuplicateVersion() async throws {
+        let fileURL = try makeAudioFile(named: "custom-base-url-v1", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+        let request = try await client.makeURLRequest(
+            fileURL: fileURL,
+            apiKey: "",
+            request: TranscriptionRequest(
+                model: "whisper-large-v3",
+                languageHint: nil,
+                prompt: nil,
+                apiBaseURL: URL(string: "http://localhost:1234/v1")!
+            )
+        )
+        let validationRequest = await client.makeValidationRequest(
+            apiKey: "",
+            apiBaseURL: URL(string: "http://localhost:1234/v1")!
+        )
+
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+        XCTAssertEqual(request.url?.absoluteString, "http://localhost:1234/v1/audio/transcriptions")
+        XCTAssertEqual(validationRequest.url?.absoluteString, "http://localhost:1234/v1/models")
+    }
+
     func testValidateAPIKeyMapsRevokedKeyResponse() async throws {
         MockURLProtocol.requestHandler = { request in
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 401, httpVersion: nil, headerFields: nil)!

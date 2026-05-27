@@ -517,7 +517,8 @@ final class SettingsStore: ObservableObject {
             return fallback
         }
 
-        let candidate = trimmedValue.contains("://") ? trimmedValue : "https://\(trimmedValue)"
+        let defaultScheme = fallback.scheme ?? "https"
+        let candidate = trimmedValue.contains("://") ? trimmedValue : "\(defaultScheme)://\(trimmedValue)"
         guard var components = URLComponents(string: candidate),
               components.host?.isEmpty == false else {
             return fallback
@@ -609,20 +610,16 @@ final class SettingsStore: ObservableObject {
     }
 
     var aiProviderCompatibilityIssue: String? {
-        let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-
         switch aiProvider {
         case .openAI:
             return nil
         case .openAICompatible:
+            let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedBaseURL.isEmpty {
                 return "Choose a non-default API base URL for the OpenAI-Compatible provider."
             }
             return nil
         case .localCompatible:
-            if trimmedBaseURL.isEmpty {
-                return "Choose your local-compatible base URL before validating or transcribing."
-            }
             if preferredModelValue == "whisper-1" {
                 return "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
             }
@@ -631,9 +628,6 @@ final class SettingsStore: ObservableObject {
             }
             return nil
         case .parakeetLocal:
-            if trimmedBaseURL.isEmpty {
-                return "Choose the local Parakeet server URL before validating or transcribing."
-            }
             if autoExtractIssues {
                 return "Turn off automatic issue extraction or choose a provider with a chat completion model."
             }
@@ -642,14 +636,8 @@ final class SettingsStore: ObservableObject {
     }
 
     func aiProviderCredentialForUserInitiatedAccess() -> String? {
-        let trimmedBaseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-
         if aiProvider.requiresAPIKey {
             return openAIAPIKeyForUserInitiatedAccess()
-        }
-
-        guard !trimmedBaseURL.isEmpty else {
-            return nil
         }
 
         return ""

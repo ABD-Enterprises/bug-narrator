@@ -91,6 +91,30 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.issues.first?.screenshotAnnotations.first?.screenshotID, session.screenshots.first?.id)
     }
 
+    func testExtractIssuesDoesNotDuplicateVersionPathInCustomBaseURL() async throws {
+        let session = makeReviewSession()
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "http://localhost:1234/v1/chat/completions")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+
+            return (
+                self.successResponse(for: request),
+                self.makeChatCompletionData(content: #"{"summary":"No issues.","guidanceNote":"","issues":[]}"#)
+            )
+        }
+
+        let service = IssueExtractionService(session: makeMockURLSession())
+        let result = try await service.extractIssues(
+            from: session,
+            apiKey: "",
+            model: "llama3.1:8b",
+            apiBaseURL: URL(string: "http://localhost:1234/v1")!
+        )
+
+        XCTAssertEqual(result.summary, "No issues.")
+    }
+
     func testExtractIssuesParsesArrayBasedContentWithMarkdownFenceAndAliasKeys() async throws {
         let session = makeReviewSession()
 

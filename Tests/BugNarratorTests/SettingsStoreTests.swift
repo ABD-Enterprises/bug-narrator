@@ -218,6 +218,23 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testLocalProviderBaseURLDefaultsToHTTPWhenSchemeIsOmitted() {
+        XCTAssertEqual(
+            SettingsStore.normalizedOpenAIBaseURL(
+                from: "localhost:1234/v1",
+                provider: .localCompatible
+            ).absoluteString,
+            "http://localhost:1234/v1"
+        )
+        XCTAssertEqual(
+            SettingsStore.normalizedOpenAIBaseURL(
+                from: "localhost:8422",
+                provider: .parakeetLocal
+            ).absoluteString,
+            "http://localhost:8422"
+        )
+    }
+
     func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {
         let suiteName = "BugNarrator-TranscriptionRequestSettingsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -318,7 +335,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "whisper-1")
     }
 
-    func testLocalCompatibleProviderRequiresExplicitBaseURLAndModels() {
+    func testLocalCompatibleProviderCanUseSafeDefaultBaseURLButRequiresLocalModels() {
         let suiteName = "BugNarrator-SettingsProviderCompatibility-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -329,14 +346,9 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "Choose your local-compatible base URL before validating or transcribing."
-        )
-
-        store.openAIBaseURL = "http://localhost:1234/v1"
-        XCTAssertEqual(
-            store.aiProviderCompatibilityIssue,
             "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
         )
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:1234/v1")
 
         store.preferredModel = "whisper-large-v3"
         XCTAssertEqual(
@@ -369,7 +381,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
-    func testParakeetProviderRequiresBaseURLButNotAPIKey() {
+    func testParakeetProviderCanUseSafeDefaultBaseURLWithoutAPIKey() {
         let suiteName = "BugNarrator-SettingsParakeet-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -379,14 +391,9 @@ final class SettingsStoreTests: XCTestCase {
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = ""
 
-        XCTAssertEqual(
-            store.aiProviderCompatibilityIssue,
-            "Choose the local Parakeet server URL before validating or transcribing."
-        )
-        XCTAssertTrue(store.hasUsableAIProviderCredential)
-
-        store.openAIBaseURL = "http://localhost:8422"
         XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.hasUsableAIProviderCredential)
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:8422")
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
     }
 

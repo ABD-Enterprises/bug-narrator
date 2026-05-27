@@ -380,7 +380,7 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func makeValidationRequest(apiKey: String, apiBaseURL: URL = URL(string: "https://api.openai.com")!) -> URLRequest {
-        var request = URLRequest(url: endpoint(for: "v1/models", baseURL: apiBaseURL))
+        var request = URLRequest(url: OpenAIEndpointBuilder.endpoint(for: "v1/models", baseURL: apiBaseURL))
         request.httpMethod = "GET"
         if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -392,7 +392,9 @@ actor TranscriptionClient: TranscriptionServing {
         _ = try validateAudioFile(at: fileURL)
 
         let boundary = "Boundary-\(UUID().uuidString)"
-        var urlRequest = URLRequest(url: endpoint(for: "v1/audio/transcriptions", baseURL: request.apiBaseURL))
+        var urlRequest = URLRequest(
+            url: OpenAIEndpointBuilder.endpoint(for: "v1/audio/transcriptions", baseURL: request.apiBaseURL)
+        )
         urlRequest.httpMethod = "POST"
         if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -523,14 +525,6 @@ actor TranscriptionClient: TranscriptionServing {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
         body.append("\(value)\r\n".data(using: .utf8)!)
-    }
-
-    private func endpoint(for path: String, baseURL: URL) -> URL {
-        path
-            .split(separator: "/")
-            .reduce(baseURL) { url, component in
-                url.appendingPathComponent(String(component))
-            }
     }
 
     private func mimeType(for fileURL: URL) -> String {
