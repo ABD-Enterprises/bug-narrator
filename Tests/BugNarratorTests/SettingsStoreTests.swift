@@ -526,6 +526,51 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(secondStore.aiProviderCredentialForUserInitiatedAccess())
     }
 
+    func testSelectedProviderCredentialStatusIgnoresCredentialsSavedForOtherProviders() {
+        let suiteName = "BugNarrator-SettingsSelectedProviderCredentialStatus-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .openAI
+        firstStore.apiKey = "sk-openai-token"
+        firstStore.refreshOpenAISecretForUserInitiatedAccess()
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        secondStore.aiProvider = .openAICompatible
+
+        XCTAssertTrue(secondStore.hasAPIKey)
+        XCTAssertFalse(secondStore.hasSelectedAIProviderCredential)
+        XCTAssertEqual(secondStore.selectedAIProviderCredentialPersistenceState, .empty)
+        XCTAssertEqual(secondStore.maskedSelectedAIProviderCredential, "No key saved")
+        XCTAssertEqual(
+            secondStore.selectedAIProviderCredentialStorageDescription,
+            "BugNarrator never ships with an API key. Paste your own OpenAI-Compatible credential to enable transcription."
+        )
+    }
+
+    func testSelectedProviderCredentialStatusIncludesLocalProviderCredential() {
+        let suiteName = "BugNarrator-SettingsSelectedLocalProviderCredentialStatus-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .localCompatible
+        firstStore.apiKey = "local-provider-token"
+        _ = firstStore.aiProviderCredentialForUserInitiatedAccess()
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        secondStore.aiProvider = .localCompatible
+
+        XCTAssertTrue(secondStore.hasSelectedAIProviderCredential)
+        XCTAssertEqual(secondStore.selectedAIProviderCredentialPersistenceState, .keychain)
+        XCTAssertEqual(secondStore.maskedSelectedAIProviderCredential, "Saved key")
+    }
+
     func testParakeetProviderRejectsAutomaticIssueExtraction() {
         let suiteName = "BugNarrator-SettingsParakeetAutoExtraction-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

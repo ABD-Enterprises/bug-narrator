@@ -79,9 +79,9 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 12) {
-                            Text(settingsStore.maskedAPIKey)
+                            Text(settingsStore.maskedSelectedAIProviderCredential)
                                 .font(.subheadline.monospaced())
-                                .foregroundStyle(settingsStore.hasAPIKey ? .primary : .secondary)
+                                .foregroundStyle(settingsStore.hasSelectedAIProviderCredential ? .primary : .secondary)
 
                             Spacer()
 
@@ -92,14 +92,16 @@ struct SettingsView: View {
                             }
                             .disabled(
                                 secureControlsDisabled ||
-                                (!settingsStore.hasAPIKey && settingsStore.aiProvider.requiresAPIKey && settingsStore.apiKeyPersistenceState != .keychainLocked) ||
+                                (!settingsStore.hasSelectedAIProviderCredential &&
+                                    settingsStore.aiProvider.requiresAPIKey &&
+                                    settingsStore.selectedAIProviderCredentialPersistenceState != .keychainLocked) ||
                                 appState.apiKeyValidationState == .validating
                             )
 
                             Button("Remove Key", role: .destructive) {
                                 appState.removeAPIKey()
                             }
-                            .disabled(secureControlsDisabled || !settingsStore.hasAPIKey)
+                            .disabled(secureControlsDisabled || !settingsStore.hasSelectedAIProviderCredential)
                         }
 
                         if let message = appState.apiKeyValidationState.message {
@@ -114,12 +116,12 @@ struct SettingsView: View {
                                 .foregroundStyle(.orange)
                         }
 
-                        Text(settingsStore.apiKeyStorageDescription)
+                        Text(settingsStore.selectedAIProviderCredentialStorageDescription)
                             .font(.footnote)
                             .foregroundStyle(
-                                settingsStore.apiKeyPersistenceState == .sessionOnly ||
-                                settingsStore.apiKeyPersistenceState == .keychainLocked ||
-                                settingsStore.apiKeyPersistenceState == .pendingSave
+                                settingsStore.selectedAIProviderCredentialPersistenceState == .sessionOnly ||
+                                settingsStore.selectedAIProviderCredentialPersistenceState == .keychainLocked ||
+                                settingsStore.selectedAIProviderCredentialPersistenceState == .pendingSave
                                     ? .orange
                                     : .secondary
                             )
@@ -882,9 +884,14 @@ struct SettingsView: View {
             return "Validating..."
         }
 
-        return settingsStore.apiKeyPersistenceState == .keychainLocked && !settingsStore.hasAPIKey
+        return settingsStore.selectedAIProviderCredentialPersistenceState == .keychainLocked &&
+            !settingsStore.hasSelectedAIProviderCredential
             ? "Unlock Credential"
-            : (settingsStore.apiKeyPersistenceState == .pendingSave ? "Save & \(settingsStore.aiProvider.validationActionTitle)" : settingsStore.aiProvider.validationActionTitle)
+            : (
+                settingsStore.selectedAIProviderCredentialPersistenceState == .pendingSave
+                    ? "Save & \(settingsStore.aiProvider.validationActionTitle)"
+                    : settingsStore.aiProvider.validationActionTitle
+            )
     }
 
     private var gitHubValidationActionTitle: String {
