@@ -393,8 +393,44 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertNil(store.aiProviderCompatibilityIssue)
         XCTAssertTrue(store.hasUsableAIProviderCredential)
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:8422")
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+    }
+
+    func testOpenAIProviderConfigurationRequiresUsableCredential() {
+        let suiteName = "BugNarrator-SettingsOpenAIReadiness-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
+
+        store.apiKey = "sk-fixture"
+
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+    }
+
+    func testLocalProviderConfigurationReadinessDoesNotRequireAPIKeyState() {
+        let suiteName = "BugNarrator-SettingsLocalProviderReadiness-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .localCompatible
+
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
+
+        store.preferredModel = "whisper-large-v3"
+        store.issueExtractionModel = "llama3.1:8b"
+
+        XCTAssertEqual(store.apiKeyPersistenceState, .empty)
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.hasUsableAIProviderCredential)
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
     }
 
     func testParakeetProviderRejectsAutomaticIssueExtraction() {
@@ -413,6 +449,7 @@ final class SettingsStoreTests: XCTestCase {
             store.aiProviderCompatibilityIssue,
             "Turn off automatic issue extraction or choose a provider with a chat completion model."
         )
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
     }
 
     func testNonAPIKeyProviderDoesNotForwardSavedOpenAIKey() {
