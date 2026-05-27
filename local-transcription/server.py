@@ -44,6 +44,9 @@ _model_aliases = {
     "whisper-1",
 }
 _default_model_name = _canonical_model_name
+_transcription_failure_message = (
+    "Local transcription failed. Check the local transcription server logs for details."
+)
 
 
 def configure_default_model(model_name: str):
@@ -177,17 +180,9 @@ async def transcribe(
         else:
             return JSONResponse(content={"text": full_text})
 
-    except Exception as e:
-        logger.error(f"Transcription failed: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": {
-                    "message": f"Local transcription failed: {str(e)}",
-                    "type": "server_error",
-                }
-            },
-        )
+    except Exception:
+        logger.exception("Transcription failed")
+        return _transcription_failure_response()
     finally:
         try:
             os.unlink(tmp.name)
@@ -208,6 +203,18 @@ def _resolve_model_id(model: Optional[str]) -> str:
         return _default_model_name
 
     return value
+
+
+def _transcription_failure_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "message": _transcription_failure_message,
+                "type": "server_error",
+            }
+        },
+    )
 
 
 def _shutdown_handler(signum, frame):
