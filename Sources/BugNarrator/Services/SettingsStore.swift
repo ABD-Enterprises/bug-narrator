@@ -640,11 +640,22 @@ final class SettingsStore: ObservableObject {
     }
 
     func aiProviderCredentialForUserInitiatedAccess() -> String? {
-        if aiProvider.requiresAPIKey {
+        switch aiProvider {
+        case .openAI, .openAICompatible:
             return openAIAPIKeyForUserInitiatedAccess()
-        }
+        case .localCompatible:
+            if hasPendingSecretChanges(for: .openAI) {
+                return openAIAPIKeyForUserInitiatedAccess() ?? ""
+            }
 
-        return ""
+            guard savedAIProviderCredentialProvider == .localCompatible else {
+                return ""
+            }
+
+            return openAIAPIKeyForUserInitiatedAccess() ?? ""
+        case .parakeetLocal:
+            return ""
+        }
     }
 
     var trimmedGitHubToken: String {
@@ -1348,6 +1359,9 @@ final class SettingsStore: ObservableObject {
                 "A secure value was cleared from persistent storage.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            if slot == .openAI {
+                defaults.removeObject(forKey: Keys.aiProviderCredentialProvider)
+            }
             committedSecrets[slot] = ""
             committedSecretStates[slot] = .empty
             return .empty
@@ -1364,6 +1378,9 @@ final class SettingsStore: ObservableObject {
                 "A secure value was saved to Keychain.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            if slot == .openAI {
+                defaults.set(aiProvider.rawValue, forKey: Keys.aiProviderCredentialProvider)
+            }
             committedSecrets[slot] = slot == .openAI ? "" : trimmedValue
             committedSecretStates[slot] = .keychain
             return .keychain
@@ -1374,6 +1391,9 @@ final class SettingsStore: ObservableObject {
                 "Keychain storage was unavailable, so a secure value is only kept in memory for this run.",
                 metadata: ["slot": slot.redactionSafeName]
             )
+            if slot == .openAI {
+                defaults.set(aiProvider.rawValue, forKey: Keys.aiProviderCredentialProvider)
+            }
             committedSecrets[slot] = trimmedValue
             committedSecretStates[slot] = .sessionOnly
             return .sessionOnly
@@ -1566,7 +1586,24 @@ final class SettingsStore: ObservableObject {
         value: String,
         persistenceState: APIKeyPersistenceState
     ) -> Bool {
-        !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || persistenceState == .keychainLocked
+        if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+
+        switch persistenceState {
+        case .keychain, .keychainLocked:
+            return true
+        case .empty, .sessionOnly, .pendingSave:
+            return false
+        }
+    }
+
+    private var savedAIProviderCredentialProvider: AIProvider? {
+        guard let rawValue = defaults.string(forKey: Keys.aiProviderCredentialProvider) else {
+            return nil
+        }
+
+        return AIProvider(rawValue: rawValue)
     }
 
     private func currentSecretValue(for slot: SecretSlot) -> String {
@@ -1752,9 +1789,10 @@ private enum SecretSlot: Hashable, CaseIterable {
     }
 }
 
-    private enum Keys {
-        static let aiProvider = "settings.aiProvider"
-        static let preferredModel = "settings.preferredModel"
+private enum Keys {
+    static let aiProvider = "settings.aiProvider"
+    static let aiProviderCredentialProvider = "settings.aiProviderCredentialProvider"
+    static let preferredModel = "settings.preferredModel"
     static let openAIBaseURL = "settings.openAIBaseURL"
     static let languageHint = "settings.languageHint"
     static let transcriptionPrompt = "settings.transcriptionPrompt"
