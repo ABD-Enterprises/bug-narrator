@@ -2,6 +2,33 @@ import XCTest
 @testable import BugNarrator
 
 final class OpenAIErrorMapperTests: XCTestCase {
+    func testEndpointBuilderDoesNotDuplicateVersionPath() {
+        let endpoint = OpenAIEndpointBuilder.endpoint(
+            for: "v1/audio/transcriptions",
+            baseURL: URL(string: "http://localhost:1234/v1")!
+        )
+
+        XCTAssertEqual(endpoint.absoluteString, "http://localhost:1234/v1/audio/transcriptions")
+    }
+
+    func testEndpointBuilderPreservesGatewayPathBeforeVersionPath() {
+        let endpoint = OpenAIEndpointBuilder.endpoint(
+            for: "v1/chat/completions",
+            baseURL: URL(string: "https://gateway.example.com/openai/v1")!
+        )
+
+        XCTAssertEqual(endpoint.absoluteString, "https://gateway.example.com/openai/v1/chat/completions")
+    }
+
+    func testEndpointBuilderAppendsVersionWhenBaseURLIsProviderRoot() {
+        let endpoint = OpenAIEndpointBuilder.endpoint(
+            for: "v1/models",
+            baseURL: URL(string: "https://api.openai.com")!
+        )
+
+        XCTAssertEqual(endpoint.absoluteString, "https://api.openai.com/v1/models")
+    }
+
     func testParseRetryAfterAcceptsCaseInsensitiveHeaderName() {
         let headers: [AnyHashable: Any] = ["RETRY-AFTER": "12"]
         XCTAssertEqual(OpenAIErrorMapper.parseRetryAfter(from: headers), 12)

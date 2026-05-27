@@ -708,7 +708,7 @@ final class AppStateTests: XCTestCase {
         let recordedAudio = try harness.makeRecordedAudio(fileName: "parakeet-setup-on-stop")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
         harness.settingsStore.aiProvider = .parakeetLocal
-        harness.settingsStore.openAIBaseURL = ""
+        harness.settingsStore.autoExtractIssues = true
 
         await harness.appState.startSession()
         await harness.appState.stopSession()

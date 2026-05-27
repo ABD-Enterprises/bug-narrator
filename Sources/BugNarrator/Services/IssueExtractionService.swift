@@ -37,7 +37,7 @@ actor IssueExtractionService: IssueExtracting {
         )
         do {
             let request = try Self.makeRequest(
-                endpoint: Self.endpoint(for: "v1/chat/completions", baseURL: apiBaseURL),
+                endpoint: OpenAIEndpointBuilder.endpoint(for: "v1/chat/completions", baseURL: apiBaseURL),
                 reviewSession: reviewSession,
                 apiKey: apiKey,
                 model: model
@@ -199,14 +199,6 @@ actor IssueExtractionService: IssueExtracting {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         return request
-    }
-
-    private static func endpoint(for path: String, baseURL: URL) -> URL {
-        path
-            .split(separator: "/")
-            .reduce(baseURL) { url, component in
-                url.appendingPathComponent(String(component))
-            }
     }
 
     private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {
