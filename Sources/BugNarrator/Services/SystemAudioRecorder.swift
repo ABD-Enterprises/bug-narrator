@@ -121,11 +121,11 @@ final class SystemAudioRecorder: AudioRecording {
         )
 
         tapSession.invalidate()
-        ioQueue.sync { }
-        try activeWriter.close()
+        await ioQueue.drain()
+        try await Self.closeWriter(activeWriter)
         cleanupActiveState()
 
-        try validateRecordedAudioFile(at: currentFileURL)
+        try await Self.validateRecordedAudioFile(at: currentFileURL)
 
         recordingLogger.info(
             "system_audio_recording_stopped",
@@ -142,15 +142,17 @@ final class SystemAudioRecorder: AudioRecording {
     func cancelRecording(preserveFile: Bool) async {
         let fileURL = currentFileURL
         tapSession?.invalidate()
-        ioQueue.sync { }
-        try? activeWriter?.close()
+        await ioQueue.drain()
+        if let activeWriter {
+            try? await Self.closeWriter(activeWriter)
+        }
         cleanupActiveState()
 
         guard !preserveFile, let fileURL else {
             return
         }
 
-        try? FileManager.default.removeItem(at: fileURL)
+        await Self.removeItemIfPresent(at: fileURL)
     }
 
     private func cleanupActiveState() {
@@ -160,7 +162,25 @@ final class SystemAudioRecorder: AudioRecording {
         recordingStartedAt = nil
     }
 
-    private func validateRecordedAudioFile(at url: URL) throws {
+    private static func closeWriter(_ writer: SystemAudioFileWriter) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try writer.close()
+        }.value
+    }
+
+    private static func removeItemIfPresent(at url: URL) async {
+        await Task.detached(priority: .utility) {
+            try? FileManager.default.removeItem(at: url)
+        }.value
+    }
+
+    private static func validateRecordedAudioFile(at url: URL) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try validateRecordedAudioFileSynchronously(at: url)
+        }.value
+    }
+
+    private nonisolated static func validateRecordedAudioFileSynchronously(at url: URL) throws {
         let attributes: [FileAttributeKey: Any]
 
         do {
@@ -398,6 +418,16 @@ private final class SystemAudioFileWriter: @unchecked Sendable {
 
         if let writeError {
             throw AppError.recordingFailure("System audio could not be written. \(writeError.localizedDescription)")
+        }
+    }
+}
+
+private extension DispatchQueue {
+    func drain() async {
+        await withCheckedContinuation { continuation in
+            async {
+                continuation.resume()
+            }
         }
     }
 }
