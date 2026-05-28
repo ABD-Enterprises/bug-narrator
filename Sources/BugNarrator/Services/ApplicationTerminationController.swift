@@ -59,19 +59,32 @@ final class ApplicationTerminationController {
     }
 
     func applicationShouldTerminate() -> NSApplication.TerminateReply {
-        guard statusPhase() == .recording,
-              let activeRecordingSession = activeRecordingSession() else {
+        let phase = statusPhase()
+        guard let activeRecordingSession = activeRecordingSession(),
+              phase == .recording || phase == .transcribing else {
             return .terminateNow
         }
 
+        let isTranscribing = phase == .transcribing
         recordingLogger.warning(
-            "termination_blocked_while_recording",
-            "BugNarrator blocked an app termination request while a recording session was still active.",
+            isTranscribing ? "termination_blocked_while_transcribing" : "termination_blocked_while_recording",
+            isTranscribing
+                ? "BugNarrator blocked an app termination request while a stopped recording was still being transcribed."
+                : "BugNarrator blocked an app termination request while a recording session was still active.",
             metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
         )
-        cancelPendingScreenshotSelection("Quit was requested while recording, so pending screenshot selection was cancelled.")
+        cancelPendingScreenshotSelection(
+            isTranscribing
+                ? "Quit was requested while transcription was finishing, so pending screenshot selection was cancelled."
+                : "Quit was requested while recording, so pending screenshot selection was cancelled."
+        )
         showRecordingControls()
-        showToast("Stop recording before quitting BugNarrator.", .informational)
+        showToast(
+            isTranscribing
+                ? "Wait for transcription to finish saving before quitting BugNarrator."
+                : "Stop recording before quitting BugNarrator.",
+            .informational
+        )
         return .terminateCancel
     }
 

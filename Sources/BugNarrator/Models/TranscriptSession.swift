@@ -4,6 +4,12 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
     case missingAPIKey
     case invalidAPIKey
     case revokedAPIKey
+    case networkTimeout
+    case networkFailure
+    case rateLimited
+    case providerRejected
+    case transcriptionFailure
+    case emptyTranscript
     case crashRecovery
 
     init?(appError: AppError) {
@@ -14,6 +20,16 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             self = .invalidAPIKey
         case .revokedAPIKey:
             self = .revokedAPIKey
+        case .networkTimeout:
+            self = .networkTimeout
+        case .networkFailure:
+            self = .networkFailure
+        case .rateLimited:
+            self = .rateLimited
+        case .openAIRequestRejected:
+            self = .providerRejected
+        case .emptyTranscript:
+            self = .emptyTranscript
         default:
             return nil
         }
@@ -36,6 +52,18 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
                 return "Recording saved locally. Add a new \(provider.displayName) API key in Settings, then retry transcription from this session."
             }
             return "Recording saved locally. Open Settings, refresh the \(provider.displayName) configuration, then retry transcription from this session."
+        case .networkTimeout:
+            return "Recording saved locally. The \(provider.displayName) request timed out, so retry transcription from this session when the connection is stable."
+        case .networkFailure:
+            return "Recording saved locally. BugNarrator could not reach \(provider.displayName), so retry transcription from this session when the connection is available."
+        case .rateLimited:
+            return "Recording saved locally. \(provider.displayName) rate limited the request, so wait a moment and retry transcription from this session."
+        case .providerRejected:
+            return "Recording saved locally. \(provider.displayName) rejected the transcription request, so review settings or retry from this session."
+        case .transcriptionFailure:
+            return "Recording saved locally. Transcription failed, so retry transcription from this session."
+        case .emptyTranscript:
+            return "Recording saved locally. Transcription returned empty text, so retry transcription from this session."
         case .crashRecovery:
             return "This older unexpected-quit recovery item is no longer supported. Delete it and start a new recording."
         }
@@ -53,6 +81,18 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             return .invalidAPIKey
         case .revokedAPIKey:
             return .revokedAPIKey
+        case .networkTimeout:
+            return .networkTimeout
+        case .networkFailure:
+            return .networkFailure
+        case .rateLimited:
+            return .rateLimited(retryAfter: nil)
+        case .providerRejected:
+            return .openAIRequestRejected("The preserved recording is waiting for transcription retry.")
+        case .transcriptionFailure:
+            return .transcriptionFailure("The preserved recording is waiting for transcription retry.")
+        case .emptyTranscript:
+            return .emptyTranscript
         case .crashRecovery:
             return .transcriptionFailure("Unexpected-quit recording recovery is no longer supported.")
         }

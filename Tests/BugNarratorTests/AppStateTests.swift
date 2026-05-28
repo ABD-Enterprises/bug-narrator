@@ -539,7 +539,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.detail, "Session saved. Transcript copied to the clipboard.")
     }
 
-    func testTranscriptionFailureTransitionsToErrorAndDeletesTemporaryAudioFile() async throws {
+    func testTransientTranscriptionFailurePreservesRetryableSession() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
@@ -551,8 +551,9 @@ final class AppStateTests: XCTestCase {
         await harness.appState.stopSession()
 
         XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertEqual(harness.appState.status.detail, AppError.networkTimeout.userMessage)
-        XCTAssertEqual(harness.transcriptStore.sessions.count, 0)
+        let session = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        XCTAssertEqual(session.pendingTranscription?.failureReason, .networkTimeout)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(session.pendingTranscriptionAudioURL).path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertNil(harness.appState.activeRecordingSession)
     }
