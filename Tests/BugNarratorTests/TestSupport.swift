@@ -118,6 +118,8 @@ actor MockTranscriptionClient: TranscriptionServing {
     private(set) var requestedFileURLs: [URL] = []
     private(set) var requestedModels: [String] = []
     private(set) var validationCallCount = 0
+    private(set) var requestedValidationAPIKeys: [String] = []
+    private(set) var requestedValidationBaseURLs: [URL] = []
 
     func enqueue(_ result: Result<TranscriptionResult, Error>) {
         queuedResults.append(result)
@@ -141,6 +143,8 @@ actor MockTranscriptionClient: TranscriptionServing {
 
     func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws {
         validationCallCount += 1
+        requestedValidationAPIKeys.append(apiKey)
+        requestedValidationBaseURLs.append(apiBaseURL)
 
         if validationResults.isEmpty {
             return

@@ -4,8 +4,13 @@ struct TranscriptQualityInspector {
     private enum Defaults {
         static let minimumUsefulCharacterCount = 12
         static let repeatedPhraseMinimumWords = 4
-        static let repeatedPhraseMinimumCount = 6
+        static let repeatedPhraseMinimumCount = 4
+        static let consecutiveRepeatedPhraseMinimumWords = 2
+        static let consecutiveRepeatedPhraseMinimumCount = 4
+        static let consecutiveRepeatedPhraseMaximumWords = 8
         static let unexpectedScriptMinimumScalars = 4
+        static let unexpectedScriptMinimumScalarsInLikelyEnglish = 2
+        static let likelyEnglishMinimumLatinScalars = 20
         static let unexpectedScriptMinimumRatio = 0.04
         static let abruptEndingMinimumWords = 25
     }
@@ -75,6 +80,10 @@ struct TranscriptQualityInspector {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
 
+        if let consecutivePhrase = consecutiveRepeatedPhrase(in: words) {
+            return consecutivePhrase
+        }
+
         guard words.count >= Defaults.repeatedPhraseMinimumWords * Defaults.repeatedPhraseMinimumCount else {
             return nil
         }
@@ -92,9 +101,44 @@ struct TranscriptQualityInspector {
         return nil
     }
 
+    private func consecutiveRepeatedPhrase(in words: [String]) -> String? {
+        guard words.count >= Defaults.consecutiveRepeatedPhraseMinimumWords * Defaults.consecutiveRepeatedPhraseMinimumCount else {
+            return nil
+        }
+
+        let maximumWindowSize = min(Defaults.consecutiveRepeatedPhraseMaximumWords, words.count / Defaults.consecutiveRepeatedPhraseMinimumCount)
+        guard maximumWindowSize >= Defaults.consecutiveRepeatedPhraseMinimumWords else {
+            return nil
+        }
+
+        for windowSize in Defaults.consecutiveRepeatedPhraseMinimumWords...maximumWindowSize {
+            var index = 0
+            while index + windowSize * Defaults.consecutiveRepeatedPhraseMinimumCount <= words.count {
+                let phrase = Array(words[index..<(index + windowSize)])
+                var repetitionCount = 1
+                var nextIndex = index + windowSize
+
+                while nextIndex + windowSize <= words.count,
+                      Array(words[nextIndex..<(nextIndex + windowSize)]) == phrase {
+                    repetitionCount += 1
+                    nextIndex += windowSize
+                }
+
+                if repetitionCount >= Defaults.consecutiveRepeatedPhraseMinimumCount {
+                    return phrase.joined(separator: " ")
+                }
+
+                index += 1
+            }
+        }
+
+        return nil
+    }
+
     private func containsUnexpectedCJKScript(_ transcript: String) -> Bool {
         var cjkScalarCount = 0
         var letterScalarCount = 0
+        var latinScalarCount = 0
 
         for scalar in transcript.unicodeScalars {
             guard CharacterSet.letters.contains(scalar) else {
@@ -104,11 +148,21 @@ struct TranscriptQualityInspector {
             letterScalarCount += 1
             if Self.isCJKScalar(scalar) {
                 cjkScalarCount += 1
+            } else if Self.isLatinScalar(scalar) {
+                latinScalarCount += 1
             }
         }
 
-        guard cjkScalarCount >= Defaults.unexpectedScriptMinimumScalars,
-              letterScalarCount > 0 else {
+        guard letterScalarCount > 0 else {
+            return false
+        }
+
+        if latinScalarCount >= Defaults.likelyEnglishMinimumLatinScalars,
+           cjkScalarCount >= Defaults.unexpectedScriptMinimumScalarsInLikelyEnglish {
+            return true
+        }
+
+        guard cjkScalarCount >= Defaults.unexpectedScriptMinimumScalars else {
             return false
         }
 
@@ -118,6 +172,15 @@ struct TranscriptQualityInspector {
     private static func isCJKScalar(_ scalar: UnicodeScalar) -> Bool {
         switch scalar.value {
         case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func isLatinScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x0041...0x005A, 0x0061...0x007A, 0x00C0...0x024F:
             return true
         default:
             return false
