@@ -173,6 +173,17 @@ final class SystemAudioRecorder: AudioRecording {
         guard fileSize > 0 else {
             throw AppError.recordingFailure("The recorded system audio file was empty.")
         }
+
+        do {
+            let audioFile = try AVAudioFile(forReading: url)
+            guard audioFile.fileFormat.sampleRate > 0, audioFile.length > 0 else {
+                throw AppError.recordingFailure("The recorded system audio file did not contain playable audio.")
+            }
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.recordingFailure("The recorded system audio file could not be read.")
+        }
     }
 
     private func makeRecoverableRecordingURL() -> URL {
