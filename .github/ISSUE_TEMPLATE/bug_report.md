@@ -10,6 +10,11 @@ assignees: ''
 **Describe the bug**
 A clear and concise description of what the bug is.
 
+**Effort leak check**
+- [ ] I searched existing open issues and pull requests for the same failure.
+- [ ] This is not blocked on an external credential, signing certificate, account permission, hardware, or clean-machine validation.
+- [ ] If it is externally blocked, I named the exact missing input and applied `ai/blocked` instead of asking for implementation.
+
 **To Reproduce**
 Steps to reproduce the behavior:
 1. Go to '...'

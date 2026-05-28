@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [INTERNAL] Added effort-leak guardrails so stale AI issue states, duplicate PR claims, and superseded CI runs are caught before agents spend more time.
+
 ## 1.0.36 - 2026-05-27
 
 - [FIX] Isolated AI provider credentials so OpenAI-compatible, local-compatible, and Local (Parakeet) setup states no longer reuse or display credentials saved for another provider.
