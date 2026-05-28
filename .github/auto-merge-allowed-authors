@@ -1,0 +1,5 @@
+# Authors allowed past the EAS trusted_author auto-merge gate.
+# Keep this intentionally narrow: branch protection, required checks, review
+# threads, blocking labels, and linked issue gates still apply.
+deffenda
+app/dependabot

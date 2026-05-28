@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] Added the EAS auto-merge trusted-author allowlist so eligible green PRs do not repeatedly fail on missing gate configuration.
 - [INTERNAL] Added effort-leak guardrails so stale AI issue states, duplicate PR claims, and superseded CI runs are caught before agents spend more time.
 
 ## 1.0.36 - 2026-05-27
