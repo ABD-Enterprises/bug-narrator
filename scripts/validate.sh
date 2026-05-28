@@ -32,6 +32,8 @@ LOCAL_TRANSCRIPTION_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-
 LOCAL_TRANSCRIPTION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-output.txt"
 EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
+REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
+REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
 rm -f \
   "$SEMGREP_STATUS_FILE" \
@@ -39,7 +41,9 @@ rm -f \
   "$LOCAL_TRANSCRIPTION_STATUS_FILE" \
   "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" \
   "$EFFORT_LEAK_STATUS_FILE" \
-  "$EFFORT_LEAK_OUTPUT_FILE"
+  "$EFFORT_LEAK_OUTPUT_FILE" \
+  "$REPO_DOCS_STATUS_FILE" \
+  "$REPO_DOCS_OUTPUT_FILE"
 
 should_skip_semgrep_target() {
   local target="$1"
@@ -153,6 +157,16 @@ if [[ -x "$ROOT/scripts/effort-leak-audit.sh" ]]; then
     fi
   else
     cat "$EFFORT_LEAK_OUTPUT_FILE" >&2
+    exit 1
+  fi
+fi
+
+if [[ -x "$ROOT/scripts/repo-docs-audit.sh" ]]; then
+  if "$ROOT/scripts/repo-docs-audit.sh" >"$REPO_DOCS_OUTPUT_FILE" 2>&1; then
+    printf 'PASS: repository docs still name canonical local validation commands\n' \
+      >"$REPO_DOCS_STATUS_FILE"
+  else
+    cat "$REPO_DOCS_OUTPUT_FILE" >&2
     exit 1
   fi
 fi
