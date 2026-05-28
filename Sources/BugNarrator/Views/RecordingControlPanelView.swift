@@ -162,6 +162,14 @@ struct RecordingControlPanelView: View {
     }
 
     private var footerMessage: String {
+        if appState.status.phase != .recording && appState.needsAPIKeySetup {
+            let provider = appState.settingsStore.aiProvider
+            if provider.requiresAPIKey {
+                return "Add and validate your \(provider.displayName) API key before recording so the session can be transcribed."
+            }
+            return "Finish \(provider.displayName) setup before recording so the session can be transcribed."
+        }
+
         if appState.status.phase == .recording && appState.needsAPIKeySetup {
             let provider = appState.settingsStore.aiProvider
             if provider.requiresAPIKey {
@@ -176,7 +184,7 @@ struct RecordingControlPanelView: View {
     private var canStartSession: Bool {
         switch appState.status.phase {
         case .idle, .success, .error:
-            return true
+            return !appState.needsAPIKeySetup
         case .recording, .transcribing:
             return false
         }

@@ -5,6 +5,8 @@ struct TranscriptQualityInspector {
         static let minimumUsefulCharacterCount = 12
         static let repeatedPhraseMinimumWords = 4
         static let repeatedPhraseMinimumCount = 6
+        static let unexpectedScriptMinimumScalars = 4
+        static let unexpectedScriptMinimumRatio = 0.04
         static let abruptEndingMinimumWords = 25
     }
 
@@ -44,6 +46,16 @@ struct TranscriptQualityInspector {
             )
         }
 
+        if containsUnexpectedCJKScript(normalized) {
+            findings.append(
+                TranscriptQualityFinding(
+                    kind: .unexpectedLanguageScript,
+                    severity: .warning,
+                    message: "The transcript contains CJK characters. If this was English narration, keep the language hint set to en and retry transcription before relying on it."
+                )
+            )
+        }
+
         if appearsAbruptlyCutOff(normalized) {
             findings.append(
                 TranscriptQualityFinding(
@@ -78,6 +90,38 @@ struct TranscriptQualityInspector {
         }
 
         return nil
+    }
+
+    private func containsUnexpectedCJKScript(_ transcript: String) -> Bool {
+        var cjkScalarCount = 0
+        var letterScalarCount = 0
+
+        for scalar in transcript.unicodeScalars {
+            guard CharacterSet.letters.contains(scalar) else {
+                continue
+            }
+
+            letterScalarCount += 1
+            if Self.isCJKScalar(scalar) {
+                cjkScalarCount += 1
+            }
+        }
+
+        guard cjkScalarCount >= Defaults.unexpectedScriptMinimumScalars,
+              letterScalarCount > 0 else {
+            return false
+        }
+
+        return Double(cjkScalarCount) / Double(letterScalarCount) >= Defaults.unexpectedScriptMinimumRatio
+    }
+
+    private static func isCJKScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+            return true
+        default:
+            return false
+        }
     }
 
     private func appearsAbruptlyCutOff(_ transcript: String) -> Bool {

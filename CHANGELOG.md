@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] Blocked recording starts until AI transcription setup is usable, defaulted fresh installs to English transcription hints, and added transcript quality warnings for wrong-script output.
+- [INTERNAL] Split AI setup, transcription defaults, and issue extraction settings into an encapsulated SwiftUI section with UI coverage.
 - [INTERNAL] Added a repository docs audit to keep maintainer docs aligned with the local-first validation path and CI unit-test scope.
 - [INTERNAL] Added a cheap Windows tester release preflight so missing signing secrets fail before reserving a Windows runner.
 - [INTERNAL] Moved Swift/project change detection ahead of the self-hosted macOS CI job so config-only PRs no longer reserve macOS runner slots.

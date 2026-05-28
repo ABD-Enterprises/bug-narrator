@@ -11,6 +11,16 @@ final class TranscriptQualityInspectorTests: XCTestCase {
         XCTAssertEqual(findings.first?.severity, .warning)
     }
 
+    func testFindsUnexpectedCJKScriptForLikelyEnglishTranscript() {
+        let transcript = """
+        The tester opened the command center and clicked refresh. 然后系统显示错误。The expected setup panel did not appear.
+        """
+
+        let findings = TranscriptQualityInspector().findings(for: transcript)
+
+        XCTAssertTrue(findings.contains { $0.kind == .unexpectedLanguageScript })
+    }
+
     func testFindsAbruptEndingForLongTranscript() {
         let transcript = """
         This customer call covered setup reliability, settings validation, tracker exports, transcript review,

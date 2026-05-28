@@ -23,9 +23,27 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.screenshotHotkeyShortcut, .disabled)
         XCTAssertEqual(store.jiraIssueType, "")
+        XCTAssertEqual(store.languageHint, "en")
+        XCTAssertEqual(store.transcriptionRequest.languageHint, "en")
         XCTAssertFalse(store.systemAudioCaptureEnabled)
         XCTAssertEqual(store.recordingAudioSource, .microphone)
         XCTAssertFalse(store.hasAcceptedSystemAudioRecordingConsent)
+    }
+
+    func testClearedLanguageHintPersistsAsNoLanguageHint() {
+        let suiteName = "BugNarrator-SettingsClearedLanguageHintTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstStore = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertEqual(firstStore.languageHint, "en")
+        firstStore.languageHint = ""
+
+        let secondStore = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(secondStore.languageHint, "")
+        XCTAssertNil(secondStore.transcriptionRequest.languageHint)
     }
 
     func testSettingsPersistAcrossReloads() {

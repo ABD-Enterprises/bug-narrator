@@ -126,6 +126,33 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertEqual(result.qualityFindings.map(\.kind), [.repeatedText])
     }
 
+    func testTranscribeSurfacesUnexpectedLanguageScriptFinding() async throws {
+        let fileURL = try makeAudioFile(named: "wrong-language-transcript", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let transcript = "The tester clicked refresh and the setup view failed. 然后系统显示错误。"
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = try JSONSerialization.data(
+                withJSONObject: [
+                    "text": transcript,
+                    "segments": []
+                ]
+            )
+            return (response, data)
+        }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+        let result = try await client.transcribe(
+            fileURL: fileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: "en", prompt: nil)
+        )
+
+        XCTAssertEqual(result.text, transcript)
+        XCTAssertTrue(result.qualityFindings.contains { $0.kind == .unexpectedLanguageScript })
+    }
+
     func testTranscribeMapsAPIErrorResponse() async throws {
         let fileURL = try makeAudioFile(named: "api-error", contents: "audio-data")
         defer { try? FileManager.default.removeItem(at: fileURL) }

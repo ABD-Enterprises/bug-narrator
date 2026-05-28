@@ -678,6 +678,20 @@ final class AppState: ObservableObject {
     func startSession() async {
         recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            let appError = AppError.transcriptionFailure(compatibilityIssue)
+            errorPresenter.setStatus(.error(compatibilityIssue), error: appError)
+            showSettingsWindow?()
+            return
+        }
+
+        guard settingsStore.hasUsableAIProviderCredential else {
+            let appError = AppError.missingAPIKey
+            errorPresenter.setStatus(.error(appError.userMessage(for: settingsStore.aiProvider)), error: appError)
+            showSettingsWindow?()
+            return
+        }
+
         let outcome = await recordingSessionController.startSession(
             statusPhase: status.phase,
             activityReason: recordingStatusMessages.recordingActivityReason()
