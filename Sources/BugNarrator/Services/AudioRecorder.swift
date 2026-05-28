@@ -12,6 +12,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
     private let recoveryDirectoryURL: URL
+    private let finalizationTimeoutNanoseconds: UInt64
 
     private var recorder: AVAudioRecorder?
     private var currentFileURL: URL?
@@ -19,22 +20,27 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     private var cancelContinuation: CheckedContinuation<Void, Never>?
     private var pendingStopResult: RecordedAudio?
     private var isCancelling = false
+    private var finalizationTimeoutTask: Task<Void, Never>?
 
     init(
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
-            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000
     ) {
         self.permissionAccess = SystemMicrophonePermissionAccess()
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
     }
 
     init(
         permissionAccess: any MicrophonePermissionAccessing,
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
-            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000
     ) {
         self.permissionAccess = permissionAccess
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
     }
 
     var currentDuration: TimeInterval {
@@ -171,6 +177,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         return try await withCheckedThrowingContinuation { continuation in
             stopContinuation = continuation
             pendingStopResult = RecordedAudio(fileURL: currentFileURL, duration: recorder.currentTime)
+            scheduleStopTimeout(fileName: currentFileURL.lastPathComponent)
             recorder.stop()
         }
     }
@@ -193,6 +200,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         await withCheckedContinuation { continuation in
             cancelContinuation = continuation
+            scheduleCancelTimeout(fileName: currentFileURL.lastPathComponent)
             recorder.stop()
         }
 
@@ -265,6 +273,8 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     }
 
     private func cleanup() {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = nil
         recorder?.delegate = nil
         recorder = nil
         currentFileURL = nil
@@ -272,6 +282,56 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         cancelContinuation = nil
         pendingStopResult = nil
         isCancelling = false
+    }
+
+    private func scheduleStopTimeout(fileName: String) {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: finalizationTimeoutNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, let stopContinuation else {
+                return
+            }
+
+            recordingLogger.error(
+                "recording_finalize_timeout",
+                "The recorded audio file did not finish finalizing before the timeout.",
+                metadata: ["file_name": fileName]
+            )
+            cleanup()
+            stopContinuation.resume(
+                throwing: AppError.recordingFailure("The recorded audio file did not finish finalizing before the timeout.")
+            )
+        }
+    }
+
+    private func scheduleCancelTimeout(fileName: String) {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: finalizationTimeoutNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, let cancelContinuation else {
+                return
+            }
+
+            recordingLogger.warning(
+                "recording_cancel_timeout",
+                "Audio recording cancellation did not receive a final delegate callback before the timeout.",
+                metadata: ["file_name": fileName]
+            )
+            cleanup()
+            cancelContinuation.resume()
+        }
     }
 
     private func validateRecordedAudioFile(at url: URL) throws {
