@@ -39,7 +39,7 @@ jobs:
             echo "docs_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '(\.swift$|\.plist$|\.entitlements$|\.xcodeproj/|\.xcworkspace/|\.xcconfig$|^Resources/|^Sources/|^Tests/|^\.github/workflows/ci\.yml$|^Package\.swift$|^Package\.resolved$)' <<< "$changed_files"; then
+          if grep -Eq '(\.swift$|\.plist$|\.entitlements$|\.xcodeproj/|\.xcworkspace/|\.xcconfig$|^Resources/|^Sources/|^Tests/|^\.github/workflows/ci\.yml$|^Package\.swift$|^Package\.resolved$|^project\.ya?ml$)' <<< "$changed_files"; then
             echo "swift_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "swift_changed=false" >> "$GITHUB_OUTPUT"
