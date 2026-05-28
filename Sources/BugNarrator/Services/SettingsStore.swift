@@ -133,6 +133,7 @@ final class SettingsStore: ObservableObject {
     ]
 
     private static let openAITranscriptionModel = "whisper-1"
+    private static let defaultLanguageHint = "en"
     private static let parakeetTranscriptionModel = "parakeet-tdt-0.6b-v3"
     private static let openAIIssueExtractionModel = "gpt-4.1-mini"
     private static let openAITranscriptionModelChoices = [
@@ -1116,7 +1117,7 @@ final class SettingsStore: ObservableObject {
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
         aiProvider = AIProvider(rawValue: stringValue(forKey: Keys.aiProvider) ?? "") ?? .openAI
         openAIBaseURL = stringValue(forKey: Keys.openAIBaseURL) ?? ""
-        languageHint = stringValue(forKey: Keys.languageHint) ?? ""
+        languageHint = stringValue(forKey: Keys.languageHint) ?? Self.defaultLanguageHint
         transcriptionPrompt = stringValue(forKey: Keys.transcriptionPrompt) ?? ""
         issueExtractionModel = stringValue(
             forKey: Keys.issueExtractionModel,

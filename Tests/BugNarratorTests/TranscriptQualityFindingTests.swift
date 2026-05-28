@@ -14,9 +14,9 @@ final class TranscriptQualityFindingTests: XCTestCase {
 
     func testFindingCodableRoundTripPreservesSeverityAndKind() throws {
         let finding = TranscriptQualityFinding(
-            kind: .repeatedText,
+            kind: .unexpectedLanguageScript,
             severity: .error,
-            message: "Repeated transcript detected."
+            message: "Unexpected script detected."
         )
 
         let data = try JSONEncoder().encode(finding)

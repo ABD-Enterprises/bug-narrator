@@ -78,6 +78,10 @@ final class BugNarratorSettingsUITests: XCTestCase {
         waitForSettingsLayout()
         XCTAssertTrue(settingsWindow.scrollViews.firstMatch.exists)
 
+        XCTAssertTrue(app.descendants(matching: .any)["AI Provider Setup section"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Transcription Defaults section"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Issue Extraction section"].waitForExistence(timeout: 5))
+
         let openAIKeyField = app.textFields["OpenAI API Key"]
         XCTAssertTrue(waitForSettingsElement(openAIKeyField, in: settingsWindow))
         replaceText(in: openAIKeyField, with: "sk-ui-test")

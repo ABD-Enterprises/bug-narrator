@@ -26,7 +26,7 @@ final class AppStateTests: XCTestCase {
     }
 
     func testRecordingControlsStartFlowShowsPanelAndStartsSession() async {
-        let harness = AppStateHarness(apiKey: "")
+        let harness = AppStateHarness()
         defer { harness.cleanup() }
 
         var didOpenRecordingControls = false
@@ -96,7 +96,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.exportHistory, [receipt])
     }
 
-    func testStartSessionWithoutAPIKeyStillStartsRecordingAndShowsTranscriptionGuidance() async {
+    func testStartSessionWithoutAPIKeyBlocksRecordingAndOpensSettings() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
 
@@ -107,13 +107,36 @@ final class AppStateTests: XCTestCase {
 
         await harness.appState.startSession()
 
-        XCTAssertEqual(harness.appState.status.phase, .recording)
+        XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "Recording in progress. Finish the AI provider setup in Settings before stopping to transcribe this session."
+            "BugNarrator requires your own OpenAI API key for transcription and issue extraction. Add it in Settings, then retry transcription."
         )
-        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
-        XCTAssertFalse(didOpenSettings)
+        XCTAssertEqual(harness.appState.currentError, .missingAPIKey)
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+        XCTAssertTrue(didOpenSettings)
+    }
+
+    func testStartSessionWithProviderCompatibilityIssueBlocksRecordingAndOpensSettings() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.aiProvider = .localCompatible
+        harness.settingsStore.preferredModel = "whisper-1"
+        var didOpenSettings = false
+        harness.appState.showSettingsWindow = {
+            didOpenSettings = true
+        }
+
+        await harness.appState.startSession()
+
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertEqual(
+            harness.appState.status.detail,
+            "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
+        )
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+        XCTAssertTrue(didOpenSettings)
     }
 
     func testAppStateRegistersDistinctRecordingHotkeys() {
@@ -708,9 +731,10 @@ final class AppStateTests: XCTestCase {
         let recordedAudio = try harness.makeRecordedAudio(fileName: "parakeet-setup-on-stop")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
         harness.settingsStore.aiProvider = .parakeetLocal
-        harness.settingsStore.autoExtractIssues = true
+        harness.settingsStore.autoExtractIssues = false
 
         await harness.appState.startSession()
+        harness.settingsStore.autoExtractIssues = true
         await harness.appState.stopSession()
 
         XCTAssertEqual(harness.appState.status.phase, .error)
