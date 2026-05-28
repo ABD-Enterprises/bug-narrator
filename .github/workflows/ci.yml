@@ -6,8 +6,14 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+concurrency:
+  group: ci-${{ github.event.pull_request.head.repo.full_name }}-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   runtime-guardrails:
@@ -34,6 +40,8 @@ jobs:
           fi
 
       - name: Run runtime guardrails validator
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git fetch --no-tags --depth=1 origin "${{ steps.base.outputs.ref }}"
           ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
