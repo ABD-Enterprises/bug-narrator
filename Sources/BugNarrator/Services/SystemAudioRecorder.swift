@@ -220,6 +220,13 @@ private final class SystemAudioTapSession {
             return audioFormat
         }
 
+        var preparedSuccessfully = false
+        defer {
+            if !preparedSuccessfully {
+                invalidate()
+            }
+        }
+
         let excludedProcesses = (try? Self.currentProcessObjectIDs()) ?? []
         let tapDescription = CATapDescription(stereoGlobalTapButExcludeProcesses: excludedProcesses)
         tapDescription.uuid = UUID()
@@ -271,6 +278,7 @@ private final class SystemAudioTapSession {
         }
 
         audioFormat = format
+        preparedSuccessfully = true
         return format
     }
 
@@ -278,6 +286,13 @@ private final class SystemAudioTapSession {
     func start(on queue: DispatchQueue, writer: SystemAudioFileWriter) throws {
         guard aggregateDeviceID != AudioObjectID(kAudioObjectUnknown) else {
             throw AppError.systemAudioUnavailable("The system audio device was not prepared.")
+        }
+
+        var startedSuccessfully = false
+        defer {
+            if !startedSuccessfully {
+                invalidate()
+            }
         }
 
         var status = AudioDeviceCreateIOProcIDWithBlock(
@@ -295,6 +310,7 @@ private final class SystemAudioTapSession {
         guard status == noErr else {
             throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio refused to start system audio capture with status \(status)."))
         }
+        startedSuccessfully = true
     }
 
     func invalidate() {

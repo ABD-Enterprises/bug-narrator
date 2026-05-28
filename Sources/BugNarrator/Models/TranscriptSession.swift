@@ -2,6 +2,7 @@ import Foundation
 
 enum PendingTranscriptionFailureReason: String, Codable, Equatable {
     case missingAPIKey
+    case providerSetup
     case invalidAPIKey
     case revokedAPIKey
     case networkTimeout
@@ -35,13 +36,15 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
         }
     }
 
-    func recoveryMessage(for provider: AIProvider) -> String {
+    func retryMessage(for provider: AIProvider) -> String {
         switch self {
         case .missingAPIKey:
             if provider.requiresAPIKey {
                 return "Recording saved locally. Add your \(provider.displayName) API key in Settings, then retry transcription from this session."
             }
             return "Recording saved locally. Open Settings, confirm the \(provider.displayName) server setup, then retry transcription from this session."
+        case .providerSetup:
+            return "Recording saved locally. Finish the \(provider.displayName) setup in Settings, then retry transcription from this session."
         case .invalidAPIKey:
             if provider.requiresAPIKey {
                 return "Recording saved locally. Replace the rejected \(provider.displayName) API key in Settings, then retry transcription from this session."
@@ -69,14 +72,20 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
         }
     }
 
+    func recoveryMessage(for provider: AIProvider) -> String {
+        retryMessage(for: provider)
+    }
+
     var recoveryMessage: String {
-        recoveryMessage(for: .openAI)
+        retryMessage(for: .openAI)
     }
 
     var appError: AppError {
         switch self {
         case .missingAPIKey:
             return .missingAPIKey
+        case .providerSetup:
+            return .transcriptionFailure("The preserved recording is waiting for AI provider setup.")
         case .invalidAPIKey:
             return .invalidAPIKey
         case .revokedAPIKey:
@@ -258,7 +267,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
     func preview(for provider: AIProvider) -> String {
         if let pendingTranscription {
-            return pendingTranscription.failureReason.recoveryMessage(for: provider)
+            return pendingTranscription.failureReason.retryMessage(for: provider)
         }
 
         return Self.previewText(from: transcript)
@@ -298,11 +307,19 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     }
 
     func transcriptionRecoveryMessage(for provider: AIProvider) -> String? {
-        pendingTranscription?.failureReason.recoveryMessage(for: provider)
+        transcriptionRetryMessage(for: provider)
     }
 
     var transcriptionRecoveryMessage: String? {
-        transcriptionRecoveryMessage(for: .openAI)
+        transcriptionRetryMessage
+    }
+
+    func transcriptionRetryMessage(for provider: AIProvider) -> String? {
+        pendingTranscription?.failureReason.retryMessage(for: provider)
+    }
+
+    var transcriptionRetryMessage: String? {
+        transcriptionRetryMessage(for: .openAI)
     }
 
     var summaryText: String {
@@ -373,9 +390,9 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
             lines.append("Prompt: \(prompt)")
         }
 
-        if let transcriptionRecoveryMessage {
+        if let transcriptionRetryMessage {
             lines.append("Transcription Status: Pending retry")
-            lines.append("Recovery: \(transcriptionRecoveryMessage)")
+            lines.append("Retry: \(transcriptionRetryMessage)")
         }
 
         if !markers.isEmpty {
@@ -435,9 +452,9 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
             lines.append("- Prompt: \(prompt)")
         }
 
-        if let transcriptionRecoveryMessage {
+        if let transcriptionRetryMessage {
             lines.append("- Transcription Status: Pending retry")
-            lines.append("- Recovery: \(transcriptionRecoveryMessage)")
+            lines.append("- Retry: \(transcriptionRetryMessage)")
         }
 
         lines.append("")

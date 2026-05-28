@@ -741,10 +741,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "Recording saved locally. Open Settings, confirm the Local (Parakeet) server setup, then retry transcription from this session."
+            "Recording saved locally. Finish the Local (Parakeet) setup in Settings, then retry transcription from this session."
         )
         XCTAssertTrue(harness.appState.needsAPIKeySetup)
-        XCTAssertEqual(harness.transcriptStore.sessions.first?.pendingTranscription?.failureReason, .missingAPIKey)
+        XCTAssertEqual(harness.transcriptStore.sessions.first?.pendingTranscription?.failureReason, .providerSetup)
     }
 
     func testStopSessionWithRejectedAPIKeyPreservesRetryableSession() async throws {

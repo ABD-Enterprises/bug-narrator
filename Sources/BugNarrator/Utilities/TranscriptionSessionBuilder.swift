@@ -9,7 +9,7 @@ enum PostTranscriptionPipelineMode: Equatable {
         case .finishedRecording:
             return "Saving the finished session locally..."
         case .retry:
-            return "Saving the recovered session locally..."
+            return "Saving the retried session locally..."
         }
     }
 
