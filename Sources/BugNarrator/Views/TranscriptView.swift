@@ -696,7 +696,7 @@ struct TranscriptView: View {
             if session.requiresTranscriptionRetry {
                 HStack(alignment: .center, spacing: 10) {
                     Label(
-                        session.transcriptionRecoveryMessage(for: appState.settingsStore.aiProvider) ?? defaultRetryRecoveryMessage,
+                        session.transcriptionRetryMessage(for: appState.settingsStore.aiProvider) ?? defaultRetryRecoveryMessage,
                         systemImage: "arrow.clockwise.circle"
                     )
                     .font(.footnote)

@@ -185,7 +185,7 @@ final class RecordingStatusMessageBuilderTests: XCTestCase {
         )
         XCTAssertEqual(
             providerWithIssueExtraction.transcriptionSavingProgressMessage(mode: .retry),
-            "Step 2 of 3: Saving the recovered session locally..."
+            "Step 2 of 3: Saving the retried session locally..."
         )
         XCTAssertEqual(
             providerWithIssueExtraction.transcriptionIssueExtractionProgressMessage(),
@@ -212,7 +212,7 @@ final class RecordingStatusMessageBuilderTests: XCTestCase {
         harness.presenter.presentSavingProgress(mode: .retry)
         XCTAssertEqual(
             harness.status(),
-            .transcribing("Step 2 of 3: Saving the recovered session locally...")
+            .transcribing("Step 2 of 3: Saving the retried session locally...")
         )
 
         harness.presenter.presentIssueExtractionProgress()

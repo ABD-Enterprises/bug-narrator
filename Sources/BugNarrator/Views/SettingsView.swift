@@ -101,7 +101,7 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
-                        Text("Completed recordings are always saved to the local session library as soon as you stop. BugNarrator keeps the session even if the app quits before you review it.")
+                        Text("When transcription cannot finish after a recording stops, BugNarrator saves the recording locally as a pending session so you can retry transcription.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 

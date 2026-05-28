@@ -2,6 +2,13 @@ import XCTest
 @testable import BugNarrator
 
 final class DiagnosticsLoggerTests: XCTestCase {
+    func testDefaultDiagnosticsStoreUsesTemporaryPathDuringUnitTests() {
+        let storageURL = DiagnosticsLogStore.defaultStorageURL(fileManager: .default)
+
+        XCTAssertTrue(storageURL.path.contains(FileManager.default.temporaryDirectory.path))
+        XCTAssertTrue(storageURL.lastPathComponent.hasPrefix("recent-log-"))
+    }
+
     func testFreeformRedactionSanitizesKnownTokenPatterns() {
         let sanitized = DiagnosticsRedactor.sanitizeFreeformText(
             """
