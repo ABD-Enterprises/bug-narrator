@@ -16,6 +16,35 @@ permissions:
   pull-requests: read
 
 jobs:
+  detect-ci-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs_changed: ${{ steps.changes.outputs.docs_changed }}
+      swift_changed: ${{ steps.changes.outputs.swift_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect CI-relevant changes
+        id: changes
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
+          if grep -Eq '^(docs/|site/|README\.md|QUICKSTART\.md|SECURITY\.md|CONTRIBUTING\.md)' <<< "$changed_files"; then
+            echo "docs_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '(\.swift$|\.plist$|\.entitlements$|\.xcodeproj/|\.xcworkspace/|\.xcconfig$|^Resources/|^Sources/|^Tests/|^\.github/workflows/ci\.yml$|^Package\.swift$|^Package\.resolved$)' <<< "$changed_files"; then
+            echo "swift_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "swift_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   runtime-guardrails:
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +76,10 @@ jobs:
           ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
 
   docs-site-validation:
-    needs: runtime-guardrails
+    needs:
+      - detect-ci-changes
+      - runtime-guardrails
+    if: needs.detect-ci-changes.outputs.docs_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,20 +87,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detect docs site changes
-        id: docs_changes
-        shell: bash
-        run: |
-          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
-          if grep -Eq '^(docs/|site/|README\.md|QUICKSTART\.md|SECURITY\.md|CONTRIBUTING\.md)' <<< "$changed_files"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup Node
-        if: steps.docs_changes.outputs.changed == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -76,14 +95,16 @@ jobs:
           cache-dependency-path: site/package-lock.json
 
       - name: Install docs site dependencies
-        if: steps.docs_changes.outputs.changed == 'true'
         run: npm ci --prefix site
 
       - name: Build docs site
-        if: steps.docs_changes.outputs.changed == 'true'
         run: npm run build --prefix site
 
   macos-build-and-test:
+    needs:
+      - detect-ci-changes
+      - runtime-guardrails
+    if: needs.detect-ci-changes.outputs.swift_changed == 'true'
     # Self-hosted ABD-Enterprises org runner with Xcode 26.5; declared
     # in deffenda/brew-sync manifests/github-runners.yaml. Falls back to
     # macos-26 (GitHub-hosted, with the 10x minute multiplier) by manual
@@ -96,20 +117,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detect Swift / project changes
-        id: swift_changes
-        shell: bash
-        run: |
-          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
-          if grep -Eq '(\.swift$|\.plist$|\.entitlements$|\.xcodeproj/|\.xcworkspace/|\.xcconfig$|^Resources/|^Sources/|^Tests/|^\.github/workflows/ci\.yml$|^Package\.swift$|^Package\.resolved$)' <<< "$changed_files"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Select Xcode (project file requires Xcode 26)
-        if: steps.swift_changes.outputs.changed == 'true'
         run: |
           # The .xcodeproj is in objectVersion 77, which only Xcode 26+
           # can read. Two valid layouts:
@@ -144,13 +152,11 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
 
       - name: Show toolchain
-        if: steps.swift_changes.outputs.changed == 'true'
         run: |
           xcodebuild -version
           swift --version
 
       - name: Build (Debug, macOS)
-        if: steps.swift_changes.outputs.changed == 'true'
         run: |
           set -o pipefail
           xcodebuild \
@@ -162,7 +168,6 @@ jobs:
             build
 
       - name: Run unit tests (BugNarratorTests only; UITests need a window server)
-        if: steps.swift_changes.outputs.changed == 'true'
         run: |
           set -o pipefail
           xcodebuild \
