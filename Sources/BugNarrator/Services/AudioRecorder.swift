@@ -230,7 +230,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         }
 
         if !preserveFile {
-            try? FileManager.default.removeItem(at: fileURL)
+            await Self.removeItemIfPresent(at: fileURL)
         }
     }
 
@@ -254,23 +254,28 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             return
         }
 
-        do {
-            try validateRecordedAudioFile(at: pendingStopResult.fileURL)
-        } catch {
-            recordingLogger.error("recording_validation_failed", (error as? AppError)?.userMessage ?? error.localizedDescription)
-            stopContinuation?.resume(throwing: error)
-            return
-        }
+        Task { [recordingLogger] in
+            do {
+                try await Self.validateRecordedAudioFile(at: pendingStopResult.fileURL)
+            } catch {
+                recordingLogger.error(
+                    "recording_validation_failed",
+                    (error as? AppError)?.userMessage ?? error.localizedDescription
+                )
+                stopContinuation?.resume(throwing: error)
+                return
+            }
 
-        recordingLogger.info(
-            "recording_stopped",
-            "Audio recording finished successfully.",
-            metadata: [
-                "file_name": pendingStopResult.fileURL.lastPathComponent,
-                "duration_seconds": String(format: "%.2f", pendingStopResult.duration)
-            ]
-        )
-        stopContinuation?.resume(returning: pendingStopResult)
+            recordingLogger.info(
+                "recording_stopped",
+                "Audio recording finished successfully.",
+                metadata: [
+                    "file_name": pendingStopResult.fileURL.lastPathComponent,
+                    "duration_seconds": String(format: "%.2f", pendingStopResult.duration)
+                ]
+            )
+            stopContinuation?.resume(returning: pendingStopResult)
+        }
     }
 
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: (any Error)?) {
@@ -359,7 +364,19 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         }
     }
 
-    private func validateRecordedAudioFile(at url: URL) throws {
+    private static func removeItemIfPresent(at url: URL) async {
+        await Task.detached(priority: .utility) {
+            try? FileManager.default.removeItem(at: url)
+        }.value
+    }
+
+    private static func validateRecordedAudioFile(at url: URL) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try validateRecordedAudioFileSynchronously(at: url)
+        }.value
+    }
+
+    private nonisolated static func validateRecordedAudioFileSynchronously(at url: URL) throws {
         let attributes: [FileAttributeKey: Any]
 
         do {
