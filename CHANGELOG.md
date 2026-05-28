@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] Added a cheap Windows tester release preflight so missing signing secrets fail before reserving a Windows runner.
 - [INTERNAL] Moved Swift/project change detection ahead of the self-hosted macOS CI job so config-only PRs no longer reserve macOS runner slots.
 - [INTERNAL] Added the EAS auto-merge trusted-author allowlist so eligible green PRs do not repeatedly fail on missing gate configuration.
 - [INTERNAL] Added effort-leak guardrails so stale AI issue states, duplicate PR claims, and superseded CI runs are caught before agents spend more time.
