@@ -10,6 +10,7 @@ final class MixedAudioRecorder: AudioRecording {
 
     private var isRecording = false
     private var isStopping = false
+    private var sourceStartTimes: MixedAudioSourceStartTimes?
 
     init(
         microphoneRecorder: any AudioRecording,
@@ -53,16 +54,29 @@ final class MixedAudioRecorder: AudioRecording {
 
         do {
             try await systemAudioRecorder.startRecording()
+            let systemAudioStartedAt = ProcessInfo.processInfo.systemUptime
             do {
                 try await microphoneRecorder.startRecording()
             } catch {
                 await systemAudioRecorder.cancelRecording(preserveFile: false)
+                sourceStartTimes = nil
                 throw error
             }
+            let microphoneStartedAt = ProcessInfo.processInfo.systemUptime
+            sourceStartTimes = MixedAudioSourceStartTimes(
+                microphoneStartedAt: microphoneStartedAt,
+                systemAudioStartedAt: systemAudioStartedAt
+            )
             isRecording = true
             recordingLogger.info(
                 "mixed_recording_started",
-                "Microphone and system audio recording started successfully."
+                "Microphone and system audio recording started successfully.",
+                metadata: [
+                    "microphone_start_offset_seconds": String(
+                        format: "%.3f",
+                        sourceStartTimes?.insertionOffsets.microphoneOffset ?? 0
+                    )
+                ]
             )
         } catch let error as AppError {
             recordingLogger.error("mixed_recording_start_failed", error.userMessage)
@@ -82,6 +96,7 @@ final class MixedAudioRecorder: AudioRecording {
         defer {
             isStopping = false
             isRecording = false
+            sourceStartTimes = nil
         }
 
         async let systemStopResult = stopSystemAudioRecorder()
@@ -101,10 +116,12 @@ final class MixedAudioRecorder: AudioRecording {
         let microphoneAudio = try microphoneResult.get()
 
         let outputURL = makeMixedRecordingURL()
+        let insertionOffsets = sourceStartTimes?.insertionOffsets ?? .zero
         let mixedAudio = try await mixAudioFiles(
             microphoneAudio: microphoneAudio,
             systemAudio: systemAudio,
-            outputURL: outputURL
+            outputURL: outputURL,
+            insertionOffsets: insertionOffsets
         )
         removeSourceAudioFiles(
             [microphoneAudio.fileURL, systemAudio.fileURL],
@@ -152,6 +169,7 @@ final class MixedAudioRecorder: AudioRecording {
         }
 
         isRecording = false
+        sourceStartTimes = nil
         await microphoneRecorder.cancelRecording(preserveFile: preserveFile)
         await systemAudioRecorder.cancelRecording(preserveFile: preserveFile)
     }
@@ -159,7 +177,8 @@ final class MixedAudioRecorder: AudioRecording {
     private func mixAudioFiles(
         microphoneAudio: RecordedAudio,
         systemAudio: RecordedAudio,
-        outputURL: URL
+        outputURL: URL,
+        insertionOffsets: MixedAudioTrackInsertionOffsets
     ) async throws -> RecordedAudio {
         try FileManager.default.createDirectory(at: outputDirectoryURL, withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: outputURL)
@@ -178,12 +197,14 @@ final class MixedAudioRecorder: AudioRecording {
             fileURL: systemAudio.fileURL,
             to: composition,
             volume: 1.0,
+            insertionTime: insertionOffsets.systemAudioInsertionTime,
             mixParameters: &mixParameters
         )
         try await addAudioTrack(
             fileURL: microphoneAudio.fileURL,
             to: composition,
             volume: 1.0,
+            insertionTime: insertionOffsets.microphoneInsertionTime,
             mixParameters: &mixParameters
         )
 
@@ -233,6 +254,7 @@ final class MixedAudioRecorder: AudioRecording {
         fileURL: URL,
         to composition: AVMutableComposition,
         volume: Float,
+        insertionTime: CMTime,
         mixParameters: inout [AVAudioMixInputParameters]
     ) async throws {
         let asset = AVURLAsset(url: fileURL)
@@ -251,11 +273,11 @@ final class MixedAudioRecorder: AudioRecording {
         try compositionTrack.insertTimeRange(
             CMTimeRange(start: .zero, duration: duration),
             of: sourceTrack,
-            at: .zero
+            at: insertionTime
         )
 
         let parameters = AVMutableAudioMixInputParameters(track: compositionTrack)
-        parameters.setVolume(volume, at: .zero)
+        parameters.setVolume(volume, at: insertionTime)
         mixParameters.append(parameters)
     }
 
@@ -269,6 +291,47 @@ final class MixedAudioRecorder: AudioRecording {
         return outputDirectoryURL
             .appendingPathComponent("\(timestamp)-mixed-recording-\(UUID().uuidString)")
             .appendingPathExtension("m4a")
+    }
+}
+
+struct MixedAudioSourceStartTimes {
+    let microphoneStartedAt: TimeInterval
+    let systemAudioStartedAt: TimeInterval
+
+    var insertionOffsets: MixedAudioTrackInsertionOffsets {
+        MixedAudioTrackInsertionOffsets(
+            microphoneStartedAt: microphoneStartedAt,
+            systemAudioStartedAt: systemAudioStartedAt
+        )
+    }
+}
+
+struct MixedAudioTrackInsertionOffsets: Equatable {
+    static let zero = MixedAudioTrackInsertionOffsets(
+        microphoneOffset: 0,
+        systemAudioOffset: 0
+    )
+
+    let microphoneOffset: TimeInterval
+    let systemAudioOffset: TimeInterval
+
+    init(microphoneStartedAt: TimeInterval, systemAudioStartedAt: TimeInterval) {
+        let earliestStart = min(microphoneStartedAt, systemAudioStartedAt)
+        microphoneOffset = max(0, microphoneStartedAt - earliestStart)
+        systemAudioOffset = max(0, systemAudioStartedAt - earliestStart)
+    }
+
+    private init(microphoneOffset: TimeInterval, systemAudioOffset: TimeInterval) {
+        self.microphoneOffset = microphoneOffset
+        self.systemAudioOffset = systemAudioOffset
+    }
+
+    var microphoneInsertionTime: CMTime {
+        CMTime(seconds: microphoneOffset, preferredTimescale: 1_000_000)
+    }
+
+    var systemAudioInsertionTime: CMTime {
+        CMTime(seconds: systemAudioOffset, preferredTimescale: 1_000_000)
     }
 }
 
