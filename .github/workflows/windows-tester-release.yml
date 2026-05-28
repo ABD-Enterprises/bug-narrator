@@ -27,7 +27,28 @@ permissions:
   contents: write
 
 jobs:
+  release-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm signing secrets exist before reserving Windows runner
+        env:
+          CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_PASSWORD }}
+        run: |
+          missing=()
+          if [[ -z "$CERT_BASE64" ]]; then
+            missing+=("BUGNARRATOR_WINDOWS_CERT_BASE64")
+          fi
+          if [[ -z "$CERT_PASSWORD" ]]; then
+            missing+=("BUGNARRATOR_WINDOWS_CERT_PASSWORD")
+          fi
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            printf '::error::Windows tester release is blocked before runner allocation. Missing repository secret(s): %s\n' "${missing[*]}"
+            exit 1
+          fi
+
   signed-windows-tester-release:
+    needs: release-preflight
     runs-on: windows-latest
     steps:
       - name: Checkout
