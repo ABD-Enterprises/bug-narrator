@@ -4,6 +4,30 @@ import XCTest
 
 @MainActor
 final class MixedAudioRecorderTests: XCTestCase {
+    func testTrackInsertionOffsetsDelayLaterMicrophoneStart() {
+        let offsets = MixedAudioTrackInsertionOffsets(
+            microphoneStartedAt: 42.150,
+            systemAudioStartedAt: 42.000
+        )
+
+        XCTAssertEqual(offsets.systemAudioOffset, 0, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.microphoneOffset, 0.150, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.systemAudioInsertionTime.seconds, 0, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.microphoneInsertionTime.seconds, 0.150, accuracy: 0.000_01)
+    }
+
+    func testTrackInsertionOffsetsDelayLaterSystemAudioStart() {
+        let offsets = MixedAudioTrackInsertionOffsets(
+            microphoneStartedAt: 10.000,
+            systemAudioStartedAt: 10.080
+        )
+
+        XCTAssertEqual(offsets.microphoneOffset, 0, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.systemAudioOffset, 0.080, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.microphoneInsertionTime.seconds, 0, accuracy: 0.000_001)
+        XCTAssertEqual(offsets.systemAudioInsertionTime.seconds, 0.080, accuracy: 0.000_001)
+    }
+
     func testStopRecordingRemovesSourceFilesAfterSuccessfulMix() async throws {
         let rootDirectoryURL = temporaryDirectoryURL()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
