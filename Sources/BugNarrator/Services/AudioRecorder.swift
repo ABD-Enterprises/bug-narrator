@@ -8,13 +8,28 @@ struct RecordedAudio {
 }
 
 @MainActor
+protocol AudioRecorderEngine: AnyObject {
+    var delegate: (any AVAudioRecorderDelegate)? { get set }
+    var currentTime: TimeInterval { get }
+
+    func prepareToRecord() -> Bool
+    func record() -> Bool
+    func stop()
+}
+
+extension AVAudioRecorder: AudioRecorderEngine {}
+
+typealias AudioRecorderEngineFactory = (URL, [String: Any]) throws -> any AudioRecorderEngine
+
+@MainActor
 final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
     private let recoveryDirectoryURL: URL
     private let finalizationTimeoutNanoseconds: UInt64
+    private let makeRecorder: AudioRecorderEngineFactory
 
-    private var recorder: AVAudioRecorder?
+    private var recorder: (any AudioRecorderEngine)?
     private var currentFileURL: URL?
     private var stopContinuation: CheckedContinuation<RecordedAudio, Error>?
     private var cancelContinuation: CheckedContinuation<Void, Never>?
@@ -25,22 +40,30 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     init(
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
             .appendingPathComponent("RecoveredRecordings", isDirectory: true),
-        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
+        makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
+            try AVAudioRecorder(url: url, settings: settings)
+        }
     ) {
         self.permissionAccess = SystemMicrophonePermissionAccess()
         self.recoveryDirectoryURL = recoveryDirectoryURL
         self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
+        self.makeRecorder = makeRecorder
     }
 
     init(
         permissionAccess: any MicrophonePermissionAccessing,
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
             .appendingPathComponent("RecoveredRecordings", isDirectory: true),
-        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
+        makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
+            try AVAudioRecorder(url: url, settings: settings)
+        }
     ) {
         self.permissionAccess = permissionAccess
         self.recoveryDirectoryURL = recoveryDirectoryURL
         self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
+        self.makeRecorder = makeRecorder
     }
 
     var currentDuration: TimeInterval {
@@ -57,7 +80,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             .appendingPathExtension("m4a")
 
         do {
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             let prepared = recorder.prepareToRecord()
             try? FileManager.default.removeItem(at: fileURL)
 
@@ -82,7 +105,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             .appendingPathExtension("m4a")
 
         do {
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             guard recorder.prepareToRecord() else {
                 return resolvedMicrophoneAccessError(
                     defaultMessage: "Check that an input device is connected and available, then try again."
@@ -127,7 +150,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             recorder.delegate = self
             guard recorder.prepareToRecord() else {
                 throw resolvedMicrophoneAccessError(
