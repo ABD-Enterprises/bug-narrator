@@ -5,6 +5,7 @@ struct TranscriptQualityInspector {
         static let minimumUsefulCharacterCount = 12
         static let repeatedPhraseMinimumWords = 4
         static let repeatedPhraseMinimumCount = 4
+        static let repeatedSingleWordMinimumCount = 6
         static let consecutiveRepeatedPhraseMinimumWords = 2
         static let consecutiveRepeatedPhraseMinimumCount = 4
         static let consecutiveRepeatedPhraseMaximumWords = 8
@@ -13,6 +14,8 @@ struct TranscriptQualityInspector {
         static let likelyEnglishMinimumLatinScalars = 20
         static let unexpectedScriptMinimumRatio = 0.04
         static let abruptEndingMinimumWords = 25
+        static let boilerplateMinimumLatinScalars = 8
+        static let boilerplateMaximumUsefulWords = 18
     }
 
     func findings(for transcript: String) -> [TranscriptQualityFinding] {
@@ -51,6 +54,16 @@ struct TranscriptQualityInspector {
             )
         }
 
+        if let boilerplatePhrase = boilerplateHallucination(in: normalized) {
+            findings.append(
+                TranscriptQualityFinding(
+                    kind: .boilerplateText,
+                    severity: .warning,
+                    message: "The transcript contains likely transcription boilerplate near \"\(boilerplatePhrase)\". Confirm the recording captured tester narration before relying on it."
+                )
+            )
+        }
+
         if containsUnexpectedCJKScript(normalized) {
             findings.append(
                 TranscriptQualityFinding(
@@ -80,6 +93,10 @@ struct TranscriptQualityInspector {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
 
+        if let repeatedWord = repeatedSingleWord(in: words) {
+            return repeatedWord
+        }
+
         if let consecutivePhrase = consecutiveRepeatedPhrase(in: words) {
             return consecutivePhrase
         }
@@ -95,6 +112,29 @@ struct TranscriptQualityInspector {
             counts[phrase, default: 0] += 1
             if counts[phrase, default: 0] >= Defaults.repeatedPhraseMinimumCount {
                 return phrase
+            }
+        }
+
+        return nil
+    }
+
+    private func repeatedSingleWord(in words: [String]) -> String? {
+        guard words.count >= Defaults.repeatedSingleWordMinimumCount else {
+            return nil
+        }
+
+        var currentWord: String?
+        var currentCount = 0
+        for word in words {
+            if word == currentWord {
+                currentCount += 1
+            } else {
+                currentWord = word
+                currentCount = 1
+            }
+
+            if currentCount >= Defaults.repeatedSingleWordMinimumCount {
+                return word
             }
         }
 
@@ -186,6 +226,90 @@ struct TranscriptQualityInspector {
             return false
         }
     }
+
+    private func boilerplateHallucination(in transcript: String) -> String? {
+        let normalized = transcript
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased()
+
+        let boilerplatePhrases = [
+            "thanks for watching",
+            "thank you for watching",
+            "like and subscribe",
+            "dont forget to subscribe",
+            "don't forget to subscribe",
+            "please subscribe",
+            "this is the end",
+            "subtitles by",
+            "transcribed by",
+            "captions by"
+        ]
+
+        if let matchedPhrase = boilerplatePhrases.first(where: { normalized.contains($0) }) {
+            return matchedPhrase
+        }
+
+        guard likelyLowInformationBoilerplate(transcript) else {
+            return nil
+        }
+
+        return "low-information transcript"
+    }
+
+    private func likelyLowInformationBoilerplate(_ transcript: String) -> Bool {
+        var latinScalarCount = 0
+        var cjkScalarCount = 0
+        for scalar in transcript.unicodeScalars where CharacterSet.letters.contains(scalar) {
+            if Self.isLatinScalar(scalar) {
+                latinScalarCount += 1
+            } else if Self.isCJKScalar(scalar) {
+                cjkScalarCount += 1
+            }
+        }
+
+        guard latinScalarCount >= Defaults.boilerplateMinimumLatinScalars,
+              cjkScalarCount == 0 else {
+            return false
+        }
+
+        let words = transcript
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+
+        guard !words.isEmpty,
+              words.count <= Defaults.boilerplateMaximumUsefulWords else {
+            return false
+        }
+
+        let usefulWords = words.filter { !Self.boilerplateStopWords.contains($0) }
+        return usefulWords.isEmpty
+    }
+
+    private static let boilerplateStopWords: Set<String> = [
+        "a",
+        "an",
+        "and",
+        "are",
+        "end",
+        "for",
+        "from",
+        "i",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "so",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "we",
+        "you"
+    ]
 
     private func appearsAbruptlyCutOff(_ transcript: String) -> Bool {
         let words = transcript.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }

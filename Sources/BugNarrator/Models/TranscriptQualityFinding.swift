@@ -8,6 +8,7 @@ struct TranscriptQualityFinding: Codable, Equatable, Identifiable, Sendable {
 
     enum Kind: String, Codable, Sendable {
         case repeatedText
+        case boilerplateText
         case unexpectedLanguageScript
         case abruptEnding
         case shortTranscript
