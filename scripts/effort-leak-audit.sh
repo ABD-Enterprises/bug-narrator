@@ -6,26 +6,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-REPO="${EFFORT_LEAK_REPO:-}"
-if [[ -z "$REPO" ]]; then
-  origin_url="$(git remote get-url origin 2>/dev/null || true)"
-  case "$origin_url" in
-    git@github.com:*)
-      REPO="${origin_url#git@github.com:}"
-      REPO="${REPO%.git}"
-      ;;
-    https://github.com/*)
-      REPO="${origin_url#https://github.com/}"
-      REPO="${REPO%.git}"
-      ;;
-  esac
-fi
-
-if [[ -z "$REPO" ]]; then
-  echo "NOT RUN: could not infer GitHub repo from origin remote."
-  exit 0
-fi
-
 if ! command -v gh >/dev/null 2>&1; then
   echo "NOT RUN: gh is not available."
   exit 0
@@ -41,10 +21,20 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
+REPO="${EFFORT_LEAK_REPO:-}"
+if [[ -z "$REPO" ]]; then
+  REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"
+fi
+
+if [[ -z "$REPO" ]]; then
+  echo "NOT RUN: could not infer GitHub repo."
+  exit 0
+fi
+
 issues_json="$(mktemp)"
 prs_json="$(mktemp)"
 audit_output="$(mktemp)"
-trap 'rm -f "$issues_json" "$prs_json" "$audit_output"' EXIT
+trap 'rm -f "${issues_json:-}" "${prs_json:-}" "${audit_output:-}"' EXIT
 
 gh issue list \
   --repo "$REPO" \
@@ -57,7 +47,7 @@ gh pr list \
   --repo "$REPO" \
   --state open \
   --limit 200 \
-  --json number,title,labels,url,closingIssuesReferences \
+  --json number,title,labels,url,closingIssuesReferences,author \
   >"$prs_json"
 
 jq -r -e -n \
@@ -100,7 +90,11 @@ jq -r -e -n \
       ] +
       [
         $prs_list[]
-        | select(((.closingIssuesReferences // []) | length) == 0 and (has_label("chore:trivial") | not))
+        | select(
+            ((.closingIssuesReferences // []) | length) == 0 and
+            (has_label("chore:trivial") | not) and
+            ((.author.login // "") | (endswith("[bot]") or . == "dependabot") | not)
+          )
         | "PR #\(.number) has no linked closing issue and is not labeled chore:trivial."
       ]
     ) as $findings |

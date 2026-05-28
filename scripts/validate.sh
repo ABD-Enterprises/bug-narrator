@@ -148,7 +148,7 @@ if [[ -x "$ROOT/scripts/effort-leak-audit.sh" ]]; then
       printf 'PASS: effort-leak audit found no duplicate, blocked-active, or unlinkable PR state\n' \
         >"$EFFORT_LEAK_STATUS_FILE"
     else
-      printf 'NOT RUN: effort-leak audit skipped because GitHub CLI/auth was unavailable\n' \
+      head -n 1 "$EFFORT_LEAK_OUTPUT_FILE" \
         >"$EFFORT_LEAK_STATUS_FILE"
     fi
   else
