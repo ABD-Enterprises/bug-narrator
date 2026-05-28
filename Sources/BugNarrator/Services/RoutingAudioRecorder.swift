@@ -19,8 +19,8 @@ final class RoutingAudioRecorder: AudioRecording {
         self.microphoneRecorder = microphoneRecorder
         self.systemAudioRecorder = systemAudioRecorder
         self.microphoneAndSystemAudioRecorder = microphoneAndSystemAudioRecorder ?? MixedAudioRecorder(
-            microphoneRecorder: AudioRecorder(),
-            systemAudioRecorder: SystemAudioRecorder()
+            microphoneRecorder: microphoneRecorder,
+            systemAudioRecorder: systemAudioRecorder
         )
     }
 

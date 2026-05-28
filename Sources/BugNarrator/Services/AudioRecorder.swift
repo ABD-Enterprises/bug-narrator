@@ -8,33 +8,62 @@ struct RecordedAudio {
 }
 
 @MainActor
+protocol AudioRecorderEngine: AnyObject {
+    var delegate: (any AVAudioRecorderDelegate)? { get set }
+    var currentTime: TimeInterval { get }
+
+    func prepareToRecord() -> Bool
+    func record() -> Bool
+    func stop()
+}
+
+extension AVAudioRecorder: AudioRecorderEngine {}
+
+typealias AudioRecorderEngineFactory = (URL, [String: Any]) throws -> any AudioRecorderEngine
+
+@MainActor
 final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
     private let recoveryDirectoryURL: URL
+    private let finalizationTimeoutNanoseconds: UInt64
+    private let makeRecorder: AudioRecorderEngineFactory
 
-    private var recorder: AVAudioRecorder?
+    private var recorder: (any AudioRecorderEngine)?
     private var currentFileURL: URL?
     private var stopContinuation: CheckedContinuation<RecordedAudio, Error>?
     private var cancelContinuation: CheckedContinuation<Void, Never>?
     private var pendingStopResult: RecordedAudio?
     private var isCancelling = false
+    private var finalizationTimeoutTask: Task<Void, Never>?
 
     init(
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
-            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
+        makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
+            try AVAudioRecorder(url: url, settings: settings)
+        }
     ) {
         self.permissionAccess = SystemMicrophonePermissionAccess()
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
+        self.makeRecorder = makeRecorder
     }
 
     init(
         permissionAccess: any MicrophonePermissionAccessing,
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
-            .appendingPathComponent("RecoveredRecordings", isDirectory: true)
+            .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
+        makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
+            try AVAudioRecorder(url: url, settings: settings)
+        }
     ) {
         self.permissionAccess = permissionAccess
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
+        self.makeRecorder = makeRecorder
     }
 
     var currentDuration: TimeInterval {
@@ -51,7 +80,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             .appendingPathExtension("m4a")
 
         do {
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             let prepared = recorder.prepareToRecord()
             try? FileManager.default.removeItem(at: fileURL)
 
@@ -76,7 +105,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
             .appendingPathExtension("m4a")
 
         do {
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             guard recorder.prepareToRecord() else {
                 return resolvedMicrophoneAccessError(
                     defaultMessage: "Check that an input device is connected and available, then try again."
@@ -121,7 +150,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
-            let recorder = try AVAudioRecorder(url: fileURL, settings: recordingSettings)
+            let recorder = try makeRecorder(fileURL, recordingSettings)
             recorder.delegate = self
             guard recorder.prepareToRecord() else {
                 throw resolvedMicrophoneAccessError(
@@ -171,6 +200,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         return try await withCheckedThrowingContinuation { continuation in
             stopContinuation = continuation
             pendingStopResult = RecordedAudio(fileURL: currentFileURL, duration: recorder.currentTime)
+            scheduleStopTimeout(fileName: currentFileURL.lastPathComponent)
             recorder.stop()
         }
     }
@@ -193,6 +223,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         await withCheckedContinuation { continuation in
             cancelContinuation = continuation
+            scheduleCancelTimeout(fileName: currentFileURL.lastPathComponent)
             recorder.stop()
         }
 
@@ -265,6 +296,8 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     }
 
     private func cleanup() {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = nil
         recorder?.delegate = nil
         recorder = nil
         currentFileURL = nil
@@ -272,6 +305,56 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         cancelContinuation = nil
         pendingStopResult = nil
         isCancelling = false
+    }
+
+    private func scheduleStopTimeout(fileName: String) {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: finalizationTimeoutNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, let stopContinuation else {
+                return
+            }
+
+            recordingLogger.error(
+                "recording_finalize_timeout",
+                "The recorded audio file did not finish finalizing before the timeout.",
+                metadata: ["file_name": fileName]
+            )
+            cleanup()
+            stopContinuation.resume(
+                throwing: AppError.recordingFailure("The recorded audio file did not finish finalizing before the timeout.")
+            )
+        }
+    }
+
+    private func scheduleCancelTimeout(fileName: String) {
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: finalizationTimeoutNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, let cancelContinuation else {
+                return
+            }
+
+            recordingLogger.warning(
+                "recording_cancel_timeout",
+                "Audio recording cancellation did not receive a final delegate callback before the timeout.",
+                metadata: ["file_name": fileName]
+            )
+            cleanup()
+            cancelContinuation.resume()
+        }
     }
 
     private func validateRecordedAudioFile(at url: URL) throws {
@@ -286,6 +369,17 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
         guard fileSize > 0 else {
             throw AppError.recordingFailure("The recorded audio file was empty.")
+        }
+
+        do {
+            let audioFile = try AVAudioFile(forReading: url)
+            guard audioFile.fileFormat.sampleRate > 0, audioFile.length > 0 else {
+                throw AppError.recordingFailure("The recorded audio file did not contain playable audio.")
+            }
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.recordingFailure("The recorded audio file could not be read.")
         }
     }
 

@@ -374,6 +374,43 @@ final class SessionLibraryTests: XCTestCase {
         XCTAssertFalse(preview.hasSuffix(" "))
     }
 
+    func testPendingTranscriptionRetryMessagesSeparateProviderSetupFromCredentialsAndLegacyRecovery() {
+        XCTAssertEqual(
+            PendingTranscriptionFailureReason.missingAPIKey.retryMessage(for: .openAI),
+            "Recording saved locally. Add your OpenAI API key in Settings, then retry transcription from this session."
+        )
+        XCTAssertEqual(
+            PendingTranscriptionFailureReason.providerSetup.retryMessage(for: .parakeetLocal),
+            "Recording saved locally. Finish the Local (Parakeet) setup in Settings, then retry transcription from this session."
+        )
+        XCTAssertEqual(
+            PendingTranscriptionFailureReason.invalidAPIKey.retryMessage(for: .openAI),
+            "Recording saved locally. Replace the rejected OpenAI API key in Settings, then retry transcription from this session."
+        )
+        XCTAssertEqual(
+            PendingTranscriptionFailureReason.crashRecovery.retryMessage(for: .openAI),
+            "This older unexpected-quit recovery item is no longer supported. Delete it and start a new recording."
+        )
+    }
+
+    func testPendingTranscriptionExportsUseRetryLabelInsteadOfRecoveryLabel() {
+        let session = makeSession(
+            transcript: "",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            summary: "",
+            pendingTranscription: PendingTranscription(
+                audioFileName: "recording.m4a",
+                failureReason: .providerSetup,
+                preservedAt: Date(timeIntervalSince1970: 1_700_000_010)
+            )
+        )
+
+        XCTAssertTrue(session.plainTextContent.contains("Retry: Recording saved locally. Finish the OpenAI setup in Settings, then retry transcription from this session."))
+        XCTAssertFalse(session.plainTextContent.contains("Recovery:"))
+        XCTAssertTrue(session.markdownContent.contains("- Retry: Recording saved locally. Finish the OpenAI setup in Settings, then retry transcription from this session."))
+        XCTAssertFalse(session.markdownContent.contains("- Recovery:"))
+    }
+
     private func makeCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

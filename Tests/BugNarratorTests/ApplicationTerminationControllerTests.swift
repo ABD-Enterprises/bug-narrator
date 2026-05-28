@@ -29,6 +29,20 @@ final class ApplicationTerminationControllerTests: XCTestCase {
         XCTAssertEqual(harness.toasts.map(\.style), [.informational])
     }
 
+    func testApplicationShouldTerminateCancelsQuitWhileTranscribing() {
+        let harness = ApplicationTerminationControllerHarness()
+        harness.statusPhase = .transcribing
+        harness.activeRecordingSession = harness.makeRecordingSession()
+
+        let reply = harness.controller.applicationShouldTerminate()
+
+        XCTAssertEqual(reply, .terminateCancel)
+        XCTAssertEqual(harness.cancelReasons, ["Quit was requested while transcription was finishing, so pending screenshot selection was cancelled."])
+        XCTAssertEqual(harness.recordingControlsShownCount, 1)
+        XCTAssertEqual(harness.toasts.map(\.message), ["Wait for transcription to finish saving before quitting BugNarrator."])
+        XCTAssertEqual(harness.toasts.map(\.style), [.informational])
+    }
+
     func testRequestApplicationTerminationInvokesInjectedTerminateOnlyWhenAllowed() {
         let allowedHarness = ApplicationTerminationControllerHarness()
 

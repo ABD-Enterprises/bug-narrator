@@ -9,6 +9,7 @@ final class MixedAudioRecorder: AudioRecording {
     private let outputDirectoryURL: URL
 
     private var isRecording = false
+    private var isStopping = false
 
     init(
         microphoneRecorder: any AudioRecording,
@@ -73,33 +74,19 @@ final class MixedAudioRecorder: AudioRecording {
     }
 
     func stopRecording() async throws -> RecordedAudio {
-        guard isRecording else {
+        guard isRecording, !isStopping else {
             throw AppError.recordingFailure("There is no active recording.")
         }
 
-        isRecording = false
-
-        var systemResult: Result<RecordedAudio, Error>?
-        var microphoneResult: Result<RecordedAudio, Error>?
-
-        do {
-            systemResult = .success(try await systemAudioRecorder.stopRecording())
-        } catch {
-            systemResult = .failure(error)
+        isStopping = true
+        defer {
+            isStopping = false
+            isRecording = false
         }
 
-        do {
-            microphoneResult = .success(try await microphoneRecorder.stopRecording())
-        } catch {
-            microphoneResult = .failure(error)
-        }
-
-        guard let systemResult else {
-            throw AppError.recordingFailure("System audio recording was unavailable.")
-        }
-        guard let microphoneResult else {
-            throw AppError.recordingFailure("Microphone recording was unavailable.")
-        }
+        async let systemStopResult = stopSystemAudioRecorder()
+        async let microphoneStopResult = stopMicrophoneRecorder()
+        let (systemResult, microphoneResult) = await (systemStopResult, microphoneStopResult)
 
         switch (systemResult, microphoneResult) {
         case (.failure, .success(let microphoneAudio)):
@@ -136,6 +123,22 @@ final class MixedAudioRecorder: AudioRecording {
         return mixedAudio
     }
 
+    private func stopSystemAudioRecorder() async -> Result<RecordedAudio, Error> {
+        do {
+            return .success(try await systemAudioRecorder.stopRecording())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private func stopMicrophoneRecorder() async -> Result<RecordedAudio, Error> {
+        do {
+            return .success(try await microphoneRecorder.stopRecording())
+        } catch {
+            return .failure(error)
+        }
+    }
+
     private func removeSourceAudioFiles(_ sourceURLs: [URL], preserving outputURL: URL) {
         let preservedURL = outputURL.standardizedFileURL
         for sourceURL in sourceURLs where sourceURL.standardizedFileURL != preservedURL {
@@ -144,7 +147,7 @@ final class MixedAudioRecorder: AudioRecording {
     }
 
     func cancelRecording(preserveFile: Bool) async {
-        guard isRecording else {
+        guard isRecording, !isStopping else {
             return
         }
 

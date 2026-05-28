@@ -43,8 +43,13 @@ final class SystemAudioRecorder: AudioRecording {
 
         do {
             let probe = SystemAudioTapSession()
-            _ = try probe.prepare()
-            probe.invalidate()
+            do {
+                _ = try probe.prepare()
+                probe.invalidate()
+            } catch {
+                probe.invalidate()
+                throw error
+            }
             return nil
         } catch let error as AppError {
             return error
@@ -68,14 +73,17 @@ final class SystemAudioRecorder: AudioRecording {
             throw AppError.systemAudioUnavailable("System audio capture requires macOS 14.2 or later.")
         }
 
+        let session = SystemAudioTapSession()
+        var writer: SystemAudioFileWriter?
+
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
-            let session = SystemAudioTapSession()
             let format = try session.prepare()
             let fileURL = makeRecoverableRecordingURL()
-            let writer = try SystemAudioFileWriter(fileURL: fileURL, format: format)
+            let preparedWriter = try SystemAudioFileWriter(fileURL: fileURL, format: format)
+            writer = preparedWriter
 
-            try session.start(on: ioQueue, writer: writer)
+            try session.start(on: ioQueue, writer: preparedWriter)
 
             tapSession = session
             activeWriter = writer
@@ -88,9 +96,13 @@ final class SystemAudioRecorder: AudioRecording {
                 metadata: ["file_name": fileURL.lastPathComponent]
             )
         } catch let error as AppError {
+            session.invalidate()
+            try? writer?.close()
             recordingLogger.error("system_audio_recording_start_failed", error.userMessage)
             throw error
         } catch {
+            session.invalidate()
+            try? writer?.close()
             recordingLogger.error("system_audio_recording_start_failed", error.localizedDescription)
             throw AppError.systemAudioUnavailable(systemAudioRecoveryMessage(details: error.localizedDescription))
         }
@@ -108,9 +120,9 @@ final class SystemAudioRecorder: AudioRecording {
             metadata: ["file_name": currentFileURL.lastPathComponent]
         )
 
-        activeWriter.close()
-        ioQueue.sync { }
         tapSession.invalidate()
+        ioQueue.sync { }
+        try activeWriter.close()
         cleanupActiveState()
 
         try validateRecordedAudioFile(at: currentFileURL)
@@ -129,9 +141,9 @@ final class SystemAudioRecorder: AudioRecording {
 
     func cancelRecording(preserveFile: Bool) async {
         let fileURL = currentFileURL
-        activeWriter?.close()
-        ioQueue.sync { }
         tapSession?.invalidate()
+        ioQueue.sync { }
+        try? activeWriter?.close()
         cleanupActiveState()
 
         guard !preserveFile, let fileURL else {
@@ -160,6 +172,17 @@ final class SystemAudioRecorder: AudioRecording {
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
         guard fileSize > 0 else {
             throw AppError.recordingFailure("The recorded system audio file was empty.")
+        }
+
+        do {
+            let audioFile = try AVAudioFile(forReading: url)
+            guard audioFile.fileFormat.sampleRate > 0, audioFile.length > 0 else {
+                throw AppError.recordingFailure("The recorded system audio file did not contain playable audio.")
+            }
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.recordingFailure("The recorded system audio file could not be read.")
         }
     }
 
@@ -195,6 +218,13 @@ private final class SystemAudioTapSession {
                 throw AppError.systemAudioUnavailable("The system audio tap was not prepared.")
             }
             return audioFormat
+        }
+
+        var preparedSuccessfully = false
+        defer {
+            if !preparedSuccessfully {
+                invalidate()
+            }
         }
 
         let excludedProcesses = (try? Self.currentProcessObjectIDs()) ?? []
@@ -248,6 +278,7 @@ private final class SystemAudioTapSession {
         }
 
         audioFormat = format
+        preparedSuccessfully = true
         return format
     }
 
@@ -255,6 +286,13 @@ private final class SystemAudioTapSession {
     func start(on queue: DispatchQueue, writer: SystemAudioFileWriter) throws {
         guard aggregateDeviceID != AudioObjectID(kAudioObjectUnknown) else {
             throw AppError.systemAudioUnavailable("The system audio device was not prepared.")
+        }
+
+        var startedSuccessfully = false
+        defer {
+            if !startedSuccessfully {
+                invalidate()
+            }
         }
 
         var status = AudioDeviceCreateIOProcIDWithBlock(
@@ -272,6 +310,7 @@ private final class SystemAudioTapSession {
         guard status == noErr else {
             throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio refused to start system audio capture with status \(status)."))
         }
+        startedSuccessfully = true
     }
 
     func invalidate() {
@@ -320,6 +359,7 @@ private final class SystemAudioFileWriter: @unchecked Sendable {
     private let lock = NSLock()
     private let format: AVAudioFormat
     private var file: AVAudioFile?
+    private var writeError: Error?
 
     init(fileURL: URL, format: AVAudioFormat) throws {
         self.format = format
@@ -342,13 +382,23 @@ private final class SystemAudioFileWriter: @unchecked Sendable {
             return
         }
 
-        try? file.write(from: buffer)
+        do {
+            try file.write(from: buffer)
+        } catch {
+            writeError = error
+        }
     }
 
-    func close() {
+    func close() throws {
         lock.lock()
+        let writeError = writeError
         file = nil
+        self.writeError = nil
         lock.unlock()
+
+        if let writeError {
+            throw AppError.recordingFailure("System audio could not be written. \(writeError.localizedDescription)")
+        }
     }
 }
 

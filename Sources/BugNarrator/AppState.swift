@@ -721,7 +721,7 @@ final class AppState: ObservableObject {
                     from: recordingSession,
                     recordedAudio: recordedAudio,
                     request: request,
-                    failureReason: .missingAPIKey
+                    failureReason: .providerSetup
                 )
                 return
             }
@@ -978,7 +978,7 @@ final class AppState: ObservableObject {
 
         do {
             guard settingsStore.aiProviderCompatibilityIssue == nil else {
-                throw AppError.missingAPIKey
+                throw AppError.transcriptionFailure("Finish the AI provider setup in Settings, then retry transcription from this session.")
             }
 
             guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {

@@ -122,7 +122,7 @@ final class RetryableSessionPreservationPresenter {
         errorPresenter.logAppError(appError, context: "preserve_retryable_session", operation: .transcription)
         errorPresenter.setStatus(
             .error(
-                retryableSession.transcriptionRecoveryMessage(for: currentProvider)
+                retryableSession.transcriptionRetryMessage(for: currentProvider)
                     ?? appError.userMessage(for: currentProvider)
             ),
             error: appError
@@ -251,7 +251,7 @@ final class TranscriptionRecoveryController: ObservableObject {
             return .failure(
                 .transcriptionFailure(aiProviderCompatibilityIssue),
                 opensSettings: true,
-                statusMessage: aiProviderCompatibilityIssue
+                statusMessage: session.transcriptionRetryMessage(for: provider) ?? aiProviderCompatibilityIssue
             )
         }
 
@@ -259,7 +259,7 @@ final class TranscriptionRecoveryController: ObservableObject {
             return .failure(
                 .missingAPIKey,
                 opensSettings: true,
-                statusMessage: session.transcriptionRecoveryMessage(for: provider)
+                statusMessage: session.transcriptionRetryMessage(for: provider)
                     ?? AppError.missingAPIKey.userMessage(for: provider)
             )
         }
@@ -313,7 +313,7 @@ final class TranscriptionRecoveryController: ObservableObject {
         } catch {
             transcriptionLogger.error(
                 "transcription_retry_state_persist_failed",
-                "Retry attempt count could not be saved durably; recovery state is in memory only.",
+                "Retry attempt count could not be saved durably; pending transcription state is in memory only.",
                 metadata: [
                     "session_id": session.id.uuidString,
                     "failure_reason": failureReason.rawValue,
@@ -333,7 +333,7 @@ final class TranscriptionRecoveryController: ObservableObject {
             session: session,
             appError: failureReason.appError,
             statusMessage: (
-                session.transcriptionRecoveryMessage(for: provider)
+                session.transcriptionRetryMessage(for: provider)
                     ?? failureReason.appError.userMessage(for: provider)
             ) + attemptMessage
         )

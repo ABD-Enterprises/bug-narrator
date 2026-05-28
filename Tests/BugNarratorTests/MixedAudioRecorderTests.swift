@@ -140,6 +140,42 @@ final class MixedAudioRecorderTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: systemAudioURL.path))
     }
 
+    func testStopRecordingStartsBothSourceStopsBeforeEitherCompletes() async throws {
+        let rootDirectoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let microphoneURL = rootDirectoryURL.appendingPathComponent("microphone.wav")
+        let systemAudioURL = rootDirectoryURL.appendingPathComponent("system.wav")
+        try writeSilentAudioFile(to: microphoneURL)
+        try writeSilentAudioFile(to: systemAudioURL)
+
+        let microphoneRecorder = MockAudioRecorder()
+        microphoneRecorder.suspendStop = true
+        let systemAudioRecorder = MockAudioRecorder()
+        systemAudioRecorder.suspendStop = true
+        let recorder = MixedAudioRecorder(
+            microphoneRecorder: microphoneRecorder,
+            systemAudioRecorder: systemAudioRecorder,
+            outputDirectoryURL: rootDirectoryURL
+        )
+
+        try await recorder.startRecording()
+        let stopTask = Task {
+            try await recorder.stopRecording()
+        }
+
+        await waitForStopCalls(microphoneRecorder: microphoneRecorder, systemAudioRecorder: systemAudioRecorder)
+
+        XCTAssertEqual(microphoneRecorder.stopCallCount, 1)
+        XCTAssertEqual(systemAudioRecorder.stopCallCount, 1)
+
+        microphoneRecorder.resumeStop(with: .success(RecordedAudio(fileURL: microphoneURL, duration: 0.1)))
+        systemAudioRecorder.resumeStop(with: .success(RecordedAudio(fileURL: systemAudioURL, duration: 0.1)))
+
+        let mixedAudio = try await stopTask.value
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mixedAudio.fileURL.path))
+    }
+
     private func temporaryDirectoryURL() -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -152,5 +188,26 @@ final class MixedAudioRecorderTests: XCTestCase {
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4_410))
         buffer.frameLength = 4_410
         try file.write(from: buffer)
+    }
+
+    private func waitForStopCalls(
+        microphoneRecorder: MockAudioRecorder,
+        systemAudioRecorder: MockAudioRecorder,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        for _ in 0..<20 {
+            if microphoneRecorder.stopCallCount == 1, systemAudioRecorder.stopCallCount == 1 {
+                return
+            }
+
+            await Task.yield()
+        }
+
+        XCTFail(
+            "Expected both mixed recorder sources to begin stopping.",
+            file: file,
+            line: line
+        )
     }
 }

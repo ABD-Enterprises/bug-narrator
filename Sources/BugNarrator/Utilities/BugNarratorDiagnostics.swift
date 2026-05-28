@@ -213,7 +213,13 @@ actor DiagnosticsLogStore {
     }
 
     static func defaultStorageURL(fileManager: FileManager) -> URL {
-        AppSupportLocation.appDirectory(fileManager: fileManager)
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return fileManager.temporaryDirectory
+                .appendingPathComponent("BugNarratorTestDiagnostics", isDirectory: true)
+                .appendingPathComponent("recent-log-\(ProcessInfo.processInfo.processIdentifier).json")
+        }
+
+        return AppSupportLocation.appDirectory(fileManager: fileManager)
             .appendingPathComponent("Diagnostics", isDirectory: true)
             .appendingPathComponent("recent-log.json")
     }

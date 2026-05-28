@@ -50,6 +50,34 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(statusMessage, session.transcriptionRecoveryMessage)
     }
 
+    func testRetryContextWithProviderSetupIssueReturnsRetryMessage() throws {
+        let harness = try TranscriptionRecoveryControllerHarness()
+        defer { harness.cleanup() }
+
+        let session = try harness.addPendingSession(failureReason: .providerSetup)
+
+        let resolution = harness.controller.retryContext(
+            for: session.id,
+            isRecording: false,
+            provider: .parakeetLocal,
+            hasUsableAIProviderCredential: true,
+            aiProviderCompatibilityIssue: "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider."
+        )
+
+        guard case .failure(let appError, let opensSettings, let statusMessage) = resolution else {
+            return XCTFail("Expected provider setup failure.")
+        }
+        XCTAssertEqual(
+            appError,
+            .transcriptionFailure("Choose a local transcription model instead of whisper-1 for the Local-Compatible provider.")
+        )
+        XCTAssertTrue(opensSettings)
+        XCTAssertEqual(
+            statusMessage,
+            "Recording saved locally. Finish the Local (Parakeet) setup in Settings, then retry transcription from this session."
+        )
+    }
+
     func testRetryContextRejectsLegacyCrashRecoverySessions() throws {
         let harness = try TranscriptionRecoveryControllerHarness()
         defer { harness.cleanup() }

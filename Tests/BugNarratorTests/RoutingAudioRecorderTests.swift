@@ -95,6 +95,51 @@ final class RoutingAudioRecorderTests: XCTestCase {
         XCTAssertEqual(mixedRecorder.stopCallCount, 1)
     }
 
+    func testDefaultMixedRecorderUsesInjectedSourceRecorders() async throws {
+        let (store, defaults, defaultsSuiteName) = makeSettingsStore()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        store.systemAudioCaptureEnabled = true
+        store.recordingAudioSource = .microphoneAndSystemAudio
+        store.hasAcceptedSystemAudioRecordingConsent = true
+
+        let rootDirectoryURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+
+        let microphoneURL = rootDirectoryURL.appendingPathComponent("microphone.wav")
+        let systemAudioURL = rootDirectoryURL.appendingPathComponent("system.wav")
+        try Data("not real audio".utf8).write(to: microphoneURL)
+        try Data("not real audio".utf8).write(to: systemAudioURL)
+
+        let microphoneRecorder = MockAudioRecorder()
+        microphoneRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: microphoneURL, duration: 0.1))
+        ]
+        let systemAudioRecorder = MockAudioRecorder()
+        systemAudioRecorder.requiresMicrophonePermission = false
+        systemAudioRecorder.stopResults = [
+            .success(RecordedAudio(fileURL: systemAudioURL, duration: 0.1))
+        ]
+        let router = RoutingAudioRecorder(
+            settingsStore: store,
+            microphoneRecorder: microphoneRecorder,
+            systemAudioRecorder: systemAudioRecorder
+        )
+
+        try await router.startRecording()
+        do {
+            _ = try await router.stopRecording()
+            XCTFail("Expected mixed stop to fail while proving the injected source recorders were used.")
+        } catch {
+            // Expected: the injected recorders returned intentionally invalid audio files.
+        }
+
+        XCTAssertEqual(microphoneRecorder.startCallCount, 1)
+        XCTAssertEqual(microphoneRecorder.stopCallCount, 1)
+        XCTAssertEqual(systemAudioRecorder.startCallCount, 1)
+        XCTAssertEqual(systemAudioRecorder.stopCallCount, 1)
+    }
+
     private func makeSettingsStore() -> (SettingsStore, UserDefaults, String) {
         let suiteName = "BugNarrator-RoutingAudioRecorderTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
