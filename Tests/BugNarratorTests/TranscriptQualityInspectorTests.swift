@@ -21,6 +21,38 @@ final class TranscriptQualityInspectorTests: XCTestCase {
         XCTAssertTrue(findings.contains { $0.kind == .repeatedText })
     }
 
+    func testFindsSingleWordRepeatedTextLoop() {
+        let transcript = "The recorder returned you you you you you you after the tester stopped talking."
+
+        let findings = TranscriptQualityInspector().findings(for: transcript)
+
+        XCTAssertTrue(findings.contains { $0.kind == .repeatedText })
+    }
+
+    func testFindsLikelyBoilerplateHallucination() {
+        let transcript = "Thanks for watching. Please subscribe."
+
+        let findings = TranscriptQualityInspector().findings(for: transcript)
+
+        XCTAssertTrue(findings.contains { $0.kind == .boilerplateText })
+    }
+
+    func testFindsLowInformationBoilerplateTranscript() {
+        let transcript = "This is the end of the"
+
+        let findings = TranscriptQualityInspector().findings(for: transcript)
+
+        XCTAssertTrue(findings.contains { $0.kind == .boilerplateText })
+    }
+
+    func testDoesNotFlagNormalShortNarrationAsBoilerplate() {
+        let transcript = "Clicked refresh and the command center crashed."
+
+        let findings = TranscriptQualityInspector().findings(for: transcript)
+
+        XCTAssertFalse(findings.contains { $0.kind == .boilerplateText })
+    }
+
     func testFindsUnexpectedCJKScriptForLikelyEnglishTranscript() {
         let transcript = """
         The tester opened the command center and clicked refresh. 然后 the expected setup panel did not appear.
