@@ -842,6 +842,45 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.apiKeyValidationState, .failure(AppError.missingAPIKey.userMessage))
     }
 
+    func testValidateOpenAICompatibleProviderBlocksMissingBaseURLBeforeNetworkCall() async {
+        let harness = AppStateHarness(apiKey: "enterprise-token")
+        defer { harness.cleanup() }
+
+        harness.settingsStore.aiProvider = .openAICompatible
+
+        await harness.appState.validateAPIKey()
+
+        XCTAssertEqual(
+            harness.appState.apiKeyValidationState,
+            .failure("Choose a non-default API base URL for the OpenAI-Compatible provider.")
+        )
+        let validationCallCount = await harness.transcriptionClient.validationCallCount
+        XCTAssertEqual(validationCallCount, 0)
+    }
+
+    func testValidateLocalCompatibleProviderUsesEmptyCredentialAndLocalBaseURLWhenSetupIsReady() async {
+        let harness = AppStateHarness(apiKey: "")
+        defer { harness.cleanup() }
+
+        harness.settingsStore.aiProvider = .localCompatible
+        harness.settingsStore.openAIBaseURL = "http://localhost:1234/v1"
+        harness.settingsStore.preferredModel = "whisper-large-v3"
+        harness.settingsStore.issueExtractionModel = "llama3.1:8b"
+
+        await harness.appState.validateAPIKey()
+
+        XCTAssertEqual(
+            harness.appState.apiKeyValidationState,
+            .success("The local-compatible provider accepted this configuration.")
+        )
+        let validationCallCount = await harness.transcriptionClient.validationCallCount
+        let validationKeys = await harness.transcriptionClient.requestedValidationAPIKeys
+        let validationBaseURLs = await harness.transcriptionClient.requestedValidationBaseURLs
+        XCTAssertEqual(validationCallCount, 1)
+        XCTAssertEqual(validationKeys, [""])
+        XCTAssertEqual(validationBaseURLs.map(\.absoluteString), ["http://localhost:1234/v1"])
+    }
+
     func testValidateGitHubConfigurationUpdatesValidationStateOnSuccess() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

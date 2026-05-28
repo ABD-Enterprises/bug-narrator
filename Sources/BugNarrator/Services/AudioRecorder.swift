@@ -174,9 +174,11 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
                 metadata: ["file_name": fileURL.lastPathComponent]
             )
         } catch let error as AppError {
+            try? FileManager.default.removeItem(at: fileURL)
             recordingLogger.error("recording_start_failed", error.userMessage)
             throw error
         } catch {
+            try? FileManager.default.removeItem(at: fileURL)
             recordingLogger.error("recording_start_failed", "Audio recording could not be started.")
             throw AppError.recordingFailure(error.localizedDescription)
         }
