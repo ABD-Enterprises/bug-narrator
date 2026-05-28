@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] Moved Swift/project change detection ahead of the self-hosted macOS CI job so config-only PRs no longer reserve macOS runner slots.
 - [INTERNAL] Added the EAS auto-merge trusted-author allowlist so eligible green PRs do not repeatedly fail on missing gate configuration.
 - [INTERNAL] Added effort-leak guardrails so stale AI issue states, duplicate PR claims, and superseded CI runs are caught before agents spend more time.
 
