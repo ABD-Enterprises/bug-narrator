@@ -230,6 +230,14 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 
 For the structured maintainer setup guide, see [docs/development/setup.md](docs/development/setup.md).
 
+Before opening a PR or spending CI runner time, run the cheap local-first validation entry point:
+
+```bash
+./scripts/validate.sh origin/main
+```
+
+That command mirrors the portable CI guardrails: changed-file Semgrep when available, Swift parse checks, local-transcription syntax checks, repository docs drift checks, and effort-leak issue/PR state checks.
+
 Open `BugNarrator.xcodeproj` in Xcode and build the `BugNarrator` scheme, or use:
 
 ```bash

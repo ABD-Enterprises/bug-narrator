@@ -10,14 +10,24 @@ Detailed companion docs:
 
 ## Automated Baseline
 
-Current macOS validation baseline:
+Cheap local-first validation before opening a PR or spending GitHub Actions runner time:
+
+```bash
+./scripts/validate.sh origin/main
+```
+
+This is the portable CI runtime-guardrails entry point. It records status files under `artifacts/validation/`, including Semgrep availability, Swift parse checks, local-transcription syntax checks, repository docs drift checks, and effort-leak issue/PR state checks.
+
+Current macOS release-readiness baseline:
 
 ```bash
 ./scripts/release_smoke_test.sh
 ./scripts/accessibility_regression_check.sh
-xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test
+xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination 'platform=macOS' -only-testing:BugNarratorTests CODE_SIGNING_ALLOWED=NO test
 xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Release CODE_SIGNING_ALLOWED=NO build
 ```
+
+The CI macOS job intentionally runs `BugNarratorTests` only; UI tests require a usable window server and remain a targeted local/manual validation path.
 
 Current Windows workspace validation baseline on Windows:
 
