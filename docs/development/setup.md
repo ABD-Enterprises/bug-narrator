@@ -39,16 +39,24 @@ If `project.yml` changed, regenerate the Xcode project:
 xcodegen generate
 ```
 
+Run the cheap local-first validator before opening a PR or spending GitHub Actions runner time:
+
+```bash
+./scripts/validate.sh origin/main
+```
+
+This is the portable validation entry point used by CI runtime guardrails. It records status files under `artifacts/validation/`, including Semgrep availability, Swift parse checks, local-transcription syntax checks, repository docs drift checks, and effort-leak issue/PR state checks.
+
 Build the app locally:
 
 ```bash
 xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
-Run tests:
+Run the CI-aligned macOS unit-test scope:
 
 ```bash
-xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test
+xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination 'platform=macOS' -only-testing:BugNarratorTests CODE_SIGNING_ALLOWED=NO test
 ```
 
 ## Local Release Validation
