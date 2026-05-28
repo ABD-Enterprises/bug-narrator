@@ -56,6 +56,26 @@ final class AudioRecorderTests: XCTestCase {
             XCTAssertEqual(error as? AppError, .recordingFailure("The recorded audio file could not be read."))
         }
     }
+
+    func testStartRecordingRemovesPreparedFileWhenRecorderRejectsStart() async throws {
+        let harness = try AudioRecorderHarness(timeoutNanoseconds: 500_000_000)
+        defer { harness.cleanup() }
+        harness.recorderFactory.nextEngineRecordResult = false
+        harness.recorderFactory.writePlaceholderFileForNextEngine = true
+
+        do {
+            try await harness.recorder.startRecording()
+            XCTFail("Expected start recording to fail.")
+        } catch {
+            XCTAssertEqual(
+                error as? AppError,
+                .microphoneUnavailable("Check that an input device is connected and available, then try again.")
+            )
+        }
+
+        let fileURL = try XCTUnwrap(harness.recordingFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
 }
 
 @MainActor
@@ -106,6 +126,8 @@ private final class AudioRecorderEngineFactorySpy {
     private let recoveryDirectoryURL: URL
     private(set) var engines: [FakeAudioRecorderEngine] = []
     private(set) var recordingFileURL: URL?
+    var nextEngineRecordResult = true
+    var writePlaceholderFileForNextEngine = false
 
     var recordingEngine: FakeAudioRecorderEngine? {
         engines.last
@@ -116,10 +138,21 @@ private final class AudioRecorderEngineFactorySpy {
     }
 
     func makeRecorder(for url: URL) -> FakeAudioRecorderEngine {
-        let engine = FakeAudioRecorderEngine()
+        let isRecordingArtifact = url.standardizedFileURL.path.hasPrefix(recoveryDirectoryURL.standardizedFileURL.path)
+        let recordResult = isRecordingArtifact ? nextEngineRecordResult : true
+
+        if isRecordingArtifact, writePlaceholderFileForNextEngine {
+            try? Data("partial recorder artifact".utf8).write(to: url)
+            writePlaceholderFileForNextEngine = false
+        }
+
+        let engine = FakeAudioRecorderEngine(recordResult: recordResult)
+        if isRecordingArtifact {
+            nextEngineRecordResult = true
+        }
         engines.append(engine)
 
-        if url.standardizedFileURL.path.hasPrefix(recoveryDirectoryURL.standardizedFileURL.path) {
+        if isRecordingArtifact {
             recordingFileURL = url
         }
 
@@ -132,13 +165,18 @@ private final class FakeAudioRecorderEngine: AudioRecorderEngine {
     weak var delegate: (any AVAudioRecorderDelegate)?
     var currentTime: TimeInterval = 3
     private(set) var stopCallCount = 0
+    private let recordResult: Bool
+
+    init(recordResult: Bool = true) {
+        self.recordResult = recordResult
+    }
 
     func prepareToRecord() -> Bool {
         true
     }
 
     func record() -> Bool {
-        true
+        recordResult
     }
 
     func stop() {
