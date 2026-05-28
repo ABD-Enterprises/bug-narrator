@@ -85,6 +85,8 @@ struct TranscriptQualityFindingsView: View {
         switch finding.kind {
         case .repeatedText:
             return "repeat"
+        case .unexpectedLanguageScript:
+            return "globe.asia.australia"
         case .abruptEnding:
             return "text.badge.exclamationmark"
         case .shortTranscript:
