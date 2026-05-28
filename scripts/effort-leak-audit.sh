@@ -74,34 +74,36 @@ jq -r -e -n \
 
     ($issues[0] // []) as $issues_list |
     ($prs[0] // []) as $prs_list |
-    [
-      $issues_list[]
-      | select(has_label("ai/blocked") and active_ai)
-      | "Issue #\(.number) is blocked but also carries an active AI workflow label: \([.labels[].name] | join(", "))"
-    ] +
-    [
-      $issues_list[]
-      | . as $issue
-      | select((has_label("ai/in-pr-review") or has_label("ai/ready-for-local-testing")) and (([ $prs_list[] | select((.closingIssuesReferences // []) | any(.number == $issue.number)) ] | length) == 0))
-      | "Issue #\(.number) is in review/testing state but no open PR closes it."
-    ] +
-    [
+    (
+      [
+        $issues_list[]
+        | select(has_label("ai/blocked") and active_ai)
+        | "Issue #\(.number) is blocked but also carries an active AI workflow label: \([.labels[].name] | join(", "))"
+      ] +
+      [
+        $issues_list[]
+        | . as $issue
+        | select((has_label("ai/in-pr-review") or has_label("ai/ready-for-local-testing")) and (([ $prs_list[] | select((.closingIssuesReferences // []) | any(.number == $issue.number)) ] | length) == 0))
+        | "Issue #\(.number) is in review/testing state but no open PR closes it."
+      ] +
+      [
+        [
+          $prs_list[]
+          | . as $pr
+          | ($pr.closingIssuesReferences // [])[].number
+          | {issue: ., pr: $pr.number}
+        ]
+        | sort_by(.issue)
+        | group_by(.issue)[]
+        | select(length > 1)
+        | "Issue #\(.[0].issue) has multiple open PRs claiming closure: \([.[].pr | "#\(.)"] | join(", "))"
+      ] +
       [
         $prs_list[]
-        | . as $pr
-        | ($pr.closingIssuesReferences // [])[].number
-        | {issue: ., pr: $pr.number}
+        | select(((.closingIssuesReferences // []) | length) == 0 and (has_label("chore:trivial") | not))
+        | "PR #\(.number) has no linked closing issue and is not labeled chore:trivial."
       ]
-      | sort_by(.issue)
-      | group_by(.issue)[]
-      | select(length > 1)
-      | "Issue #\(.[0].issue) has multiple open PRs claiming closure: \([.[].pr | "#\(.)"] | join(", "))"
-    ] +
-    [
-      $prs_list[]
-      | select(((.closingIssuesReferences // []) | length) == 0 and (has_label("chore:trivial") | not))
-      | "PR #\(.number) has no linked closing issue and is not labeled chore:trivial."
-    ] as $findings |
+    ) as $findings |
     if ($findings | length) == 0 then
       "PASS: no effort-leak issue/PR states detected."
     else
