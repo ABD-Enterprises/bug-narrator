@@ -14,9 +14,9 @@ final class TranscriptQualityFindingTests: XCTestCase {
 
     func testFindingCodableRoundTripPreservesSeverityAndKind() throws {
         let finding = TranscriptQualityFinding(
-            kind: .unexpectedLanguageScript,
+            kind: .boilerplateText,
             severity: .error,
-            message: "Unexpected script detected."
+            message: "Likely boilerplate detected."
         )
 
         let data = try JSONEncoder().encode(finding)
