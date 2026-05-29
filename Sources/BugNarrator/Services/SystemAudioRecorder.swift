@@ -41,6 +41,8 @@ final class SystemAudioRecorder: AudioRecording {
             return .systemAudioUnavailable("System audio capture requires macOS 14.2 or later.")
         }
 
+        logAggregateDeviceCleanupSummary(SystemAudioTapSession.cleanupStaleAggregateDevices())
+
         do {
             let probe = SystemAudioTapSession()
             do {
@@ -72,6 +74,8 @@ final class SystemAudioRecorder: AudioRecording {
         guard #available(macOS 14.2, *) else {
             throw AppError.systemAudioUnavailable("System audio capture requires macOS 14.2 or later.")
         }
+
+        logAggregateDeviceCleanupSummary(SystemAudioTapSession.cleanupStaleAggregateDevices())
 
         let session = SystemAudioTapSession()
         var writer: SystemAudioFileWriter?
@@ -223,6 +227,56 @@ final class SystemAudioRecorder: AudioRecording {
         let suffix = trimmedDetails.isEmpty ? "" : " \(trimmedDetails)"
         return "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again.\(suffix)"
     }
+
+    private func logAggregateDeviceCleanupSummary(_ summary: SystemAudioAggregateDeviceCleanupSummary) {
+        guard summary.destroyedCount > 0 || summary.failedCount > 0 || summary.scanFailed else {
+            return
+        }
+
+        let levelMessage = summary.failedCount > 0 || summary.scanFailed
+            ? "BugNarrator found stale system audio devices, but some could not be cleaned up."
+            : "BugNarrator cleaned up stale system audio devices before recording."
+        let metadata = [
+            "inspected_count": "\(summary.inspectedCount)",
+            "destroyed_count": "\(summary.destroyedCount)",
+            "failed_count": "\(summary.failedCount)",
+            "scan_failed": "\(summary.scanFailed)"
+        ]
+
+        if summary.failedCount > 0 || summary.scanFailed {
+            recordingLogger.warning(
+                "system_audio_stale_aggregate_cleanup_partial",
+                levelMessage,
+                metadata: metadata
+            )
+        } else {
+            recordingLogger.info(
+                "system_audio_stale_aggregate_cleanup_succeeded",
+                levelMessage,
+                metadata: metadata
+            )
+        }
+    }
+}
+
+struct SystemAudioAggregateDeviceCleanupSummary: Equatable {
+    var inspectedCount = 0
+    var destroyedCount = 0
+    var failedCount = 0
+    var scanFailed = false
+}
+
+enum SystemAudioAggregateDeviceIdentity {
+    static let name = "BugNarrator System Audio"
+    static let uidPrefix = "BugNarrator.SystemAudio."
+
+    static func makeUID() -> String {
+        "\(uidPrefix)\(UUID().uuidString)"
+    }
+
+    static func isOwnedAggregateDeviceUID(_ uid: String) -> Bool {
+        uid.hasPrefix(uidPrefix)
+    }
 }
 
 private final class SystemAudioTapSession {
@@ -230,6 +284,35 @@ private final class SystemAudioTapSession {
     private var aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
     private var deviceProcID: AudioDeviceIOProcID?
     private var audioFormat: AVAudioFormat?
+
+    static func cleanupStaleAggregateDevices() -> SystemAudioAggregateDeviceCleanupSummary {
+        var summary = SystemAudioAggregateDeviceCleanupSummary()
+
+        let devices: [AudioObjectID]
+        do {
+            devices = try AudioObjectID.systemObject.audioDevices()
+        } catch {
+            summary.scanFailed = true
+            return summary
+        }
+
+        for deviceID in devices {
+            guard let deviceUID = try? deviceID.deviceUID(),
+                  SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID(deviceUID) else {
+                continue
+            }
+
+            summary.inspectedCount += 1
+            let status = AudioHardwareDestroyAggregateDevice(deviceID)
+            if status == noErr {
+                summary.destroyedCount += 1
+            } else {
+                summary.failedCount += 1
+            }
+        }
+
+        return summary
+    }
 
     @available(macOS 14.2, *)
     func prepare() throws -> AVAudioFormat {
@@ -250,7 +333,7 @@ private final class SystemAudioTapSession {
         let excludedProcesses = (try? Self.currentProcessObjectIDs()) ?? []
         let tapDescription = CATapDescription(stereoGlobalTapButExcludeProcesses: excludedProcesses)
         tapDescription.uuid = UUID()
-        tapDescription.name = "BugNarrator System Audio"
+        tapDescription.name = SystemAudioAggregateDeviceIdentity.name
         tapDescription.isPrivate = true
         tapDescription.muteBehavior = .unmuted
 
@@ -272,8 +355,8 @@ private final class SystemAudioTapSession {
         }
 
         let aggregateDescription: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "BugNarrator System Audio",
-            kAudioAggregateDeviceUIDKey: "BugNarrator.SystemAudio.\(UUID().uuidString)",
+            kAudioAggregateDeviceNameKey: SystemAudioAggregateDeviceIdentity.name,
+            kAudioAggregateDeviceUIDKey: SystemAudioAggregateDeviceIdentity.makeUID(),
             kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
@@ -444,6 +527,11 @@ private extension AudioObjectID {
         )
     }
 
+    func audioDevices() throws -> [AudioObjectID] {
+        try readArray(kAudioHardwarePropertyDevices, defaultValue: AudioObjectID(kAudioObjectUnknown))
+            .filter { $0 != AudioObjectID(kAudioObjectUnknown) }
+    }
+
     func deviceUID() throws -> String {
         try readString(kAudioDevicePropertyDeviceUID)
     }
@@ -501,6 +589,54 @@ private extension AudioObjectID {
             qualifierSize: 0,
             qualifierData: nil
         )
+    }
+
+    func readArray<T>(
+        _ selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
+        element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain,
+        defaultValue: T
+    ) throws -> [T] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: scope,
+            mElement: element
+        )
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(
+            self,
+            &address,
+            0,
+            nil,
+            &dataSize
+        )
+
+        guard status == noErr else {
+            throw AppError.systemAudioUnavailable("Core Audio property size read failed with status \(status).")
+        }
+
+        let elementCount = Int(dataSize) / MemoryLayout<T>.stride
+        guard elementCount > 0 else {
+            return []
+        }
+
+        var values = Array(repeating: defaultValue, count: elementCount)
+        status = values.withUnsafeMutableBufferPointer { buffer in
+            AudioObjectGetPropertyData(
+                self,
+                &address,
+                0,
+                nil,
+                &dataSize,
+                buffer.baseAddress!
+            )
+        }
+
+        guard status == noErr else {
+            throw AppError.systemAudioUnavailable("Core Audio property read failed with status \(status).")
+        }
+
+        return values
     }
 
     private func read<T>(
