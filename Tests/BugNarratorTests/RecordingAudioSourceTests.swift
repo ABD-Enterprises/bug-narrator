@@ -21,4 +21,13 @@ final class RecordingAudioSourceTests: XCTestCase {
         XCTAssertTrue(RecordingAudioSource.microphoneAndSystemAudio.usesMicrophone)
         XCTAssertTrue(RecordingAudioSource.microphoneAndSystemAudio.usesSystemAudio)
     }
+
+    func testSystemAudioAggregateDeviceIdentityOnlyMatchesBugNarratorOwnedDevices() {
+        let ownedUID = "\(SystemAudioAggregateDeviceIdentity.uidPrefix)A3F3A4E8-8637-4596-B3A7-4DF4CC893C11"
+
+        XCTAssertTrue(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID(ownedUID))
+        XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID("BugNarrator.Other.\(UUID().uuidString)"))
+        XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID("com.apple.BugNarrator.SystemAudio.\(UUID().uuidString)"))
+        XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID(""))
+    }
 }
