@@ -76,6 +76,21 @@ final class AudioRecorderTests: XCTestCase {
         let fileURL = try XCTUnwrap(harness.recordingFileURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
+
+    func testWavCaptureFormatUsesPCMRecoveryArtifact() async throws {
+        let harness = try AudioRecorderHarness(
+            captureFormat: .wavPCM,
+            timeoutNanoseconds: 500_000_000
+        )
+        defer { harness.cleanup() }
+
+        try await harness.recorder.startRecording()
+
+        let fileURL = try XCTUnwrap(harness.recordingFileURL)
+        XCTAssertEqual(fileURL.pathExtension, "wav")
+        XCTAssertEqual(harness.recorderFactory.recordingSettings?[AVFormatIDKey] as? AudioFormatID, kAudioFormatLinearPCM)
+        XCTAssertEqual(harness.recorderFactory.recordingSettings?[AVLinearPCMBitDepthKey] as? Int, 16)
+    }
 }
 
 @MainActor
@@ -99,7 +114,10 @@ private final class AudioRecorderHarness {
         recorderFactory.recordingFileURL
     }
 
-    init(timeoutNanoseconds: UInt64) throws {
+    init(
+        captureFormat: AudioRecorderCaptureFormat = .aacM4A,
+        timeoutNanoseconds: UInt64
+    ) throws {
         rootDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("AudioRecorderTests-\(UUID().uuidString)", isDirectory: true)
         recoveryDirectoryURL = rootDirectoryURL.appendingPathComponent("RecoveredRecordings", isDirectory: true)
@@ -110,9 +128,10 @@ private final class AudioRecorderHarness {
         recorder = AudioRecorder(
             permissionAccess: StaticMicrophonePermissionAccess(),
             recoveryDirectoryURL: recoveryDirectoryURL,
+            captureFormat: captureFormat,
             finalizationTimeoutNanoseconds: timeoutNanoseconds
-        ) { url, _ in
-            factory.makeRecorder(for: url)
+        ) { url, settings in
+            factory.makeRecorder(for: url, settings: settings)
         }
     }
 
@@ -126,6 +145,7 @@ private final class AudioRecorderEngineFactorySpy {
     private let recoveryDirectoryURL: URL
     private(set) var engines: [FakeAudioRecorderEngine] = []
     private(set) var recordingFileURL: URL?
+    private(set) var recordingSettings: [String: Any]?
     var nextEngineRecordResult = true
     var writePlaceholderFileForNextEngine = false
 
@@ -137,7 +157,7 @@ private final class AudioRecorderEngineFactorySpy {
         self.recoveryDirectoryURL = recoveryDirectoryURL
     }
 
-    func makeRecorder(for url: URL) -> FakeAudioRecorderEngine {
+    func makeRecorder(for url: URL, settings: [String: Any]) -> FakeAudioRecorderEngine {
         let isRecordingArtifact = url.standardizedFileURL.path.hasPrefix(recoveryDirectoryURL.standardizedFileURL.path)
         let recordResult = isRecordingArtifact ? nextEngineRecordResult : true
 
@@ -154,6 +174,7 @@ private final class AudioRecorderEngineFactorySpy {
 
         if isRecordingArtifact {
             recordingFileURL = url
+            recordingSettings = settings
         }
 
         return engine

@@ -11,11 +11,14 @@ final class RoutingAudioRecorder: AudioRecording {
 
     init(
         settingsStore: SettingsStore,
-        microphoneRecorder: any AudioRecording = AudioRecorder(),
+        microphoneRecorder: (any AudioRecording)? = nil,
         systemAudioRecorder: any AudioRecording = SystemAudioRecorder(),
         microphoneAndSystemAudioRecorder: (any AudioRecording)? = nil
     ) {
         self.settingsStore = settingsStore
+        let microphoneRecorder = microphoneRecorder ?? AudioRecorder(
+            captureFormat: settingsStore.debugMode ? .wavPCM : .aacM4A
+        )
         self.microphoneRecorder = microphoneRecorder
         self.systemAudioRecorder = systemAudioRecorder
         self.microphoneAndSystemAudioRecorder = microphoneAndSystemAudioRecorder ?? MixedAudioRecorder(

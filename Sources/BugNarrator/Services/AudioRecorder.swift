@@ -21,11 +21,47 @@ extension AVAudioRecorder: AudioRecorderEngine {}
 
 typealias AudioRecorderEngineFactory = (URL, [String: Any]) throws -> any AudioRecorderEngine
 
+enum AudioRecorderCaptureFormat: Equatable {
+    case aacM4A
+    case wavPCM
+
+    var fileExtension: String {
+        switch self {
+        case .aacM4A:
+            return "m4a"
+        case .wavPCM:
+            return "wav"
+        }
+    }
+
+    var recordingSettings: [String: Any] {
+        switch self {
+        case .aacM4A:
+            return [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 44_100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+        case .wavPCM:
+            return [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: 44_100,
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false
+            ]
+        }
+    }
+}
+
 @MainActor
 final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
     private let recoveryDirectoryURL: URL
+    private let captureFormat: AudioRecorderCaptureFormat
     private let finalizationTimeoutNanoseconds: UInt64
     private let makeRecorder: AudioRecorderEngineFactory
 
@@ -40,6 +76,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     init(
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
             .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        captureFormat: AudioRecorderCaptureFormat = .aacM4A,
         finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
         makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
             try AVAudioRecorder(url: url, settings: settings)
@@ -47,6 +84,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     ) {
         self.permissionAccess = SystemMicrophonePermissionAccess()
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.captureFormat = captureFormat
         self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
         self.makeRecorder = makeRecorder
     }
@@ -55,6 +93,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         permissionAccess: any MicrophonePermissionAccessing,
         recoveryDirectoryURL: URL = AppSupportLocation.appDirectory()
             .appendingPathComponent("RecoveredRecordings", isDirectory: true),
+        captureFormat: AudioRecorderCaptureFormat = .aacM4A,
         finalizationTimeoutNanoseconds: UInt64 = 10_000_000_000,
         makeRecorder: @escaping AudioRecorderEngineFactory = { url, settings in
             try AVAudioRecorder(url: url, settings: settings)
@@ -62,6 +101,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
     ) {
         self.permissionAccess = permissionAccess
         self.recoveryDirectoryURL = recoveryDirectoryURL
+        self.captureFormat = captureFormat
         self.finalizationTimeoutNanoseconds = finalizationTimeoutNanoseconds
         self.makeRecorder = makeRecorder
     }
@@ -77,7 +117,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-Preflight-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+            .appendingPathExtension(captureFormat.fileExtension)
 
         do {
             let recorder = try makeRecorder(fileURL, recordingSettings)
@@ -102,7 +142,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-ActivationProbe-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+            .appendingPathExtension(captureFormat.fileExtension)
 
         do {
             let recorder = try makeRecorder(fileURL, recordingSettings)
@@ -426,15 +466,10 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
 
         return recoveryDirectoryURL
             .appendingPathComponent("\(timestamp)-recording-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+            .appendingPathExtension(captureFormat.fileExtension)
     }
 
     private var recordingSettings: [String: Any] {
-        [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 44_100,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
+        captureFormat.recordingSettings
     }
 }
