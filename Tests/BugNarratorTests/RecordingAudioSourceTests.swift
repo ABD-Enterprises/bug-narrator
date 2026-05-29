@@ -52,4 +52,29 @@ final class RecordingAudioSourceTests: XCTestCase {
             XCTAssertTrue(message.contains("System audio format changed while recording"))
         }
     }
+
+    func testMicrophoneLevelCalculatorReturnsZeroForSilentBuffer() throws {
+        let buffer = try makePCMBuffer(samples: [0, 0, 0, 0])
+
+        XCTAssertEqual(MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer), 0, accuracy: 0.000_001)
+    }
+
+    func testMicrophoneLevelCalculatorNormalizesRMSLevel() throws {
+        let buffer = try makePCMBuffer(samples: [0.25, -0.25, 0.25, -0.25])
+
+        XCTAssertEqual(MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer), 1, accuracy: 0.000_001)
+    }
+
+    private func makePCMBuffer(samples: [Float]) throws -> AVAudioPCMBuffer {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)))
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+
+        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
+        for (index, sample) in samples.enumerated() {
+            channel[index] = sample
+        }
+
+        return buffer
+    }
 }
