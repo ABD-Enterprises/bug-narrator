@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import BugNarrator
 
@@ -29,5 +30,26 @@ final class RecordingAudioSourceTests: XCTestCase {
         XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID("BugNarrator.Other.\(UUID().uuidString)"))
         XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID("com.apple.BugNarrator.SystemAudio.\(UUID().uuidString)"))
         XCTAssertFalse(SystemAudioAggregateDeviceIdentity.isOwnedAggregateDeviceUID(""))
+    }
+
+    func testSystemAudioFileWriterFailsCloseWhenFormatInvalidated() throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("system-audio-format-invalidated-\(UUID().uuidString)")
+            .appendingPathExtension("wav")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2))
+        let writer = try SystemAudioFileWriter(fileURL: fileURL, format: format)
+
+        writer.markFormatInvalidated()
+
+        XCTAssertThrowsError(try writer.close()) { error in
+            guard case let AppError.recordingFailure(message) = error else {
+                XCTFail("Expected recordingFailure, got \(error).")
+                return
+            }
+
+            XCTAssertTrue(message.contains("System audio format changed while recording"))
+        }
     }
 }

@@ -283,6 +283,9 @@ private final class SystemAudioTapSession {
     private var processTapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
     private var deviceProcID: AudioDeviceIOProcID?
+    private var outputDeviceID = AudioObjectID(kAudioObjectUnknown)
+    private var nominalSampleRateListener: AudioObjectPropertyListenerBlock?
+    private let listenerQueue = DispatchQueue(label: "BugNarrator.SystemAudioRecorder.FormatListener", qos: .userInitiated)
     private var audioFormat: AVAudioFormat?
 
     static func cleanupStaleAggregateDevices() -> SystemAudioAggregateDeviceCleanupSummary {
@@ -346,6 +349,7 @@ private final class SystemAudioTapSession {
         processTapID = tapID
 
         let outputDeviceID = try AudioObjectID.defaultSystemOutputDevice()
+        self.outputDeviceID = outputDeviceID
         let outputDeviceUID = try outputDeviceID.deviceUID()
         let streamDescription = try tapID.audioTapStreamDescription()
         var mutableStreamDescription = streamDescription
@@ -409,6 +413,8 @@ private final class SystemAudioTapSession {
             throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio could not create the system audio callback with status \(status)."))
         }
 
+        try installFormatChangeListener(writer: writer)
+
         status = AudioDeviceStart(aggregateDeviceID, deviceProcID)
         guard status == noErr else {
             throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio refused to start system audio capture with status \(status)."))
@@ -417,6 +423,8 @@ private final class SystemAudioTapSession {
     }
 
     func invalidate() {
+        removeFormatChangeListener()
+
         if aggregateDeviceID != AudioObjectID(kAudioObjectUnknown) {
             _ = AudioDeviceStop(aggregateDeviceID, deviceProcID)
 
@@ -437,6 +445,7 @@ private final class SystemAudioTapSession {
         }
 
         audioFormat = nil
+        outputDeviceID = AudioObjectID(kAudioObjectUnknown)
     }
 
     deinit {
@@ -445,6 +454,52 @@ private final class SystemAudioTapSession {
 
     private static func recoveryMessage(_ details: String) -> String {
         "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again. \(details)"
+    }
+
+    private func installFormatChangeListener(writer: SystemAudioFileWriter) throws {
+        guard outputDeviceID != AudioObjectID(kAudioObjectUnknown) else {
+            return
+        }
+
+        var address = Self.nominalSampleRateAddress()
+        let listenerBlock: AudioObjectPropertyListenerBlock = { _, _ in
+            writer.markFormatInvalidated()
+        }
+        let status = AudioObjectAddPropertyListenerBlock(
+            outputDeviceID,
+            &address,
+            listenerQueue,
+            listenerBlock
+        )
+        guard status == noErr else {
+            throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio could not monitor output device format changes with status \(status)."))
+        }
+
+        nominalSampleRateListener = listenerBlock
+    }
+
+    private func removeFormatChangeListener() {
+        guard let nominalSampleRateListener,
+              outputDeviceID != AudioObjectID(kAudioObjectUnknown) else {
+            return
+        }
+
+        var address = Self.nominalSampleRateAddress()
+        _ = AudioObjectRemovePropertyListenerBlock(
+            outputDeviceID,
+            &address,
+            listenerQueue,
+            nominalSampleRateListener
+        )
+        self.nominalSampleRateListener = nil
+    }
+
+    private static func nominalSampleRateAddress() -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
     }
 
     private static func currentProcessObjectIDs() throws -> [AudioObjectID] {
@@ -458,11 +513,12 @@ private final class SystemAudioTapSession {
     }
 }
 
-private final class SystemAudioFileWriter: @unchecked Sendable {
+final class SystemAudioFileWriter: @unchecked Sendable {
     private let lock = NSLock()
     private let format: AVAudioFormat
     private var file: AVAudioFile?
     private var writeError: Error?
+    private var formatInvalidated = false
 
     init(fileURL: URL, format: AVAudioFormat) throws {
         self.format = format
@@ -492,12 +548,26 @@ private final class SystemAudioFileWriter: @unchecked Sendable {
         }
     }
 
+    func markFormatInvalidated() {
+        lock.lock()
+        formatInvalidated = true
+        lock.unlock()
+    }
+
     func close() throws {
         lock.lock()
         let writeError = writeError
+        let formatInvalidated = formatInvalidated
         file = nil
         self.writeError = nil
+        self.formatInvalidated = false
         lock.unlock()
+
+        if formatInvalidated {
+            throw AppError.recordingFailure(
+                "System audio format changed while recording. Stop and start a new recording after changing output devices or sample rate."
+            )
+        }
 
         if let writeError {
             throw AppError.recordingFailure("System audio could not be written. \(writeError.localizedDescription)")
