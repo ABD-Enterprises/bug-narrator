@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 struct MenuBarView: View {
@@ -9,6 +10,7 @@ struct MenuBarView: View {
 
     @State private var isOptionKeyPressed = false
     @State private var modifierKeyMonitor: Any?
+    @StateObject private var microphoneLevelMonitor = MicrophoneInputLevelMonitor()
 
     private let metadata = BugNarratorMetadata()
 
@@ -36,9 +38,17 @@ struct MenuBarView: View {
         .onAppear {
             refreshModifierKeys()
             startModifierKeyMonitoring()
+            syncMicrophoneLevelMonitoring()
         }
         .onDisappear {
             stopModifierKeyMonitoring()
+            microphoneLevelMonitor.stop()
+        }
+        .onChange(of: appState.status.phase) { _, _ in
+            syncMicrophoneLevelMonitoring()
+        }
+        .onChange(of: appState.settingsStore.recordingAudioSource) { _, _ in
+            syncMicrophoneLevelMonitoring()
         }
         .alert("Discard this recording?", isPresented: $appState.showDiscardConfirmation) {
             Button("Discard", role: .destructive) {
@@ -339,6 +349,8 @@ struct MenuBarView: View {
             .controlSize(.large)
             .accessibilityHint("Opens the recording controls window.")
 
+            microphoneLevelSection
+
             switch appState.status.phase {
             case .idle:
                 Text("Open the control window to start, stop, and capture screenshots that automatically mark important moments. Global shortcuts stay active too.")
@@ -385,6 +397,38 @@ struct MenuBarView: View {
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    @ViewBuilder
+    private var microphoneLevelSection: some View {
+        if appState.settingsStore.recordingAudioSource.usesMicrophone {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 8) {
+                    Text("Mic Level")
+                        .font(.footnote.weight(.semibold))
+
+                    Spacer()
+
+                    Text(microphoneLevelMonitor.state.label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                LevelMeterView(level: microphoneLevelMonitor.currentLevel)
+                    .frame(height: 8)
+                    .accessibilityLabel("Microphone input level")
+                    .accessibilityValue(microphoneLevelMonitor.state.accessibilityValue(level: microphoneLevelMonitor.currentLevel))
+
+                if microphoneLevelMonitor.state == .permissionNeeded {
+                    Button("Open Microphone Settings") {
+                        appState.openMicrophonePrivacySettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     private var assignedHotkeyLines: [(label: String, value: String)] {
         [
             ("Start", appState.settingsStore.startRecordingHotkeyShortcut.displayStringIfEnabled),
@@ -397,6 +441,20 @@ struct MenuBarView: View {
             }
 
             return (label: label, value: value)
+        }
+    }
+
+    private func syncMicrophoneLevelMonitoring() {
+        guard appState.settingsStore.recordingAudioSource.usesMicrophone else {
+            microphoneLevelMonitor.stop()
+            return
+        }
+
+        switch appState.status.phase {
+        case .idle, .success, .error:
+            microphoneLevelMonitor.start()
+        case .recording, .transcribing:
+            microphoneLevelMonitor.stop()
         }
     }
 
@@ -668,5 +726,169 @@ struct MenuBarView: View {
         }
 
         return appState.status.title
+    }
+}
+
+struct LevelMeterView: View {
+    let level: Float
+
+    private let segmentCount = 18
+
+    var body: some View {
+        GeometryReader { proxy in
+            HStack(spacing: 3) {
+                ForEach(0..<segmentCount, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(index < activeSegmentCount ? segmentColor(for: index) : Color.secondary.opacity(0.18))
+                        .frame(width: segmentWidth(totalWidth: proxy.size.width), height: proxy.size.height)
+                }
+            }
+        }
+    }
+
+    private var activeSegmentCount: Int {
+        min(segmentCount, max(0, Int(ceil(Double(level) * Double(segmentCount)))))
+    }
+
+    private func segmentWidth(totalWidth: CGFloat) -> CGFloat {
+        max(2, (totalWidth - CGFloat(segmentCount - 1) * 3) / CGFloat(segmentCount))
+    }
+
+    private func segmentColor(for index: Int) -> Color {
+        let ratio = Double(index + 1) / Double(segmentCount)
+        if ratio > 0.78 {
+            return .red
+        }
+        if ratio > 0.55 {
+            return .orange
+        }
+        return .green
+    }
+}
+
+@MainActor
+final class MicrophoneInputLevelMonitor: ObservableObject {
+    @Published private(set) var currentLevel: Float = 0
+    @Published private(set) var state: MicrophoneInputLevelState = .idle
+
+    private let engine = AVAudioEngine()
+    private var isMonitoring = false
+
+    func start() {
+        guard !isMonitoring else {
+            return
+        }
+
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            startEngine()
+        case .notDetermined, .denied, .restricted:
+            currentLevel = 0
+            state = .permissionNeeded
+        @unknown default:
+            currentLevel = 0
+            state = .unavailable
+        }
+    }
+
+    func stop() {
+        guard isMonitoring || state != .idle || currentLevel != 0 else {
+            return
+        }
+
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        isMonitoring = false
+        currentLevel = 0
+        state = .idle
+    }
+
+    private func startEngine() {
+        do {
+            let inputNode = engine.inputNode
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1_024, format: nil) { [weak self] buffer, _ in
+                let level = MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer)
+                Task { @MainActor [weak self] in
+                    self?.currentLevel = level
+                }
+            }
+
+            try engine.start()
+            isMonitoring = true
+            state = .monitoring
+        } catch {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+            isMonitoring = false
+            currentLevel = 0
+            state = .unavailable
+        }
+    }
+}
+
+enum MicrophoneInputLevelState: Equatable {
+    case idle
+    case monitoring
+    case permissionNeeded
+    case unavailable
+
+    var label: String {
+        switch self {
+        case .idle:
+            return "Paused"
+        case .monitoring:
+            return "Live"
+        case .permissionNeeded:
+            return "Permission needed"
+        case .unavailable:
+            return "Unavailable"
+        }
+    }
+
+    func accessibilityValue(level: Float) -> String {
+        switch self {
+        case .monitoring:
+            return "\(Int((level * 100).rounded())) percent"
+        case .permissionNeeded:
+            return "Microphone permission is needed"
+        case .unavailable:
+            return "Microphone level is unavailable"
+        case .idle:
+            return "Paused"
+        }
+    }
+}
+
+enum MicrophoneLevelCalculator {
+    static func normalizedRMSLevel(for buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData else {
+            return 0
+        }
+
+        let frameLength = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        guard frameLength > 0, channelCount > 0 else {
+            return 0
+        }
+
+        var sumOfSquares: Float = 0
+        var sampleCount = 0
+
+        for channelIndex in 0..<channelCount {
+            let samples = channels[channelIndex]
+            for frameIndex in 0..<frameLength {
+                let sample = samples[frameIndex]
+                sumOfSquares += sample * sample
+                sampleCount += 1
+            }
+        }
+
+        guard sampleCount > 0 else {
+            return 0
+        }
+
+        let rms = sqrt(sumOfSquares / Float(sampleCount))
+        return min(1, max(0, rms * 4))
     }
 }
