@@ -216,7 +216,7 @@ actor JiraExportProvider {
         var projects: [JiraProjectOption] = []
 
         while true {
-            let request = makeProjectSearchRequest(configuration: configuration, startAt: startAt)
+            let request = try makeProjectSearchRequest(configuration: configuration, startAt: startAt)
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -333,12 +333,13 @@ actor JiraExportProvider {
         exportFingerprint: String? = nil
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/issue")
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        var request = authenticatedRequest(
+            url: endpoint,
+            httpMethod: "POST",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: true
+        )
         request.httpBody = try JSONEncoder().encode(
             JiraIssueRequest(
                 fields: .init(
@@ -359,87 +360,71 @@ actor JiraExportProvider {
     private func makeProjectSearchRequest(
         configuration: JiraConnectionConfiguration,
         startAt: Int
-    ) -> URLRequest {
-        var components = URLComponents(
-            url: configuration.baseURL.appending(path: "rest/api/3/project/search"),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
-            .init(name: "startAt", value: "\(startAt)"),
-            .init(name: "maxResults", value: "50")
-        ]
-
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "GET"
-        request.setValue(
-            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-            forHTTPHeaderField: "Authorization"
+    ) throws -> URLRequest {
+        let url = try jiraRequestURL(
+            baseURL: configuration.baseURL,
+            path: "rest/api/3/project/search",
+            queryItems: [
+                .init(name: "startAt", value: "\(startAt)"),
+                .init(name: "maxResults", value: "50")
+            ]
         )
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+
+        return authenticatedRequest(
+            url: url,
+            httpMethod: "GET",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: false
+        )
     }
 
     private func makeProjectIssueTypesRequest(
         configuration: JiraConnectionConfiguration,
         projectKey: String,
         projectID: String?
-    ) -> URLRequest {
+    ) throws -> URLRequest {
+        let url: URL
         if let normalizedProjectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
-            var components = URLComponents(
-                url: configuration.baseURL.appending(path: "rest/api/3/issuetype/project"),
-                resolvingAgainstBaseURL: false
-            )!
-            components.queryItems = [
-                .init(name: "projectId", value: normalizedProjectID)
-            ]
-
-            var request = URLRequest(url: components.url!)
-            request.httpMethod = "GET"
-            request.setValue(
-                "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-                forHTTPHeaderField: "Authorization"
+            url = try jiraRequestURL(
+                baseURL: configuration.baseURL,
+                path: "rest/api/3/issuetype/project",
+                queryItems: [.init(name: "projectId", value: normalizedProjectID)]
             )
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-            return request
+        } else {
+            url = configuration.baseURL.appending(path: "rest/api/3/project/\(projectKey)")
         }
 
-        let url = configuration.baseURL.appending(path: "rest/api/3/project/\(projectKey)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(
-            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-            forHTTPHeaderField: "Authorization"
+        return authenticatedRequest(
+            url: url,
+            httpMethod: "GET",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: false
         )
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
     }
 
     private func makeCreateFieldMetadataRequest(
         configuration: JiraConnectionConfiguration,
         projectKey: String,
         issueTypeID: String
-    ) -> URLRequest {
-        var components = URLComponents(
-            url: configuration.baseURL.appending(path: "rest/api/3/issue/createmeta/\(projectKey)/issuetypes/\(issueTypeID)"),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
-            .init(name: "startAt", value: "0"),
-            .init(name: "maxResults", value: "100")
-        ]
-
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "GET"
-        request.setValue(
-            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-            forHTTPHeaderField: "Authorization"
+    ) throws -> URLRequest {
+        let url = try jiraRequestURL(
+            baseURL: configuration.baseURL,
+            path: "rest/api/3/issue/createmeta/\(projectKey)/issuetypes/\(issueTypeID)",
+            queryItems: [
+                .init(name: "startAt", value: "0"),
+                .init(name: "maxResults", value: "100")
+            ]
         )
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+
+        return authenticatedRequest(
+            url: url,
+            httpMethod: "GET",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: false
+        )
     }
 
     private func fetchCreateIssueTypesPayload(
@@ -447,7 +432,7 @@ actor JiraExportProvider {
         projectID: String?,
         configuration: JiraConnectionConfiguration
     ) async throws -> JiraCreateMetaIssueTypesResponse {
-        let request = makeProjectIssueTypesRequest(
+        let request = try makeProjectIssueTypesRequest(
             configuration: configuration,
             projectKey: projectKey,
             projectID: projectID
@@ -484,7 +469,7 @@ actor JiraExportProvider {
         issueTypeID: String,
         configuration: JiraConnectionConfiguration
     ) async throws -> [JiraCreateFieldMetadata] {
-        let request = makeCreateFieldMetadataRequest(
+        let request = try makeCreateFieldMetadataRequest(
             configuration: configuration,
             projectKey: projectKey,
             issueTypeID: issueTypeID
@@ -544,15 +529,13 @@ actor JiraExportProvider {
         configuration: JiraExportConfiguration
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/search/jql")
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue(
-            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-            forHTTPHeaderField: "Authorization"
+        var request = authenticatedRequest(
+            url: endpoint,
+            httpMethod: "POST",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: true
         )
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         request.httpBody = try JSONEncoder().encode(
             JiraSearchRequest(
                 jql: searchJQL(for: issue, projectKey: configuration.projectKey),
@@ -568,15 +551,13 @@ actor JiraExportProvider {
         configuration: JiraExportConfiguration
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/search/jql")
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue(
-            "Basic \(basicAuthValue(email: configuration.email, apiToken: configuration.apiToken))",
-            forHTTPHeaderField: "Authorization"
+        var request = authenticatedRequest(
+            url: endpoint,
+            httpMethod: "POST",
+            email: configuration.email,
+            apiToken: configuration.apiToken,
+            includesJSONContentType: true
         )
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         request.httpBody = try JSONEncoder().encode(
             JiraSearchRequest(
                 jql: #"project = \#(configuration.projectKey) AND description ~ "\"\#(TrackerExportFingerprint.marker(for: fingerprint))\"" ORDER BY created DESC"#,
@@ -590,6 +571,60 @@ actor JiraExportProvider {
     private func basicAuthValue(email: String, apiToken: String) -> String {
         let rawValue = "\(email):\(apiToken)"
         return Data(rawValue.utf8).base64EncodedString()
+    }
+
+    /// Builds a Jira request URL from the configured base URL, appending the
+    /// given path and optional query items. Throws a typed export error instead
+    /// of trapping when the base URL cannot be expressed as URL components.
+    private func jiraRequestURL(
+        baseURL: URL,
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) throws -> URL {
+        guard var components = URLComponents(
+            url: baseURL.appending(path: path),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw AppError.exportFailure(
+                "Could not build a Jira request URL from the configured base URL."
+            )
+        }
+
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        guard let url = components.url else {
+            throw AppError.exportFailure(
+                "Could not build a Jira request URL from the configured base URL."
+            )
+        }
+
+        return url
+    }
+
+    /// Produces a Jira REST request with the shared Basic auth, Accept, and
+    /// User-Agent headers applied. Pass `includesJSONContentType` for requests
+    /// that carry a JSON body.
+    private func authenticatedRequest(
+        url: URL,
+        httpMethod: String,
+        email: String,
+        apiToken: String,
+        includesJSONContentType: Bool
+    ) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = httpMethod
+        request.setValue(
+            "Basic \(basicAuthValue(email: email, apiToken: apiToken))",
+            forHTTPHeaderField: "Authorization"
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if includesJSONContentType {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        return request
     }
 
     private func existingExportResult(
