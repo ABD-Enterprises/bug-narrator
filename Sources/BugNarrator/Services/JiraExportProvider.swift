@@ -886,34 +886,12 @@ actor JiraExportProvider {
     }
 
     private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
-        let screenshots = session.screenshots(for: issue).filter {
-            !issue.screenshotAnnotations(for: $0.id).isEmpty
-        }
-
-        guard !screenshots.isEmpty else {
-            return []
-        }
-
-        let annotationDirectoryURL = session.artifactsDirectoryURL?.appendingPathComponent(
-            "annotated-exports",
-            isDirectory: true
-        )
-
-        return try screenshots.map { screenshot in
-            let renderedAsset = try annotationDirectoryURL.flatMap {
-                try annotationRenderer.writeAnnotatedScreenshot(
-                    for: issue,
-                    screenshot: screenshot,
-                    to: $0
-                )
-            }
-            let summaries = issue.screenshotAnnotations(for: screenshot.id).map(\.exportDescription).joined(separator: "; ")
-
-            if let renderedAsset {
-                return "\(renderedAsset.fileName) from \(screenshot.fileName) (\(screenshot.timeLabel)) - \(summaries)"
+        try annotationRenderer.annotatedScreenshotExports(for: issue, session: session).map { export in
+            if let renderedFileName = export.renderedFileName {
+                return "\(renderedFileName) from \(export.screenshotFileName) (\(export.timeLabel)) - \(export.summaries)"
             }
 
-            return "\(screenshot.fileName) (\(screenshot.timeLabel)) - \(summaries)"
+            return "\(export.screenshotFileName) (\(export.timeLabel)) - \(export.summaries)"
         }
     }
 

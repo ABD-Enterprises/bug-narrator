@@ -55,6 +55,60 @@ final class ScreenshotAnnotationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: asset?.fileURL.path ?? ""))
         XCTAssertTrue(asset?.fileName.contains("annotated") == true)
     }
+
+    func testAnnotatedScreenshotExportsGathersOnlyAnnotatedScreenshots() throws {
+        let annotatedURL = makeScreenshotFileURL(named: "exports-annotated.png")
+        let annotatedScreenshot = SessionScreenshot(elapsedTime: 12, filePath: annotatedURL.path)
+        let plainURL = makeScreenshotFileURL(named: "exports-plain.png")
+        let plainScreenshot = SessionScreenshot(elapsedTime: 20, filePath: plainURL.path)
+        let issue = ExtractedIssue(
+            title: "Submit button does not respond",
+            category: .bug,
+            summary: "The highlighted submit button does not respond.",
+            evidenceExcerpt: "The submit button never reacts to clicks.",
+            timestamp: 12,
+            relatedScreenshotIDs: [annotatedScreenshot.id, plainScreenshot.id],
+            screenshotAnnotations: [
+                IssueScreenshotAnnotation(
+                    screenshotID: annotatedScreenshot.id,
+                    label: "Submit button",
+                    x: 0.42,
+                    y: 0.56,
+                    width: 0.22,
+                    height: 0.16
+                )
+            ]
+        )
+        let artifactsDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 30,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            screenshots: [annotatedScreenshot, plainScreenshot],
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue]),
+            artifactsDirectoryPath: artifactsDirectory.path
+        )
+
+        let exports = try IssueScreenshotAnnotationRenderer()
+            .annotatedScreenshotExports(for: issue, session: session)
+
+        // The screenshot without annotations is filtered out.
+        XCTAssertEqual(exports.count, 1)
+        let export = try XCTUnwrap(exports.first)
+        XCTAssertEqual(export.screenshotFileName, annotatedScreenshot.fileName)
+        XCTAssertEqual(export.timeLabel, annotatedScreenshot.timeLabel)
+        // Summaries are joined exactly as the providers render them.
+        let expectedSummaries = issue.screenshotAnnotations(for: annotatedScreenshot.id)
+            .map(\.exportDescription)
+            .joined(separator: "; ")
+        XCTAssertEqual(export.summaries, expectedSummaries)
+        // An annotated asset was rendered into the artifacts directory.
+        XCTAssertEqual(export.renderedFileName?.contains("annotated"), true)
+    }
 }
 
 private func makeScreenshotFileURL(named fileName: String) -> URL {
