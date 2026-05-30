@@ -115,6 +115,40 @@ struct TrackerIssueCandidate: Equatable {
     let remoteURL: URL?
 }
 
+/// Helpers shared by the tracker export providers (Jira, GitHub) whose
+/// implementations are byte-identical apart from the provider's display name.
+enum TrackerExportSupport {
+    /// Builds a short search phrase from an issue's most significant terms, used
+    /// to look for potential duplicate issues before exporting.
+    static func searchTerms(for issue: ExtractedIssue) -> String {
+        let source = [issue.title, issue.component, issue.summary]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let significantTerms = source
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 3 }
+
+        return significantTerms.prefix(6).joined(separator: " ")
+    }
+
+    /// Wraps an export error with the count of issues that succeeded before the
+    /// failure, so a partial export reports how much work already landed.
+    static func partialExportError(
+        _ error: AppError,
+        providerName: String,
+        successfulCount: Int
+    ) -> AppError {
+        guard successfulCount > 0 else {
+            return error
+        }
+
+        return .exportFailure(
+            "\(providerName) exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
+        )
+    }
+}
+
 actor SimilarIssueReviewService {
     private let session: URLSession
 

@@ -203,7 +203,11 @@ actor GitHubExportProvider {
                     try? await receiptStore.clearReceipt(for: fingerprint)
                 }
                 let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
-                throw partialExportError(mappedError, successfulCount: results.count)
+                throw TrackerExportSupport.partialExportError(
+                    mappedError,
+                    providerName: "GitHub",
+                    successfulCount: results.count
+                )
             }
         }
 
@@ -347,7 +351,7 @@ actor GitHubExportProvider {
         configuration: GitHubExportConfiguration
     ) throws -> URLRequest {
         var components = URLComponents(string: "https://api.github.com/search/issues")!
-        let searchTerms = searchTerms(for: issue)
+        let searchTerms = TrackerExportSupport.searchTerms(for: issue)
         let query = "repo:\(configuration.owner)/\(configuration.repository) is:issue is:open \(searchTerms)"
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
@@ -631,28 +635,6 @@ actor GitHubExportProvider {
 
     private func decodeGitHubMessage(from data: Data) -> String? {
         (try? JSONDecoder().decode(GitHubErrorResponse.self, from: data))?.message
-    }
-
-    private func partialExportError(_ error: AppError, successfulCount: Int) -> AppError {
-        guard successfulCount > 0 else {
-            return error
-        }
-
-        return .exportFailure(
-            "GitHub exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
-        )
-    }
-
-    private func searchTerms(for issue: ExtractedIssue) -> String {
-        let source = [issue.title, issue.component, issue.summary]
-            .compactMap { $0 }
-            .joined(separator: " ")
-        let significantTerms = source
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 3 }
-
-        return significantTerms.prefix(6).joined(separator: " ")
     }
 
     private func url(from components: URLComponents) throws -> URL {

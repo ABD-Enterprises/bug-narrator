@@ -140,7 +140,11 @@ actor JiraExportProvider {
                     try? await receiptStore.clearReceipt(for: fingerprint)
                 }
                 let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
-                throw partialExportError(mappedError, successfulCount: results.count)
+                throw TrackerExportSupport.partialExportError(
+                    mappedError,
+                    providerName: "Jira",
+                    successfulCount: results.count
+                )
             }
         }
 
@@ -931,18 +935,8 @@ actor JiraExportProvider {
         return nil
     }
 
-    private func partialExportError(_ error: AppError, successfulCount: Int) -> AppError {
-        guard successfulCount > 0 else {
-            return error
-        }
-
-        return .exportFailure(
-            "Jira exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
-        )
-    }
-
     private func searchJQL(for issue: ExtractedIssue, projectKey: String) -> String {
-        let phrase = searchPhrase(for: issue)
+        let phrase = TrackerExportSupport.searchTerms(for: issue)
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
 
@@ -951,17 +945,6 @@ actor JiraExportProvider {
         """
     }
 
-    private func searchPhrase(for issue: ExtractedIssue) -> String {
-        let source = [issue.title, issue.component, issue.summary]
-            .compactMap { $0 }
-            .joined(separator: " ")
-        let significantTerms = source
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 3 }
-
-        return significantTerms.prefix(6).joined(separator: " ")
-    }
 }
 
 private struct JiraIssueRequest: Encodable {
