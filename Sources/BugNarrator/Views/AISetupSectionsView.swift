@@ -31,7 +31,7 @@ struct AISetupSectionsView: View {
                 } else {
                     labeledField(title: settingsStore.aiProvider.credentialFieldTitle) {
                         CredentialTokenField(
-                            placeholder: "sk-...",
+                            placeholder: aiProviderCredentialPlaceholder,
                             text: apiKeyBinding,
                             isDisabled: secureControlsDisabled,
                             accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle
@@ -182,6 +182,17 @@ struct AISetupSectionsView: View {
             get: { settingsStore.apiKey },
             set: { settingsStore.apiKey = $0 }
         )
+    }
+
+    private var aiProviderCredentialPlaceholder: String {
+        switch settingsStore.selectedAIProviderCredentialPersistenceState {
+        case .keychain:
+            return "Stored in Keychain — type to replace"
+        case .keychainLocked:
+            return "Stored in Keychain — unlock to use"
+        case .empty, .sessionOnly, .pendingSave:
+            return "sk-..."
+        }
     }
 
     private var transcriptionModelSelection: Binding<String> {
