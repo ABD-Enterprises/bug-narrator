@@ -11,11 +11,65 @@ struct RenderedIssueScreenshotAsset: Equatable {
     }
 }
 
+/// One annotated screenshot resolved for export: the rendered asset's file
+/// name (nil when no annotated asset could be written), plus the source
+/// screenshot's file name, time label, and the joined annotation summaries.
+/// Tracker providers format these fields into their own line syntax.
+struct AnnotatedScreenshotExport: Equatable {
+    let renderedFileName: String?
+    let screenshotFileName: String
+    let timeLabel: String
+    let summaries: String
+}
+
 struct IssueScreenshotAnnotationRenderer {
     private let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
+    }
+
+    /// Gathers the annotated screenshots for an issue, rendering each annotated
+    /// asset into the session's `annotated-exports` directory, and returns the
+    /// per-screenshot fields tracker providers need to build export lines. The
+    /// gathering/rendering logic is shared; each provider applies its own line
+    /// formatting to the returned values.
+    func annotatedScreenshotExports(
+        for issue: ExtractedIssue,
+        session: TranscriptSession
+    ) throws -> [AnnotatedScreenshotExport] {
+        let screenshots = session.screenshots(for: issue).filter {
+            !issue.screenshotAnnotations(for: $0.id).isEmpty
+        }
+
+        guard !screenshots.isEmpty else {
+            return []
+        }
+
+        let annotationDirectoryURL = session.artifactsDirectoryURL?.appendingPathComponent(
+            "annotated-exports",
+            isDirectory: true
+        )
+
+        return try screenshots.map { screenshot in
+            let renderedAsset = try annotationDirectoryURL.flatMap {
+                try writeAnnotatedScreenshot(
+                    for: issue,
+                    screenshot: screenshot,
+                    to: $0
+                )
+            }
+            let summaries = issue.screenshotAnnotations(for: screenshot.id)
+                .map(\.exportDescription)
+                .joined(separator: "; ")
+
+            return AnnotatedScreenshotExport(
+                renderedFileName: renderedAsset?.fileName,
+                screenshotFileName: screenshot.fileName,
+                timeLabel: screenshot.timeLabel,
+                summaries: summaries
+            )
+        }
     }
 
     func writeAnnotatedScreenshot(
