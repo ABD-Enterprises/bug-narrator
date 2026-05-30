@@ -352,6 +352,82 @@ final class GitHubExportProviderTests: XCTestCase {
             XCTAssertTrue(message.contains("Validation Failed"))
         }
     }
+
+    func testExportReconcilesPendingReceiptInsteadOfCreatingDuplicate() async throws {
+        let issue = ExtractedIssue(
+            title: "Login button is disabled",
+            category: .bug,
+            summary: "The login button never enables after valid input.",
+            evidenceExcerpt: "The login button stayed disabled after I entered a valid email.",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 30,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+        let configuration = GitHubExportConfiguration(
+            token: "fixture-github-token",
+            owner: "acme",
+            repository: "bugnarrator",
+            labels: []
+        )
+
+        // A prior attempt left a pending receipt for this issue's fingerprint.
+        let fingerprint = TrackerExportFingerprint.make(
+            destination: .github,
+            targetIdentity: configuration.targetIdentity,
+            sessionID: session.id,
+            issueID: issue.id
+        )
+        let receiptStore = StubExportReceiptStore()
+        await receiptStore.seedPending(
+            fingerprint: fingerprint,
+            sourceIssueID: issue.id,
+            destination: .github,
+            targetIdentity: configuration.targetIdentity
+        )
+        let provider = GitHubExportProvider(session: makeMockURLSession(), receiptStore: receiptStore)
+
+        let marker = TrackerExportFingerprint.marker(for: fingerprint)
+        MockURLProtocol.requestHandler = { request in
+            // Reconciliation must locate the existing issue via a search GET and
+            // never POST a duplicate create request.
+            XCTAssertEqual(request.httpMethod, "GET")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            let data = Data(
+                #"{"items":[{"number":77,"title":"Login button stuck disabled","body":"Tracked \#(marker)","html_url":"https://github.com/acme/bugnarrator/issues/77"}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let results = try await provider.export(
+            issues: [issue],
+            session: session,
+            configuration: configuration
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.remoteIdentifier, "#77")
+        XCTAssertEqual(
+            results.first?.remoteURL,
+            URL(string: "https://github.com/acme/bugnarrator/issues/77")
+        )
+
+        // The pending receipt was reconciled to succeeded exactly once.
+        let succeededCalls = await receiptStore.markSucceededCalls
+        XCTAssertEqual(succeededCalls.count, 1)
+        XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "#77")
+    }
 }
 
 private struct GitHubIssueRequestPayload: Decodable {
