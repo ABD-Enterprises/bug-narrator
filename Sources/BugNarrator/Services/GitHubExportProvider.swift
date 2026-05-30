@@ -291,12 +291,12 @@ actor GitHubExportProvider {
     ) throws -> URLRequest {
         let endpoint = issueEndpoint(configuration: configuration)
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        var request = authenticatedRequest(
+            url: endpoint,
+            httpMethod: "POST",
+            token: configuration.token,
+            includesJSONContentType: true
+        )
         request.httpBody = try JSONEncoder().encode(
             GitHubIssueRequest(
                 title: issue.title,
@@ -314,12 +314,12 @@ actor GitHubExportProvider {
     private func makeRepositoryValidationRequest(
         configuration: GitHubExportConfiguration
     ) throws -> URLRequest {
-        var request = URLRequest(url: repositoryEndpoint(configuration: configuration))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+        return authenticatedRequest(
+            url: repositoryEndpoint(configuration: configuration),
+            httpMethod: "GET",
+            token: configuration.token,
+            includesJSONContentType: false
+        )
     }
 
     private func makeRepositoryListRequest(
@@ -334,12 +334,12 @@ actor GitHubExportProvider {
             .init(name: "page", value: "\(page)")
         ]
 
-        var request = URLRequest(url: try url(from: components))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+        return authenticatedRequest(
+            url: try url(from: components),
+            httpMethod: "GET",
+            token: token,
+            includesJSONContentType: false
+        )
     }
 
     private func makeSearchRequest(
@@ -354,12 +354,12 @@ actor GitHubExportProvider {
             URLQueryItem(name: "per_page", value: "5")
         ]
 
-        var request = URLRequest(url: try url(from: components))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+        return authenticatedRequest(
+            url: try url(from: components),
+            httpMethod: "GET",
+            token: configuration.token,
+            includesJSONContentType: false
+        )
     }
 
     private func makeExportFingerprintSearchRequest(
@@ -373,12 +373,12 @@ actor GitHubExportProvider {
             URLQueryItem(name: "per_page", value: "1")
         ]
 
-        var request = URLRequest(url: try url(from: components))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
-        return request
+        return authenticatedRequest(
+            url: try url(from: components),
+            httpMethod: "GET",
+            token: configuration.token,
+            includesJSONContentType: false
+        )
     }
 
     private func makeIssueBody(
@@ -683,6 +683,26 @@ actor GitHubExportProvider {
         }
 
         return url
+    }
+
+    /// Produces a GitHub REST request with the shared Bearer auth, Accept, and
+    /// User-Agent headers applied. Pass `includesJSONContentType` for requests
+    /// that carry a JSON body.
+    private func authenticatedRequest(
+        url: URL,
+        httpMethod: String,
+        token: String,
+        includesJSONContentType: Bool
+    ) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = httpMethod
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        if includesJSONContentType {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
+        return request
     }
 
     private func repositoryEndpoint(configuration: GitHubExportConfiguration) -> URL {
