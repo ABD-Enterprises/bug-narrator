@@ -25,6 +25,24 @@ final class AppStateTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(appStateChangeCount, 2)
     }
 
+    func testSettingsStoreChangesInvalidateMenuFacingSetupState() {
+        let harness = AppStateHarness(apiKey: "")
+        defer { harness.cleanup() }
+
+        XCTAssertTrue(harness.appState.needsAPIKeySetup)
+
+        var appStateChangeCount = 0
+        let cancellable = harness.appState.objectWillChange.sink {
+            appStateChangeCount += 1
+        }
+        defer { cancellable.cancel() }
+
+        harness.settingsStore.apiKey = "fixture-openai-key"
+
+        XCTAssertFalse(harness.appState.needsAPIKeySetup)
+        XCTAssertGreaterThanOrEqual(appStateChangeCount, 1)
+    }
+
     func testRecordingControlsStartFlowShowsPanelAndStartsSession() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

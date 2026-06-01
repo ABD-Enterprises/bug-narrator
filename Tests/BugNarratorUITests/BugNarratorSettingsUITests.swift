@@ -35,6 +35,27 @@ final class BugNarratorSettingsUITests: XCTestCase {
     }
 
     @MainActor
+    func testSavedOpenAIKeyKeepsSettingsCredentialActionsEnabled() throws {
+        let app = launchSettingsApp(scope: "saved-openai-key-actions", seedCredentials: true)
+        defer { app.terminate() }
+
+        let settingsWindow = app.windows["BugNarrator Settings"]
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+        waitForSettingsLayout()
+
+        XCTAssertTrue(app.descendants(matching: .any)["AI provider status: Ready"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Saved key"].waitForExistence(timeout: 5))
+
+        let validateKeyButton = app.buttons["Validate Key"]
+        XCTAssertTrue(waitForSettingsElement(validateKeyButton, in: settingsWindow))
+        XCTAssertTrue(validateKeyButton.isEnabled)
+
+        let removeKeyButton = app.buttons["Remove Key"]
+        XCTAssertTrue(waitForSettingsElement(removeKeyButton, in: settingsWindow))
+        XCTAssertTrue(removeKeyButton.isEnabled)
+    }
+
+    @MainActor
     func testSettingsCredentialFieldsAcceptTypingWithoutLockingWindow() throws {
         let app = launchSettingsApp(scope: "credential-fields-editable")
         defer { app.terminate() }
@@ -282,8 +303,17 @@ final class BugNarratorSettingsUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchSettingsApp(scope: String, launchAtLoginStatus: String = "disabled") -> XCUIApplication {
-        launchApp(scope: scope, openSettings: true, launchAtLoginStatus: launchAtLoginStatus)
+    private func launchSettingsApp(
+        scope: String,
+        launchAtLoginStatus: String = "disabled",
+        seedCredentials: Bool = false
+    ) -> XCUIApplication {
+        launchApp(
+            scope: scope,
+            openSettings: true,
+            seedSessionLibrary: seedCredentials,
+            launchAtLoginStatus: launchAtLoginStatus
+        )
     }
 
     @MainActor
