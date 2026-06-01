@@ -529,6 +529,7 @@ final class AppState: ObservableObject {
 
         objectChangeForwarder.forward(
             [
+                settingsStore.objectWillChange,
                 trackerIntegration.objectWillChange,
                 aiProviderSettings.objectWillChange,
                 presentationState.objectWillChange,

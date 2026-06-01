@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Refreshed menu-bar AI setup state when the saved OpenAI credential changes, so Settings and the menu no longer disagree about a usable key.
 - [FIX] Blocked recording starts until AI transcription setup is usable, defaulted fresh installs to English transcription hints, and added transcript quality warnings for wrong-script output.
 - [INTERNAL] Split AI setup, transcription defaults, and issue extraction settings into an encapsulated SwiftUI section with UI coverage.
 - [INTERNAL] Added a repository docs audit to keep maintainer docs aligned with the local-first validation path and CI unit-test scope.
