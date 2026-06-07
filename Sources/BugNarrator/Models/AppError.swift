@@ -74,8 +74,14 @@ enum AppError: LocalizedError, Equatable {
         case .emptyTranscript:
             return "The transcription finished but returned empty text."
         case .networkTimeout:
+            if provider == .parakeetLocal {
+                return "The local transcription server did not respond in time. Make sure it is running."
+            }
             return "The request to \(providerName) timed out. Check the connection and try again."
         case .networkFailure:
+            if provider == .parakeetLocal {
+                return "BugNarrator could not reach the local transcription server. Start it with: local-transcription/venv/bin/python local-transcription/server.py --preload"
+            }
             return "BugNarrator could not reach \(providerName). Check the connection and try again."
         case .rateLimited(let retryAfter):
             if let retryAfter {

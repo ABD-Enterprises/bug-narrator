@@ -178,6 +178,9 @@ struct RecordingControlPanelView: View {
             return "You can keep recording without finishing \(provider.displayName) setup. Open Settings before stopping if you want transcription."
         }
 
+        if appState.settingsStore.aiProvider == .parakeetLocal && appState.status.phase != .recording {
+            return "Transcription will use the local Parakeet server. Make sure it is running before you stop recording."
+        }
         return "The controls stay open until you close them."
     }
 
