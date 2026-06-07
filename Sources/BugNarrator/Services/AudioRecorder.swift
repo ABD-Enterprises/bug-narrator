@@ -297,6 +297,9 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         if isCancelling {
             recordingLogger.info("recording_cancelled", "The active recording session was cancelled.")
             cancelContinuation?.resume()
+            // If a stop was in flight when cancel was requested, unblock the
+            // stopRecording caller so it doesn't hang forever.
+            stopContinuation?.resume(throwing: AppError.recordingFailure("The recording was cancelled."))
             return
         }
 
@@ -340,6 +343,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         if isCancelling {
             recordingLogger.info("recording_cancelled", "The active recording session was cancelled during encoder shutdown.")
             cancelContinuation?.resume()
+            stopContinuation?.resume(throwing: AppError.recordingFailure("The recording was cancelled."))
             return
         }
 
