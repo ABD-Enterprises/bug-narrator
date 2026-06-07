@@ -67,7 +67,7 @@ struct SettingsView: View {
                             )
                             .disabled(secureControlsDisabled)
 
-                            Text("Get consent before recording system audio. BugNarrator stores finished sessions locally and sends recorded audio to OpenAI only when transcription runs.")
+                            Text("Get consent before recording system audio. BugNarrator stores finished sessions locally and \(settingsStore.aiProvider == .parakeetLocal ? "processes audio on this Mac" : "sends recorded audio to \(settingsStore.aiProvider.displayName)") only when transcription runs.")
                                 .font(.footnote)
                                 .foregroundStyle(
                                     settingsStore.hasAcceptedSystemAudioRecordingConsent

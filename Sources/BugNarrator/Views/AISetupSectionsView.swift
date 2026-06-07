@@ -19,14 +19,22 @@ struct AISetupSectionsView: View {
                     }
                     .pickerStyle(.menu)
                     .accessibilityLabel("AI provider")
+                    .help("OpenAI uses cloud transcription. Local (Parakeet) transcribes on this Mac with no API key or upload required.")
                 }
 
                 if settingsStore.aiProvider.credentialFieldTitle.isEmpty {
                     labeledField(title: "Credential") {
-                        Text("No API key required")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityLabel("No AI provider credential required")
+                        HStack {
+                            Text("No API key required")
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if settingsStore.aiProvider == .parakeetLocal {
+                                Text("Transcription runs entirely on this Mac.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        .accessibilityLabel("No AI provider credential required")
                     }
                 } else {
                     labeledField(title: settingsStore.aiProvider.credentialFieldTitle) {
@@ -42,8 +50,11 @@ struct AISetupSectionsView: View {
                 labeledField(title: "API Base URL") {
                     TextField(settingsStore.aiProvider.baseURLPlaceholder, text: $settingsStore.openAIBaseURL)
                         .textFieldStyle(.roundedBorder)
-                        .disabled(secureControlsDisabled)
+                        .disabled(secureControlsDisabled || settingsStore.aiProvider == .parakeetLocal)
                         .accessibilityLabel("AI provider base URL")
+                        .help(settingsStore.aiProvider == .parakeetLocal
+                            ? "Parakeet uses localhost:8422 automatically. Start the server with: local-transcription/venv/bin/python local-transcription/server.py --preload"
+                            : "The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
                 }
 
                 Text(settingsStore.aiProvider.baseURLHint)
@@ -69,6 +80,9 @@ struct AISetupSectionsView: View {
                             settingsStore.selectedAIProviderCredentialPersistenceState != .keychainLocked) ||
                         appState.apiKeyValidationState == .validating
                     )
+                    .help(settingsStore.aiProvider == .parakeetLocal
+                        ? "Checks that the local Parakeet transcription server is running and reachable."
+                        : "Validates the credential and base URL against the selected provider.")
 
                     Button("Remove Key", role: .destructive) {
                         appState.removeAPIKey()
@@ -123,6 +137,7 @@ struct AISetupSectionsView: View {
                     TextField("For English narration, keep en", text: $settingsStore.languageHint)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Transcription language hint")
+                        .help("Helps the model recognize the correct language. Use 'en' for English. Clear for auto-detection.")
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
