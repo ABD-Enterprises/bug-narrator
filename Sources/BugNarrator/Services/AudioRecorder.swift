@@ -274,7 +274,19 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         }
     }
 
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+    nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        Task { @MainActor [weak self] in
+            self?.handleRecordingFinished(successfully: flag)
+        }
+    }
+
+    nonisolated func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: (any Error)?) {
+        Task { @MainActor [weak self] in
+            self?.handleEncoderError(error)
+        }
+    }
+
+    private func handleRecordingFinished(successfully flag: Bool) {
         let stopContinuation = self.stopContinuation
         let cancelContinuation = self.cancelContinuation
         let pendingStopResult = self.pendingStopResult
@@ -318,7 +330,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
         }
     }
 
-    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: (any Error)?) {
+    private func handleEncoderError(_ error: (any Error)?) {
         let stopContinuation = self.stopContinuation
         let cancelContinuation = self.cancelContinuation
         let isCancelling = self.isCancelling
@@ -364,9 +376,12 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
                 return
             }
 
-            guard !Task.isCancelled, let stopContinuation else {
-                return
-            }
+            guard !Task.isCancelled else { return }
+
+            // Capture and nil-swap the continuation atomically so the delegate
+            // callback cannot also resume it if it fires on the next run-loop tick.
+            guard let continuation = self.stopContinuation else { return }
+            self.stopContinuation = nil
 
             recordingLogger.error(
                 "recording_finalize_timeout",
@@ -374,7 +389,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
                 metadata: ["file_name": fileName]
             )
             cleanup()
-            stopContinuation.resume(
+            continuation.resume(
                 throwing: AppError.recordingFailure("The recorded audio file did not finish finalizing before the timeout.")
             )
         }
@@ -390,9 +405,10 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
                 return
             }
 
-            guard !Task.isCancelled, let cancelContinuation else {
-                return
-            }
+            guard !Task.isCancelled else { return }
+
+            guard let continuation = self.cancelContinuation else { return }
+            self.cancelContinuation = nil
 
             recordingLogger.warning(
                 "recording_cancel_timeout",
@@ -400,7 +416,7 @@ final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, Au
                 metadata: ["file_name": fileName]
             )
             cleanup()
-            cancelContinuation.resume()
+            continuation.resume()
         }
     }
 
