@@ -56,8 +56,14 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             }
             return "Recording saved locally. Open Settings, refresh the \(provider.displayName) configuration, then retry transcription from this session."
         case .networkTimeout:
+            if provider == .parakeetLocal {
+                return "Recording saved locally. The local transcription server did not respond. Start it, then retry transcription from this session."
+            }
             return "Recording saved locally. The \(provider.displayName) request timed out, so retry transcription from this session when the connection is stable."
         case .networkFailure:
+            if provider == .parakeetLocal {
+                return "Recording saved locally. The local transcription server is not running. Start it, then retry transcription from this session."
+            }
             return "Recording saved locally. BugNarrator could not reach \(provider.displayName), so retry transcription from this session when the connection is available."
         case .rateLimited:
             return "Recording saved locally. \(provider.displayName) rate limited the request, so wait a moment and retry transcription from this session."
