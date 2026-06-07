@@ -164,10 +164,12 @@ final class MixedAudioRecorder: AudioRecording {
     }
 
     func cancelRecording(preserveFile: Bool) async {
-        guard isRecording, !isStopping else {
+        guard isRecording else {
             return
         }
 
+        // Allow cancel to override a hung stop so the user is never trapped.
+        isStopping = false
         isRecording = false
         sourceStartTimes = nil
         await microphoneRecorder.cancelRecording(preserveFile: preserveFile)

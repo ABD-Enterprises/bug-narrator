@@ -1726,6 +1726,14 @@ final class SettingsStore: ObservableObject {
         allowsLegacyOpenAICredential: Bool
     ) -> Bool {
         guard let savedProvider = savedAIProviderCredentialProvider else {
+            // Legacy credential with no provider tag. Accept it for any
+            // provider that uses the OpenAI credential slot and tag it
+            // so future checks are fast.
+            let credentialExists = apiKeyPersistenceState == .keychain || apiKeyPersistenceState == .keychainLocked
+            if credentialExists && aiProvider.requiresAPIKey {
+                defaults.set(aiProvider.rawValue, forKey: Keys.aiProviderCredentialProvider)
+                return true
+            }
             return allowsLegacyOpenAICredential && aiProvider == .openAI
         }
 
