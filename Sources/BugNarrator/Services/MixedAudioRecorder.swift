@@ -222,21 +222,33 @@ final class MixedAudioRecorder: AudioRecording {
         exportSession.audioMix = audioMix
 
         let exportBridge = MixedAssetExportSessionBridge(exportSession)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            exportBridge.session.exportAsynchronously {
-                switch exportBridge.session.status {
-                case .completed:
-                    continuation.resume()
-                case .failed:
-                    continuation.resume(
-                        throwing: exportBridge.session.error ?? AppError.recordingFailure("The mixed audio export failed.")
-                    )
-                case .cancelled:
-                    continuation.resume(throwing: AppError.recordingFailure("The mixed audio export was cancelled."))
-                default:
-                    continuation.resume(throwing: AppError.recordingFailure("The mixed audio export did not complete."))
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    exportBridge.session.exportAsynchronously {
+                        switch exportBridge.session.status {
+                        case .completed:
+                            continuation.resume()
+                        case .failed:
+                            continuation.resume(
+                                throwing: exportBridge.session.error ?? AppError.recordingFailure("The mixed audio export failed.")
+                            )
+                        case .cancelled:
+                            continuation.resume(throwing: AppError.recordingFailure("The mixed audio export was cancelled."))
+                        default:
+                            continuation.resume(throwing: AppError.recordingFailure("The mixed audio export did not complete."))
+                        }
+                    }
                 }
             }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+                exportBridge.session.cancelExport()
+                throw AppError.recordingFailure("The mixed audio export timed out after 30 seconds.")
+            }
+            // First to finish wins; the other is cancelled.
+            try await group.next()
+            group.cancelAll()
         }
 
         let attributes = try FileManager.default.attributesOfItem(atPath: outputURL.path)
