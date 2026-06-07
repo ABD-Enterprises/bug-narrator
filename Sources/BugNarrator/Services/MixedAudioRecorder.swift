@@ -104,6 +104,15 @@ final class MixedAudioRecorder: AudioRecording {
         let (systemResult, microphoneResult) = await (systemStopResult, microphoneStopResult)
 
         switch (systemResult, microphoneResult) {
+        case (.failure(let sysErr), .failure(let micErr)):
+            recordingLogger.error(
+                "mixed_recording_both_failed",
+                "Both audio sources failed to stop.",
+                metadata: [
+                    "system_error": sysErr.localizedDescription,
+                    "microphone_error": micErr.localizedDescription,
+                ]
+            )
         case (.failure, .success(let microphoneAudio)):
             try? FileManager.default.removeItem(at: microphoneAudio.fileURL)
         case (.success(let systemAudio), .failure):
@@ -117,16 +126,24 @@ final class MixedAudioRecorder: AudioRecording {
 
         let outputURL = makeMixedRecordingURL()
         let insertionOffsets = sourceStartTimes?.insertionOffsets ?? .zero
-        let mixedAudio = try await mixAudioFiles(
-            microphoneAudio: microphoneAudio,
-            systemAudio: systemAudio,
-            outputURL: outputURL,
-            insertionOffsets: insertionOffsets
-        )
-        removeSourceAudioFiles(
-            [microphoneAudio.fileURL, systemAudio.fileURL],
-            preserving: mixedAudio.fileURL
-        )
+        let sourceFileURLs = [microphoneAudio.fileURL, systemAudio.fileURL]
+        let mixedAudio: RecordedAudio
+        do {
+            mixedAudio = try await mixAudioFiles(
+                microphoneAudio: microphoneAudio,
+                systemAudio: systemAudio,
+                outputURL: outputURL,
+                insertionOffsets: insertionOffsets
+            )
+        } catch {
+            // Clean up source audio files that would otherwise be orphaned.
+            for url in sourceFileURLs {
+                try? FileManager.default.removeItem(at: url)
+            }
+            throw error
+        }
+
+        removeSourceAudioFiles(sourceFileURLs, preserving: mixedAudio.fileURL)
 
         recordingLogger.info(
             "mixed_recording_stopped",
