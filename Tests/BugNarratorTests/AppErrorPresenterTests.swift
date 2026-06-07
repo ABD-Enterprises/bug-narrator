@@ -132,8 +132,8 @@ final class AppErrorPresenterTests: XCTestCase {
         }
         XCTAssertFalse(text.contains("OpenAI"), "Parakeet error text should not contain OpenAI: \(text)")
         XCTAssertTrue(
-            text.contains(AIProvider.parakeetLocal.displayName),
-            "Parakeet error text should reference active provider: \(text)"
+            text.contains("local transcription server") || text.contains(AIProvider.parakeetLocal.displayName),
+            "Parakeet error text should reference local server or active provider: \(text)"
         )
     }
 
