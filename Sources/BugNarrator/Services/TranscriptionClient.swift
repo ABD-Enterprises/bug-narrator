@@ -101,7 +101,7 @@ actor TranscriptionClient: TranscriptionServing {
 
         logger.info(
             "transcription_chunked_requested",
-            "Uploading chunked audio to OpenAI for transcription.",
+            "Uploading chunked audio for transcription.",
             metadata: [
                 "file_name": fileURL.lastPathComponent,
                 "chunk_count": "\(chunks.count)",
@@ -117,7 +117,7 @@ actor TranscriptionClient: TranscriptionServing {
         for (index, chunk) in chunks.enumerated() {
             logger.debug(
                 "transcription_chunk_upload",
-                "Uploading a transcription chunk to OpenAI.",
+                "Uploading a transcription chunk.",
                 metadata: [
                     "chunk_index": "\(index + 1)",
                     "chunk_count": "\(chunks.count)",
@@ -145,7 +145,7 @@ actor TranscriptionClient: TranscriptionServing {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !transcript.isEmpty else {
-            logger.warning("transcription_empty", "OpenAI returned an empty transcript after chunked transcription.")
+            logger.warning("transcription_empty", "The provider returned an empty transcript after chunked transcription.")
             throw AppError.emptyTranscript
         }
 
@@ -153,7 +153,7 @@ actor TranscriptionClient: TranscriptionServing {
         logQualityFindings(qualityFindings, fileName: fileURL.lastPathComponent)
         logger.info(
             "transcription_chunked_completed",
-            "OpenAI returned a completed transcript after chunked transcription.",
+            "Completed transcript received after chunked transcription.",
             metadata: [
                 "character_count": "\(transcript.count)",
                 "segments_count": "\(adjustedSegments.count)",
@@ -255,7 +255,7 @@ actor TranscriptionClient: TranscriptionServing {
         if attempt == 0 {
             logger.info(
                 "transcription_requested",
-                "Uploading audio to OpenAI for transcription.",
+                "Uploading audio for transcription.",
                 metadata: [
                     "file_name": fileURL.lastPathComponent,
                     "model": request.model,
@@ -276,7 +276,7 @@ actor TranscriptionClient: TranscriptionServing {
             guard (200...299).contains(httpResponse.statusCode) else {
                 logger.warning(
                     "transcription_rejected",
-                    "OpenAI rejected the transcription request.",
+                    "The provider rejected the transcription request.",
                     metadata: ["status_code": "\(httpResponse.statusCode)"]
                 )
                 throw OpenAIErrorMapper.mapResponse(
@@ -291,7 +291,7 @@ actor TranscriptionClient: TranscriptionServing {
             let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !transcript.isEmpty else {
-                logger.warning("transcription_empty", "OpenAI returned an empty transcript.")
+                logger.warning("transcription_empty", "The provider returned an empty transcript.")
                 throw AppError.emptyTranscript
             }
 
@@ -299,7 +299,7 @@ actor TranscriptionClient: TranscriptionServing {
             logQualityFindings(qualityFindings, fileName: fileURL.lastPathComponent)
             logger.info(
                 "transcription_completed",
-                "OpenAI returned a completed transcript.",
+                "Completed transcript received.",
                 metadata: [
                     "character_count": "\(transcript.count)",
                     "segments_count": "\(result.segments?.count ?? 0)"
@@ -343,7 +343,7 @@ actor TranscriptionClient: TranscriptionServing {
 
     func validateAPIKey(_ apiKey: String, apiBaseURL: URL) async throws {
         let request = makeValidationRequest(apiKey: apiKey, apiBaseURL: apiBaseURL)
-        logger.info("openai_key_validation_requested", "Validating the OpenAI API key.")
+        logger.info("openai_key_validation_requested", "Validating the provider connection.")
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -356,7 +356,7 @@ actor TranscriptionClient: TranscriptionServing {
             guard (200...299).contains(httpResponse.statusCode) else {
                 logger.warning(
                     "openai_key_validation_rejected",
-                    "The OpenAI API key validation request was rejected.",
+                    "The provider validation request was rejected.",
                     metadata: ["status_code": "\(httpResponse.statusCode)"]
                 )
                 throw OpenAIErrorMapper.mapResponse(
@@ -365,7 +365,7 @@ actor TranscriptionClient: TranscriptionServing {
                     fallback: AppError.transcriptionFailure
                 )
             }
-            logger.info("openai_key_validation_succeeded", "The OpenAI API key was accepted.")
+            logger.info("openai_key_validation_succeeded", "The provider connection was validated.")
         } catch {
             logger.error(
                 "openai_key_validation_failed",
