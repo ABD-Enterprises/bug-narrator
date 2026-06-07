@@ -22,15 +22,28 @@ struct SettingsView: View {
 
                 GroupBox("Before You Start") {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("BugNarrator requires your own AI provider configuration.")
-                            .font(.headline)
+                        if settingsStore.aiProvider == .parakeetLocal {
+                            Text("Local transcription is selected.")
+                                .font(.headline)
 
-                        Text("BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")
-                            .foregroundStyle(.secondary)
+                            Text("BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Start the local transcription server before recording.")
+                                .foregroundStyle(.secondary)
 
-                        Text("Transcription and issue extraction use the selected provider and may incur charges on that provider account.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            Text("Run in Terminal: local-transcription/venv/bin/python local-transcription/server.py --preload")
+                                .font(.footnote.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        } else {
+                            Text("BugNarrator requires your own AI provider configuration.")
+                                .font(.headline)
+
+                            Text("BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")
+                                .foregroundStyle(.secondary)
+
+                            Text("Transcription and issue extraction use the selected provider and may incur charges on that provider account.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
