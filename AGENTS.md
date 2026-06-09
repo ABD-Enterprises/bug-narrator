@@ -4,6 +4,12 @@
 
 This repo uses ORC's ticket-driven autonomous coding loop.
 
+Division of labor (Capability + Router, not a dial):
+
+- Which agent authors the diff is a Capability — the configured coding backend (`.ai/config.json#continuity.model_provider`; the toolchain catalog's "Default coding agent") — resolved by the always-on router, not by a dial. The orchestrating/planning agent plans, grooms, reviews, and drives the board; when a coding backend is configured the router delegates implementation to it through the loop. Hand-authoring is the un-orchestrated fallback (no backend available, or an explicit per-knob override), not the default when a backend exists.
+- The O/R/C dials govern the risk posture around the work, never authorship: O = who merges / how unattended, R = how hard it is verified, C = how contained the coder is.
+- The loop is the unit of execution; the router and effort/cost telemetry are always-on (lit even at vibe). `orc metrics` (cost/effort/routing) is a primary product, so implementation should flow through the loop to be captured.
+
 Source of truth:
 
 - Board and provider: `.ai/config.json`
@@ -13,6 +19,7 @@ Source of truth:
 Startup:
 
 - If the branch contains a ticket id, run `bin/ai-pipeline current`. If on `main` / `master` or no ticket id, run `bin/ai-pipeline next` before implementing. If the operator is asking for new work and no ticket exists, run `bin/ai-pipeline plan "<title>"`.
+- Before relying on the loop to implement, confirm a coding backend is available (`orc fleet-health` / the toolchain catalog — a Capability, not a dial). If none is configured, provision one from the manifest or proceed in un-orchestrated mode; do not silently treat hand-authoring as the configured-backend path.
 - Read ticket comments with `ai-pipeline comments` (default: structured-metadata only; `--all` opts into full thread). Read diffs with `ai-pipeline diff` (lockfiles / generated / vendor stripped; 200KB cap). Never re-fetch raw thread or raw diff into the agent context.
 - Search before broad reads: use `rg`, targeted provider queries, or deterministic CLI commands to locate the exact symbol, config, or ticket evidence before opening large files/directories. Read only the surrounding lines needed, and stop exploration once the next safe implementation step is clear.
 - Treat `ai-pipeline claim` / `next` continuity notices as startup inputs.
