@@ -807,12 +807,19 @@ final class MicrophoneInputLevelMonitor: ObservableObject {
         do {
             let inputNode = engine.inputNode
             inputNode.removeTap(onBus: 0)
-            inputNode.installTap(onBus: 0, bufferSize: 1_024, format: nil) { [weak self] buffer, _ in
-                let level = MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer)
-                Task { @MainActor [weak self] in
-                    self?.currentLevel = level
+            inputNode.installTap(
+                onBus: 0,
+                bufferSize: 1_024,
+                format: nil,
+                block: MicrophoneInputLevelTapFactory.makeTap { [weak self] level in
+                    Task { @MainActor [weak self] in
+                        guard let self, isMonitoring else {
+                            return
+                        }
+                        currentLevel = level
+                    }
                 }
-            }
+            )
 
             try engine.start()
             isMonitoring = true
@@ -890,5 +897,13 @@ enum MicrophoneLevelCalculator {
 
         let rms = sqrt(sumOfSquares / Float(sampleCount))
         return min(1, max(0, rms * 4))
+    }
+}
+
+enum MicrophoneInputLevelTapFactory {
+    static func makeTap(deliverLevel: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            deliverLevel(MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer))
+        }
     }
 }

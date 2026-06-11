@@ -65,6 +65,21 @@ final class RecordingAudioSourceTests: XCTestCase {
         XCTAssertEqual(MicrophoneLevelCalculator.normalizedRMSLevel(for: buffer), 1, accuracy: 0.000_001)
     }
 
+    func testMicrophoneInputLevelTapCanDeliverFromRealtimeQueue() throws {
+        let buffer = try makePCMBuffer(samples: [0.125, -0.125, 0.125, -0.125])
+        let deliveredLevel = expectation(description: "delivered microphone level")
+        let tap = MicrophoneInputLevelTapFactory.makeTap { level in
+            XCTAssertGreaterThan(level, 0)
+            deliveredLevel.fulfill()
+        }
+
+        DispatchQueue(label: "RealtimeMessenger.mServiceQueue").async {
+            tap(buffer, AVAudioTime(sampleTime: 0, atRate: 44_100))
+        }
+
+        wait(for: [deliveredLevel], timeout: 1)
+    }
+
     private func makePCMBuffer(samples: [Float]) throws -> AVAudioPCMBuffer {
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)))
