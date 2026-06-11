@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.39 - 2026-06-11
+
+- [FIX] Stopped the menu bar microphone level meter from crashing when CoreAudio delivers level updates on its realtime callback queue.
+
 ## 1.0.38 - 2026-06-11
 
 - [FIX] Refreshed menu-bar AI setup state when the saved OpenAI credential changes, so Settings and the menu no longer disagree about a usable key.
