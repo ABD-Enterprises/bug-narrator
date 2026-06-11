@@ -120,12 +120,14 @@ jobs:
       - name: Select Xcode (project file requires Xcode 26)
         run: |
           # The .xcodeproj is in objectVersion 77, which only Xcode 26+
-          # can read. Two valid layouts:
+          # can read. Valid layouts:
           #   1. GitHub-hosted macos-26 runners: /Applications/Xcode_26*.app
           #      (multiple side-by-side versions are present; pick newest)
           #   2. Self-hosted runners (the brew-sync fleet Mac): just
           #      /Applications/Xcode.app, which we accept if its
           #      CFBundleShortVersionString starts with `26`.
+          #   3. Self-hosted runners with xcode-select already pointing at
+          #      an Xcode 26 developer directory outside the app paths above.
           XCODE_APP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' -print | sort -V | tail -1)
 
           if [[ -z "$XCODE_APP" && -d /Applications/Xcode.app ]]; then
@@ -137,7 +139,22 @@ jobs:
           fi
 
           if [[ -z "$XCODE_APP" ]]; then
-            echo "::error::No Xcode 26.x found. Looked for /Applications/Xcode_26*.app and /Applications/Xcode.app. Installed Xcode apps:"
+            SELECTED_DEVELOPER_DIR=$(xcode-select -p 2>/dev/null || echo "")
+            SELECTED_XCODE_APP="${SELECTED_DEVELOPER_DIR%/Contents/Developer}"
+            if [[ -n "$SELECTED_DEVELOPER_DIR" && -d "$SELECTED_XCODE_APP/Contents" ]]; then
+              VERSION=$(defaults read "$SELECTED_XCODE_APP/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "")
+              if [[ "$VERSION" == 26* ]]; then
+                XCODE_APP="$SELECTED_XCODE_APP"
+                echo "Accepting selected Xcode at $XCODE_APP (version $VERSION)."
+              fi
+            fi
+          fi
+
+          if [[ -z "$XCODE_APP" ]]; then
+            echo "::error::No Xcode 26.x found. Looked for /Applications/Xcode_26*.app, /Applications/Xcode.app, and the selected developer directory."
+            echo "Selected developer directory: $(xcode-select -p 2>/dev/null || echo unavailable)"
+            xcodebuild -version || true
+            echo "Installed Xcode apps:"
             ls -d /Applications/Xcode*.app || true
             exit 1
           fi
