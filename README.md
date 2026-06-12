@@ -60,14 +60,17 @@ It can:
 
 BugNarrator does not ship with built-in AI access or credits.
 
-OpenAI is the default provider. In `Settings`, you can also choose an OpenAI-compatible enterprise gateway or a local-compatible endpoint when that endpoint exposes the OpenAI-compatible APIs BugNarrator needs.
+OpenAI is the hosted default provider. In `Settings`, you can also choose `OpenAI-Compatible`, `Local-Compatible`, or `Local (Parakeet)`.
 
 Important:
 
+- `OpenAI` requires your own OpenAI API key and uses `https://api.openai.com` unless you override it
+- `OpenAI-Compatible` is for enterprise gateways or hosted providers that expose compatible transcription and chat endpoints
+- `Local-Compatible` is for local or self-hosted OpenAI-compatible endpoints such as LM Studio or Ollama
+- `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio
 - transcription requires a provider endpoint compatible with `/v1/audio/transcriptions`
-- issue extraction requires a provider endpoint compatible with `/v1/chat/completions`
-- local-compatible providers can leave the API key blank if the local endpoint does not require authentication
-- unsupported local/default model combinations show clear setup guidance in Settings instead of starting a broken transcription
+- review summary and issue extraction require a provider endpoint compatible with `/v1/chat/completions`
+- unsupported provider/model combinations show clear setup guidance in Settings instead of starting a broken transcription
 - provider usage may cost money on your account when you use a hosted provider
 - the app stores your provider credential in macOS Keychain when available
 - credentials are not bundled into the source code or compiled app
@@ -89,7 +92,7 @@ Important:
 
 1. Launch BugNarrator and open the menu bar item.
 2. Open `Settings`.
-3. Choose an AI provider and enter the required key or base URL.
+3. Choose an AI provider. Use `OpenAI` for hosted transcription and issue extraction, or `Local (Parakeet)` for local transcription after the local Parakeet server is installed and running.
 4. Optionally click `Validate Key` or `Validate Connection`.
 5. Click `Show Recording Controls`.
 6. Click `Start Recording`.
@@ -287,8 +290,8 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 
 ## Known Limitations
 
-- transcription and issue extraction require network access
-- BugNarrator does not yet support offline Whisper
+- hosted transcription, review summary, issue extraction, GitHub export, and Jira export require network access
+- `Local (Parakeet)` is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider
 - GitHub and Jira export include screenshot references in issue bodies instead of uploading attachments automatically
 - session deletion is permanent today
 
