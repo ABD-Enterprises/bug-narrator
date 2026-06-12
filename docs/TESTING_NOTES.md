@@ -30,7 +30,9 @@ For public-release validation, also run the signed and notarized DMG workflow do
 
 - live microphone permission prompts and denied-permission recovery
 - end-to-end transcription against the real OpenAI API
+- end-to-end local transcription against the `Local (Parakeet)` server
 - real screenshot capture behavior with macOS Screen Recording permission
+- signed-app menu bar smoke testing from `/Applications`: launch the installed app, click the menu bar item, confirm the popover opens, and confirm no fresh `~/Library/Logs/DiagnosticReports/BugNarrator*.ips` crash report appears
 - real GitHub export against a repository you control
 - real Jira Cloud export against a project you control
 - opening the generated DMG in Finder and validating the drag-to-Applications flow

@@ -49,13 +49,15 @@ It helps you:
 1. Launch BugNarrator and confirm the menu bar icon appears.
 2. Open `Settings`.
 3. Choose an AI provider.
-4. Enter the required API key or base URL for that provider.
+4. Enter the required API key or base URL for that provider, or leave the key blank for `Local (Parakeet)`.
 5. Optionally click `Validate Key` or `Validate Connection`.
 6. Optionally assign global hotkeys for `Start Recording`, `Stop Recording`, and `Capture Screenshot`. They begin as `Not Set` until you choose them.
 7. Click `Show Recording Controls`.
 8. Start a session with `Start Recording`.
 
-BugNarrator does not ship with built-in AI access or credits. OpenAI is the default provider. You can also select an OpenAI-compatible enterprise gateway or a local-compatible endpoint when that endpoint exposes the OpenAI-compatible transcription and chat APIs BugNarrator needs. Hosted provider usage may incur charges on that provider account.
+BugNarrator does not ship with built-in AI access or credits. `OpenAI` is the hosted default provider and requires your own API key. You can also select `OpenAI-Compatible` for an enterprise gateway or hosted compatible provider, `Local-Compatible` for local or self-hosted OpenAI-compatible endpoints, or `Local (Parakeet)` for transcription on this Mac through `http://localhost:8422`.
+
+`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
 
 ## Core Workflow
 
@@ -264,7 +266,8 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 
 - confirm your AI provider configuration is valid in `Settings`
 - validate the key if needed
-- confirm the Mac has network access
+- for hosted providers, confirm the Mac has network access
+- for `Local (Parakeet)`, confirm the local transcription server is running
 - retry with a short test recording to rule out an empty or corrupt audio file
 
 ### Microphone Permission Problems
@@ -287,7 +290,8 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 ### Provider Credential Missing
 
 - open `Settings`
-- choose an AI provider and enter your own provider credential or base URL
+- choose an AI provider and enter your own provider credential or base URL when that provider requires one
+- for `Local (Parakeet)`, confirm the local server is running instead of adding an API key
 - click `Validate Key` or `Validate Connection` if you want to check it before transcription or issue extraction
 - BugNarrator stores provider credentials in macOS Keychain when available
 - if a completed session could not be transcribed because the provider configuration was missing at stop time, keep the session and retry after restoring the configuration
@@ -329,10 +333,11 @@ What stays local on your Mac:
 
 What is sent to the configured AI provider:
 
-- recorded audio after you stop a session and request transcription
-- transcript context used for review summary or issue extraction
+- for hosted or compatible providers, recorded audio after you stop a session and request transcription
+- for `Local (Parakeet)`, audio is processed by the local server on this Mac instead of uploaded
+- transcript context used for review summary or issue extraction when a chat-capable provider is selected
 
-BugNarrator does not continuously stream live audio to OpenAI while you are still recording.
+BugNarrator does not continuously stream live audio to any AI provider while you are still recording.
 
 ## More Documentation
 

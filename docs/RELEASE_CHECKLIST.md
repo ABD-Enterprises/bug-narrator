@@ -16,15 +16,18 @@ Use this checklist before cutting a public test build or release candidate.
 - Confirm the Release app bundle contains `Contents/Resources/AppIcon.icns` and `Contents/Resources/Assets.car`.
 - Confirm the signed Release app and the mounted DMG app both retain `com.apple.security.device.audio-input=true`.
 - Launch the built app and confirm the menu bar item appears.
+- Install the signed app into `/Applications`, launch that copy, click the menu bar item, and confirm the popover opens without a fresh `~/Library/Logs/DiagnosticReports/BugNarrator*.ips` crash report.
 - Confirm first launch does not trigger an unexpected Keychain prompt before the user opens Settings or starts a credential-dependent workflow.
 
 ## Core Product Workflow
 
 - Add or validate the intended AI provider configuration in Settings.
+- If testing `Local (Parakeet)`, start the local server first and confirm `Check Server` succeeds.
 - Start a recording session and confirm the app enters `Recording`.
 - Capture at least one screenshot during the session and confirm it creates a visible timeline moment in review.
-- Stop the session and confirm transcription succeeds.
-- Confirm the transcript, review summary, screenshots, and extracted issues appear in the session library.
+- Stop the session and confirm transcription succeeds with the selected provider.
+- For chat-capable providers, confirm the transcript, review summary, screenshots, and extracted issues appear in the session library.
+- For `Local (Parakeet)`, confirm the transcript and screenshots appear in the session library and automatic issue extraction stays disabled until a chat-capable provider is selected.
 - Export a session bundle and verify `transcript.md` plus the `screenshots` folder are created.
 
 ## Export Integrations
