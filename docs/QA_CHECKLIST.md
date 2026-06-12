@@ -213,7 +213,7 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
   Expected: BugNarrator explains that the local screenshot file is no longer available instead of failing silently.
 - Disconnect networking or force a timeout during transcription.
   Expected: transcription ends in a clear timeout or API error state and the app returns to a usable state.
-- Use an invalid hosted-provider API key or unsupported local-compatible model combination.
+- Use an invalid hosted-provider API key, unsupported local-compatible model combination, or stopped `Local (Parakeet)` server.
   Expected: transcription or issue extraction ends in clear provider setup guidance, Settings opens when useful, and the preserved session remains available so transcription can be retried after the configuration is fixed.
 - Simulate a local history write failure after a successful transcription if practical.
   Expected: the transcript window still opens, the completed session remains available as an unsaved session, screenshots remain accessible, and `Save to History` can be retried later after storage is fixed.

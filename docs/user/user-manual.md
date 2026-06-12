@@ -37,10 +37,12 @@ You need:
 1. Open the menu bar item.
 2. Open `Settings`.
 3. Choose an AI provider.
-4. Enter the required API key or base URL.
+4. Enter the required API key or base URL, or leave the key blank for `Local (Parakeet)`.
 5. Optionally validate the key or connection.
 
-BugNarrator does not ship with built-in AI access or credits. OpenAI remains the default provider, and OpenAI-compatible enterprise or local-compatible endpoints can be configured when they expose the transcription and chat APIs BugNarrator needs.
+BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs BugNarrator needs. `Local (Parakeet)` transcribes on this Mac through `http://localhost:8422`, does not use an API key, and does not upload audio.
+
+`Local (Parakeet)` is transcription-only. Review summary and issue extraction still require an OpenAI-compatible chat provider.
 
 ## Recording Workflow
 
@@ -54,7 +56,7 @@ The recording controls window stays open until you close it.
 
 If the AI provider configuration is missing, invalid, or revoked when the recording finishes, BugNarrator preserves the finished session in the library so you can restore the configuration and retry transcription later.
 
-Sessions waiting for transcription retry are also surfaced in the menu bar window and at the top of the session-library list, so the recovery flow stays visible after relaunch.
+Finished sessions waiting for transcription retry are surfaced in the menu bar window and at the top of the session-library list after relaunch.
 
 ## Review Workflow
 

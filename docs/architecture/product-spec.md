@@ -205,7 +205,7 @@ BugNarrator generates transcripts after recording ends.
 
 It does not continuously stream live audio to the configured AI provider while the user is still recording.
 
-OpenAI remains the default provider. OpenAI-compatible enterprise gateways and local-compatible endpoints are supported when they expose the transcription and chat APIs BugNarrator needs. Unsupported provider/model combinations must fail before transcription or issue extraction starts with clear setup guidance.
+OpenAI remains the hosted default provider. OpenAI-compatible enterprise gateways and local-compatible endpoints are supported when they expose the transcription and chat APIs BugNarrator needs. Local Parakeet transcription is supported through the local server at `http://localhost:8422`; it requires no API key and must not upload audio. Because Parakeet is transcription-only, review summary and issue extraction must stay disabled until an OpenAI-compatible chat provider is selected. Unsupported provider/model combinations must fail before transcription or issue extraction starts with clear setup guidance.
 
 ### Recovery
 
