@@ -5,6 +5,8 @@ struct AISetupSectionsView: View {
     @ObservedObject var settingsStore: SettingsStore
     let secureControlsDisabled: Bool
 
+    @State private var revealCredential = false
+
     var body: some View {
         GroupBox("AI Provider Setup") {
             VStack(alignment: .leading, spacing: 12) {
@@ -22,6 +24,8 @@ struct AISetupSectionsView: View {
                     .help("OpenAI uses cloud transcription. Local (Parakeet) transcribes on this Mac with no API key or upload required.")
                 }
 
+                providerComparison
+
                 if settingsStore.aiProvider.credentialFieldTitle.isEmpty {
                     labeledField(title: "Credential") {
                         HStack {
@@ -38,13 +42,28 @@ struct AISetupSectionsView: View {
                     }
                 } else {
                     labeledField(title: settingsStore.aiProvider.credentialFieldTitle) {
-                        CredentialTokenField(
-                            placeholder: aiProviderCredentialPlaceholder,
-                            text: apiKeyBinding,
-                            isDisabled: secureControlsDisabled,
-                            accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle
-                        )
+                        HStack(spacing: 6) {
+                            CredentialTokenField(
+                                placeholder: aiProviderCredentialPlaceholder,
+                                text: apiKeyBinding,
+                                isDisabled: secureControlsDisabled,
+                                accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle,
+                                revealWhenNotEditing: revealCredential
+                            )
+
+                            Button {
+                                revealCredential.toggle()
+                            } label: {
+                                Image(systemName: revealCredential ? "eye.slash" : "eye")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(secureControlsDisabled)
+                            .help(revealCredential ? "Hide the credential" : "Show the credential to verify your paste")
+                            .accessibilityLabel(revealCredential ? "Hide credential" : "Show credential")
+                        }
                     }
+
+                    costEstimate
                 }
 
                 labeledField(title: "API Base URL") {
@@ -67,6 +86,12 @@ struct AISetupSectionsView: View {
                         .foregroundStyle(settingsStore.hasSelectedAIProviderCredential ? .primary : .secondary)
 
                     Spacer()
+
+                    if appState.apiKeyValidationState == .validating {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel("Validating")
+                    }
 
                     Button(apiKeyActionTitle) {
                         Task {
@@ -190,6 +215,47 @@ struct AISetupSectionsView: View {
             }
         }
         .accessibilityIdentifier("Issue Extraction section")
+    }
+
+    @ViewBuilder
+    private var providerComparison: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            comparisonRow(label: "API key", openAI: "Required", parakeet: "Not needed")
+            comparisonRow(label: "Cost", openAI: "~$0.04 / 5-min session", parakeet: "Free")
+            comparisonRow(label: "Privacy", openAI: "Audio sent to OpenAI", parakeet: "Stays on device")
+            comparisonRow(label: "Network", openAI: "Required", parakeet: "Offline after setup")
+        }
+        .font(.footnote)
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Provider comparison. OpenAI requires an API key and network and sends audio to OpenAI. Local Parakeet is free, offline, and keeps audio on device.")
+    }
+
+    private func comparisonRow(label: String, openAI: String, parakeet: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: 70, alignment: .leading)
+            Text(openAI)
+                .fontWeight(settingsStore.aiProvider == .openAI ? .semibold : .regular)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(parakeet)
+                .fontWeight(settingsStore.aiProvider == .parakeetLocal ? .semibold : .regular)
+                .foregroundStyle(settingsStore.aiProvider == .parakeetLocal ? .green : .primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var costEstimate: some View {
+        if settingsStore.aiProvider == .openAI {
+            Text("Typical cost: about $0.04 for a 5-minute session (Whisper transcription), plus issue-extraction tokens. Switch to Local (Parakeet) for free, offline transcription.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var apiKeyBinding: Binding<String> {
