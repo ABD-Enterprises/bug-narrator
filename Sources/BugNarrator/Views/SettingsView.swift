@@ -996,6 +996,7 @@ struct CredentialTokenField: NSViewRepresentable {
     @Binding var text: String
     let isDisabled: Bool
     let accessibilityLabel: String
+    var revealWhenNotEditing: Bool = false
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -1017,7 +1018,7 @@ struct CredentialTokenField: NSViewRepresentable {
         textField.setAccessibilityLabel(accessibilityLabel)
         textField.isEnabled = !isDisabled
 
-        let displayValue = context.coordinator.isEditing
+        let displayValue = (context.coordinator.isEditing || revealWhenNotEditing)
             ? text
             : Self.maskedDisplayValue(for: text)
         if textField.stringValue != displayValue {
