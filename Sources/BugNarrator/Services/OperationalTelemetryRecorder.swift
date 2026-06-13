@@ -43,18 +43,29 @@ extension TelemetryEventName {
 }
 
 struct OperationalTelemetryRecorder {
+    /// UserDefaults key shared with SettingsStore so the recorder can honor the
+    /// user's opt-out without a direct dependency on the settings object.
+    static let enabledDefaultsKey = "settings.operationalTelemetryEnabled"
+
     private let fileManager: FileManager
     private let storageURL: URL
+    private let userDefaults: UserDefaults
     private let encoder = JSONEncoder()
 
-    init(fileManager: FileManager = .default, storageURL: URL? = nil) {
+    init(fileManager: FileManager = .default, storageURL: URL? = nil, userDefaults: UserDefaults = .standard) {
         self.fileManager = fileManager
         self.storageURL = storageURL ?? AppSupportLocation.appDirectory(fileManager: fileManager)
             .appendingPathComponent("operational-telemetry.jsonl")
+        self.userDefaults = userDefaults
         encoder.dateEncodingStrategy = .iso8601
     }
 
+    private var isEnabled: Bool {
+        userDefaults.object(forKey: Self.enabledDefaultsKey) as? Bool ?? true
+    }
+
     func record(_ name: String, metadata: [String: String] = [:]) {
+        guard isEnabled else { return }
         do {
             let parentDirectoryURL = storageURL.deletingLastPathComponent()
             if !fileManager.fileExists(atPath: parentDirectoryURL.path) {
