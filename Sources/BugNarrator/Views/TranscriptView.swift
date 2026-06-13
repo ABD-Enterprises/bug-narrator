@@ -201,6 +201,16 @@ struct TranscriptView: View {
                         appState.openSettings()
                     }
                 }
+            } else if allSessions.isEmpty {
+                ContentUnavailableView {
+                    Label("No sessions yet", systemImage: "waveform")
+                } description: {
+                    Text("Open the recording controls to capture your first BugNarrator session.")
+                } actions: {
+                    Button("Open Recording Controls") {
+                        appState.openRecordingControls()
+                    }
+                }
             } else if let emptyState {
                 ContentUnavailableView {
                     Label(emptyState.title, systemImage: emptyState.systemImage)
