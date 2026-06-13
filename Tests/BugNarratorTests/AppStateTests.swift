@@ -627,7 +627,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertTrue(
-            harness.appState.status.detail?.hasPrefix("Transcript ready, but Could not save local session history:") == true
+            harness.appState.status.detail?.hasPrefix("Transcript ready, but Could not save local session history. The transcript is still in memory") == true
         )
         XCTAssertEqual(harness.appState.currentTranscript?.transcript, "Transcript survived local save failure.")
         XCTAssertFalse(harness.appState.currentTranscriptIsPersisted)
@@ -2194,7 +2194,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertTrue(
-            harness.appState.status.detail?.hasPrefix("Could not save local session history:") == true
+            harness.appState.status.detail?.hasPrefix("Could not save local session history. The transcript is still in memory") == true
         )
         XCTAssertEqual(
             harness.appState.currentTranscript?.issueExtraction?.issues.first?.title,

@@ -28,6 +28,19 @@ final class AppErrorTests: XCTestCase {
         XCTAssertEqual(AppError.screenRecordingPermissionDenied.recoveryHeadline, "Screen recording access is blocked.")
     }
 
+    func testStorageFailureGivesActionableRecoveryGuidance() {
+        let error = AppError.storageFailure("Disk full")
+
+        XCTAssertEqual(
+            error.userMessage,
+            "Could not save local session history. The transcript is still in memory — copy it now from the popover before trying again. Details: Disk full"
+        )
+        XCTAssertEqual(
+            error.recoveryHeadline,
+            "BugNarrator could not save the session. Copy your transcript before retrying."
+        )
+    }
+
     func testOpenAIKeyErrorsUseSpecificStatusPresentation() {
         XCTAssertEqual(AppError.missingAPIKey.statusTitle, "OpenAI Key Needed")
         XCTAssertEqual(AppError.invalidAPIKey.statusTitle, "OpenAI Key Rejected")

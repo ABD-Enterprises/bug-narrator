@@ -368,16 +368,25 @@ struct MenuBarView: View {
 
     private var storageRecoverySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("The transcript is still available in BugNarrator. After fixing local storage, open the transcript window and save it to history.")
+            Text("The transcript is still available in BugNarrator. Copy it now, then fix local storage and save it to history.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Open Transcript Window") {
-                appState.openTranscriptHistory()
+            HStack(spacing: 8) {
+                Button("Copy Transcript") {
+                    appState.copyDisplayedTranscript()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(appState.currentTranscript?.hasTranscriptContent != true)
+
+                Button("Open Transcript Window") {
+                    appState.openTranscriptHistory()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 

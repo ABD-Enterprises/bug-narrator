@@ -93,7 +93,7 @@ enum AppError: LocalizedError, Equatable {
         case .exportFailure(let message):
             return "Export failed: \(message)"
         case .storageFailure(let message):
-            return "Could not save local session history: \(message)"
+            return "Could not save local session history. The transcript is still in memory — copy it now from the popover before trying again. Details: \(message)"
         case .diagnosticsFailure(let message):
             return "BugNarrator could not prepare diagnostics: \(message)"
         }
@@ -179,7 +179,7 @@ enum AppError: LocalizedError, Equatable {
         case .exportConfigurationMissing:
             return "Finish export setup before continuing."
         case .storageFailure:
-            return "BugNarrator could not update local session history."
+            return "BugNarrator could not save the session. Copy your transcript before retrying."
         default:
             return nil
         }
