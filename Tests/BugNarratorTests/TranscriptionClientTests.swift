@@ -67,6 +67,49 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertEqual(bodyString, expectedBody)
     }
 
+    func testTranscriptionRequestFactoryBuildsTranscriptionRequest() throws {
+        let factory = TranscriptionRequestFactory()
+        let request = factory.transcriptionRequest(
+            apiKey: "fixture-key",
+            transcriptionRequest: TranscriptionRequest(
+                model: "whisper-1",
+                languageHint: nil,
+                prompt: nil,
+                apiBaseURL: URL(string: "https://proxy.example.com/openai")!
+            ),
+            boundary: "Boundary-fixture",
+            body: Data("body".utf8)
+        )
+
+        XCTAssertEqual(request.url?.absoluteString, "https://proxy.example.com/openai/v1/audio/transcriptions")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-key")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "multipart/form-data; boundary=Boundary-fixture")
+        XCTAssertEqual(request.httpBody, Data("body".utf8))
+    }
+
+    func testVerboseTranscriptionResponseParserTrimsTranscriptAndPreservesSegments() throws {
+        let parser = VerboseTranscriptionResponseParser(qualityInspector: TranscriptQualityInspector())
+        let data = Data(#"{"text":"  Captured a settings bug.  ","segments":[{"start":1,"end":2,"text":"Captured a settings bug."}]}"#.utf8)
+
+        let result = try parser.parse(data)
+
+        XCTAssertEqual(result.text, "Captured a settings bug.")
+        XCTAssertEqual(result.segments.count, 1)
+        XCTAssertEqual(result.segments[0].start, 1)
+        XCTAssertEqual(result.segments[0].end, 2)
+        XCTAssertEqual(result.segments[0].text, "Captured a settings bug.")
+    }
+
+    func testVerboseTranscriptionResponseParserRejectsEmptyTranscript() throws {
+        let parser = VerboseTranscriptionResponseParser(qualityInspector: TranscriptQualityInspector())
+        let data = Data(#"{"text":"   ","segments":[]}"#.utf8)
+
+        XCTAssertThrowsError(try parser.parse(data)) { error in
+            XCTAssertEqual(error as? AppError, .emptyTranscript)
+        }
+    }
+
     func testTranscribeRejectsEmptyAudioFileBeforeMakingNetworkCall() async throws {
         let fileURL = try makeAudioFile(named: "empty", contents: "")
         defer { try? FileManager.default.removeItem(at: fileURL) }
