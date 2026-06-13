@@ -77,12 +77,71 @@ struct MultipartFormDataBuilder {
     }
 }
 
+struct TranscriptionRequestFactory {
+    static let defaultAPIBaseURL = URL(string: "https://api.openai.com")!
+
+    func validationRequest(
+        apiKey: String,
+        apiBaseURL: URL = Self.defaultAPIBaseURL
+    ) -> URLRequest {
+        var request = URLRequest(url: OpenAIEndpointBuilder.endpoint(for: "v1/models", baseURL: apiBaseURL))
+        request.httpMethod = "GET"
+        applyAuthorization(apiKey, to: &request)
+        return request
+    }
+
+    func transcriptionRequest(
+        apiKey: String,
+        transcriptionRequest: TranscriptionRequest,
+        boundary: String,
+        body: Data
+    ) -> URLRequest {
+        var request = URLRequest(
+            url: OpenAIEndpointBuilder.endpoint(
+                for: "v1/audio/transcriptions",
+                baseURL: transcriptionRequest.apiBaseURL
+            )
+        )
+        request.httpMethod = "POST"
+        applyAuthorization(apiKey, to: &request)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return request
+    }
+
+    private func applyAuthorization(_ apiKey: String, to request: inout URLRequest) {
+        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+    }
+}
+
+struct VerboseTranscriptionResponseParser {
+    let qualityInspector: TranscriptQualityInspector
+
+    func parse(_ data: Data) throws -> TranscriptionResult {
+        let result = try JSONDecoder().decode(VerboseTranscriptionResponse.self, from: data)
+        let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !transcript.isEmpty else {
+            throw AppError.emptyTranscript
+        }
+
+        return TranscriptionResult(
+            text: transcript,
+            segments: result.segments ?? [],
+            qualityFindings: qualityInspector.findings(for: transcript)
+        )
+    }
+}
+
 actor TranscriptionClient: TranscriptionServing {
     private let session: URLSession
     private let fileManager: FileManager
     private let transcriptionChunker: any TranscriptionChunking
     private let audioUploadPolicy: AudioUploadPolicy
     private let qualityInspector: TranscriptQualityInspector
+    private let requestFactory = TranscriptionRequestFactory()
     private let logger = DiagnosticsLogger(category: .transcription)
 
     init(
@@ -322,29 +381,24 @@ actor TranscriptionClient: TranscriptionServing {
                 )
             }
 
-            let result = try JSONDecoder().decode(VerboseTranscriptionResponse.self, from: data)
-            let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !transcript.isEmpty else {
+            let result: TranscriptionResult
+            do {
+                result = try VerboseTranscriptionResponseParser(qualityInspector: qualityInspector).parse(data)
+            } catch AppError.emptyTranscript {
                 logger.warning("transcription_empty", "The provider returned an empty transcript.")
                 throw AppError.emptyTranscript
             }
 
-            let qualityFindings = qualityInspector.findings(for: transcript)
-            logQualityFindings(qualityFindings, fileName: fileURL.lastPathComponent)
+            logQualityFindings(result.qualityFindings, fileName: fileURL.lastPathComponent)
             logger.info(
                 "transcription_completed",
                 "Completed transcript received.",
                 metadata: [
-                    "character_count": "\(transcript.count)",
-                    "segments_count": "\(result.segments?.count ?? 0)"
+                    "character_count": "\(result.text.count)",
+                    "segments_count": "\(result.segments.count)"
                 ]
             )
-            return TranscriptionResult(
-                text: transcript,
-                segments: result.segments ?? [],
-                qualityFindings: qualityFindings
-            )
+            return result
         } catch {
             logger.error(
                 "transcription_failed",
@@ -411,33 +465,26 @@ actor TranscriptionClient: TranscriptionServing {
     }
 
     func validateAPIKey(_ apiKey: String) async throws {
-        try await validateAPIKey(apiKey, apiBaseURL: URL(string: "https://api.openai.com")!)
+        try await validateAPIKey(apiKey, apiBaseURL: TranscriptionRequestFactory.defaultAPIBaseURL)
     }
 
-    func makeValidationRequest(apiKey: String, apiBaseURL: URL = URL(string: "https://api.openai.com")!) -> URLRequest {
-        var request = URLRequest(url: OpenAIEndpointBuilder.endpoint(for: "v1/models", baseURL: apiBaseURL))
-        request.httpMethod = "GET"
-        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-        return request
+    func makeValidationRequest(
+        apiKey: String,
+        apiBaseURL: URL = TranscriptionRequestFactory.defaultAPIBaseURL
+    ) -> URLRequest {
+        requestFactory.validationRequest(apiKey: apiKey, apiBaseURL: apiBaseURL)
     }
 
     func makeURLRequest(fileURL: URL, apiKey: String, request: TranscriptionRequest) throws -> URLRequest {
         _ = try validateAudioFile(at: fileURL)
 
         let boundary = "Boundary-\(UUID().uuidString)"
-        var urlRequest = URLRequest(
-            url: OpenAIEndpointBuilder.endpoint(for: "v1/audio/transcriptions", baseURL: request.apiBaseURL)
+        return try requestFactory.transcriptionRequest(
+            apiKey: apiKey,
+            transcriptionRequest: request,
+            boundary: boundary,
+            body: makeBody(fileURL: fileURL, request: request, boundary: boundary)
         )
-        urlRequest.httpMethod = "POST"
-        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try makeBody(fileURL: fileURL, request: request, boundary: boundary)
-
-        return urlRequest
     }
 
     func makeBody(fileURL: URL, request: TranscriptionRequest, boundary: String) throws -> Data {
