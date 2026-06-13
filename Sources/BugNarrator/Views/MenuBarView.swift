@@ -477,8 +477,8 @@ struct MenuBarView: View {
 
                     Text(
                         appState.settingsStore.aiProvider.requiresAPIKey
-                            ? "Restore or replace the \(appState.settingsStore.aiProvider.displayName) API key in Settings if needed, then reopen the saved session to retry transcription."
-                            : "Confirm the \(appState.settingsStore.aiProvider.displayName) setup in Settings if needed, then reopen the saved session to retry transcription."
+                            ? "Restore or replace the \(appState.settingsStore.aiProvider.displayName) API key in Settings if needed, then retry the saved session."
+                            : "Confirm the \(appState.settingsStore.aiProvider.displayName) setup in Settings if needed, then retry the saved session."
                     )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -490,7 +490,23 @@ struct MenuBarView: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                        } else if transcriptStore.pendingTranscriptionSessionCount == 1 {
+                            Button("Retry Transcription") {
+                                retryLatestPendingTranscription()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(appState.retryingSessionID != nil)
+                            .help("Retry transcription for the saved session without opening the library.")
                         } else {
+                            Button("Retry Latest") {
+                                retryLatestPendingTranscription()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(appState.retryingSessionID != nil)
+                            .help("Retry transcription for the most recent saved session.")
+
                             Button("Open Retry Needed Session") {
                                 openPendingTranscriptionSession()
                             }
@@ -688,6 +704,16 @@ struct MenuBarView: View {
         }
 
         appState.openTranscriptHistory()
+    }
+
+    private func retryLatestPendingTranscription() {
+        guard let sessionID = transcriptStore.latestPendingTranscriptionSession?.id else {
+            return
+        }
+
+        Task {
+            await appState.retryPendingTranscription(for: sessionID)
+        }
     }
 
     private func hotkeyLine(label: String, value: String) -> some View {
