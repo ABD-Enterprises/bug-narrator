@@ -38,6 +38,35 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertTrue(bodyString.contains("audio-data"))
     }
 
+    func testMultipartFormDataBuilderBuildsFieldFileAndClosingBoundary() throws {
+        var builder = MultipartFormDataBuilder(boundary: "Boundary-fixture")
+
+        builder.appendField(named: "model", value: "whisper-1")
+        builder.appendFile(
+            named: "file",
+            fileName: "recording.m4a",
+            mimeType: "audio/mp4",
+            data: Data("audio-data".utf8)
+        )
+
+        let bodyString = try XCTUnwrap(String(data: builder.finalizedBody(), encoding: .utf8))
+        let expectedBody = [
+            "--Boundary-fixture",
+            "Content-Disposition: form-data; name=\"model\"",
+            "",
+            "whisper-1",
+            "--Boundary-fixture",
+            "Content-Disposition: form-data; name=\"file\"; filename=\"recording.m4a\"",
+            "Content-Type: audio/mp4",
+            "",
+            "audio-data",
+            "--Boundary-fixture--",
+            ""
+        ].joined(separator: "\r\n")
+
+        XCTAssertEqual(bodyString, expectedBody)
+    }
+
     func testTranscribeRejectsEmptyAudioFileBeforeMakingNetworkCall() async throws {
         let fileURL = try makeAudioFile(named: "empty", contents: "")
         defer { try? FileManager.default.removeItem(at: fileURL) }
