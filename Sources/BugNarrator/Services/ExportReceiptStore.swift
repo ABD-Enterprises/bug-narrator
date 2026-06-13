@@ -51,6 +51,9 @@ protocol ExportReceiptStoring: Sendable {
 }
 
 actor ExportReceiptStore: ExportReceiptStoring {
+    static let defaultStorageURL = AppSupportLocation.appDirectory()
+        .appendingPathComponent("export-receipts.json", isDirectory: false)
+
     private let fileManager: FileManager
     private let storageURL: URL
     private let encoder = JSONEncoder()
@@ -59,8 +62,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
 
     init(
         fileManager: FileManager = .default,
-        storageURL: URL = AppSupportLocation.appDirectory()
-            .appendingPathComponent("export-receipts.json", isDirectory: false)
+        storageURL: URL = ExportReceiptStore.defaultStorageURL
     ) {
         self.fileManager = fileManager
         self.storageURL = storageURL

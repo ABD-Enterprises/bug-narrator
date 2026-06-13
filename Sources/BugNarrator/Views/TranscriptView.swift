@@ -1967,7 +1967,9 @@ struct TranscriptView: View {
 
     private func export(session: TranscriptSession, format: TranscriptExportFormat) {
         do {
-            try exporter.export(session: session, as: format)
+            if let exportedURL = try exporter.export(session: session, as: format) {
+                appState.showRevealInFinderToast("Transcript exported", revealing: exportedURL)
+            }
         } catch {
             exportErrorMessage = error.localizedDescription
         }
@@ -1975,7 +1977,9 @@ struct TranscriptView: View {
 
     private func exportBundle(session: TranscriptSession) {
         do {
-            try exporter.exportBundle(session: session)
+            if let bundleURL = try exporter.exportBundle(session: session) {
+                appState.showRevealInFinderToast("Session bundle exported", revealing: bundleURL)
+            }
         } catch {
             exportErrorMessage = error.localizedDescription
         }

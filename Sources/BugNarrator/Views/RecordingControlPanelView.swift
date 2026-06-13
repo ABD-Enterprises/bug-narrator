@@ -22,19 +22,7 @@ struct RecordingControlPanelView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .top) {
             if let transientToast = appState.transientToast {
-                Label(transientToast.message, systemImage: transientToast.style.symbolName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(transientToast.style == .success ? .green : .secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.regularMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(.quaternary.opacity(0.55), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-                    .padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                transientToastView(transientToast)
             }
         }
         .animation(.easeInOut(duration: 0.18), value: appState.transientToast)
@@ -62,6 +50,35 @@ struct RecordingControlPanelView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(statusTint)
         }
+    }
+
+    private func transientToastView(_ transientToast: TransientToast) -> some View {
+        HStack(spacing: 8) {
+            Label(transientToast.message, systemImage: transientToast.style.symbolName)
+
+            if let action = transientToast.action {
+                Divider()
+                    .frame(height: 14)
+
+                Button(action.title) {
+                    action.perform()
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(action.accessibilityLabel)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(transientToast.style == .success ? .green : .secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(.quaternary.opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .padding(.top, 10)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var statusSummary: some View {
