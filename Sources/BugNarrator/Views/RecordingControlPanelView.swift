@@ -125,6 +125,7 @@ struct RecordingControlPanelView: View {
                     enabled: canStartSession,
                     action: onStartSession
                 )
+                .help(startRecordingHint)
 
                 actionButton(
                     title: "Stop Recording",
@@ -133,6 +134,7 @@ struct RecordingControlPanelView: View {
                     enabled: canStopSession,
                     action: onStopSession
                 )
+                .help(stopRecordingHint)
             }
 
             actionButton(
@@ -142,6 +144,7 @@ struct RecordingControlPanelView: View {
                 enabled: canUseLiveControls,
                 action: onCaptureScreenshot
             )
+            .help(captureScreenshotHint)
         }
     }
 
@@ -193,12 +196,54 @@ struct RecordingControlPanelView: View {
         }
     }
 
+    private var startRecordingHint: String {
+        if canStartSession {
+            return "Start a narrated recording session."
+        }
+        switch appState.status.phase {
+        case .recording:
+            return "A recording is already in progress."
+        case .transcribing:
+            return "Wait for the current transcription to finish before starting a new recording."
+        default:
+            let provider = appState.settingsStore.aiProvider
+            return provider.requiresAPIKey
+                ? "Add your \(provider.displayName) API key in Settings before recording."
+                : "Finish \(provider.displayName) setup in Settings before recording."
+        }
+    }
+
     private var canStopSession: Bool {
         appState.status.phase == .recording
     }
 
+    private var stopRecordingHint: String {
+        switch appState.status.phase {
+        case .recording:
+            return "Stop the current recording and start transcription."
+        case .transcribing:
+            return "The recording has already stopped. Wait for transcription to finish."
+        default:
+            return "Start a recording before stopping one."
+        }
+    }
+
     private var canUseLiveControls: Bool {
         appState.status.phase == .recording && !appState.isScreenshotCaptureInProgress
+    }
+
+    private var captureScreenshotHint: String {
+        if appState.status.phase == .recording {
+            return appState.isScreenshotCaptureInProgress
+                ? "Finish or cancel the current screenshot selection before capturing another screenshot."
+                : "Capture a screenshot and add it to the current recording timeline."
+        }
+
+        if appState.status.phase == .transcribing {
+            return "Wait for transcription to finish before capturing screenshots."
+        }
+
+        return "Start a recording before capturing screenshots."
     }
 
     private var statusHeadline: String {
