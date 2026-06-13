@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import SwiftUI
 
 struct MenuBarView: View {
@@ -87,7 +88,18 @@ struct MenuBarView: View {
             return false
         }
 
-        return AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .denied, .restricted:
+            return true
+        case .authorized, .notDetermined:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    private var screenRecordingSetupIncomplete: Bool {
+        !CGPreflightScreenCaptureAccess()
     }
 
     private var setupBanner: some View {
@@ -441,6 +453,7 @@ struct MenuBarView: View {
             .accessibilityHint("Opens the recording controls window.")
 
             microphoneLevelSection
+            screenRecordingPermissionSection
 
             switch appState.status.phase {
             case .idle:
@@ -515,6 +528,30 @@ struct MenuBarView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    @ViewBuilder
+    private var screenRecordingPermissionSection: some View {
+        if screenRecordingSetupIncomplete {
+            VStack(alignment: .leading, spacing: 7) {
+                Label("Screenshot access is not enabled", systemImage: "camera.viewfinder")
+                    .font(.footnote.weight(.semibold))
+
+                Text("Recording can continue without screenshots. Enable Screen Recording if you want BugNarrator to capture screenshots during a session.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("Open Screen Recording Settings") {
+                    appState.openScreenRecordingPrivacySettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("Open Screen Recording privacy settings")
+                .accessibilityHint("Opens the macOS privacy settings for screen recording access")
             }
             .padding(.vertical, 2)
         }
