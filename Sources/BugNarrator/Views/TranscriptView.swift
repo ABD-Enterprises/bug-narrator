@@ -1,16 +1,6 @@
 import AppKit
 import SwiftUI
 
-func normalizedOptionalReproductionStepText(_ value: String) -> String? {
-    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmedValue.isEmpty ? nil : trimmedValue
-}
-
-func normalizedOptionalIssueText(_ value: String) -> String? {
-    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmedValue.isEmpty ? nil : trimmedValue
-}
-
 struct TranscriptView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var recordingTimer: RecordingTimerViewModel
@@ -772,11 +762,6 @@ struct TranscriptView: View {
         "\(session.createdAt.formatted(date: .abbreviated, time: .shortened)) • \(ElapsedTimeFormatter.string(from: session.duration)) • \(session.model)"
     }
 
-    private var dividerSection: some View {
-        Divider()
-            .overlay(Color(nsColor: .separatorColor).opacity(0.45))
-    }
-
     private func workspaceActions(_ session: TranscriptSession, availableWidth: CGFloat) -> some View {
         Group {
             if availableWidth < 420 {
@@ -831,22 +816,6 @@ struct TranscriptView: View {
                 rawTranscriptSection(session, availableWidth: availableWidth)
             }
         }
-    }
-
-    private func reviewSectionCard<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
@@ -1061,15 +1030,6 @@ struct TranscriptView: View {
                 }
             }
         }
-    }
-
-    private func metadataChip(label: String, systemImage: String) -> some View {
-        return Label(label, systemImage: systemImage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.32), in: Capsule())
     }
 
     @ViewBuilder
@@ -1415,19 +1375,6 @@ struct TranscriptView: View {
             let liveItem = currentExportReviewItem(for: item.issue.id) ?? item
             return liveItem.resolution == .exportNew || liveItem.selectedMatch != nil
         }
-    }
-
-    private func emptyDetailState(title: String, message: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 8)
     }
 
     private func extractIssuesButton(for session: TranscriptSession) -> some View {
@@ -1949,14 +1896,6 @@ struct TranscriptView: View {
         }
     }
 
-    private func resolveSession(for entry: SessionLibraryEntry) -> TranscriptSession? {
-        if appState.currentTranscript?.id == entry.id {
-            return appState.currentTranscript
-        }
-
-        return transcriptStore.session(with: entry.id)
-    }
-
     @ViewBuilder
     private func fieldEditor(title: String, text: Binding<String>, minHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1993,11 +1932,6 @@ struct TranscriptView: View {
         } catch {
             exportErrorMessage = error.localizedDescription
         }
-    }
-
-    private func extractedIssue(sessionID: UUID, issueID: UUID) -> ExtractedIssue? {
-        let sourceSession = liveSession(with: sessionID)
-        return sourceSession?.issueExtraction?.issues.first(where: { $0.id == issueID })
     }
 
     private func effectiveGitHubTarget(for issue: ExtractedIssue) -> GitHubIssueExportTarget {
@@ -2044,14 +1978,6 @@ struct TranscriptView: View {
         extractedIssue(sessionID: sessionID, issueID: issueID)?
             .reproductionSteps
             .first(where: { $0.id == stepID })
-    }
-
-    private func liveSession(with sessionID: UUID) -> TranscriptSession? {
-        if appState.currentTranscript?.id == sessionID {
-            return appState.currentTranscript
-        }
-
-        return transcriptStore.session(with: sessionID)
     }
 
     private func issueBinding<Value>(
@@ -2399,11 +2325,6 @@ struct TranscriptView: View {
         }
 
         return components.joined(separator: ". ")
-    }
-
-    private func screenshotActionLabel(for screenshot: SessionScreenshot, index: Int?, action: String) -> String {
-        let ordinal = index.map { "Screenshot \($0 + 1)" } ?? "Screenshot"
-        return "\(action) \(ordinal) at \(screenshot.timeLabel)"
     }
 
     private func sessionPreview(for entry: SessionLibraryEntry) -> String {
