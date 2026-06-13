@@ -42,6 +42,41 @@ struct TranscriptionSegment: Decodable, Sendable {
     let text: String
 }
 
+struct MultipartFormDataBuilder {
+    let boundary: String
+    private var body = Data()
+
+    init(boundary: String) {
+        self.boundary = boundary
+    }
+
+    mutating func appendField(named name: String, value: String) {
+        appendLine("--\(boundary)")
+        appendLine("Content-Disposition: form-data; name=\"\(name)\"")
+        appendLine("")
+        appendLine(value)
+    }
+
+    mutating func appendFile(named name: String, fileName: String, mimeType: String, data: Data) {
+        appendLine("--\(boundary)")
+        appendLine("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(fileName)\"")
+        appendLine("Content-Type: \(mimeType)")
+        appendLine("")
+        body.append(data)
+        appendLine("")
+    }
+
+    mutating func finalizedBody() -> Data {
+        var finalizedBody = body
+        finalizedBody.append(Data("--\(boundary)--\r\n".utf8))
+        return finalizedBody
+    }
+
+    private mutating func appendLine(_ value: String) {
+        body.append(Data("\(value)\r\n".utf8))
+    }
+}
+
 actor TranscriptionClient: TranscriptionServing {
     private let session: URLSession
     private let fileManager: FileManager
@@ -407,31 +442,28 @@ actor TranscriptionClient: TranscriptionServing {
 
     func makeBody(fileURL: URL, request: TranscriptionRequest, boundary: String) throws -> Data {
         let fileData = try Data(contentsOf: fileURL)
-        var body = Data()
+        var builder = MultipartFormDataBuilder(boundary: boundary)
 
-        appendField(named: "model", value: request.model, boundary: boundary, to: &body)
-        appendField(named: "response_format", value: "verbose_json", boundary: boundary, to: &body)
-        appendField(named: "temperature", value: "0", boundary: boundary, to: &body)
+        builder.appendField(named: "model", value: request.model)
+        builder.appendField(named: "response_format", value: "verbose_json")
+        builder.appendField(named: "temperature", value: "0")
 
         if let languageHint = request.languageHint, !languageHint.isEmpty {
-            appendField(named: "language", value: languageHint, boundary: boundary, to: &body)
+            builder.appendField(named: "language", value: languageHint)
         }
 
         if let prompt = request.prompt, !prompt.isEmpty {
-            appendField(named: "prompt", value: prompt, boundary: boundary, to: &body)
+            builder.appendField(named: "prompt", value: prompt)
         }
 
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append(
-            "Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n"
-                .data(using: .utf8)!
+        builder.appendFile(
+            named: "file",
+            fileName: fileURL.lastPathComponent,
+            mimeType: mimeType(for: fileURL),
+            data: fileData
         )
-        body.append("Content-Type: \(mimeType(for: fileURL))\r\n\r\n".data(using: .utf8)!)
-        body.append(fileData)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
-        return body
+        return builder.finalizedBody()
     }
 
     @discardableResult
@@ -519,12 +551,6 @@ actor TranscriptionClient: TranscriptionServing {
                 "finding_kinds": findings.map(\.kind.rawValue).joined(separator: ",")
             ]
         )
-    }
-
-    private func appendField(named name: String, value: String, boundary: String, to body: inout Data) {
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(value)\r\n".data(using: .utf8)!)
     }
 
     private func mimeType(for fileURL: URL) -> String {
