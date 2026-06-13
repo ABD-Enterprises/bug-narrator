@@ -45,7 +45,7 @@ struct TranscriptExporter {
         self.bundleWriter = AtomicBundleDirectoryWriter(fileManager: fileManager)
     }
 
-    func export(session: TranscriptSession, as format: TranscriptExportFormat) throws {
+    func export(session: TranscriptSession, as format: TranscriptExportFormat) throws -> URL? {
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [format.contentType]
         savePanel.canCreateDirectories = true
@@ -53,7 +53,7 @@ struct TranscriptExporter {
         savePanel.nameFieldStringValue = session.suggestedFileName(fileExtension: format.fileExtension)
 
         guard savePanel.runModal() == .OK, let url = savePanel.url else {
-            return
+            return nil
         }
 
         let content: String
@@ -73,9 +73,10 @@ struct TranscriptExporter {
                 "format": format.fileExtension
             ]
         )
+        return url
     }
 
-    func exportBundle(session: TranscriptSession) throws {
+    func exportBundle(session: TranscriptSession) throws -> URL? {
         let openPanel = NSOpenPanel()
         openPanel.canChooseFiles = false
         openPanel.canChooseDirectories = true
@@ -85,10 +86,10 @@ struct TranscriptExporter {
         openPanel.message = "Choose a folder for the exported BugNarrator session bundle."
 
         guard openPanel.runModal() == .OK, let destinationRoot = openPanel.url else {
-            return
+            return nil
         }
 
-        _ = try writeBundle(session: session, to: destinationRoot)
+        return try writeBundle(session: session, to: destinationRoot)
     }
 
     func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {

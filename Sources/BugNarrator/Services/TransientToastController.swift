@@ -16,10 +16,11 @@ final class TransientToastController {
     func showToast(
         _ message: String,
         style: TransientToastStyle = .success,
-        durationNanoseconds: UInt64 = 2_000_000_000
+        durationNanoseconds: UInt64 = 2_000_000_000,
+        action: TransientToastAction? = nil
     ) {
         dismissTask?.cancel()
-        presentationState.showToast(TransientToast(message: message, style: style))
+        presentationState.showToast(TransientToast(message: message, style: style, action: action))
         dismissTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: durationNanoseconds)
             guard !Task.isCancelled else {

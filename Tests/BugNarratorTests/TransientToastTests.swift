@@ -18,4 +18,20 @@ final class TransientToastTests: XCTestCase {
         XCTAssertEqual(toast.style, .informational)
         XCTAssertEqual(toast.style.symbolName, "xmark.circle")
     }
+
+    @MainActor
+    func testToastActionRunsHandler() {
+        var didRun = false
+        let toast = TransientToast(
+            message: "Session saved.",
+            action: TransientToastAction(title: "Reveal") {
+                didRun = true
+            }
+        )
+
+        toast.action?.perform()
+
+        XCTAssertEqual(toast.action?.title, "Reveal")
+        XCTAssertTrue(didRun)
+    }
 }
