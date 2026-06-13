@@ -93,7 +93,8 @@ final class WindowCoordinator {
             recordingControlWindowController = makeRecordingControlWindowController()
         }
 
-        present(recordingControlWindowController!)
+        guard let recordingControlWindowController else { return }
+        present(recordingControlWindowController)
     }
 
     private func present(_ windowController: NSWindowController) {
