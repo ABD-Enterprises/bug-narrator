@@ -144,6 +144,7 @@ final class FinishedRecordingPostTranscriptionResultHandler {
     private let postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter
     private let autoCopyTranscript: () -> Bool
     private let cleanupPendingRecordedAudio: () -> Void
+    private let showSavedSessionReveal: (TranscriptSession) -> Void
 
     init(
         sessionLibrary: SessionLibraryController,
@@ -152,7 +153,8 @@ final class FinishedRecordingPostTranscriptionResultHandler {
         transcriptPersistenceFailurePresenter: TranscriptPersistenceFailurePresenter,
         postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter,
         autoCopyTranscript: @escaping () -> Bool,
-        cleanupPendingRecordedAudio: @escaping () -> Void
+        cleanupPendingRecordedAudio: @escaping () -> Void,
+        showSavedSessionReveal: @escaping (TranscriptSession) -> Void = { _ in }
     ) {
         self.sessionLibrary = sessionLibrary
         self.recordingSessionController = recordingSessionController
@@ -161,14 +163,16 @@ final class FinishedRecordingPostTranscriptionResultHandler {
         self.postTranscriptionFailurePresenter = postTranscriptionFailurePresenter
         self.autoCopyTranscript = autoCopyTranscript
         self.cleanupPendingRecordedAudio = cleanupPendingRecordedAudio
+        self.showSavedSessionReveal = showSavedSessionReveal
     }
 
     func handle(_ result: PostTranscriptionPipelineResult) {
         switch result {
-        case .success:
+        case .success(let session):
             cleanupPendingRecordedAudio()
             recordingSessionController.endActivity()
             statusPresenter.presentSuccess()
+            showSavedSessionReveal(session)
 
         case .persistenceFailure(let session, let error):
             handleCompletedTranscriptPersistenceFailure(error, session: session)

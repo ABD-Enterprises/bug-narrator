@@ -10,12 +10,14 @@ final class FinishedRecordingPostTranscriptionResultHandlerTests: XCTestCase {
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
         _ = try await harness.recordingSessionController.stopRecording()
 
-        harness.handler.handle(.success(makeSampleTranscriptSession(index: 1)))
+        let session = makeSampleTranscriptSession(index: 1)
+        harness.handler.handle(.success(session))
 
         XCTAssertNil(harness.recordingSessionController.pendingRecordedAudioSnapshot)
         XCTAssertFalse(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
         XCTAssertEqual(harness.presentationState.status.phase, .success)
         XCTAssertEqual(harness.presentationState.status.detail, "Session saved. Transcript copied to the clipboard.")
+        XCTAssertEqual(harness.revealSpy.sessionIDs, [session.id])
         XCTAssertFalse(harness.transcriptWindowSpy.didShow)
     }
 
@@ -72,6 +74,7 @@ private final class FinishedRecordingPostTranscriptionResultHandlerHarness {
     let presentationState: AppPresentationState
     let transcriptWindowSpy = TranscriptWindowSpy()
     let settingsWindowSpy = SettingsWindowSpy()
+    let revealSpy = SavedSessionRevealSpy()
     let handler: FinishedRecordingPostTranscriptionResultHandler
 
     init(debugMode: Bool = false) throws {
@@ -141,6 +144,9 @@ private final class FinishedRecordingPostTranscriptionResultHandlerHarness {
             autoCopyTranscript: { true },
             cleanupPendingRecordedAudio: { [recordingSessionController] in
                 recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: debugMode)
+            },
+            showSavedSessionReveal: { [revealSpy] session in
+                revealSpy.sessionIDs.append(session.id)
             }
         )
     }
@@ -164,4 +170,9 @@ private final class TranscriptWindowSpy {
 @MainActor
 private final class SettingsWindowSpy {
     var didShow = false
+}
+
+@MainActor
+private final class SavedSessionRevealSpy {
+    var sessionIDs: [UUID] = []
 }

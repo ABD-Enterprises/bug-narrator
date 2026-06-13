@@ -349,6 +349,13 @@ final class AppState: ObservableObject {
             errorPresenter: self.errorPresenter,
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
         )
+        let appUtilityActionPresenter = AppUtilityActionResultPresenter(
+            statusPhase: { presentationState.status.phase },
+            setStatus: { status in
+                presentationState.setStatus(status, error: nil)
+            }
+        )
+        self.appUtilityActionPresenter = appUtilityActionPresenter
         self.finishedRecordingPostTranscriptionResultHandler = FinishedRecordingPostTranscriptionResultHandler(
             sessionLibrary: sessionLibrary,
             recordingSessionController: recordingSessionController,
@@ -358,15 +365,25 @@ final class AppState: ObservableObject {
             autoCopyTranscript: { settingsStore.autoCopyTranscript },
             cleanupPendingRecordedAudio: {
                 recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
+            },
+            showSavedSessionReveal: { session in
+                guard let artifactsDirectoryURL = session.artifactsDirectoryURL else {
+                    return
+                }
+
+                transientToastController.showToast(
+                    "Session saved",
+                    style: .success,
+                    durationNanoseconds: 5_000_000_000,
+                    action: TransientToastAction(
+                        title: "Reveal",
+                        accessibilityLabel: "Reveal in Finder"
+                    ) {
+                        appUtilityActionPresenter.present(appUtilityActions.revealInFinder(artifactsDirectoryURL))
+                    }
+                )
             }
         )
-        let appUtilityActionPresenter = AppUtilityActionResultPresenter(
-            statusPhase: { presentationState.status.phase },
-            setStatus: { status in
-                presentationState.setStatus(status, error: nil)
-            }
-        )
-        self.appUtilityActionPresenter = appUtilityActionPresenter
         self.supportDataActionPresenter = SupportDataActionPresenter(
             presentationState: presentationState,
             errorPresenter: self.errorPresenter,
@@ -1170,6 +1187,9 @@ final class AppState: ObservableObject {
             }
 
             issueExportPresentationController.presentCompletion(completion)
+            if completion.performedRemoteExport {
+                showRevealInFinderToast("Export receipt saved", revealing: ExportReceiptStore.defaultStorageURL)
+            }
             await refreshExportHistory()
         } catch {
             recordingSessionController.endActivity()
@@ -1179,6 +1199,24 @@ final class AppState: ObservableObject {
 
     func openScreenshot(_ screenshot: SessionScreenshot) {
         appUtilityActionPresenter.present(appUtilityActions.openScreenshot(screenshot))
+    }
+
+    func showRevealInFinderToast(_ message: String, revealing url: URL) {
+        transientToastController.showToast(
+            message,
+            style: .success,
+            durationNanoseconds: 5_000_000_000,
+            action: TransientToastAction(
+                title: "Reveal",
+                accessibilityLabel: "Reveal in Finder"
+            ) { [weak self] in
+                self?.revealInFinder(url)
+            }
+        )
+    }
+
+    func revealInFinder(_ url: URL) {
+        appUtilityActionPresenter.present(appUtilityActions.revealInFinder(url))
     }
 
     private func prepareErrorPresentationSideEffects() {
