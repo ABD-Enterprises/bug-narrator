@@ -152,9 +152,17 @@ struct SettingsView: View {
                         hotkeyRow(action: .captureScreenshot, shortcut: $settingsStore.screenshotHotkeyShortcut)
 
                         if let hotkeyConflictMessage = settingsStore.hotkeyConflictMessage {
-                            Text(hotkeyConflictMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                            HStack(spacing: 8) {
+                                Text(hotkeyConflictMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                                if let conflicting = settingsStore.conflictingHotkeyAction {
+                                    Button("Clear \(conflicting.title)") {
+                                        settingsStore.clearHotkey(for: conflicting)
+                                    }
+                                    .controlSize(.small)
+                                }
+                            }
                         }
 
                         Text("Hotkeys use Carbon and do not require Accessibility access. Screenshot hotkeys only work while a session is recording. If you choose a shortcut that is already assigned to another BugNarrator action, the new assignment is rejected until you clear or change the conflicting shortcut.")
@@ -174,7 +182,11 @@ struct SettingsView: View {
                                 isDisabled: secureControlsDisabled,
                                 accessibilityLabel: "GitHub personal access token"
                             )
+                            .help(secureControlsDisabled ? secureControlsDisabledHint : "Paste a GitHub personal access token with the repo scope.")
                         }
+
+                        Link("Generate a GitHub token →", destination: BugNarratorLinks.generateGitHubToken)
+                            .font(.footnote)
 
                         gitHubPrerequisites
 
@@ -292,7 +304,11 @@ struct SettingsView: View {
                                 isDisabled: secureControlsDisabled,
                                 accessibilityLabel: "Jira API token"
                             )
+                            .help(secureControlsDisabled ? secureControlsDisabledHint : "Paste an Atlassian API token created for your Jira Cloud account.")
                         }
+
+                        Link("Generate a Jira API token →", destination: BugNarratorLinks.generateJiraToken)
+                            .font(.footnote)
 
                         jiraPrerequisites
 
@@ -318,10 +334,19 @@ struct SettingsView: View {
 
                         labeledField(title: "Project") {
                             if appState.jiraProjects.isEmpty {
-                                Text(settingsStore.normalizedJiraProjectKey.isEmpty ? jiraProjectPlaceholder : settingsStore.normalizedJiraProjectKey)
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .accessibilityLabel("Jira project key")
+                                HStack {
+                                    Text(settingsStore.normalizedJiraProjectKey.isEmpty ? jiraProjectPlaceholder : settingsStore.normalizedJiraProjectKey)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .accessibilityLabel("Jira project key")
+                                    if settingsStore.jiraProjectDiscoveryIsReady {
+                                        Button("Load Projects") {
+                                            Task { await appState.validateJiraConfiguration() }
+                                        }
+                                        .controlSize(.small)
+                                        .disabled(secureControlsDisabled || appState.jiraValidationState == .validating)
+                                    }
+                                }
                             } else {
                                 Picker("Jira project", selection: jiraProjectSelection) {
                                     Text("Choose a project")
@@ -471,6 +496,15 @@ struct SettingsView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
+
+                        Divider()
+
+                        Toggle("Record local usage analytics", isOn: $settingsStore.operationalTelemetryEnabled)
+                            .help("Records named app events (recordings started, transcriptions completed, errors) to a local file. Nothing is uploaded.")
+
+                        Text("BugNarrator records anonymous usage events to a local file (operational-telemetry.jsonl) to help diagnose issues. The data never leaves this Mac and is included in Export Data. Turn this off to stop recording new events.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -500,6 +534,16 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Setup Status")
                 .font(.headline)
+
+            let configured = setupConfiguredCount
+            let total = setupTotalCount
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(configured) of \(total) configured")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                ProgressView(value: Double(configured), total: Double(total))
+                    .accessibilityLabel("Setup progress: \(configured) of \(total) configured")
+            }
 
             VStack(spacing: 8) {
                 settingsStatusRow(
@@ -584,6 +628,20 @@ struct SettingsView: View {
 
     private var secureControlsDisabled: Bool {
         appState.status.phase == .recording || appState.status.phase == .transcribing
+    }
+
+    private var setupTotalCount: Int { 3 }
+
+    private var setupConfiguredCount: Int {
+        var count = 0
+        if openAIReadiness == .ready { count += 1 }
+        if gitHubReadiness == .ready { count += 1 }
+        if jiraReadiness == .ready { count += 1 }
+        return count
+    }
+
+    private var secureControlsDisabledHint: String {
+        "Disabled while recording or transcribing is in progress."
     }
 
     private var availableRecordingAudioSources: [RecordingAudioSource] {
