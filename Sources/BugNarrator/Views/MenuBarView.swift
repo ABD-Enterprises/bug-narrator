@@ -8,6 +8,7 @@ struct MenuBarView: View {
     @ObservedObject var recordingTimer: RecordingTimerViewModel
     @ObservedObject var transcriptStore: TranscriptStore
 
+    @AppStorage("hasDismissedSetupBanner") private var hasDismissedSetupBanner = false
     @State private var isOptionKeyPressed = false
     @State private var modifierKeyMonitor: Any?
     @StateObject private var microphoneLevelMonitor = MicrophoneInputLevelMonitor()
@@ -20,6 +21,9 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if shouldShowSetupBanner {
+                setupBanner
+            }
             statusCard
             if appState.needsAPIKeySetup {
                 providerRequirementCard
@@ -50,6 +54,11 @@ struct MenuBarView: View {
         .onChange(of: appState.settingsStore.recordingAudioSource) { _, _ in
             syncMicrophoneLevelMonitoring()
         }
+        .onChange(of: setupBannerRequired) { _, isRequired in
+            if !isRequired {
+                hasDismissedSetupBanner = false
+            }
+        }
         .alert("Discard this recording?", isPresented: $appState.showDiscardConfirmation) {
             Button("Discard", role: .destructive) {
                 Task {
@@ -63,6 +72,79 @@ struct MenuBarView: View {
         } message: {
             Text("The current audio file will be deleted and the session will not be transcribed.")
         }
+    }
+
+    private var setupBannerRequired: Bool {
+        appState.needsAPIKeySetup || microphoneSetupIncomplete
+    }
+
+    private var shouldShowSetupBanner: Bool {
+        setupBannerRequired && !hasDismissedSetupBanner && appState.status.phase != .recording
+    }
+
+    private var microphoneSetupIncomplete: Bool {
+        guard appState.settingsStore.recordingAudioSource.usesMicrophone else {
+            return false
+        }
+
+        return AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
+    }
+
+    private var setupBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Finish setup to start recording")
+                    .font(.subheadline.weight(.semibold))
+
+                Text(setupBannerDetail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    if appState.needsAPIKeySetup {
+                        Button("Open Settings") {
+                            appState.openSettings()
+                        }
+                        .controlSize(.small)
+                    }
+
+                    if microphoneSetupIncomplete {
+                        Button("Open Microphone Settings") {
+                            appState.openMicrophonePrivacySettings()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Button {
+                hasDismissedSetupBanner = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Dismiss setup banner")
+        }
+        .padding(12)
+        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var setupBannerDetail: String {
+        if appState.needsAPIKeySetup && microphoneSetupIncomplete {
+            return "BugNarrator needs microphone access and a configured AI provider before it can record and transcribe."
+        }
+
+        if microphoneSetupIncomplete {
+            return "BugNarrator needs microphone access before it can record."
+        }
+
+        return "Configure your AI provider so recordings can be transcribed."
     }
 
     private var statusCard: some View {
@@ -417,7 +499,7 @@ struct MenuBarView: View {
                     .accessibilityLabel("Microphone input level")
                     .accessibilityValue(microphoneLevelMonitor.state.accessibilityValue(level: microphoneLevelMonitor.currentLevel))
 
-                if microphoneLevelMonitor.state == .permissionNeeded {
+                if microphoneLevelMonitor.state == .permissionNeeded && !shouldShowSetupBanner {
                     Button("Open Microphone Settings") {
                         appState.openMicrophonePrivacySettings()
                     }
