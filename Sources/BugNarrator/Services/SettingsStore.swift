@@ -430,10 +430,18 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var operationalTelemetryEnabled: Bool = true {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(operationalTelemetryEnabled, forKey: Keys.operationalTelemetryEnabled)
+        }
+    }
+
     @Published private(set) var apiKeyPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var githubTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var jiraTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var hotkeyConflictMessage: String?
+    @Published private(set) var conflictingHotkeyAction: HotkeyAction?
     @Published private(set) var openAtStartupSupported = true
     @Published private(set) var openAtStartupStatusMessage: String?
     @Published private(set) var openAtStartupStatusTone: SettingsCalloutTone = .secondary
@@ -1172,6 +1180,7 @@ final class SettingsStore: ObservableObject {
         migrateLegacyPlaintextJiraEmailIfNeeded()
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
+        operationalTelemetryEnabled = boolValue(forKey: Keys.operationalTelemetryEnabled) ?? true
         migrateLegacyBuiltInHotkeysIfNeeded()
         normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
@@ -1279,12 +1288,21 @@ final class SettingsStore: ObservableObject {
                 ]
             )
             hotkeyConflictMessage = "\(changedShortcut.displayString) is already assigned to \(conflictingAction.title). Clear it first or choose a different shortcut."
+            conflictingHotkeyAction = conflictingAction
             setShortcut(previousShortcut, for: changedAction)
             return
         }
 
         hotkeyConflictMessage = nil
+        conflictingHotkeyAction = nil
         persistHotkey(changedShortcut, key: storageKey(for: changedAction))
+    }
+
+    /// Clears the binding for the named action, resolving a reported conflict.
+    func clearHotkey(for action: HotkeyAction) {
+        setShortcut(.disabled, for: action)
+        hotkeyConflictMessage = nil
+        conflictingHotkeyAction = nil
     }
 
     private func migrateLegacyBuiltInHotkeysIfNeeded() {
@@ -1956,6 +1974,7 @@ private enum Keys {
     static let jiraIssueTypeID = "settings.jiraIssueTypeID"
     static let jiraIssueType = "settings.jiraIssueType"
     static let debugMode = "settings.debugMode"
+    static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
 }
 
 enum APIKeyPersistenceState: Equatable {

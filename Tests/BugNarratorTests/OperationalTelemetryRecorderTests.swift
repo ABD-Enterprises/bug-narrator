@@ -22,6 +22,43 @@ final class OperationalTelemetryRecorderTests: XCTestCase {
         XCTAssertTrue(lines[1].contains(TelemetryEvent.transcriptionCompleted.rawValue))
     }
 
+    func testRecorderSkipsWritesWhenTelemetryDisabled() throws {
+        let rootDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-OperationalTelemetryRecorderTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let suiteName = "BugNarrator-Telemetry-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(false, forKey: OperationalTelemetryRecorder.enabledDefaultsKey)
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("telemetry.jsonl")
+        let recorder = OperationalTelemetryRecorder(storageURL: storageURL, userDefaults: defaults)
+
+        recorder.record(.recordingStarted)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storageURL.path))
+    }
+
+    func testRecorderWritesWhenTelemetryFlagUnset() throws {
+        let rootDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-OperationalTelemetryRecorderTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let suiteName = "BugNarrator-Telemetry-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("telemetry.jsonl")
+        let recorder = OperationalTelemetryRecorder(storageURL: storageURL, userDefaults: defaults)
+
+        recorder.record(.recordingStarted)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storageURL.path))
+    }
+
     func testRecorderRedactsSensitiveMetadataBeforePersisting() throws {
         let rootDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-OperationalTelemetryRecorderTests-\(UUID().uuidString)", isDirectory: true)
