@@ -3,6 +3,23 @@ import XCTest
 @testable import BugNarrator
 
 final class ProductInfoTests: XCTestCase {
+    func testHelpMenuLinkDestinations() {
+        // Locks the Help menu / Support view link destinations so an accidental
+        // edit to BugNarratorLinks is caught in CI.
+        XCTAssertEqual(
+            BugNarratorLinks.documentation.absoluteString,
+            "https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md"
+        )
+        XCTAssertEqual(
+            BugNarratorLinks.issues.absoluteString,
+            "https://github.com/ABD-Enterprises/bug-narrator/issues/new"
+        )
+        XCTAssertEqual(
+            BugNarratorLinks.repository.absoluteString,
+            "https://github.com/ABD-Enterprises/bug-narrator"
+        )
+    }
+
     func testMetadataBuildsVersionDescriptionFromInfoDictionary() {
         let metadata = BugNarratorMetadata(
             infoDictionary: [

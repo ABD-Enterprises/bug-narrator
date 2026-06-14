@@ -187,6 +187,19 @@ struct BugNarratorApp: App {
             .background(WindowSceneRegistrar(appState: appState, windowCoordinator: windowCoordinator))
         }
         .menuBarExtraStyle(.window)
+        .commands {
+            CommandGroup(replacing: .help) {
+                Button("BugNarrator User Guide") {
+                    NSWorkspace.shared.open(BugNarratorLinks.documentation)
+                }
+                Button("Report a Bug") {
+                    NSWorkspace.shared.open(BugNarratorLinks.issues)
+                }
+                Button("Visit Repository") {
+                    NSWorkspace.shared.open(BugNarratorLinks.repository)
+                }
+            }
+        }
 
         Window("BugNarrator Sessions", id: WindowCoordinator.SceneID.transcript) {
             TranscriptView(
