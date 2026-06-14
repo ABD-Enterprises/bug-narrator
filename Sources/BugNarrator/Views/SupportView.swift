@@ -7,6 +7,7 @@ struct SupportView: View {
         VStack(alignment: .leading, spacing: 20) {
             headerSection
             actionSection
+            helpResourcesSection
             footerCard
             Spacer(minLength: 0)
         }
@@ -56,6 +57,20 @@ struct SupportView: View {
             .accessibilityLabel("Open the PayPal donation page")
             .accessibilityHint("Opens PayPal in your default browser")
         }
+        .padding(18)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var helpResourcesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Help & Resources")
+                .font(.headline)
+
+            Link("BugNarrator User Guide", destination: BugNarratorLinks.documentation)
+            Link("Report a Bug", destination: BugNarratorLinks.issues)
+            Link("Visit Repository", destination: BugNarratorLinks.repository)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
