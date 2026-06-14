@@ -73,6 +73,9 @@ struct MenuBarView: View {
         } message: {
             Text("The current audio file will be deleted and the session will not be transcribed.")
         }
+        .sheet(isPresented: $appState.isPresentingSystemAudioExplainer) {
+            SystemAudioExplainerView(appState: appState)
+        }
     }
 
     private var setupBannerRequired: Bool {

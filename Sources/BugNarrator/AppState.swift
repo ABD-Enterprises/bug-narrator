@@ -5,6 +5,8 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     @Published var showDiscardConfirmation = false
+    @Published var isPresentingSystemAudioExplainer = false
+    private var systemAudioExplainerAcknowledged = false
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
@@ -710,11 +712,34 @@ final class AppState: ObservableObject {
             return
         }
 
+        if settingsStore.shouldShowSystemAudioExplainer(
+            for: settingsStore.recordingAudioSource,
+            acknowledged: systemAudioExplainerAcknowledged
+        ) {
+            isPresentingSystemAudioExplainer = true
+            return
+        }
+        systemAudioExplainerAcknowledged = false
+
         let outcome = await recordingSessionController.startSession(
             statusPhase: status.phase,
             activityReason: recordingStatusMessages.recordingActivityReason()
         )
         recordingSessionStartStatusPresenter.present(outcome)
+    }
+
+    /// User dismissed the system-audio explainer; proceed with the recording.
+    func confirmSystemAudioExplainer(suppressFuture: Bool) async {
+        if suppressFuture {
+            settingsStore.suppressSystemAudioExplainer = true
+        }
+        systemAudioExplainerAcknowledged = true
+        isPresentingSystemAudioExplainer = false
+        await startSession()
+    }
+
+    func cancelSystemAudioExplainer() {
+        isPresentingSystemAudioExplainer = false
     }
 
     func stopSession() async {
