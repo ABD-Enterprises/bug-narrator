@@ -2,11 +2,13 @@ import SwiftUI
 
 struct ChangelogView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject private var settingsStore: SettingsStore
 
     private let changelog: ChangelogDocument
 
     init(appState: AppState, changelog: ChangelogDocument = ChangelogDocument()) {
         self.appState = appState
+        self.settingsStore = appState.settingsStore
         self.changelog = changelog
     }
 
@@ -43,6 +45,10 @@ struct ChangelogView: View {
             Text("Release notes for BugNarrator. Use this as a lightweight in-app view of the bundled changelog.")
                 .font(.body)
                 .foregroundStyle(.secondary)
+
+            Toggle("Show automatically after each update", isOn: $settingsStore.autoShowChangelogOnUpdate)
+                .font(.subheadline)
+                .accessibilityLabel("Show the changelog automatically after each update")
         }
     }
 }

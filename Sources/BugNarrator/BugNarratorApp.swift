@@ -50,6 +50,8 @@ private struct WindowSceneRegistrar: View {
                 appState.showSupportWindow = { [weak windowCoordinator] in
                     windowCoordinator?.showSupportWindow()
                 }
+
+                appState.presentChangelogIfNeeded()
             }
     }
 }
