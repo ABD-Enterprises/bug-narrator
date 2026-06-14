@@ -444,6 +444,20 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var suppressSystemAudioExplainer: Bool = false {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(suppressSystemAudioExplainer, forKey: Keys.suppressSystemAudioExplainer)
+        }
+    }
+
+    /// Whether to show the one-time system-audio explainer before starting a
+    /// recording. `acknowledged` is the transient per-attempt flag the caller
+    /// sets after the user dismisses the sheet, so re-entry does not loop.
+    func shouldShowSystemAudioExplainer(for source: RecordingAudioSource, acknowledged: Bool) -> Bool {
+        source.usesSystemAudio && !suppressSystemAudioExplainer && !acknowledged
+    }
+
     /// Decides whether to auto-present the changelog once after a version bump.
     /// Brand-new installs (no recorded version and no existing user state) defer
     /// to onboarding instead of showing the changelog.
@@ -1217,6 +1231,7 @@ final class SettingsStore: ObservableObject {
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
         operationalTelemetryEnabled = boolValue(forKey: Keys.operationalTelemetryEnabled) ?? true
         autoShowChangelogOnUpdate = boolValue(forKey: Keys.autoShowChangelogOnUpdate) ?? true
+        suppressSystemAudioExplainer = boolValue(forKey: Keys.suppressSystemAudioExplainer) ?? false
         migrateLegacyBuiltInHotkeysIfNeeded()
         normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
@@ -2013,6 +2028,7 @@ private enum Keys {
     static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
     static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
+    static let suppressSystemAudioExplainer = "settings.suppressSystemAudioExplainer"
 }
 
 enum APIKeyPersistenceState: Equatable {
