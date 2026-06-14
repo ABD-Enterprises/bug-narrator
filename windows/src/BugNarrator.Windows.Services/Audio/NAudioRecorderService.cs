@@ -8,6 +8,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
     private TaskCompletionSource? stopCompletionSource;
     private IWaveIn? activeCapture;
     private WaveFileWriter? waveWriter;
+    private MixedAudioRecording? mixedRecording;
 
     public bool IsRecording { get; private set; }
 
@@ -28,6 +29,30 @@ public sealed class NAudioRecorderService : IAudioRecorderService
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(audioFilePath)!);
+
+            if (request.Source == AudioRecordingSource.MicrophoneAndSystemAudio)
+            {
+                if (request.MicrophoneDeviceNumber is null)
+                {
+                    throw new InvalidOperationException(
+                        "A microphone device is required for microphone plus system audio recording.");
+                }
+
+                var mixed = new MixedAudioRecording(audioFilePath, request.MicrophoneDeviceNumber.Value);
+                try
+                {
+                    mixed.Start();
+                }
+                catch
+                {
+                    mixed.Dispose();
+                    throw;
+                }
+
+                mixedRecording = mixed;
+                IsRecording = true;
+                return Task.CompletedTask;
+            }
 
             activeCapture = CreateCapture(request);
             activeCapture.DataAvailable += OnDataAvailable;
@@ -55,15 +80,46 @@ public sealed class NAudioRecorderService : IAudioRecorderService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        MixedAudioRecording? mixed;
         lock (syncRoot)
         {
-            if (!IsRecording || activeCapture is null)
+            if (mixedRecording is not null)
             {
-                return Task.CompletedTask;
+                mixed = mixedRecording;
             }
+            else
+            {
+                if (!IsRecording || activeCapture is null)
+                {
+                    return Task.CompletedTask;
+                }
 
-            activeCapture.StopRecording();
-            return stopCompletionSource?.Task ?? Task.CompletedTask;
+                activeCapture.StopRecording();
+                return stopCompletionSource?.Task ?? Task.CompletedTask;
+            }
+        }
+
+        return StopMixedAsync(mixed);
+    }
+
+    private async Task StopMixedAsync(MixedAudioRecording mixed)
+    {
+        try
+        {
+            await mixed.StopAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (syncRoot)
+            {
+                mixed.Dispose();
+                if (ReferenceEquals(mixedRecording, mixed))
+                {
+                    mixedRecording = null;
+                }
+
+                IsRecording = false;
+            }
         }
     }
 
@@ -73,9 +129,7 @@ public sealed class NAudioRecorderService : IAudioRecorderService
         {
             AudioRecordingSource.Microphone => CreateMicrophoneCapture(request),
             AudioRecordingSource.SystemAudio => new WasapiLoopbackCapture(),
-            AudioRecordingSource.MicrophoneAndSystemAudio =>
-                throw new NotSupportedException(
-                    "Microphone plus system audio recording is not implemented yet. Choose Microphone or System Audio for this build."),
+            // MicrophoneAndSystemAudio is handled by MixedAudioRecording in StartAsync.
             _ => throw new InvalidOperationException("Unsupported recording source."),
         };
     }
@@ -109,6 +163,10 @@ public sealed class NAudioRecorderService : IAudioRecorderService
 
             waveWriter?.Dispose();
             waveWriter = null;
+
+            mixedRecording?.Dispose();
+            mixedRecording = null;
+
             stopCompletionSource = null;
             IsRecording = false;
         }

@@ -35,7 +35,7 @@ public sealed record AudioRecordingSourceProfile(
             AudioRecordingSource.MicrophoneAndSystemAudio,
             "microphoneAndSystemAudio",
             "Microphone + System Audio",
-            "Mixed capture is tracked as a follow-up; choose this to see the explicit limitation.",
+            "Record the selected microphone and system audio together as one mixed track.",
             UsesMicrophone: true,
             UsesSystemAudio: true),
     ];
