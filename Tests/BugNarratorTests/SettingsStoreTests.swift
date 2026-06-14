@@ -83,6 +83,29 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotNil(store.suggestedShortcutIfAvailable(for: .captureScreenshot))
     }
 
+    func testSystemAudioExplainerGating() {
+        let suiteName = "BugNarrator-SystemAudioExplainer-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // Microphone-only never shows the explainer.
+        XCTAssertFalse(store.shouldShowSystemAudioExplainer(for: .microphone, acknowledged: false))
+        // System-audio sources show it on the first, un-acknowledged attempt.
+        XCTAssertTrue(store.shouldShowSystemAudioExplainer(for: .systemAudio, acknowledged: false))
+        XCTAssertTrue(store.shouldShowSystemAudioExplainer(for: .microphoneAndSystemAudio, acknowledged: false))
+        // Once acknowledged for this attempt, it does not re-show (prevents a loop).
+        XCTAssertFalse(store.shouldShowSystemAudioExplainer(for: .systemAudio, acknowledged: true))
+        // Suppressing it persists and disables future shows.
+        store.suppressSystemAudioExplainer = true
+        XCTAssertFalse(store.shouldShowSystemAudioExplainer(for: .systemAudio, acknowledged: false))
+
+        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(reloaded.suppressSystemAudioExplainer)
+    }
+
     func testFirstLaunchStartsWithAllHotkeysDisabled() {
         let suiteName = "BugNarrator-SettingsNoHotkeyDefaultsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

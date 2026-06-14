@@ -31,6 +31,9 @@ struct RecordingControlPanelView: View {
         .onChange(of: appState.transientToast?.message) { _, newMessage in
             announceAccessibilityMessage(newMessage)
         }
+        .sheet(isPresented: $appState.isPresentingSystemAudioExplainer) {
+            SystemAudioExplainerView(appState: appState)
+        }
     }
 
     private var header: some View {
