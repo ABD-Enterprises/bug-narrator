@@ -20,6 +20,12 @@ enum HotkeyAction: UInt32, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Vetted default offered as a one-click suggestion on empty hotkey rows.
+    /// Uses ⌘⌥⌃-based combinations that avoid common macOS system shortcuts.
+    var suggestedShortcut: HotkeyShortcut? {
+        legacyBuiltInShortcut
+    }
+
     var legacyBuiltInShortcut: HotkeyShortcut? {
         switch self {
         case .startRecording:

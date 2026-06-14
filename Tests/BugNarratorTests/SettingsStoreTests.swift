@@ -58,6 +58,31 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(second.autoShowChangelogOnUpdate)
     }
 
+    func testSuggestedShortcutAvailableWhenUnassignedAndHiddenWhenTaken() {
+        let suiteName = "BugNarrator-HotkeySuggestion-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // On a fresh install every row is empty, so each action offers its suggestion.
+        let startSuggestion = store.suggestedShortcutIfAvailable(for: .startRecording)
+        XCTAssertEqual(startSuggestion, HotkeyAction.startRecording.suggestedShortcut)
+
+        // Assigning Start's suggested shortcut to Stop must hide it from Start.
+        if let suggestion = HotkeyAction.startRecording.suggestedShortcut {
+            store.stopRecordingHotkeyShortcut = suggestion
+            XCTAssertNil(store.suggestedShortcutIfAvailable(for: .startRecording))
+        }
+
+        // An action that already has a binding still computes its own suggestion
+        // availability independent of its current value; once Start is bound it
+        // is no longer "empty" — the row gate (`!isEnabled`) handles that in the view.
+        store.startRecordingHotkeyShortcut = .disabled
+        XCTAssertNotNil(store.suggestedShortcutIfAvailable(for: .captureScreenshot))
+    }
+
     func testFirstLaunchStartsWithAllHotkeysDisabled() {
         let suiteName = "BugNarrator-SettingsNoHotkeyDefaultsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
