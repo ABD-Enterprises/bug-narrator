@@ -437,6 +437,28 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var autoShowChangelogOnUpdate: Bool = true {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(autoShowChangelogOnUpdate, forKey: Keys.autoShowChangelogOnUpdate)
+        }
+    }
+
+    /// Decides whether to auto-present the changelog once after a version bump.
+    /// Brand-new installs (no recorded version and no existing user state) defer
+    /// to onboarding instead of showing the changelog.
+    func shouldAutoShowChangelog(currentVersion: String, hasExistingUserState: Bool) -> Bool {
+        guard autoShowChangelogOnUpdate else { return false }
+        if let lastShown = stringValue(forKey: Keys.lastShownChangelogVersion) {
+            return lastShown != currentVersion
+        }
+        return hasExistingUserState
+    }
+
+    func markChangelogShown(version: String) {
+        defaults.set(version, forKey: Keys.lastShownChangelogVersion)
+    }
+
     @Published private(set) var apiKeyPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var githubTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var jiraTokenPersistenceState: APIKeyPersistenceState = .empty
@@ -1181,6 +1203,7 @@ final class SettingsStore: ObservableObject {
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
         operationalTelemetryEnabled = boolValue(forKey: Keys.operationalTelemetryEnabled) ?? true
+        autoShowChangelogOnUpdate = boolValue(forKey: Keys.autoShowChangelogOnUpdate) ?? true
         migrateLegacyBuiltInHotkeysIfNeeded()
         normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
@@ -1975,6 +1998,8 @@ private enum Keys {
     static let jiraIssueType = "settings.jiraIssueType"
     static let debugMode = "settings.debugMode"
     static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
+    static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
+    static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
 }
 
 enum APIKeyPersistenceState: Equatable {

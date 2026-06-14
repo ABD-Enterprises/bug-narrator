@@ -875,6 +875,21 @@ final class AppState: ObservableObject {
         appUtilityActionPresenter.present(appUtilityActions.checkForUpdates())
     }
 
+    /// Presents the changelog once after a version bump. Records the shown
+    /// version immediately so a force-quit before dismissal does not re-trigger.
+    func presentChangelogIfNeeded(metadata: BugNarratorMetadata = BugNarratorMetadata()) {
+        let hasExistingUserState = !transcriptStore.sessions.isEmpty
+        guard settingsStore.shouldAutoShowChangelog(
+            currentVersion: metadata.version,
+            hasExistingUserState: hasExistingUserState
+        ) else {
+            return
+        }
+
+        settingsStore.markChangelogShown(version: metadata.version)
+        showChangelogWindow?()
+    }
+
     func copyDebugInfo() {
         let result = supportDataController.copyDebugInfo(sessionID: currentDebugSessionID)
         supportDataActionPresenter.presentCopyDebugInfo(result)
