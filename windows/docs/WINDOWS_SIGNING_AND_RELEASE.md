@@ -70,9 +70,56 @@ The GitHub Actions workflow is manual (`workflow_dispatch`) and requires these r
 - `BUGNARRATOR_WINDOWS_CERT_BASE64`: base64-encoded PFX certificate
 - `BUGNARRATOR_WINDOWS_CERT_PASSWORD`: PFX password
 
+## Signing With Azure Trusted Signing
+
+Azure Trusted Signing is the preferred path: there is no PFX file or password to manage, and the
+certificate is short-lived and cloud-held. It is wired through:
+
+- `windows/scripts/sign-windows-trustedsigning.ps1`
+- the `-UseTrustedSigning` switch on `windows/scripts/release-windows-tester.ps1`
+
+It signs with `signtool` plus the `Azure.CodeSigning` dlib (from the
+`Microsoft.Trusted.Signing.Client` NuGet package, restored on demand if not already cached).
+Authentication uses Azure.Identity `DefaultAzureCredential`, so it works from a local `az login`
+session, or from `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` in CI.
+
+Prerequisites:
+
+- the signing identity holds the **Trusted Signing Certificate Profile Signer** data-plane role on
+  the account (Azure has since renamed this "Artifact Signing Certificate Profile Signer")
+- a certificate profile exists on the account; a `PublicTrust` profile requires a **completed
+  identity validation**
+
+Current BugNarrator account (in subscription `7fb728a1-...`, tenant `alanabdenterprises.onmicrosoft.com`):
+
+- Endpoint: `https://wus3.codesigning.azure.net/`
+- Account: `bugnarrator-signing`
+- Certificate profile: `bugnarrator-public` (PublicTrust) — these are the script defaults
+
+Sign a single file:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/scripts/sign-windows-trustedsigning.ps1 `
+  -FilePath windows/artifacts/publish/win-x64/BugNarrator.Windows.exe
+```
+
+Produce a signed tester release with Trusted Signing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 `
+  -Runtime win-x64 -UseTrustedSigning
+```
+
+The release script's verify/repack/validate/release-note steps are unchanged — Authenticode
+verification via `Get-AuthenticodeSignature` is signing-method agnostic.
+
 ## Current Release Blocker
 
-The current blocker for public signed distribution is certificate availability, not the script entrypoints.
+The remaining blocker for public signed distribution is the **Trusted Signing identity validation**,
+not the script entrypoints. The account, RBAC role, tooling, and scripts are in place, but a
+`PublicTrust` certificate profile cannot be created until the tenant's identity validation is
+approved by Microsoft. Once it is approved, create the profile and run the release with
+`-UseTrustedSigning`.
 
 This branch does not include:
 
@@ -80,7 +127,9 @@ This branch does not include:
 - a CI signing secret
 - an installer authoring pipeline
 
-Until a real code-signing certificate is provisioned and configured in the release environment, the signed tester release workflow will fail intentionally rather than producing an unsigned artifact that looks signed.
+The PFX-based path (`sign-windows.ps1`, `BUGNARRATOR_CERT_PATH` / `BUGNARRATOR_CERT_PASSWORD`)
+remains available as an alternative; it will fail intentionally rather than produce an unsigned
+artifact that looks signed.
 
 ## Recommended Next Release Steps
 
