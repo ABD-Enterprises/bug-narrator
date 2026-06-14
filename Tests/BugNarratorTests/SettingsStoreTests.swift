@@ -11,6 +11,53 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testShouldAutoShowChangelogDefersOnBrandNewInstall() {
+        let suiteName = "BugNarrator-ChangelogAutoShow-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // Brand-new install: no recorded version, no existing user state -> defer to onboarding.
+        XCTAssertFalse(store.shouldAutoShowChangelog(currentVersion: "1.0.40", hasExistingUserState: false))
+        // Upgrade from a pre-feature version (existing sessions, no recorded version) -> show once.
+        XCTAssertTrue(store.shouldAutoShowChangelog(currentVersion: "1.0.40", hasExistingUserState: true))
+    }
+
+    func testShouldAutoShowChangelogTracksVersionAndOptOut() {
+        let suiteName = "BugNarrator-ChangelogAutoShow-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        store.markChangelogShown(version: "1.0.40")
+        // Same version after shown -> no re-show.
+        XCTAssertFalse(store.shouldAutoShowChangelog(currentVersion: "1.0.40", hasExistingUserState: true))
+        // New version -> show again.
+        XCTAssertTrue(store.shouldAutoShowChangelog(currentVersion: "1.0.41", hasExistingUserState: true))
+
+        // Opt-out suppresses all auto-shows regardless of version.
+        store.autoShowChangelogOnUpdate = false
+        XCTAssertFalse(store.shouldAutoShowChangelog(currentVersion: "1.0.41", hasExistingUserState: true))
+    }
+
+    func testAutoShowChangelogPreferencePersists() {
+        let suiteName = "BugNarrator-ChangelogAutoShowPersist-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(first.autoShowChangelogOnUpdate)
+        first.autoShowChangelogOnUpdate = false
+
+        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertFalse(second.autoShowChangelogOnUpdate)
+    }
+
     func testFirstLaunchStartsWithAllHotkeysDisabled() {
         let suiteName = "BugNarrator-SettingsNoHotkeyDefaultsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
