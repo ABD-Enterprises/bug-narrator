@@ -484,6 +484,19 @@ final class SettingsStore: ObservableObject {
         ]
     }
 
+    /// The action's suggested default, but only when it is enabled and not
+    /// already assigned to a different action — so a suggestion never collides.
+    func suggestedShortcutIfAvailable(for action: HotkeyAction) -> HotkeyShortcut? {
+        guard let suggestion = action.suggestedShortcut, suggestion.isEnabled else {
+            return nil
+        }
+
+        let assignedElsewhere = hotkeyAssignments.contains {
+            $0.action != action && $0.shortcut == suggestion
+        }
+        return assignedElsewhere ? nil : suggestion
+    }
+
     var maskedAPIKey: String {
         mask(
             secret: trimmedAPIKey,
