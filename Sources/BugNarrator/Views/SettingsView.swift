@@ -893,6 +893,18 @@ struct SettingsView: View {
             Text(action.title)
                 .font(.subheadline.weight(.medium))
             HotkeyRecorderView(actionTitle: action.title, shortcut: shortcut)
+
+            if !shortcut.wrappedValue.isEnabled,
+               let suggestion = settingsStore.suggestedShortcutIfAvailable(for: action) {
+                Button("Use suggested: \(suggestion.displayString)") {
+                    shortcut.wrappedValue = suggestion
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .disabled(secureControlsDisabled)
+                .help("Apply the recommended shortcut for \(action.title).")
+                .accessibilityLabel("Use suggested shortcut \(suggestion.displayString) for \(action.title)")
+            }
         }
         .accessibilityElement(children: .contain)
     }
