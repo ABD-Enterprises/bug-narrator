@@ -31,15 +31,15 @@ function Resolve-SignTool {
 
     # An explicit value wins when it resolves; otherwise fall back to PATH and then the newest
     # Windows SDK build, so the common default of "signtool.exe" still works when it is not on PATH.
-    if ($Explicit -and (Test-Path $Explicit)) {
-        return (Resolve-Path $Explicit).Path
-    }
-
     if ($Explicit) {
+        if (Test-Path $Explicit) {
+            return (Resolve-Path $Explicit).Path
+        }
         $command = Get-Command $Explicit -ErrorAction SilentlyContinue
         if ($command) {
             return $command.Source
         }
+        throw "signtool.exe was not found at the specified path: $Explicit"
     }
 
     $command = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
@@ -47,13 +47,17 @@ function Resolve-SignTool {
         return $command.Source
     }
 
-    $candidate = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match '\\x64\\' } |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1
+    $sdkBinDir = "C:\Program Files (x86)\Windows Kits\10\bin"
+    if (Test-Path $sdkBinDir) {
+        $candidate = Get-ChildItem -Path $sdkBinDir -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName "x64\signtool.exe" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
 
-    if ($candidate) {
-        return $candidate.FullName
+        if ($candidate) {
+            return $candidate
+        }
     }
 
     throw "signtool.exe was not found. Install the Windows SDK or pass -SignToolPath."
@@ -74,11 +78,18 @@ function Resolve-Dlib {
         return (Resolve-Path $env:BUGNARRATOR_SIGNING_DLIB).Path
     }
 
-    $localsLine = (& dotnet nuget locals global-packages --list) 2>$null | Select-Object -First 1
     $globalPackages = $null
-    if ($localsLine -match 'global-packages:\s*(.+)$') {
-        $globalPackages = $Matches[1].Trim()
+    if ($env:NUGET_PACKAGES -and (Test-Path $env:NUGET_PACKAGES)) {
+        $globalPackages = (Resolve-Path $env:NUGET_PACKAGES).Path
     }
+
+    if (-not $globalPackages) {
+        $localsLine = (& dotnet nuget locals global-packages --list) 2>$null | Select-Object -First 1
+        if ($localsLine -match 'global-packages:\s*(.+)$') {
+            $globalPackages = $Matches[1].Trim()
+        }
+    }
+
     if (-not $globalPackages) {
         $globalPackages = Join-Path $env:USERPROFILE ".nuget\packages"
     }
@@ -121,16 +132,17 @@ function Resolve-Dlib {
 $signTool = Resolve-SignTool -Explicit $SignToolPath
 $dlib = Resolve-Dlib -Explicit $DlibPath -Version $DlibVersion
 
-# Trusted Signing metadata consumed by the dlib (no secrets; safe to write to a temp file).
-$metadata = [ordered]@{
-    Endpoint               = $Endpoint
-    CodeSigningAccountName = $Account
-    CertificateProfileName = $CertificateProfile
-}
-$metadataPath = Join-Path ([System.IO.Path]::GetTempPath()) ("bugnarrator-signing-" + [System.Guid]::NewGuid().ToString("N") + ".json")
-$metadata | ConvertTo-Json | Set-Content -Path $metadataPath -Encoding utf8
-
+$metadataPath = $null
 try {
+    # Trusted Signing metadata consumed by the dlib (no secrets; safe to write to a temp file).
+    $metadata = [ordered]@{
+        Endpoint               = $Endpoint
+        CodeSigningAccountName = $Account
+        CertificateProfileName = $CertificateProfile
+    }
+    $metadataPath = Join-Path ([System.IO.Path]::GetTempPath()) ("bugnarrator-signing-" + [System.Guid]::NewGuid().ToString("N") + ".json")
+    $metadata | ConvertTo-Json | Set-Content -Path $metadataPath -Encoding utf8
+
     & $signTool sign `
         /v `
         /fd $DigestAlgorithm `
@@ -145,7 +157,9 @@ try {
     }
 }
 finally {
-    Remove-Item $metadataPath -Force -ErrorAction SilentlyContinue
+    if ($metadataPath -and (Test-Path $metadataPath)) {
+        Remove-Item $metadataPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "Signed $FilePath with Azure Trusted Signing ($Account / $CertificateProfile)."
