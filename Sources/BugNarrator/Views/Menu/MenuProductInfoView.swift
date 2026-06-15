@@ -6,7 +6,7 @@ import SwiftUI
 /// Behavior is unchanged: the `isOptionKeyPressed` flag still reveals the
 /// debug-bundle export, and every action delegates to `AppState`.
 struct MenuProductInfoView: View {
-    @ObservedObject var appState: AppState
+    let appState: AppState
     let isOptionKeyPressed: Bool
 
     var body: some View {
