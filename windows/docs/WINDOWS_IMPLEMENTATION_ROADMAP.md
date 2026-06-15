@@ -569,8 +569,8 @@ Current implementation findings:
 - microphone recording remains the default and continues to use the selected Windows microphone input device
 - system audio recording is implemented with NAudio WASAPI loopback against the default Windows render/output device and writes the captured stream into the existing session WAV artifact path
 - system-audio capture requires an explicit Settings consent checkbox explaining that audio from other apps on the PC may be recorded
-- `Microphone + System Audio` is intentionally surfaced as a clear limitation for this build instead of silently producing an incomplete artifact; true mixed-source muxing remains a follow-up after tester distribution unless prioritized earlier
-- automated coverage now includes `9` core tests and `47` Windows tests, including recording-source routing, system-audio consent blocking, and the mixed-capture limitation state
+- `Microphone + System Audio` was originally surfaced as a clear limitation for this build instead of silently producing an incomplete artifact; true mixed-source muxing is now implemented in `WIN-010` (see below)
+- automated coverage at the time of WIN-008 included `9` core tests and `47` Windows tests, including recording-source routing, system-audio consent blocking, and the (now-resolved) mixed-capture limitation state
 
 ### WIN-009: Signed Windows Tester Release
 
@@ -596,6 +596,31 @@ Current status:
 Tracking:
 
 - GitHub issue #75
+
+### WIN-010: Windows Mixed Microphone + System Audio Recording
+
+Goal:
+
+- replace the `Microphone + System Audio` limitation with a real mixed recording that produces one combined track
+
+Deliverables:
+
+- simultaneous microphone (`WaveInEvent`) and system-audio (`WasapiLoopbackCapture`) capture
+- a deterministic mixing pipeline that downmixes both sources to mono, resamples them to 16 kHz, and sums them into one 16-bit PCM track
+- wall-clock-paced writing so the two sources stay aligned without progressive drift
+- reuse of the existing system-audio consent gate for mixed mode
+
+Current implementation findings:
+
+- `MixedAudioPipeline` builds the mixer (mono downmix + `WdlResamplingSampleProvider` to 16 kHz + `MixingSampleProvider` with `ReadFully` + `SampleToWaveProvider16`) and is unit-tested with synthetic providers, so the DSP is covered without audio hardware
+- `MixedAudioRecording` owns the two captures, feeds independent `BufferedWaveProvider`s, and a pump thread reads the mixed pipeline paced to a `Stopwatch` so output length tracks real time and the sources stay in sync
+- `NAudioRecorderService` now starts/stops the mixed path; `WindowsAppSettings` no longer reports a "not implemented" limitation for mixed mode but still requires system-audio consent (mixed uses system audio)
+- automated coverage now includes `9` core tests and `52` Windows tests, including mixed start-with-consent, mixed-blocked-without-consent, and the mixing-pipeline DSP
+- real-desktop validation of the mixed recording on representative output devices remains manual and is tracked alongside the other Windows runtime checks
+
+Tracking:
+
+- GitHub issue #453
 
 ## Suggested Repo Skeleton
 

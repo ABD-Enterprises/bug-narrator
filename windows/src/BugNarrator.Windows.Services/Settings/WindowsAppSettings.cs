@@ -61,13 +61,6 @@ public sealed record WindowsAppSettings(
     {
         get
         {
-            var source = EffectiveRecordingAudioSourceProfile.Source;
-
-            if (source == AudioRecordingSource.MicrophoneAndSystemAudio)
-            {
-                return "Microphone plus system audio recording is not implemented yet. Choose Microphone or System Audio for this build.";
-            }
-
             if (EffectiveRecordingAudioSourceProfile.UsesSystemAudio
                 && !HasAcceptedSystemAudioRecordingConsent)
             {

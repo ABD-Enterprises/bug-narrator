@@ -42,9 +42,9 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 
 ## Automated Coverage Notes
 - `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
-- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, AI provider settings, audio recording-source routing, OpenAI-compatible issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
+- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, AI provider settings, audio recording-source routing (including mixed microphone + system audio with and without consent), the mixed-audio mixing pipeline DSP (channel downmix, resample to 16 kHz, and source summing), OpenAI-compatible issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
 - CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, writes a structured package smoke report, and uploads package and validation artifacts from the Windows runner.
-- Current passing automated coverage on this branch is `9` core tests and `47` Windows tests when run on Windows.
+- Current passing automated coverage on this branch is `9` core tests and `52` Windows tests when run on Windows.
 - Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live AI provider transcription, live AI provider issue extraction, representative system-audio output devices, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
 
 ## Milestone 2: Tray Shell And Single Instance
@@ -192,10 +192,17 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Confirm the system-audio consent checkbox appears near the recording-source setting.
 - Select system audio recording when a loopback-capable output device exists.
 - Confirm system audio recording produces a non-empty artifact that can be transcribed.
-- Select microphone plus system audio recording.
-- Confirm the app records an explicit unsupported/follow-up limitation instead of creating an incomplete mixed artifact.
 - Confirm system audio consent and privacy messaging appears before capture.
 - Probe silent output, Bluetooth/headset output, device changes, and unavailable loopback devices.
+
+## WIN-010: Mixed Microphone + System Audio Recording
+- Accept the system-audio consent checkbox, then select `Microphone + System Audio` in Settings.
+- Without consent accepted, confirm starting a mixed recording fails with the system-audio consent message.
+- Start a mixed recording, speak into the microphone while audio plays from another app, then stop.
+- Confirm a single non-empty WAV is produced and that both the spoken audio and the system audio are audible in it.
+- Confirm the WAV is 16 kHz mono and transcribes successfully.
+- Confirm the two sources stay in sync across a longer (several-minute) recording with no progressive drift.
+- Probe edge cases: system output silent for part of the session, output device changed mid-recording, and microphone unplugged mid-recording.
 
 ## WIN-009: Signed Tester Release
 - Produce the signed tester release package with `powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-tester.ps1 -Runtime win-x64`.

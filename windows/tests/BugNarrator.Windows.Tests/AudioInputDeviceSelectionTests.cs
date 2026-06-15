@@ -99,19 +99,48 @@ public sealed class AudioInputDeviceSelectionTests
     }
 
     [Fact]
-    public async Task StartRecordingAsync_WithMixedAudio_ReportsTrackedLimitation()
+    public async Task StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone()
     {
         using var harness = new RecordingHarness();
         harness.SettingsStore.Settings = WindowsAppSettings.Default with
         {
             RecordingAudioSource = "microphoneAndSystemAudio",
             HasAcceptedSystemAudioRecordingConsent = true,
+            AudioInputDeviceName = "Built-in Microphone",
         };
+        harness.AudioInputDeviceCatalog.Devices =
+        [
+            new AudioInputDeviceOption(0, "Built-in Microphone")
+        ];
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.True(harness.AudioRecorderService.IsRecording);
+        Assert.Equal(AudioRecordingSource.MicrophoneAndSystemAudio, harness.AudioRecorderService.LastRequest?.Source);
+        Assert.Equal(0, harness.AudioRecorderService.LastRequest?.MicrophoneDeviceNumber);
+        Assert.Equal(1, harness.MicrophonePreflightService.CallCount);
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithMixedAudioWithoutConsent_FailsBeforeCapture()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = "microphoneAndSystemAudio",
+            HasAcceptedSystemAudioRecordingConsent = false,
+            AudioInputDeviceName = "Built-in Microphone",
+        };
+        harness.AudioInputDeviceCatalog.Devices =
+        [
+            new AudioInputDeviceOption(0, "Built-in Microphone")
+        ];
 
         await harness.Service.StartRecordingAsync();
 
         Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
-        Assert.Contains("Microphone plus system audio recording is not implemented yet", harness.Service.CurrentState.StatusMessage);
+        Assert.Contains("Accept the system audio recording notice", harness.Service.CurrentState.StatusMessage);
         Assert.False(harness.AudioRecorderService.IsRecording);
     }
 
