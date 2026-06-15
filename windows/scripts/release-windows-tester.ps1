@@ -7,7 +7,12 @@ param(
     [string]$TimestampUrl = "http://timestamp.digicert.com",
     [string]$DigestAlgorithm = "sha256",
     [string]$SignToolPath = "signtool.exe",
-    [string]$ReleaseNotesPath = ""
+    [string]$ReleaseNotesPath = "",
+    [switch]$UseTrustedSigning,
+    [string]$TrustedSigningEndpoint = "https://wus3.codesigning.azure.net/",
+    [string]$TrustedSigningAccount = "bugnarrator-signing",
+    [string]$TrustedSigningCertificateProfile = "bugnarrator-public",
+    [string]$TrustedSigningTimestampUrl = "http://timestamp.acs.microsoft.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,12 +41,14 @@ function Get-RelativeArtifactPath {
     return [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('\', '/')
 }
 
-if (-not $env:BUGNARRATOR_CERT_PATH) {
-    throw "Set BUGNARRATOR_CERT_PATH to an external Windows code-signing certificate before producing a signed tester release."
-}
+if (-not $UseTrustedSigning) {
+    if (-not $env:BUGNARRATOR_CERT_PATH) {
+        throw "Set BUGNARRATOR_CERT_PATH to an external Windows code-signing certificate before producing a signed tester release, or pass -UseTrustedSigning to sign with Azure Trusted Signing."
+    }
 
-if (-not $env:BUGNARRATOR_CERT_PASSWORD) {
-    throw "Set BUGNARRATOR_CERT_PASSWORD before producing a signed tester release."
+    if (-not $env:BUGNARRATOR_CERT_PASSWORD) {
+        throw "Set BUGNARRATOR_CERT_PASSWORD before producing a signed tester release, or pass -UseTrustedSigning to sign with Azure Trusted Signing."
+    }
 }
 
 Push-Location $repoRoot
@@ -51,13 +58,28 @@ try {
         throw "package-windows.ps1 failed."
     }
 
-    & "$PSScriptRoot\sign-windows.ps1" `
-        -FilePath $executablePath `
-        -TimestampUrl $TimestampUrl `
-        -DigestAlgorithm $DigestAlgorithm `
-        -SignToolPath $SignToolPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "sign-windows.ps1 failed."
+    if ($UseTrustedSigning) {
+        & "$PSScriptRoot\sign-windows-trustedsigning.ps1" `
+            -FilePath $executablePath `
+            -Endpoint $TrustedSigningEndpoint `
+            -Account $TrustedSigningAccount `
+            -CertificateProfile $TrustedSigningCertificateProfile `
+            -TimestampUrl $TrustedSigningTimestampUrl `
+            -DigestAlgorithm $DigestAlgorithm `
+            -SignToolPath $SignToolPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "sign-windows-trustedsigning.ps1 failed."
+        }
+    }
+    else {
+        & "$PSScriptRoot\sign-windows.ps1" `
+            -FilePath $executablePath `
+            -TimestampUrl $TimestampUrl `
+            -DigestAlgorithm $DigestAlgorithm `
+            -SignToolPath $SignToolPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "sign-windows.ps1 failed."
+        }
     }
 
     & "$PSScriptRoot\verify-windows-signature.ps1" `
