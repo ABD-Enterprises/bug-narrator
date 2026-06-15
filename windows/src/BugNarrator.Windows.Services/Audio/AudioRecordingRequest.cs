@@ -13,4 +13,9 @@ public sealed record AudioRecordingRequest(
     {
         return new AudioRecordingRequest(AudioRecordingSource.SystemAudio, MicrophoneDeviceNumber: null);
     }
+
+    public static AudioRecordingRequest ForMixed(int microphoneDeviceNumber)
+    {
+        return new AudioRecordingRequest(AudioRecordingSource.MicrophoneAndSystemAudio, microphoneDeviceNumber);
+    }
 }

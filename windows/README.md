@@ -62,7 +62,7 @@ Current Windows milestone status:
 - the post-MVP hardening milestone is implemented, including shared atomic file writes, root-bound session path validation, corrupted-secret tolerance, diagnostic redaction, safer export/session loading, friendlier network failure messages, and defensive screenshot preview handling
 - stopping a recording now saves the session even when required AI provider setup is missing and preserves a clear failure state if transcription fails
 - Windows AI provider setup parity is implemented, including provider selection for OpenAI, OpenAI-compatible hosted endpoints, and local-compatible endpoints, plus compatibility guidance for unsupported provider/model combinations
-- Windows audio-source parity now includes microphone recording and WASAPI loopback system-audio recording; microphone plus system audio is visible as an explicit tracked limitation until mixed-source muxing is implemented
+- Windows audio-source parity now includes microphone recording, WASAPI loopback system-audio recording, and mixed microphone + system audio recording muxed into a single 16 kHz mono track (`WIN-010` / #453); mixed capture reuses the system-audio consent gate
 - automated coverage currently includes `9` core tests and `47` Windows tests
 - `windows/scripts/package-windows.ps1` currently produces a zipped self-contained `dotnet publish` artifact at `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
 - `windows/scripts/release-windows-tester.ps1` produces the first tester release format: a zip containing a signed `BugNarrator.Windows.exe`, plus signature, package-validation, and release-note evidence under `windows/artifacts/validation/`
