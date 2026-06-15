@@ -73,4 +73,4 @@ Current Windows milestone status:
 Current follow-up parity tickets:
 
 - `RR-002` / #44 remains the real Windows desktop validation gate.
-- `WIN-009` / #75 now has the repository-side signed tester release path; the remaining external dependency is a real Windows code-signing certificate configured outside the repo.
+- `WIN-009` / #75 now has the repository-side signed tester release path, including an Azure Trusted Signing flow (`windows/scripts/sign-windows-trustedsigning.ps1`, plus `release-windows-tester.ps1 -UseTrustedSigning`); the remaining external dependency is the Trusted Signing identity validation being approved so a `PublicTrust` certificate profile can be created.
