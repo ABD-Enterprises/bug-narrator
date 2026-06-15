@@ -1,18 +1,14 @@
-using System.Diagnostics;
 using NAudio.Wave;
 
 namespace BugNarrator.Windows.Services.Audio;
 
 /// <summary>
 /// Captures the microphone and system-audio loopback simultaneously and writes a single mixed
-/// 16 kHz mono 16-bit PCM WAV. The two captures fill independent buffers; a pump thread reads the
-/// mixed pipeline paced to the wall clock so the sources stay aligned without progressive drift.
+/// 16 kHz mono 16-bit PCM WAV. Driving the mixing directly from the microphone's DataAvailable
+/// event keeps the two sources aligned and paced to the microphone's clock.
 /// </summary>
 internal sealed class MixedAudioRecording : IDisposable
 {
-    private const int PumpIntervalMilliseconds = 20;
-    private const int OutputBytesPerSample = 2; // 16-bit mono
-
     private readonly object writeLock = new();
     private readonly WaveInEvent microphoneCapture;
     private readonly WasapiLoopbackCapture systemCapture;
@@ -20,12 +16,8 @@ internal sealed class MixedAudioRecording : IDisposable
     private readonly BufferedWaveProvider systemBuffer;
     private readonly IWaveProvider mixedOutput;
     private readonly WaveFileWriter writer;
-    private readonly Stopwatch clock = new();
-    private readonly byte[] pumpBuffer = new byte[16384];
+    private readonly byte[] mixBuffer = new byte[16384];
 
-    private Thread? pumpThread;
-    private volatile bool running;
-    private long bytesWritten;
     private Exception? captureFailure;
 
     public MixedAudioRecording(string audioFilePath, int microphoneDeviceNumber)
@@ -65,26 +57,8 @@ internal sealed class MixedAudioRecording : IDisposable
 
     public void Start()
     {
-        running = true;
-        clock.Start();
-
-        try
-        {
-            microphoneCapture.StartRecording();
-            systemCapture.StartRecording();
-        }
-        catch
-        {
-            running = false;
-            throw;
-        }
-
-        pumpThread = new Thread(PumpLoop)
-        {
-            IsBackground = true,
-            Name = "BugNarrator.MixedAudioPump",
-        };
-        pumpThread.Start();
+        microphoneCapture.StartRecording();
+        systemCapture.StartRecording();
     }
 
     public Task StopAsync()
@@ -94,16 +68,8 @@ internal sealed class MixedAudioRecording : IDisposable
 
     private void Stop()
     {
-        running = false;
-        pumpThread?.Join(TimeSpan.FromSeconds(5));
-        pumpThread = null;
-        clock.Stop();
-
         TryStop(microphoneCapture);
         TryStop(systemCapture);
-
-        // Final drain so the output length matches the elapsed wall-clock time.
-        DrainToClock();
 
         lock (writeLock)
         {
@@ -116,46 +82,26 @@ internal sealed class MixedAudioRecording : IDisposable
         }
     }
 
-    private void PumpLoop()
+    private void OnMicrophoneDataAvailable(object? sender, WaveInEventArgs eventArgs)
     {
-        while (running)
-        {
-            DrainToClock();
-            Thread.Sleep(PumpIntervalMilliseconds);
-        }
-    }
-
-    private void DrainToClock()
-    {
-        // Pace output to real time: the number of bytes that should exist by now is
-        // elapsed seconds * sample rate * bytes/sample. Writing only the delta each tick keeps
-        // both sources locked to the wall clock and prevents progressive drift, while the mixer's
-        // ReadFully fills any momentary gap in a single source with silence.
-        var targetBytes =
-            (long)(clock.Elapsed.TotalSeconds * MixedAudioPipeline.TargetSampleRate) * OutputBytesPerSample;
-
         lock (writeLock)
         {
-            var pending = targetBytes - bytesWritten;
+            microphoneBuffer.AddSamples(eventArgs.Buffer, 0, eventArgs.BytesRecorded);
+
+            var pending = eventArgs.BytesRecorded;
             while (pending > 0)
             {
-                var want = (int)Math.Min(pumpBuffer.Length, pending);
-                var read = mixedOutput.Read(pumpBuffer, 0, want);
+                var want = Math.Min(mixBuffer.Length, pending);
+                var read = mixedOutput.Read(mixBuffer, 0, want);
                 if (read <= 0)
                 {
                     break;
                 }
 
-                writer.Write(pumpBuffer, 0, read);
-                bytesWritten += read;
+                writer.Write(mixBuffer, 0, read);
                 pending -= read;
             }
         }
-    }
-
-    private void OnMicrophoneDataAvailable(object? sender, WaveInEventArgs eventArgs)
-    {
-        microphoneBuffer.AddSamples(eventArgs.Buffer, 0, eventArgs.BytesRecorded);
     }
 
     private void OnSystemDataAvailable(object? sender, WaveInEventArgs eventArgs)
@@ -185,10 +131,6 @@ internal sealed class MixedAudioRecording : IDisposable
 
     public void Dispose()
     {
-        running = false;
-        pumpThread?.Join(TimeSpan.FromSeconds(5));
-        pumpThread = null;
-
         microphoneCapture.DataAvailable -= OnMicrophoneDataAvailable;
         systemCapture.DataAvailable -= OnSystemDataAvailable;
         microphoneCapture.RecordingStopped -= OnCaptureStopped;

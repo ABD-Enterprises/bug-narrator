@@ -80,12 +80,13 @@ public sealed class NAudioRecorderService : IAudioRecorderService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        MixedAudioRecording? mixed;
+        MixedAudioRecording? mixed = null;
         lock (syncRoot)
         {
             if (mixedRecording is not null)
             {
                 mixed = mixedRecording;
+                mixedRecording = null;
             }
             else
             {
@@ -113,11 +114,6 @@ public sealed class NAudioRecorderService : IAudioRecorderService
             lock (syncRoot)
             {
                 mixed.Dispose();
-                if (ReferenceEquals(mixedRecording, mixed))
-                {
-                    mixedRecording = null;
-                }
-
                 IsRecording = false;
             }
         }
