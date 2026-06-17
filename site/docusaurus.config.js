@@ -5,10 +5,10 @@ const config = {
   title: 'BugNarrator Docs',
   tagline: 'User, release, and roadmap documentation for BugNarrator',
   favicon: 'img/favicon.png',
-  url: 'https://deffenda.github.io',
+  url: 'https://abd-enterprises.github.io',
   baseUrl: '/bug-narrator/',
   trailingSlash: true,
-  organizationName: 'deffenda',
+  organizationName: 'ABD-Enterprises',
   projectName: 'bug-narrator',
   onBrokenLinks: 'throw',
   markdown: {
