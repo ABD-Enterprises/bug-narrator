@@ -5,9 +5,10 @@ import SwiftUI
 ///
 /// Extracted from `MenuBarView` as a focused section split for #433.
 /// Behavior is unchanged; every action delegates to `AppState`.
+@MainActor
 struct MenuSessionLibraryCardView: View {
-    let appState: AppState
-    let transcriptStore: TranscriptStore
+    @ObservedObject var appState: AppState
+    @ObservedObject var transcriptStore: TranscriptStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
