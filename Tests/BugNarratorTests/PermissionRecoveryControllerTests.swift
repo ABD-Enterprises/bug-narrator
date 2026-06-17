@@ -131,62 +131,6 @@ final class PermissionRecoveryControllerTests: XCTestCase {
         )
     }
 
-    private func makeStatusPresenter(
-        status: AppStatus = .idle(),
-        currentError: AppError? = nil
-    ) -> (
-        presenter: PermissionRecoveryStatusPresenter,
-        presentationState: AppPresentationState,
-        telemetryRecorder: MockOperationalTelemetryRecorder
-    ) {
-        let presentationState = AppPresentationState(status: status, currentError: currentError)
-        let telemetryRecorder = MockOperationalTelemetryRecorder()
-        let presenter = PermissionRecoveryStatusPresenter(
-            errorPresenter: AppErrorPresenter(
-                presentationState: presentationState,
-                telemetryRecorder: telemetryRecorder
-            )
-        )
-
-        return (
-            presenter: presenter,
-            presentationState: presentationState,
-            telemetryRecorder: telemetryRecorder
-        )
-    }
-}
-
-@MainActor
-private final class PermissionRecoveryControllerHarness {
-    let audioRecorder: MockAudioRecorder
-    let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
-    let urlHandler: MockURLHandler
-    let controller: PermissionRecoveryController
-
-    init(
-        microphonePermissionState: MicrophonePermissionState = .authorized,
-        screenPermissionState: ScreenCapturePermissionState = .granted,
-        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
-    ) {
-        let audioRecorder = MockAudioRecorder()
-        audioRecorder.permissionState = microphonePermissionState
-
-        let screenCapturePermissionAccess = MockScreenCapturePermissionAccess()
-        screenCapturePermissionAccess.permissionState = screenPermissionState
-
-        let urlHandler = MockURLHandler()
-
-        self.audioRecorder = audioRecorder
-        self.screenCapturePermissionAccess = screenCapturePermissionAccess
-        self.urlHandler = urlHandler
-        self.controller = PermissionRecoveryController(
-            microphonePermissionService: MicrophonePermissionService(permissionAccess: audioRecorder),
-            screenCapturePermissionService: ScreenCapturePermissionService(permissionAccess: screenCapturePermissionAccess),
-            urlHandler: urlHandler,
-            runtimeEnvironment: runtimeEnvironment
-        )
-    }
-
     func testPermissionRefreshClearsStaleMicrophoneDeniedErrorAfterAccessIsGranted() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
@@ -263,6 +207,62 @@ private final class PermissionRecoveryControllerHarness {
         XCTAssertEqual(
             harness.appState.microphoneRecoveryLocalTestingNote,
             "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
+        )
+    }
+
+    private func makeStatusPresenter(
+        status: AppStatus = .idle(),
+        currentError: AppError? = nil
+    ) -> (
+        presenter: PermissionRecoveryStatusPresenter,
+        presentationState: AppPresentationState,
+        telemetryRecorder: MockOperationalTelemetryRecorder
+    ) {
+        let presentationState = AppPresentationState(status: status, currentError: currentError)
+        let telemetryRecorder = MockOperationalTelemetryRecorder()
+        let presenter = PermissionRecoveryStatusPresenter(
+            errorPresenter: AppErrorPresenter(
+                presentationState: presentationState,
+                telemetryRecorder: telemetryRecorder
+            )
+        )
+
+        return (
+            presenter: presenter,
+            presentationState: presentationState,
+            telemetryRecorder: telemetryRecorder
+        )
+    }
+}
+
+@MainActor
+private final class PermissionRecoveryControllerHarness {
+    let audioRecorder: MockAudioRecorder
+    let screenCapturePermissionAccess: MockScreenCapturePermissionAccess
+    let urlHandler: MockURLHandler
+    let controller: PermissionRecoveryController
+
+    init(
+        microphonePermissionState: MicrophonePermissionState = .authorized,
+        screenPermissionState: ScreenCapturePermissionState = .granted,
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(bundlePath: "/Applications/BugNarrator.app")
+    ) {
+        let audioRecorder = MockAudioRecorder()
+        audioRecorder.permissionState = microphonePermissionState
+
+        let screenCapturePermissionAccess = MockScreenCapturePermissionAccess()
+        screenCapturePermissionAccess.permissionState = screenPermissionState
+
+        let urlHandler = MockURLHandler()
+
+        self.audioRecorder = audioRecorder
+        self.screenCapturePermissionAccess = screenCapturePermissionAccess
+        self.urlHandler = urlHandler
+        self.controller = PermissionRecoveryController(
+            microphonePermissionService: MicrophonePermissionService(permissionAccess: audioRecorder),
+            screenCapturePermissionService: ScreenCapturePermissionService(permissionAccess: screenCapturePermissionAccess),
+            urlHandler: urlHandler,
+            runtimeEnvironment: runtimeEnvironment
         )
     }
 }
