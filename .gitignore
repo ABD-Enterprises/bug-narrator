@@ -42,6 +42,9 @@ local-transcription/build/
 local-transcription/dist/
 .worktrees/
 
+# Runtime logs (e.g. the local Parakeet transcription server) — never committed.
+logs/
+
 # scripts/validate.sh and scripts/swift-parse-check.sh write status/output
 # files here on every run; they should never be committed.
 artifacts/validation/
