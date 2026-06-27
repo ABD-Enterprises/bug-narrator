@@ -311,6 +311,14 @@ struct SettingsView: View {
                                 .accessibilityLabel("Jira Cloud URL")
                         }
 
+                        if let warning = settingsStore.jiraBaseURLPlaintextWarning {
+                            Label(warning, systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel("Insecure Jira endpoint warning")
+                        }
+
                         labeledField(title: "Email") {
                             TextField("you@example.com", text: $settingsStore.jiraEmail)
                                 .textFieldStyle(.roundedBorder)

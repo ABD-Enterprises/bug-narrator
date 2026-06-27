@@ -104,6 +104,29 @@ public sealed record WindowsAppSettings(
     public string? AiProviderBaseUrlSecurityWarning =>
         OpenAiCompatibleEndpoint.PlaintextRemoteWarning(AiProviderBaseUrl);
 
+    /// <summary>
+    /// Non-blocking warning when the Jira base URL would send Basic-auth
+    /// credentials (email + API token) over plaintext HTTP to a remote host.
+    /// Null for remote HTTPS and local HTTP. Mirrors the macOS app (#504).
+    /// </summary>
+    public string? JiraBaseUrlSecurityWarning
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(JiraBaseUrl)
+                || !Uri.TryCreate(JiraBaseUrl.Trim(), UriKind.Absolute, out var parsed)
+                || !string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+                || OpenAiCompatibleEndpoint.IsLocalEndpointHost(parsed.Host))
+            {
+                return null;
+            }
+
+            return $"This Jira URL uses plaintext HTTP to a remote host ({parsed.Host}). "
+                + "Your email and API token would be sent unencrypted. Use https:// "
+                + "unless this is a trusted local server.";
+        }
+    }
+
     public string? AiProviderCompatibilityIssue
     {
         get

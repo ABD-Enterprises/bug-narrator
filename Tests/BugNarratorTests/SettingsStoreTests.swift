@@ -386,6 +386,28 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://203.0.113.10:8080"))
     }
 
+    func testJiraBaseURLWarnsOnlyForPlaintextRemoteHost() {
+        let suiteName = "BugNarrator-JiraPlaintextTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for allowed in [
+            "https://acme.atlassian.net",   // remote HTTPS
+            "http://localhost:8080",         // loopback HTTP
+            "http://192.168.1.10",           // private network
+            "acme.atlassian.net",            // no scheme → defaults to https
+            ""
+        ] {
+            store.jiraBaseURL = allowed
+            XCTAssertNil(store.jiraBaseURLPlaintextWarning, "expected no warning for \(allowed)")
+        }
+
+        store.jiraBaseURL = "http://jira.example.com"
+        XCTAssertNotNil(store.jiraBaseURLPlaintextWarning)
+    }
+
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
                       "192.168.0.1", "169.254.1.1", "myserver.local", "lmstudio", "::1"] {
