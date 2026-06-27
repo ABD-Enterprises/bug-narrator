@@ -18,6 +18,9 @@ if [[ ! -d "$PROJECT_PATH" ]]; then
     exit 1
 fi
 
+echo "Checking version consistency (VERSION / project.yml / CHANGELOG)..."
+bash "$ROOT_DIR/scripts/check_version_consistency.sh"
+
 if [[ "$ROOT_DIR/project.yml" -nt "$PROJECT_PATH/project.pbxproj" ]]; then
     echo "Regenerating Xcode project with xcodegen..."
     (cd "$ROOT_DIR" && xcodegen generate)
