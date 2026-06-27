@@ -385,6 +385,28 @@ actor GitHubExportProvider {
         )
     }
 
+    /// Neutralizes untrusted (LLM-derived) text so it renders as literal content
+    /// in a GitHub Markdown issue body: it cannot trigger `@mentions` or `#issue`
+    /// cross-links, inject raw HTML, or start new block-level structure
+    /// (headings, quotes, lists, tables, code fences).
+    static func neutralizingUntrustedMarkdown(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n").map { line -> String in
+            var escaped = line
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+                // A zero-width space after @/# breaks GitHub's mention and issue
+                // autolinks (and defeats `# heading` injection) while leaving the
+                // text visually identical.
+                .replacingOccurrences(of: "@", with: "@\u{200B}")
+                .replacingOccurrences(of: "#", with: "#\u{200B}")
+            if let first = escaped.first, "-*+|=`~".contains(first) {
+                escaped = "\\" + escaped
+            }
+            return escaped
+        }
+        return lines.joined(separator: "\n")
+    }
+
     private func makeIssueBody(
         issue: ExtractedIssue,
         session: TranscriptSession,
@@ -392,15 +414,19 @@ actor GitHubExportProvider {
     ) throws -> String {
         var lines: [String] = [
             "## Summary",
-            TrackerExportPayloadBudget.truncated(
-                issue.summary,
-                maxCharacters: TrackerExportPayloadBudget.issueSummaryLimit
+            Self.neutralizingUntrustedMarkdown(
+                TrackerExportPayloadBudget.truncated(
+                    issue.summary,
+                    maxCharacters: TrackerExportPayloadBudget.issueSummaryLimit
+                )
             ),
             "",
             "## Evidence",
-            TrackerExportPayloadBudget.truncated(
-                issue.evidenceExcerpt,
-                maxCharacters: TrackerExportPayloadBudget.evidenceLimit
+            Self.neutralizingUntrustedMarkdown(
+                TrackerExportPayloadBudget.truncated(
+                    issue.evidenceExcerpt,
+                    maxCharacters: TrackerExportPayloadBudget.evidenceLimit
+                )
             ),
             ""
         ]
@@ -413,13 +439,13 @@ actor GitHubExportProvider {
 
         if let component = issue.component?.trimmingCharacters(in: .whitespacesAndNewlines),
            !component.isEmpty {
-            lines.append("- Component: \(component)")
+            lines.append("- Component: \(Self.neutralizingUntrustedMarkdown(component))")
         }
 
         lines.append("- Deduplication hint: `\(issue.deduplicationHint)`")
 
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
-            lines.append("- Transcript section: \(sectionTitle)")
+            lines.append("- Transcript section: \(Self.neutralizingUntrustedMarkdown(sectionTitle))")
         }
 
         if let confidenceLabel = issue.confidenceLabel {
@@ -433,6 +459,9 @@ actor GitHubExportProvider {
         if let note = issue.note?.trimmingCharacters(in: .whitespacesAndNewlines),
            !note.isEmpty {
             lines.append("")
+            // `note` is set by our own dedup policy (trackerContextNote) and may
+            // deliberately contain a "Related to #123" cross-link, so it is not
+            // neutralized here.
             lines.append("## Tracker Context")
             lines.append(
                 TrackerExportPayloadBudget.truncated(
@@ -448,17 +477,17 @@ actor GitHubExportProvider {
 
             for (index, step) in issue.reproductionSteps.prefix(TrackerExportPayloadBudget.reproductionStepLimit).enumerated() {
                 lines.append(
-                    "\(index + 1). \(TrackerExportPayloadBudget.truncated(step.instruction, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))"
+                    "\(index + 1). \(Self.neutralizingUntrustedMarkdown(TrackerExportPayloadBudget.truncated(step.instruction, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))"
                 )
 
                 if let expectedResult = step.expectedResult?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !expectedResult.isEmpty {
-                    lines.append("   - Expected: \(TrackerExportPayloadBudget.truncated(expectedResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
+                    lines.append("   - Expected: \(Self.neutralizingUntrustedMarkdown(TrackerExportPayloadBudget.truncated(expectedResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))")
                 }
 
                 if let actualResult = step.actualResult?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !actualResult.isEmpty {
-                    lines.append("   - Actual: \(TrackerExportPayloadBudget.truncated(actualResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
+                    lines.append("   - Actual: \(Self.neutralizingUntrustedMarkdown(TrackerExportPayloadBudget.truncated(actualResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))")
                 }
 
                 if let reference = reproductionStepReference(step, session: session) {

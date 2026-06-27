@@ -209,6 +209,59 @@ final class GitHubExportProviderTests: XCTestCase {
         )
     }
 
+    func testNeutralizingUntrustedMarkdownDefangsMentionsRefsAndStructure() {
+        let out = GitHubExportProvider.neutralizingUntrustedMarkdown("@channel ping #123 <img src=x> done")
+        XCTAssertFalse(out.contains("@channel"), "mention should be broken with a zero-width space")
+        XCTAssertFalse(out.contains("#123"), "issue ref should be broken with a zero-width space")
+        XCTAssertFalse(out.contains("<img"))
+        XCTAssertTrue(out.contains("&lt;img"))
+
+        let heading = GitHubExportProvider.neutralizingUntrustedMarkdown("## Injected heading")
+        XCTAssertFalse(heading.hasPrefix("## "), "injected heading must not start with a real `# ` token")
+
+        let fence = GitHubExportProvider.neutralizingUntrustedMarkdown("```malicious fence")
+        XCTAssertTrue(fence.hasPrefix("\\`"), "leading code fence should be escaped")
+    }
+
+    func testIssueBodyNeutralizesUntrustedSummaryFields() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "@channel please fix #999 <script>alert(1)</script>",
+            evidenceExcerpt: "## Injected\nSee @maintainer about #1",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            )
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: body)
+        XCTAssertFalse(payload.body.contains("@channel"))
+        XCTAssertFalse(payload.body.contains("#999"))
+        XCTAssertFalse(payload.body.contains("@maintainer"))
+        XCTAssertFalse(payload.body.contains("<script>"))
+        XCTAssertTrue(payload.body.contains("&lt;script&gt;"))
+    }
+
     func testValidateConfigurationChecksRepositoryAccess() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
 
