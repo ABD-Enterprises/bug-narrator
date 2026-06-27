@@ -564,7 +564,7 @@ actor JiraExportProvider {
         )
         request.httpBody = try JSONEncoder().encode(
             JiraSearchRequest(
-                jql: #"project = \#(configuration.projectKey) AND description ~ "\"\#(TrackerExportFingerprint.marker(for: fingerprint))\"" ORDER BY created DESC"#,
+                jql: #"\#(Self.jqlProjectClause(configuration.projectKey)) AND description ~ "\"\#(TrackerExportFingerprint.marker(for: fingerprint))\"" ORDER BY created DESC"#,
                 maxResults: 1,
                 fields: ["summary", "description"]
             )
@@ -941,8 +941,19 @@ actor JiraExportProvider {
             .replacingOccurrences(of: "\"", with: "\\\"")
 
         return """
-        project = \(projectKey) AND statusCategory != Done AND (summary ~ "\\"\(phrase)\\"" OR description ~ "\\"\(phrase)\\"") ORDER BY updated DESC
+        \(Self.jqlProjectClause(projectKey)) AND statusCategory != Done AND (summary ~ "\\"\(phrase)\\"" OR description ~ "\\"\(phrase)\\"") ORDER BY updated DESC
         """
+    }
+
+    /// Builds the `project = "KEY"` JQL clause with the project key quoted and
+    /// backslash/quote-escaped. Jira accepts a quoted project key, so quoting is
+    /// behaviour-preserving for normal keys while neutralizing a malformed or
+    /// operator-bearing key value before it reaches the JQL parser.
+    static func jqlProjectClause(_ projectKey: String) -> String {
+        let escaped = projectKey
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "project = \"\(escaped)\""
     }
 
 }
