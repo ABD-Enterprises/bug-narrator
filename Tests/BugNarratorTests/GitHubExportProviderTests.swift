@@ -8,6 +8,58 @@ final class GitHubExportProviderTests: XCTestCase {
         super.tearDown()
     }
 
+    func testExportFailsClosedWithoutCreatingWhenReceiptStoreIsCorrupt() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let storageURL = directoryURL.appendingPathComponent("export-receipts.json")
+        try Data("{ corrupt receipts".utf8).write(to: storageURL)
+
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("No remote request may be made when the receipt store is corrupt; method=\(request.httpMethod ?? "?")")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 500, httpVersion: nil, headerFields: nil)!
+            return (response, Data())
+        }
+
+        let provider = GitHubExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: ExportReceiptStore(storageURL: storageURL)
+        )
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout never enabled.",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        do {
+            _ = try await provider.export(
+                issues: [issue],
+                session: session,
+                configuration: GitHubExportConfiguration(
+                    token: "fixture-github-token",
+                    owner: "acme",
+                    repository: "bugnarrator",
+                    labels: []
+                )
+            )
+            XCTFail("Expected a fail-closed export error")
+        } catch is AppError {
+            // expected — and no remote request was made (the handler would XCTFail)
+        }
+    }
+
     func testMakeURLRequestIncludesAuthorizationAndIssueBody() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let screenshotURL = makeScreenshotFileURL(named: "review-shot.png")

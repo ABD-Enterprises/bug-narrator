@@ -641,12 +641,12 @@ actor JiraExportProvider {
         sourceIssueID: UUID,
         configuration: JiraExportConfiguration
     ) async throws -> ExportResult? {
-        if let receipt = await receiptStore.receipt(for: fingerprint),
+        if let receipt = try await receiptStore.receipt(for: fingerprint),
            let exportResult = receipt.asExportResult() {
             return exportResult
         }
 
-        guard let receipt = await receiptStore.receipt(for: fingerprint),
+        guard let receipt = try await receiptStore.receipt(for: fingerprint),
               receipt.state == .pending else {
             return nil
         }

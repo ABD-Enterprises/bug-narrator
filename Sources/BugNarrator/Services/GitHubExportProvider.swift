@@ -539,12 +539,12 @@ actor GitHubExportProvider {
         sourceIssueID: UUID,
         configuration: GitHubExportConfiguration
     ) async throws -> ExportResult? {
-        if let receipt = await receiptStore.receipt(for: fingerprint),
+        if let receipt = try await receiptStore.receipt(for: fingerprint),
            let exportResult = receipt.asExportResult() {
             return exportResult
         }
 
-        guard await receiptStore.receipt(for: fingerprint)?.state == .pending else {
+        guard try await receiptStore.receipt(for: fingerprint)?.state == .pending else {
             return nil
         }
 
