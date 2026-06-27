@@ -673,6 +673,213 @@ final class JiraExportProviderTests: XCTestCase {
             XCTAssertTrue(message.contains("Issue type is invalid"))
         }
     }
+
+    func testExportRetriesTransientFailureThenSucceedsWithExactlyOneCreate() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = JiraExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        var createCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if Self.isJiraCreateRequest(request) {
+                createCount += 1
+                if createCount == 1 {
+                    let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: nil)!
+                    return (response, Data(#"{"errorMessages":["Service Unavailable"]}"#.utf8))
+                }
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"id":"10001","key":"FM-88"}"#.utf8))
+            }
+
+            // Reconciliation JQL search finds no existing issue between attempts.
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"issues":[]}"#.utf8))
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.remoteIdentifier, "FM-88")
+        XCTAssertEqual(
+            results.first?.remoteURL,
+            URL(string: "https://acme.atlassian.net/browse/FM-88")
+        )
+        XCTAssertEqual(createCount, 2, "the transient failure should be retried exactly once")
+
+        let succeededCalls = await receiptStore.markSucceededCalls
+        XCTAssertEqual(succeededCalls.count, 1)
+        XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "FM-88")
+    }
+
+    func testExportTransientFailureReconcilesCreatedIssueWithoutDuplicateCreate() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = JiraExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        let fingerprint = TrackerExportFingerprint.make(
+            destination: .jira,
+            targetIdentity: configuration.targetIdentity,
+            sessionID: session.id,
+            issueID: issue.id
+        )
+        let marker = TrackerExportFingerprint.marker(for: fingerprint)
+
+        var createCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if Self.isJiraCreateRequest(request) {
+                createCount += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"errorMessages":["Service Unavailable"]}"#.utf8))
+            }
+
+            // The issue was actually created; reconciliation locates it by marker.
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"issues":[{"key":"FM-77","fields":{"summary":"Created issue","description":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Tracked \#(marker)"}]}]}}}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.remoteIdentifier, "FM-77")
+        XCTAssertEqual(createCount, 1, "a created-but-unacked issue must not be duplicated by a retry create")
+
+        let succeededCalls = await receiptStore.markSucceededCalls
+        XCTAssertEqual(succeededCalls.count, 1)
+        XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "FM-77")
+    }
+
+    func testExportPermanentFailureFailsWithoutRetrying() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let provider = JiraExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: StubExportReceiptStore(),
+            retryConfiguration: .immediate
+        )
+
+        var createCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if Self.isJiraCreateRequest(request) {
+                createCount += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 400, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"errorMessages":["Issue type is invalid"],"errors":{}}"#.utf8))
+            }
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"issues":[]}"#.utf8))
+        }
+
+        do {
+            _ = try await provider.export(issues: [issue], session: session, configuration: configuration)
+            XCTFail("Expected a permanent failure to surface.")
+        } catch let error as AppError {
+            guard case .exportFailure(let message) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+            XCTAssertTrue(message.contains("Issue type is invalid"))
+            XCTAssertEqual(createCount, 1, "a permanent (non-transient) failure must not be retried")
+        }
+    }
+
+    func testExportTreatsUnreadable2xxBodyAsAmbiguousAndReconcilesWithoutDuplicate() async throws {
+        // Jira accepted the create (2xx) but the body is unreadable. This is a
+        // created-but-unacknowledged issue: it must be reconciled by marker, never
+        // re-created, and the pending receipt must not be cleared.
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = JiraExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        let fingerprint = TrackerExportFingerprint.make(
+            destination: .jira,
+            targetIdentity: configuration.targetIdentity,
+            sessionID: session.id,
+            issueID: issue.id
+        )
+        let marker = TrackerExportFingerprint.marker(for: fingerprint)
+
+        var createCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if Self.isJiraCreateRequest(request) {
+                createCount += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201, httpVersion: nil, headerFields: nil)!
+                return (response, Data("not json".utf8))
+            }
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"issues":[{"key":"FM-91","fields":{"summary":"Created issue","description":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Tracked \#(marker)"}]}]}}}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.first?.remoteIdentifier, "FM-91")
+        XCTAssertEqual(createCount, 1, "an unreadable 2xx body must not trigger a duplicate create")
+
+        let receipt = await receiptStore.receipts[fingerprint]
+        XCTAssertEqual(receipt?.state, .succeeded)
+        XCTAssertEqual(receipt?.remoteIdentifier, "FM-91")
+    }
+
+    private static func isJiraCreateRequest(_ request: URLRequest) -> Bool {
+        request.httpMethod == "POST" && request.url?.path == "/rest/api/3/issue"
+    }
+
+    private func makeRetryFixtureIssue() -> ExtractedIssue {
+        ExtractedIssue(
+            title: "Retry fixture issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+    }
+
+    private func makeRetryFixtureSession(issue: ExtractedIssue) -> TranscriptSession {
+        TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+    }
+
+    private func makeRetryFixtureConfiguration() -> JiraExportConfiguration {
+        JiraExportConfiguration(
+            baseURL: URL(string: "https://acme.atlassian.net")!,
+            email: "you@example.com",
+            apiToken: "fixture-jira-token",
+            projectKey: "FM",
+            issueType: "Task"
+        )
+    }
 }
 
 private func makeScreenshotFileURL(named fileName: String) -> URL {

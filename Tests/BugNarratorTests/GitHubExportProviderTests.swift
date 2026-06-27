@@ -615,6 +615,234 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(succeededCalls.count, 1)
         XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "#77")
     }
+
+    func testExportRetriesTransientFailureThenSucceedsWithExactlyOneCreate() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = GitHubExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        var postCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                postCount += 1
+                if postCount == 1 {
+                    // First create attempt fails transiently (server error).
+                    let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: nil)!
+                    return (response, Data(#"{"message":"Service Unavailable"}"#.utf8))
+                }
+                // The retry create succeeds.
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"number":88,"html_url":"https://github.com/acme/bugnarrator/issues/88"}"#.utf8))
+            }
+
+            // Reconciliation search between attempts finds no existing issue, so a
+            // retry create is warranted.
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"items":[]}"#.utf8))
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.remoteIdentifier, "#88")
+        XCTAssertEqual(postCount, 2, "the transient failure should be retried exactly once")
+
+        // Exactly one issue was actually created and recorded as succeeded.
+        let succeededCalls = await receiptStore.markSucceededCalls
+        XCTAssertEqual(succeededCalls.count, 1)
+        XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "#88")
+    }
+
+    func testExportTransientFailureReconcilesCreatedIssueWithoutDuplicateCreate() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = GitHubExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        // The issue WAS created on the server, but the create response never
+        // reached us (transient transport/5xx). Reconciliation must locate it by
+        // marker and stop — never POST a duplicate.
+        let fingerprint = TrackerExportFingerprint.make(
+            destination: .github,
+            targetIdentity: configuration.targetIdentity,
+            sessionID: session.id,
+            issueID: issue.id
+        )
+        let marker = TrackerExportFingerprint.marker(for: fingerprint)
+
+        var postCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                postCount += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"message":"Service Unavailable"}"#.utf8))
+            }
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"items":[{"number":77,"title":"Created issue","body":"Tracked \#(marker)","html_url":"https://github.com/acme/bugnarrator/issues/77"}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.remoteIdentifier, "#77")
+        XCTAssertEqual(postCount, 1, "a created-but-unacked issue must not be duplicated by a retry create")
+
+        let succeededCalls = await receiptStore.markSucceededCalls
+        XCTAssertEqual(succeededCalls.count, 1)
+        XCTAssertEqual(succeededCalls.first?.remoteIdentifier, "#77")
+    }
+
+    func testExportPermanentFailureFailsWithoutRetrying() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let provider = GitHubExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: StubExportReceiptStore(),
+            retryConfiguration: .immediate
+        )
+
+        var postCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                postCount += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 422, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"message":"Validation Failed"}"#.utf8))
+            }
+
+            // Any reconciliation search finds nothing.
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"items":[]}"#.utf8))
+        }
+
+        do {
+            _ = try await provider.export(issues: [issue], session: session, configuration: configuration)
+            XCTFail("Expected a permanent failure to surface.")
+        } catch let error as AppError {
+            guard case .exportFailure(let message) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+            XCTAssertTrue(message.contains("Validation Failed"))
+            XCTAssertEqual(postCount, 1, "a permanent (non-transient) failure must not be retried")
+        }
+    }
+
+    func testExportTreatsUnreadable2xxBodyAsAmbiguousAndReconcilesWithoutDuplicate() async throws {
+        // GitHub accepted the create (2xx) but the body is unreadable. This is a
+        // created-but-unacknowledged issue: it must be reconciled by marker, never
+        // re-created, and the pending receipt must not be cleared.
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receiptStore = StubExportReceiptStore()
+        let provider = GitHubExportProvider(
+            session: makeMockURLSession(),
+            receiptStore: receiptStore,
+            retryConfiguration: .immediate
+        )
+
+        let fingerprint = TrackerExportFingerprint.make(
+            destination: .github,
+            targetIdentity: configuration.targetIdentity,
+            sessionID: session.id,
+            issueID: issue.id
+        )
+        let marker = TrackerExportFingerprint.marker(for: fingerprint)
+
+        var postCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                postCount += 1
+                // 2xx with a body we cannot decode into a GitHubIssueResponse.
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201, httpVersion: nil, headerFields: nil)!
+                return (response, Data("not json".utf8))
+            }
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = Data(
+                #"{"items":[{"number":91,"title":"Created issue","body":"Tracked \#(marker)","html_url":"https://github.com/acme/bugnarrator/issues/91"}]}"#.utf8
+            )
+            return (response, data)
+        }
+
+        let results = try await provider.export(issues: [issue], session: session, configuration: configuration)
+
+        XCTAssertEqual(results.first?.remoteIdentifier, "#91")
+        XCTAssertEqual(postCount, 1, "an unreadable 2xx body must not trigger a duplicate create")
+
+        // The pending receipt was reconciled to succeeded — not cleared.
+        let receipt = await receiptStore.receipts[fingerprint]
+        XCTAssertEqual(receipt?.state, .succeeded)
+        XCTAssertEqual(receipt?.remoteIdentifier, "#91")
+    }
+
+    func testRetryDelayHonorsRetryAfterAndOtherwiseBacksOffExponentially() {
+        // An explicit Retry-After wins over the configured backoff.
+        XCTAssertEqual(
+            TrackerExportSupport.retryDelay(attempt: 1, retryAfterSeconds: 30, base: .zero),
+            .seconds(30)
+        )
+        // Without Retry-After, the base delay doubles each attempt.
+        XCTAssertEqual(
+            TrackerExportSupport.retryDelay(attempt: 1, retryAfterSeconds: nil, base: .milliseconds(500)),
+            .milliseconds(500)
+        )
+        XCTAssertEqual(
+            TrackerExportSupport.retryDelay(attempt: 2, retryAfterSeconds: nil, base: .milliseconds(500)),
+            .milliseconds(1000)
+        )
+        XCTAssertEqual(
+            TrackerExportSupport.retryDelay(attempt: 3, retryAfterSeconds: nil, base: .milliseconds(500)),
+            .milliseconds(2000)
+        )
+    }
+
+    private func makeRetryFixtureIssue() -> ExtractedIssue {
+        ExtractedIssue(
+            title: "Retry fixture issue",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+    }
+
+    private func makeRetryFixtureSession(issue: ExtractedIssue) -> TranscriptSession {
+        TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+    }
+
+    private func makeRetryFixtureConfiguration() -> GitHubExportConfiguration {
+        GitHubExportConfiguration(
+            token: "fixture-github-token",
+            owner: "acme",
+            repository: "bugnarrator",
+            labels: []
+        )
+    }
 }
 
 private struct GitHubIssueRequestPayload: Decodable {
