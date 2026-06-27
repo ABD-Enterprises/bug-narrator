@@ -149,6 +149,34 @@ final class TranscriptStoreTests: XCTestCase {
         )
     }
 
+    func testTranscriptStoreStillSurfacesRecoveredSessionsWhenDurableRepairFails() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let backupURL = storageURL.deletingPathExtension().appendingPathExtension("backup.json")
+        let session = makeSampleTranscriptSession(index: 1)
+
+        try Data("not-json".utf8).write(to: storageURL, options: [.atomic])
+        try JSONEncoder().encode([session]).write(to: backupURL, options: [.atomic])
+
+        // Occupy the partitioned index path with a directory so the durable
+        // repair write during recovery fails. Previously this was swallowed with
+        // try?; now it is logged, but the recovered session must still be surfaced
+        // (not silently lost) for the rest of the run.
+        let indexURL = rootDirectoryURL.appendingPathComponent("sessions.index.json")
+        try FileManager.default.createDirectory(at: indexURL, withIntermediateDirectories: true)
+
+        let store = TranscriptStore(storageURL: storageURL)
+
+        XCTAssertEqual(store.libraryEntries.map(\.id), [session.id])
+        XCTAssertEqual(store.session(with: session.id), session)
+        XCTAssertEqual(
+            store.lastLoadRecoveryEvent,
+            TranscriptStoreRecoveryEvent(source: .backup, recoveredSessionCount: 1)
+        )
+    }
+
     func testTranscriptStoreReportsFailedRecoveryWhenPrimaryAndBackupAreCorrupt() throws {
         let rootDirectoryURL = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
