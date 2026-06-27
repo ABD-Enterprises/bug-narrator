@@ -146,7 +146,12 @@ actor GitHubExportProvider {
                 }
 
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    throw mapGitHubError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+                    throw mapGitHubError(
+                        statusCode: httpResponse.statusCode,
+                        data: data,
+                        configuration: configuration,
+                        retryAfterSeconds: TrackerExportSupport.retryAfterSeconds(from: httpResponse)
+                    )
                 }
 
                 let payload = try JSONDecoder().decode(GitHubIssueResponse.self, from: data)
@@ -638,16 +643,19 @@ actor GitHubExportProvider {
     private func mapGitHubError(
         statusCode: Int,
         data: Data,
-        configuration: GitHubExportConfiguration
+        configuration: GitHubExportConfiguration,
+        retryAfterSeconds: Int? = nil
     ) -> AppError {
         let message = decodeGitHubMessage(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: statusCode)
         let normalizedMessage = message.lowercased()
 
-        if statusCode == 401 || statusCode == 403 {
-            if normalizedMessage.contains("rate limit") {
-                return .exportFailure("GitHub rate limited the request. Wait a moment and try again.")
-            }
+        // A secondary rate limit returns 429 (not 401/403); map it explicitly so
+        // the user gets a "wait and retry" message rather than a token/auth error.
+        if statusCode == 429 || normalizedMessage.contains("rate limit") {
+            return .exportFailure("GitHub rate limited the request.\(TrackerExportSupport.retryAfterSuffix(retryAfterSeconds))")
+        }
 
+        if statusCode == 401 || statusCode == 403 {
             return .exportFailure("GitHub rejected the token or repository access for \(configuration.owner)/\(configuration.repository).")
         }
 

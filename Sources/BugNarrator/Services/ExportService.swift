@@ -161,6 +161,27 @@ enum TrackerExportSupport {
             "\(providerName) exported \(successfulCount) issue\(successfulCount == 1 ? "" : "s") before failing. \(error.userMessage)"
         )
     }
+
+    /// Parses the integer (delta-seconds) form of an HTTP `Retry-After` header.
+    /// The HTTP-date form is treated as absent.
+    static func retryAfterSeconds(from response: HTTPURLResponse) -> Int? {
+        guard let raw = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespaces),
+              let seconds = Int(raw),
+              seconds >= 0 else {
+            return nil
+        }
+        return seconds
+    }
+
+    /// A "wait and retry" suffix for a rate-limit message, using the Retry-After
+    /// hint when one is available.
+    static func retryAfterSuffix(_ seconds: Int?) -> String {
+        if let seconds {
+            return " Wait \(seconds)s and try again."
+        }
+        return " Wait a moment and try again."
+    }
 }
 
 actor SimilarIssueReviewService {
