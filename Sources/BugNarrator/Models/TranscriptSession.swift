@@ -162,6 +162,14 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     var transcriptQualityFindings: [TranscriptQualityFinding]
     var recoveredSourceFileName: String?
     let artifactsDirectoryPath: String?
+    /// Persisted-format version. Absent in files written before this field
+    /// existed, which decode as `legacySchemaVersion`. A future required-field
+    /// change can branch on this to migrate old sessions instead of failing to
+    /// decode and silently dropping them.
+    let schemaVersion: Int
+
+    static let currentSchemaVersion = 1
+    static let legacySchemaVersion = 1
 
     init(
         id: UUID = UUID(),
@@ -179,8 +187,10 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         transcriptQualityFindings: [TranscriptQualityFinding] = [],
         recoveredSourceFileName: String? = nil,
         updatedAt: Date? = nil,
-        artifactsDirectoryPath: String? = nil
+        artifactsDirectoryPath: String? = nil,
+        schemaVersion: Int = TranscriptSession.currentSchemaVersion
     ) {
+        self.schemaVersion = schemaVersion
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
@@ -201,6 +211,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? TranscriptSession.legacySchemaVersion
         let createdAt = try container.decode(Date.self, forKey: .createdAt)
 
         self.id = try container.decode(UUID.self, forKey: .id)
@@ -226,6 +237,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
         try container.encode(id, forKey: .id)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
@@ -261,6 +273,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         case transcriptQualityFindings
         case recoveredSourceFileName
         case artifactsDirectoryPath
+        case schemaVersion
     }
 
     var title: String {
