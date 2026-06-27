@@ -177,6 +177,52 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(issueType["name"] as? String, "Task")
     }
 
+    func testUntrustedSummaryStaysLiteralInJiraADF() async throws {
+        // Jira descriptions are built as ADF text nodes, so untrusted content is
+        // stored verbatim (no Markdown interpretation). Assert it round-trips
+        // literally rather than being parsed as markup.
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let hostile = "@channel ping #999 <script>alert(1)</script>"
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: hostile,
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        let description = try XCTUnwrap(fields["description"] as? [String: Any])
+        let descriptionData = try JSONSerialization.data(withJSONObject: description)
+        let descriptionString = try XCTUnwrap(String(data: descriptionData, encoding: .utf8))
+        // The literal hostile text is present as a JSON string value (text node).
+        XCTAssertTrue(descriptionString.contains("@channel ping"))
+        XCTAssertTrue(descriptionString.contains("alert(1)"))
+    }
+
     func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
