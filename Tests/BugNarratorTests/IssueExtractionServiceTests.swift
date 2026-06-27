@@ -315,6 +315,51 @@ final class IssueExtractionServiceTests: XCTestCase {
         XCTAssertEqual(result.summary, "Budgeted.")
     }
 
+    func testExtractIssuesNotesScreenshotsThatFailToAttach() async throws {
+        let directoryURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        // Exists and is non-empty (passes the size budget) but is an unsupported
+        // image type, so it cannot be encoded as an image part.
+        let unsupportedURL = directoryURL.appendingPathComponent("evidence.bmp")
+        try Data(repeating: 0x42, count: 64).write(to: unsupportedURL)
+        let screenshot = SessionScreenshot(elapsedTime: 5, filePath: unsupportedURL.path)
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 10),
+            transcript: "The save button is clipped.",
+            duration: 12,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            screenshots: [screenshot]
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            let body = try requestBodyData(from: request)
+            let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
+            let userContent = try XCTUnwrap(messages.last?["content"] as? [[String: Any]])
+            let textContent = userContent
+                .compactMap { $0["text"] as? String }
+                .joined(separator: "\n")
+
+            // No image attached, no dangling "Screenshot reference" line, and an
+            // explicit failed-to-attach note instead.
+            XCTAssertEqual(userContent.filter { ($0["type"] as? String) == "image_url" }.count, 0)
+            XCTAssertFalse(textContent.contains("Screenshot reference: evidence.bmp"))
+            XCTAssertTrue(textContent.contains("failed to attach"))
+
+            return (
+                self.successResponse(for: request),
+                self.makeChatCompletionData(content: #"{"summary":"ok","guidanceNote":"","issues":[]}"#)
+            )
+        }
+
+        let service = IssueExtractionService(session: makeMockURLSession())
+        _ = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+    }
+
     func testExtractIssuesTimesOutAfterConfiguredBudget() async throws {
         let session = makeReviewSession()
 
