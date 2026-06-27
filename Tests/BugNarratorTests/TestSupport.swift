@@ -594,13 +594,17 @@ final class MockPrivacyDataExporter: PrivacyDataExporting {
     private(set) var exportRequests: [ExportRequest] = []
 
     func export(
-        sessions: [TranscriptSession],
+        sessions: PrivacyDataSessionStream,
         settings: PrivacyDataExportSettingsSnapshot,
         diagnostics: PrivacyDataExportDiagnosticsSnapshot
     ) throws -> URL? {
+        // Materialize the lazy stream so existing assertions on the requested
+        // sessions keep working.
+        var materialized: [TranscriptSession] = []
+        try sessions.forEach { materialized.append($0) }
         exportRequests.append(
             ExportRequest(
-                sessions: sessions,
+                sessions: materialized,
                 settings: settings,
                 diagnostics: diagnostics
             )

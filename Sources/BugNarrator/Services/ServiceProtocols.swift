@@ -249,7 +249,7 @@ protocol DebugBundleExporting {
 @MainActor
 protocol PrivacyDataExporting {
     func export(
-        sessions: [TranscriptSession],
+        sessions: PrivacyDataSessionStream,
         settings: PrivacyDataExportSettingsSnapshot,
         diagnostics: PrivacyDataExportDiagnosticsSnapshot
     ) throws -> URL?
