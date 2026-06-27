@@ -18,7 +18,37 @@ final class FinishedRecordingPostTranscriptionResultHandlerTests: XCTestCase {
         XCTAssertEqual(harness.presentationState.status.phase, .success)
         XCTAssertEqual(harness.presentationState.status.detail, "Session saved. Transcript copied to the clipboard.")
         XCTAssertEqual(harness.revealSpy.sessionIDs, [session.id])
+        XCTAssertTrue(harness.preserveSpy.sessionIDs.isEmpty)
         XCTAssertFalse(harness.transcriptWindowSpy.didShow)
+    }
+
+    func testSuccessWithHighConfidenceQualityFindingsPreservesRecordingInsteadOfDeleting() async throws {
+        let harness = try FinishedRecordingPostTranscriptionResultHandlerHarness()
+        defer { harness.cleanup() }
+        let recordedAudio = try harness.makeRecordedAudio()
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        _ = try await harness.recordingSessionController.stopRecording()
+
+        let session = TranscriptSession(
+            id: UUID(),
+            createdAt: Date(timeIntervalSince1970: 60),
+            transcript: "same same same same",
+            duration: 60,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            transcriptQualityFindings: [
+                TranscriptQualityFinding(kind: .repeatedText, severity: .error, message: "Repeated text detected.")
+            ]
+        )
+
+        harness.handler.handle(.success(session))
+
+        // Preservation is routed and cleanup is skipped, so the recording survives.
+        XCTAssertEqual(harness.preserveSpy.sessionIDs, [session.id])
+        XCTAssertNotNil(harness.recordingSessionController.pendingRecordedAudioSnapshot)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recordedAudio.fileURL.path))
+        XCTAssertEqual(harness.presentationState.status.phase, .success)
     }
 
     func testPersistenceFailureStagesTranscriptClearsActiveRecordingAndPresentsFailure() async throws {
@@ -75,6 +105,7 @@ private final class FinishedRecordingPostTranscriptionResultHandlerHarness {
     let transcriptWindowSpy = TranscriptWindowSpy()
     let settingsWindowSpy = SettingsWindowSpy()
     let revealSpy = SavedSessionRevealSpy()
+    let preserveSpy = SavedSessionRevealSpy()
     let handler: FinishedRecordingPostTranscriptionResultHandler
 
     init(debugMode: Bool = false) throws {
@@ -144,6 +175,9 @@ private final class FinishedRecordingPostTranscriptionResultHandlerHarness {
             autoCopyTranscript: { true },
             cleanupPendingRecordedAudio: { [recordingSessionController] in
                 recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: debugMode)
+            },
+            preserveRecordedAudioForReview: { [preserveSpy] session in
+                preserveSpy.sessionIDs.append(session.id)
             },
             showSavedSessionReveal: { [revealSpy] session in
                 revealSpy.sessionIDs.append(session.id)
