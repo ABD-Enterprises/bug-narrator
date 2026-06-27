@@ -722,6 +722,22 @@ final class SettingsStore: ObservableObject {
         openAIBaseURLValue.host
     }
 
+    /// Warning when the configured Jira base URL would send Basic-auth credentials
+    /// (email + API token) over plaintext HTTP to a remote host. Loopback/private/
+    /// `.local` HTTP and remote HTTPS return nil. Reuses the host classifier from
+    /// the AI base-URL guard (#472).
+    var jiraBaseURLPlaintextWarning: String? {
+        guard let url = jiraBaseURLValue,
+              url.scheme?.lowercased() == "http",
+              let host = url.host,
+              !Self.isLocalEndpointHost(host) else {
+            return nil
+        }
+        return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
+            + "Your email and API token would be sent unencrypted. Use https:// "
+            + "unless this is a trusted local server."
+    }
+
     var preferredModelValue: String {
         Self.normalizedTranscriptionModel(preferredModel, for: aiProvider)
     }
