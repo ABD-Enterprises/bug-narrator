@@ -96,6 +96,14 @@ public sealed record WindowsAppSettings(
             ? null
             : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
 
+    /// <summary>
+    /// Non-blocking warning to surface near the base-URL field when the endpoint
+    /// would send the API key + transcript text over plaintext HTTP to a remote
+    /// host. Null for remote HTTPS and local HTTP. Mirrors the macOS app (#472).
+    /// </summary>
+    public string? AiProviderBaseUrlSecurityWarning =>
+        OpenAiCompatibleEndpoint.PlaintextRemoteWarning(AiProviderBaseUrl);
+
     public string? AiProviderCompatibilityIssue
     {
         get
