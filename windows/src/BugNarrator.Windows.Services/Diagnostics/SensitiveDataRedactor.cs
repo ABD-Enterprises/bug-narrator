@@ -24,6 +24,11 @@ internal static partial class SensitiveDataRedactor
     [GeneratedRegex(@"\bgithub_pat_[A-Za-z0-9_]{20,}\b")]
     private static partial Regex GitHubFineGrainedTokenRegex();
 
+    // Redacts the local-part of an email address (PII — e.g. the Jira account
+    // email used for Basic auth) while keeping the domain for debuggability.
+    [GeneratedRegex(@"(?i)\b[A-Za-z0-9._%+\-]+@([A-Za-z0-9.\-]+\.[A-Za-z]{2,})\b")]
+    private static partial Regex EmailRegex();
+
     public static string Redact(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -37,6 +42,7 @@ internal static partial class SensitiveDataRedactor
         redactedValue = OpenAiKeyRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubClassicTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubFineGrainedTokenRegex().Replace(redactedValue, RedactionToken);
+        redactedValue = EmailRegex().Replace(redactedValue, $"{RedactionToken}@$1");
         return redactedValue;
     }
 }
