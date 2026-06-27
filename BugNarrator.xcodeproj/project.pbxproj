@@ -24,6 +24,7 @@
 		1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */; };
 		1A4DDBF8B434316F8BA22C2E /* RetryTranscriptionStatusPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D940C14237976DFE861600CE /* RetryTranscriptionStatusPresenterTests.swift */; };
 		1D215DF2182DF192A8160F22 /* ChangelogDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E210EC5ADA6A8ED8028CDA /* ChangelogDocumentTests.swift */; };
+		1D7402D8CC37B5E8F4F71CD6 /* SettingsAudioPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C626F1B07544DE20B370D35 /* SettingsAudioPanes.swift */; };
 		1F758F881FC9E36B8EB89C18 /* IssueExtractionRequestBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */; };
 		255F6B56A8E14ED7C80DB0FA /* ScreenshotsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D050A90CD83BD3C04D0487 /* ScreenshotsSection.swift */; };
 		280973289AE78D9919ECD80C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5346EDB503C6B05C81C368 /* KeychainService.swift */; };
@@ -348,6 +349,7 @@
 		98A652F7AA9829954147C9A1 /* HotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerTests.swift; sourceTree = "<group>"; };
 		99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderSettingsController.swift; sourceTree = "<group>"; };
 		9AFA7A7FD4F1B6ACB5E3D70F /* AsyncTimeoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncTimeoutTests.swift; sourceTree = "<group>"; };
+		9C626F1B07544DE20B370D35 /* SettingsAudioPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAudioPanes.swift; sourceTree = "<group>"; };
 		9D2B31107CC14CDD9E0898ED /* MenuBarStatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusPresentation.swift; sourceTree = "<group>"; };
 		9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIErrorMapperTests.swift; sourceTree = "<group>"; };
 		9E5530F00F9B6ABE2F8E52B8 /* SessionArtifactsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionArtifactsService.swift; sourceTree = "<group>"; };
@@ -432,6 +434,7 @@
 		05B6FECAF7F08D43DE50EBA0 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				9C626F1B07544DE20B370D35 /* SettingsAudioPanes.swift */,
 				D58A3885853863EE9118FC63 /* SettingsDiagnosticsPrivacyPane.swift */,
 				8D4748B8137EC364C1FD89B9 /* SettingsViewComponents.swift */,
 			);
@@ -1046,6 +1049,7 @@
 				CEDAB8D8BF65455F21123B22 /* SessionLibraryController.swift in Sources */,
 				6DDE29389B4D58A9BD6CD115 /* SessionMarker.swift in Sources */,
 				99268A7BF811CD29DB330195 /* SessionScreenshot.swift in Sources */,
+				1D7402D8CC37B5E8F4F71CD6 /* SettingsAudioPanes.swift in Sources */,
 				3546CF9BD922CF576E96F1C5 /* SettingsDiagnosticsPrivacyPane.swift in Sources */,
 				DFEC8A8B12366B1CC1ECF429 /* SettingsStore.swift in Sources */,
 				134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */,
