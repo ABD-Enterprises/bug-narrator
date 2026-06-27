@@ -681,6 +681,7 @@ final class MockScreenCapturePermissionAccess: ScreenCapturePermissionAccessing 
 final class MockKeychainService: KeychainServicing {
     var values: [String: String] = [:]
     var setError: Error?
+    var deleteError: Error?
     var interactionRequiredKeys: Set<String> = []
     private(set) var readRequests: [(service: String, account: String, allowInteraction: Bool)] = []
 
@@ -704,6 +705,9 @@ final class MockKeychainService: KeychainServicing {
     }
 
     func deleteValue(service: String, account: String) throws {
+        if let deleteError {
+            throw deleteError
+        }
         values.removeValue(forKey: key(forService: service, account: account))
     }
 
