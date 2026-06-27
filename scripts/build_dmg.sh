@@ -16,6 +16,9 @@ DEFAULT_DEVELOPMENT_TEAM="2R4WAH4R53"
 DEFAULT_NOTARY_PROFILE="BugNarratorNotary"
 CANONICAL_NOTARY_APPLE_ID="abdeffenderfer@icloud.com"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
+# The Team ID a Developer ID-signed build MUST carry. Defaults to the canonical
+# BugNarrator team; override only to intentionally sign under a different team.
+EXPECTED_SIGNING_TEAM="${EXPECTED_SIGNING_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:-}"
 ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
@@ -316,10 +319,26 @@ if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
 
     CODESIGN_DETAILS="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
     SIGNING_AUTHORITY="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^Authority=/{print $2; exit}')"
+    SIGNING_TEAM="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^TeamIdentifier=/{print $2; exit}')"
 
     if [[ -z "$SIGNING_AUTHORITY" ]]; then
         echo "error: expected a signed app build, but could not determine the signing authority" >&2
         exit 1
+    fi
+
+    # A Developer ID signature proves "signed by *some* Apple developer", not
+    # "signed by us". Pin the Team ID so a stray/foreign Developer ID certificate
+    # in the keychain cannot silently ship a release under the wrong identity.
+    if [[ "$SIGNING_AUTHORITY" == Developer\ ID\ Application:* ]]; then
+        if [[ -z "$SIGNING_TEAM" ]]; then
+            echo "error: could not determine the signing TeamIdentifier for a Developer ID build" >&2
+            exit 1
+        fi
+        if [[ "$SIGNING_TEAM" != "$EXPECTED_SIGNING_TEAM" ]]; then
+            echo "error: app is signed by team '$SIGNING_TEAM' ($SIGNING_AUTHORITY), but the approved canonical team is '$EXPECTED_SIGNING_TEAM'. Set EXPECTED_SIGNING_TEAM to sign under a different team intentionally." >&2
+            exit 1
+        fi
+        echo "Verified Developer ID signing team: $SIGNING_TEAM ($SIGNING_AUTHORITY)"
     fi
 
     if [[ "$NOTARIZE" == "YES" && "$SIGNING_AUTHORITY" != Developer\ ID\ Application:* ]]; then
