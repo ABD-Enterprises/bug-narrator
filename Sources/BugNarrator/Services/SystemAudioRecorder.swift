@@ -513,6 +513,10 @@ private final class SystemAudioTapSession {
     }
 }
 
+// Thread-safety invariant: every access to the mutable state (`file`,
+// `writeError`, `formatInvalidated`) is serialized through `lock`, so this type
+// is safe to share across the CoreAudio callback thread and the recording actor
+// despite `AVAudioFile` not being Sendable. Hence the `@unchecked` is sound.
 final class SystemAudioFileWriter: @unchecked Sendable {
     private let lock = NSLock()
     private let format: AVAudioFormat

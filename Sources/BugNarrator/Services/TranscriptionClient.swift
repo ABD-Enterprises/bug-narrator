@@ -734,6 +734,11 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
     private static let chunkExportTimeoutMultiplier: Double = 3
 }
 
+// Thread-safety invariant: a bridge instance wraps one AVAssetExportSession used
+// by exactly one `exportChunk` call. The session is fully configured before
+// `exportAsynchronously` starts; thereafter the only concurrent touch is
+// `cancelExport()` from the timeout task, which Apple documents as safe to call
+// while an export is in flight. No other aliasing exists, so `@unchecked` holds.
 private final class AssetExportSessionBridge: @unchecked Sendable {
     let session: AVAssetExportSession
 
