@@ -171,6 +171,29 @@ final class TranscriptStore: ObservableObject {
         libraryEntries.compactMap { session(with: $0.id) }
     }
 
+    /// Streams every stored session for export, loading each body lazily and
+    /// WITHOUT populating the in-memory cache, so peak memory stays bounded by a
+    /// single session rather than the whole library (#508). Already-cached
+    /// sessions are reused as-is; uncached ones are read from disk, handed to
+    /// `body`, and released. Sessions whose body can no longer be decoded are
+    /// skipped, matching `allStoredSessions()`.
+    func forEachStoredSessionForExport(_ body: (TranscriptSession) throws -> Void) rethrows {
+        for entry in libraryEntries {
+            let session = sessionLookup[entry.id] ?? loadSessionFile(with: entry.id)
+            if let session {
+                try body(session)
+            }
+        }
+    }
+
+    /// A lazy export source over the stored sessions; see
+    /// `forEachStoredSessionForExport`.
+    func privacyExportSessionStream() -> PrivacyDataSessionStream {
+        PrivacyDataSessionStream(count: libraryEntries.count) { body in
+            try self.forEachStoredSessionForExport(body)
+        }
+    }
+
     private func load() {
         if let state = loadPartitionedState(from: indexURL) {
             replaceState(with: state.entries, loadedSessions: state.loadedSessions)

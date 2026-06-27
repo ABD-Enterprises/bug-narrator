@@ -222,7 +222,7 @@ final class SupportDataController {
         let diagnostics = await makePrivacyDataExportDiagnosticsSnapshot(
             exportHistoryFallback: exportHistoryFallback
         )
-        let sessions = transcriptStore.allStoredSessions()
+        let sessions = transcriptStore.privacyExportSessionStream()
 
         guard let bundleURL = try privacyDataExporter.export(
             sessions: sessions,
