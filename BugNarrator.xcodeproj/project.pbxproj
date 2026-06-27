@@ -24,6 +24,7 @@
 		1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */; };
 		1A4DDBF8B434316F8BA22C2E /* RetryTranscriptionStatusPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D940C14237976DFE861600CE /* RetryTranscriptionStatusPresenterTests.swift */; };
 		1D215DF2182DF192A8160F22 /* ChangelogDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E210EC5ADA6A8ED8028CDA /* ChangelogDocumentTests.swift */; };
+		1F758F881FC9E36B8EB89C18 /* IssueExtractionRequestBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */; };
 		255F6B56A8E14ED7C80DB0FA /* ScreenshotsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D050A90CD83BD3C04D0487 /* ScreenshotsSection.swift */; };
 		280973289AE78D9919ECD80C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5346EDB503C6B05C81C368 /* KeychainService.swift */; };
 		28FFF0FBF53923BC686FF79D /* ScreenshotAnnotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */; };
@@ -106,6 +107,7 @@
 		7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */; };
 		7FC6E70710547A486C4ED5BA /* AboutBugNarratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59B0A4E5E69C1FD99320DDB2 /* AboutBugNarratorView.swift */; };
 		806F6B3953A77B84672AD2DA /* AppRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64113E8532E84371F91096AF /* AppRuntimeEnvironmentTests.swift */; };
+		8124F6AEFE87F470DE1D3B56 /* IssueExtractionRequestBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBC77AC70873AF0E20A29D8 /* IssueExtractionRequestBuilderTests.swift */; };
 		821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2B31107CC14CDD9E0898ED /* MenuBarStatusPresentation.swift */; };
 		82C0E2BE74D268CA44EEA500 /* IssueScreenshotAnnotationPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */; };
 		8419388E08492DBAC01BEEE8 /* SingleInstanceControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */; };
@@ -329,6 +331,7 @@
 		88E210EC5ADA6A8ED8028CDA /* ChangelogDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangelogDocumentTests.swift; sourceTree = "<group>"; };
 		8A59E3782D54041B521412C9 /* AudioUploadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioUploadPolicy.swift; sourceTree = "<group>"; };
 		8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotAnnotationTests.swift; sourceTree = "<group>"; };
+		8DBC77AC70873AF0E20A29D8 /* IssueExtractionRequestBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionRequestBuilderTests.swift; sourceTree = "<group>"; };
 		8E2A6DBFC267AEED543EC2DB /* TranscriptQualityInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspectorTests.swift; sourceTree = "<group>"; };
 		90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuProductInfoView.swift; sourceTree = "<group>"; };
 		90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
@@ -392,6 +395,7 @@
 		E500A980171E57FE562FBB7C /* TranscriptSessionSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSessionSchemaTests.swift; sourceTree = "<group>"; };
 		E59F6509D79E57A86ED795CA /* SessionLibraryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryControllerTests.swift; sourceTree = "<group>"; };
 		E75E9A5FCC6C1D45D20E8F80 /* IssueExportControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportControllerTests.swift; sourceTree = "<group>"; };
+		E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionRequestBuilder.swift; sourceTree = "<group>"; };
 		E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCoordinator.swift; sourceTree = "<group>"; };
 		EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionService.swift; sourceTree = "<group>"; };
 		EC896693FCB08C685103A65B /* TranscriptQualityFindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityFindingTests.swift; sourceTree = "<group>"; };
@@ -455,6 +459,7 @@
 				FCF1EE5E9EEE1A5D22F7A647 /* HotkeyShortcutTests.swift */,
 				E75E9A5FCC6C1D45D20E8F80 /* IssueExportControllerTests.swift */,
 				4DFCA03B8104C84F3B6BFDF1 /* IssueExtractionControllerTests.swift */,
+				8DBC77AC70873AF0E20A29D8 /* IssueExtractionRequestBuilderTests.swift */,
 				33C72E7D77CE5A2F8560651F /* IssueExtractionServiceTests.swift */,
 				DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */,
 				B0D1F9ADC8F56876FCB33162 /* KeychainServiceTests.swift */,
@@ -611,6 +616,7 @@
 				BA49B2B79731E3A62B083174 /* IssueExportController.swift */,
 				46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */,
 				D0FD7C5D1FD4184BCC0CC331 /* IssueExtractionController.swift */,
+				E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */,
 				BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */,
 				F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */,
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
@@ -861,6 +867,7 @@
 				DA186645807A441A35F08A44 /* HotkeyShortcutTests.swift in Sources */,
 				09B048166CEEFA50BD278F7D /* IssueExportControllerTests.swift in Sources */,
 				58E53F2092F34D45456CE5DF /* IssueExtractionControllerTests.swift in Sources */,
+				8124F6AEFE87F470DE1D3B56 /* IssueExtractionRequestBuilderTests.swift in Sources */,
 				F8BF8DC6CA90989293D790EF /* IssueExtractionServiceTests.swift in Sources */,
 				57C3B6C3C646F1588CF4E45C /* JiraExportProviderTests.swift in Sources */,
 				6F4442D6646F20C3D3536F67 /* KeychainServiceTests.swift in Sources */,
@@ -969,6 +976,7 @@
 				5AC3F76F7DCE14EA3E8D8303 /* IssueExportController.swift in Sources */,
 				474B8B38A576590B2AB08D3F /* IssueExportReviewPolicy.swift in Sources */,
 				EB5DAB7367CC0E4D69D936B6 /* IssueExtractionController.swift in Sources */,
+				1F758F881FC9E36B8EB89C18 /* IssueExtractionRequestBuilder.swift in Sources */,
 				E3A4A5182E639F1AE4F7A773 /* IssueExtractionService.swift in Sources */,
 				82C0E2BE74D268CA44EEA500 /* IssueScreenshotAnnotationPreview.swift in Sources */,
 				A82C126F44F43B42D82EA0DF /* IssueScreenshotAnnotationRenderer.swift in Sources */,
