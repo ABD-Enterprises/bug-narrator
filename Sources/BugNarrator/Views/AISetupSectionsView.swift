@@ -80,6 +80,19 @@ struct AISetupSectionsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
+                if let warning = settingsStore.aiBaseURLPlaintextWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Insecure endpoint warning")
+                } else if let host = settingsStore.effectiveAIBaseURLHost {
+                    Text("Requests go to: \(host)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Requests go to \(host)")
+                }
+
                 HStack(spacing: 12) {
                     Text(settingsStore.maskedSelectedAIProviderCredential)
                         .font(.subheadline.monospaced())

@@ -370,6 +370,32 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testBaseURLWarnsOnlyForPlaintextRemoteHost() {
+        // Remote HTTPS and local HTTP must not warn (supported workflows).
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "https://api.example.com/v1"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://localhost:1234/v1"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://127.0.0.1:8422"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://192.168.1.50:1234"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://10.0.0.5:8080"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
+        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: ""))
+
+        // Plaintext HTTP to a public host must warn.
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://api.example.com/v1"))
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://203.0.113.10:8080"))
+    }
+
+    func testIsLocalEndpointHostClassification() {
+        for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
+                      "192.168.0.1", "169.254.1.1", "myserver.local", "lmstudio", "::1"] {
+            XCTAssertTrue(SettingsStore.isLocalEndpointHost(local), "expected \(local) to be local")
+        }
+        for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com"] {
+            XCTAssertFalse(SettingsStore.isLocalEndpointHost(remote), "expected \(remote) to be remote")
+        }
+    }
+
     func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {
         let suiteName = "BugNarrator-TranscriptionRequestSettingsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
