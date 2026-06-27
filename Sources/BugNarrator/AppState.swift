@@ -368,6 +368,39 @@ final class AppState: ObservableObject {
             cleanupPendingRecordedAudio: {
                 recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
             },
+            preserveRecordedAudioForReview: { session in
+                // A low-quality transcript "succeeded" but is likely unusable;
+                // preserve the recording into the session assets dir so it can be
+                // re-transcribed. Only remove the pending temp after preservation
+                // succeeds; on failure keep it so the recording is never lost (#466).
+                guard let artifactsDirectoryURL = session.artifactsDirectoryURL,
+                      let recordedAudio = recordingSessionController.pendingRecordedAudioSnapshot else {
+                    return
+                }
+
+                let logger = DiagnosticsLogger(category: .transcription)
+                do {
+                    let preservedURL = try artifactsService.preserveRecordedAudio(
+                        recordedAudio,
+                        in: artifactsDirectoryURL
+                    )
+                    recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
+                    logger.info(
+                        "low_quality_recording_preserved",
+                        "Preserved the recording for a low-quality transcript so it can be re-transcribed.",
+                        metadata: [
+                            "session_id": session.id.uuidString,
+                            "file_name": preservedURL.lastPathComponent
+                        ]
+                    )
+                } catch {
+                    logger.error(
+                        "low_quality_recording_preserve_failed",
+                        (error as? AppError)?.userMessage ?? error.localizedDescription,
+                        metadata: ["session_id": session.id.uuidString]
+                    )
+                }
+            },
             showSavedSessionReveal: { session in
                 guard let artifactsDirectoryURL = session.artifactsDirectoryURL else {
                     return

@@ -312,6 +312,23 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         !Self.normalizedTranscriptBody(from: transcript).isEmpty
     }
 
+    /// High-confidence transcript quality problems (repeated or boilerplate text)
+    /// that indicate the transcript is likely unusable even though transcription
+    /// "succeeded". When present, the original recording must be preserved so the
+    /// user can re-transcribe instead of silently losing the audio (#466). Minor
+    /// warnings (short transcript, abrupt ending, unexpected script) do not
+    /// warrant retaining the full recording.
+    var hasHighConfidenceQualityFindings: Bool {
+        transcriptQualityFindings.contains { finding in
+            switch finding.kind {
+            case .repeatedText, .boilerplateText:
+                return true
+            case .unexpectedLanguageScript, .abruptEnding, .shortTranscript:
+                return false
+            }
+        }
+    }
+
     func transcriptionRecoveryMessage(for provider: AIProvider) -> String? {
         transcriptionRetryMessage(for: provider)
     }

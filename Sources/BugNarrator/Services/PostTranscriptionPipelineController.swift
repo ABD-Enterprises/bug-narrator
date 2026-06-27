@@ -144,6 +144,7 @@ final class FinishedRecordingPostTranscriptionResultHandler {
     private let postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter
     private let autoCopyTranscript: () -> Bool
     private let cleanupPendingRecordedAudio: () -> Void
+    private let preserveRecordedAudioForReview: (TranscriptSession) -> Void
     private let showSavedSessionReveal: (TranscriptSession) -> Void
 
     init(
@@ -154,6 +155,7 @@ final class FinishedRecordingPostTranscriptionResultHandler {
         postTranscriptionFailurePresenter: PostTranscriptionFailurePresenter,
         autoCopyTranscript: @escaping () -> Bool,
         cleanupPendingRecordedAudio: @escaping () -> Void,
+        preserveRecordedAudioForReview: @escaping (TranscriptSession) -> Void = { _ in },
         showSavedSessionReveal: @escaping (TranscriptSession) -> Void = { _ in }
     ) {
         self.sessionLibrary = sessionLibrary
@@ -163,13 +165,21 @@ final class FinishedRecordingPostTranscriptionResultHandler {
         self.postTranscriptionFailurePresenter = postTranscriptionFailurePresenter
         self.autoCopyTranscript = autoCopyTranscript
         self.cleanupPendingRecordedAudio = cleanupPendingRecordedAudio
+        self.preserveRecordedAudioForReview = preserveRecordedAudioForReview
         self.showSavedSessionReveal = showSavedSessionReveal
     }
 
     func handle(_ result: PostTranscriptionPipelineResult) {
         switch result {
         case .success(let session):
-            cleanupPendingRecordedAudio()
+            // A "successful" transcript with high-confidence quality findings is
+            // likely unusable; preserve the recording for re-transcription instead
+            // of deleting it (#466).
+            if session.hasHighConfidenceQualityFindings {
+                preserveRecordedAudioForReview(session)
+            } else {
+                cleanupPendingRecordedAudio()
+            }
             recordingSessionController.endActivity()
             statusPresenter.presentSuccess()
             showSavedSessionReveal(session)
@@ -231,8 +241,12 @@ final class RetryPostTranscriptionResultHandler {
         context: PendingTranscriptionRetryContext
     ) {
         switch result {
-        case .success:
-            cleanupPreservedRetryAudio(for: context)
+        case .success(let session):
+            // If the retried transcript is still low-quality, keep the preserved
+            // recording (already in the session assets dir) for another retry (#466).
+            if !session.hasHighConfidenceQualityFindings {
+                cleanupPreservedRetryAudio(for: context)
+            }
             transcriptionRecovery.finishRetry()
             statusPresenter.presentTranscriptWindow()
             recordingSessionController.endActivity()

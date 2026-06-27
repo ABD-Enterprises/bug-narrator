@@ -19,6 +19,34 @@ final class RetryPostTranscriptionResultHandlerTests: XCTestCase {
         XCTAssertEqual(harness.presentationState.status.detail, "Session saved. Transcript copied to the clipboard.")
     }
 
+    func testSuccessKeepsPreservedAudioWhenRetriedTranscriptStillHasQualityFindings() throws {
+        let harness = try RetryPostTranscriptionResultHandlerHarness()
+        defer { harness.cleanup() }
+        let context = try harness.makeRetryContext(index: 5)
+
+        XCTAssertTrue(harness.transcriptionRecovery.beginRetry(for: context.session.id))
+
+        let lowQualitySession = TranscriptSession(
+            id: context.session.id,
+            createdAt: context.session.createdAt,
+            transcript: "same same same same",
+            duration: 4,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            transcriptQualityFindings: [
+                TranscriptQualityFinding(kind: .boilerplateText, severity: .error, message: "Boilerplate text detected.")
+            ]
+        )
+
+        harness.handler.handle(.success(lowQualitySession), context: context)
+
+        XCTAssertNil(harness.transcriptionRecovery.retryingSessionID)
+        // The preserved recording is kept so the user can retry transcription again.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: context.audioFileURL.path))
+        XCTAssertEqual(harness.presentationState.status.phase, .success)
+    }
+
     func testSuccessKeepsPreservedAudioWhenDebugModeIsEnabled() throws {
         let harness = try RetryPostTranscriptionResultHandlerHarness(debugMode: true)
         defer { harness.cleanup() }
