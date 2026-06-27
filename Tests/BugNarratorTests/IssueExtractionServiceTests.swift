@@ -318,8 +318,13 @@ final class IssueExtractionServiceTests: XCTestCase {
     func testExtractIssuesTimesOutAfterConfiguredBudget() async throws {
         let session = makeReviewSession()
 
+        // Block the request until the test releases it, so the configured timeout
+        // is guaranteed to win the race. This removes the flaky dependency on a
+        // real Thread.sleep being longer than the timeout under CI load.
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
         MockURLProtocol.requestHandler = { request in
-            Thread.sleep(forTimeInterval: 0.3)
+            release.wait()
             return (self.successResponse(for: request), self.makeChatCompletionData(content: #"{"summary":"","guidanceNote":"","issues":[]}"#))
         }
 
