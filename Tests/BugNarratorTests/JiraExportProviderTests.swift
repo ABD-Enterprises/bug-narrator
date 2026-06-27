@@ -223,6 +223,46 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(descriptionString.contains("alert(1)"))
     }
 
+    func testFindOpenIssuesMapsRateLimitToDistinctMessage() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout never enabled.",
+            timestamp: nil
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: ["Retry-After": "12"]
+            )!
+            return (response, Data(#"{"errorMessages":["Rate limit exceeded"]}"#.utf8))
+        }
+
+        do {
+            _ = try await provider.findOpenIssues(
+                matching: issue,
+                configuration: JiraExportConfiguration(
+                    baseURL: URL(string: "https://acme.atlassian.net")!,
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    projectKey: "FM",
+                    issueType: "Task"
+                )
+            )
+            XCTFail("Expected a rate-limit error")
+        } catch let error as AppError {
+            // The search path maps 429 to a distinct rate-limit message; Retry-After
+            // threading is exercised on the export path + the helper unit test.
+            XCTAssertTrue(error.userMessage.lowercased().contains("rate limited"), error.userMessage)
+            XCTAssertFalse(error.userMessage.lowercased().contains("rejected the credentials"), error.userMessage)
+        }
+    }
+
     func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(

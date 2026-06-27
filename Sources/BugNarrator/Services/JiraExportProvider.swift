@@ -82,7 +82,12 @@ actor JiraExportProvider {
                 }
 
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    throw mapJiraError(statusCode: httpResponse.statusCode, data: data, configuration: configuration)
+                    throw mapJiraError(
+                        statusCode: httpResponse.statusCode,
+                        data: data,
+                        configuration: configuration,
+                        retryAfterSeconds: TrackerExportSupport.retryAfterSeconds(from: httpResponse)
+                    )
                 }
 
                 let payload = try JSONDecoder().decode(JiraIssueResponse.self, from: data)
@@ -902,16 +907,18 @@ actor JiraExportProvider {
     private func mapJiraError(
         statusCode: Int,
         data: Data,
-        configuration: JiraExportConfiguration
+        configuration: JiraExportConfiguration,
+        retryAfterSeconds: Int? = nil
     ) -> AppError {
         let message = decodeJiraMessage(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: statusCode)
         let normalizedMessage = message.lowercased()
 
-        if statusCode == 401 || statusCode == 403 {
-            if normalizedMessage.contains("rate limit") {
-                return .exportFailure("Jira rate limited the request. Wait a moment and try again.")
-            }
+        // 429 is a rate limit, not an auth failure; map it explicitly.
+        if statusCode == 429 || normalizedMessage.contains("rate limit") {
+            return .exportFailure("Jira rate limited the request.\(TrackerExportSupport.retryAfterSuffix(retryAfterSeconds))")
+        }
 
+        if statusCode == 401 || statusCode == 403 {
             return .exportFailure("Jira rejected the credentials for project \(configuration.projectKey).")
         }
 
