@@ -114,10 +114,10 @@ public sealed class GitHubExportProvider
         var lines = new List<string>
         {
             "## Summary",
-            issue.Summary,
+            UntrustedMarkdown.Neutralize(issue.Summary),
             string.Empty,
             "## Evidence",
-            issue.EvidenceExcerpt,
+            UntrustedMarkdown.Neutralize(issue.EvidenceExcerpt),
             string.Empty,
         };
 
@@ -128,7 +128,7 @@ public sealed class GitHubExportProvider
 
         if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
         {
-            lines.Add($"- Transcript section: {issue.SectionTitle}");
+            lines.Add($"- Transcript section: {UntrustedMarkdown.Neutralize(issue.SectionTitle)}");
         }
 
         if (issue.ConfidenceLabel is not null)
@@ -143,7 +143,7 @@ public sealed class GitHubExportProvider
 
         if (!string.IsNullOrWhiteSpace(issue.Note))
         {
-            lines.Add($"- Note: {issue.Note}");
+            lines.Add($"- Note: {UntrustedMarkdown.Neutralize(issue.Note)}");
         }
 
         var screenshots = session.Screenshots
