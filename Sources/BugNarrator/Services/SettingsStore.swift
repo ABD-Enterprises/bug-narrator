@@ -1510,16 +1510,61 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    /// Best-effort removal of a secret from a slot's legacy service names.
+    /// Missing items are not an error (KeychainService treats not-found as
+    /// success); a genuine failure is logged but does not block the primary
+    /// operation, since the canonical service-name delete is what matters.
+    private func deleteLegacySecrets(for slot: SecretSlot) {
+        for service in slot.legacyServices {
+            do {
+                try keychainService.deleteValue(service: service, account: slot.account)
+            } catch {
+                logger.warning(
+                    "secret_legacy_clear_failed",
+                    "A legacy secure value could not be removed from Keychain.",
+                    metadata: [
+                        "slot": slot.redactionSafeName,
+                        "error": Self.redactedKeychainErrorDetail(error)
+                    ]
+                )
+            }
+        }
+    }
+
+    /// Renders a Keychain error for diagnostics without including any secret
+    /// material (only the error type / OSStatus code).
+    private static func redactedKeychainErrorDetail(_ error: Error) -> String {
+        if case KeychainError.unhandledStatus(let status) = error {
+            return "osstatus_\(status)"
+        }
+        return String(describing: type(of: error))
+    }
+
     @discardableResult
     private func persistSecret(_ value: String, for slot: SecretSlot) -> APIKeyPersistenceState {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmedValue.isEmpty {
-            try? keychainService.deleteValue(service: slot.service, account: slot.account)
-            slot.legacyServices.forEach { service in
-                try? keychainService.deleteValue(service: service, account: slot.account)
-            }
             sessionOnlySecrets.removeValue(forKey: slot)
+            do {
+                try keychainService.deleteValue(service: slot.service, account: slot.account)
+            } catch {
+                // KeychainService maps "item not found" to success, so any thrown
+                // error means the secret is still resident. Surface it instead of
+                // reporting the credential as cleared — otherwise the UI/state
+                // would diverge from what is actually in the Keychain.
+                logger.warning(
+                    "secret_clear_failed",
+                    "A secure value could not be removed from Keychain.",
+                    metadata: [
+                        "slot": slot.redactionSafeName,
+                        "error": Self.redactedKeychainErrorDetail(error)
+                    ]
+                )
+                committedSecretStates[slot] = .keychain
+                return .keychain
+            }
+            deleteLegacySecrets(for: slot)
             logger.info(
                 "secret_cleared",
                 "A secure value was cleared from persistent storage.",
@@ -1535,9 +1580,7 @@ final class SettingsStore: ObservableObject {
 
         do {
             try keychainService.setString(trimmedValue, service: slot.service, account: slot.account)
-            slot.legacyServices.forEach { service in
-                try? keychainService.deleteValue(service: service, account: slot.account)
-            }
+            deleteLegacySecrets(for: slot)
             sessionOnlySecrets.removeValue(forKey: slot)
             logger.info(
                 "secret_persisted",
