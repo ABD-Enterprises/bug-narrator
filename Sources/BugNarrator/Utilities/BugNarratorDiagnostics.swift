@@ -142,14 +142,18 @@ actor DiagnosticsLogStore {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let storageURL: URL
+    private let flushInterval: Duration
     private var entries: [DiagnosticsLogEntry]
+    private var isDirty = false
+    private var pendingFlushTask: Task<Void, Never>?
 
-    init(fileManager: FileManager = .default, storageURL: URL? = nil) {
+    init(fileManager: FileManager = .default, storageURL: URL? = nil, flushInterval: Duration = .seconds(1)) {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
         self.fileManager = fileManager
         self.encoder = encoder
         self.decoder = decoder
+        self.flushInterval = flushInterval
         self.storageURL = storageURL ?? Self.defaultStorageURL(fileManager: fileManager)
         self.entries = Self.loadEntries(
             from: self.storageURL,
@@ -163,6 +167,45 @@ actor DiagnosticsLogStore {
         if entries.count > StoragePolicy.maximumStoredEntries {
             entries.removeFirst(entries.count - StoragePolicy.maximumStoredEntries)
         }
+        // Coalesce writes: rewriting the whole (up to 500-entry) file on every log
+        // line is wasteful under bursty logging. Mark dirty and persist on a
+        // debounce; flush() forces an immediate write for shutdown/export.
+        isDirty = true
+        scheduleFlush()
+    }
+
+    /// Persists immediately if there are unwritten entries. Call on app
+    /// background/terminate so recent logs survive a quit between debounce ticks.
+    func flush() {
+        pendingFlushTask?.cancel()
+        pendingFlushTask = nil
+        if isDirty {
+            isDirty = false
+            persist()
+        }
+    }
+
+    private func scheduleFlush() {
+        guard pendingFlushTask == nil else {
+            return
+        }
+        pendingFlushTask = Task { [weak self, flushInterval] in
+            try? await Task.sleep(for: flushInterval)
+            // If flush()/clear() cancelled this task, do not run: a stale task
+            // could otherwise clobber a newer pending task scheduled meanwhile.
+            if Task.isCancelled {
+                return
+            }
+            await self?.flushPending()
+        }
+    }
+
+    private func flushPending() {
+        pendingFlushTask = nil
+        guard isDirty else {
+            return
+        }
+        isDirty = false
         persist()
     }
 
@@ -180,6 +223,9 @@ actor DiagnosticsLogStore {
     }
 
     func clear() {
+        pendingFlushTask?.cancel()
+        pendingFlushTask = nil
+        isDirty = false
         entries = []
         try? fileManager.removeItem(at: storageURL)
     }

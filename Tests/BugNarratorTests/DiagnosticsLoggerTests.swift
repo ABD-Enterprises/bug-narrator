@@ -55,6 +55,31 @@ final class DiagnosticsLoggerTests: XCTestCase {
         BugNarratorDiagnostics.setDebugModeEnabled(false)
     }
 
+    func testRecordDebouncesPersistenceUntilFlush() async throws {
+        let storageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DiagnosticsDebounce-\(UUID().uuidString)")
+            .appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: storageURL) }
+
+        // A long interval so the debounce timer never fires during the test: only
+        // flush() should write, proving record() no longer persists per entry.
+        let store = DiagnosticsLogStore(storageURL: storageURL, flushInterval: .seconds(1000))
+
+        await store.record(DiagnosticsLogEntry(level: .info, category: .settings, event: "a", message: "m"))
+        await store.record(DiagnosticsLogEntry(level: .info, category: .settings, event: "b", message: "m"))
+
+        // Two records produced zero writes (debounced) — the file does not exist yet.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storageURL.path))
+
+        await store.flush()
+
+        // flush() persisted the latest entries durably.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storageURL.path))
+        let reloaded = DiagnosticsLogStore(storageURL: storageURL, flushInterval: .seconds(1000))
+        let events = await reloaded.recentEntries().map(\.event)
+        XCTAssertEqual(events, ["a", "b"])
+    }
+
     func testDebugLogsAreSuppressedUnlessDebugModeIsEnabled() async {
         let storageURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("DiagnosticsLoggerTests-\(UUID().uuidString)")

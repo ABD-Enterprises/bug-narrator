@@ -603,6 +603,8 @@ final class AppState: ObservableObject {
                 self?.refreshPermissionRecoveryState()
             },
             willTerminate: {
+                // Best-effort: flush any debounced diagnostics before quitting.
+                Task { await BugNarratorDiagnostics.store.flush() }
                 applicationTerminationController.prepareForApplicationTermination()
             }
         )
