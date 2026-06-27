@@ -192,7 +192,7 @@ final class JiraExportProviderTests: XCTestCase {
             XCTAssertEqual(request.url?.absoluteString, "https://acme.atlassian.net/rest/api/3/search/jql")
             let body = try requestBodyData(from: request)
             let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-            XCTAssertTrue((payload["jql"] as? String)?.contains("project = FM") == true)
+            XCTAssertTrue((payload["jql"] as? String)?.contains(#"project = "FM""#) == true)
             XCTAssertEqual(payload["maxResults"] as? Int, 5)
 
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
@@ -216,6 +216,45 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(matches.count, 1)
         XCTAssertEqual(matches.first?.remoteIdentifier, "FM-142")
         XCTAssertEqual(matches.first?.title, "Existing modal close affordance issue")
+    }
+
+    func testFindOpenIssuesKeepsJQLScopeWhenTermsAndProjectKeyAreHostile() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        // Reserved words in the title (which the shared tokenizer now drops) and a
+        // malformed project key that, unquoted, would break out of the JQL.
+        let issue = ExtractedIssue(
+            title: #"checkout AND NOT broken ORDER"#,
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout never enabled.",
+            timestamp: nil
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            let body = try requestBodyData(from: request)
+            let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let jql = try XCTUnwrap(payload["jql"] as? String)
+
+            // Project key is quoted/escaped, so an injected operator stays inert.
+            XCTAssertTrue(jql.hasPrefix(#"project = "FM\" OR project = ZZ""#))
+            // The reserved words from the title do not survive as bare match terms.
+            XCTAssertFalse(jql.contains("checkout AND NOT"))
+            XCTAssertTrue(jql.contains("checkout broken"))
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"issues":[]}"#.utf8))
+        }
+
+        _ = try await provider.findOpenIssues(
+            matching: issue,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: #"FM" OR project = ZZ"#,
+                issueType: "Task"
+            )
+        )
     }
 
     func testValidateConfigurationChecksProjectAndIssueType() async throws {
