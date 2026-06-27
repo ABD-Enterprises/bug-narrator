@@ -14,6 +14,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  actions: read
 
 jobs:
   detect-ci-changes:
@@ -100,6 +101,48 @@ jobs:
       - name: Build docs site
         run: npm run build --prefix site
 
+  # Makes an offline self-hosted macOS runner VISIBLE instead of letting the
+  # required macos-build-and-test job sit queued indefinitely (which reads as a
+  # perpetual "pending" check and silently stalls merges). Runs on a hosted
+  # runner and polls this run's own jobs API; if the macOS job has not started
+  # within the grace period, it fails loudly so a human re-runs on GitHub-hosted
+  # macos-26 or brings the runner back online.
+  macos-runner-watchdog:
+    # Mirror macos-build-and-test's prerequisites exactly so the grace clock
+    # starts only once the macOS job is actually runner-eligible. If the watchdog
+    # gated on fewer needs, a slow runtime-guardrails could trip the 10-minute
+    # timeout while the macOS job is still legitimately blocked, failing a healthy
+    # runner and stalling merges.
+    needs:
+      - detect-ci-changes
+      - runtime-guardrails
+    if: needs.detect-ci-changes.outputs.swift_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fail if the self-hosted macOS job never starts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grace_seconds=600   # 10 minutes for the self-hosted runner to pick up
+          deadline=$(( SECONDS + grace_seconds ))
+          while (( SECONDS < deadline )); do
+            status="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+              --jq '.jobs[] | select(.name=="macos-build-and-test") | .status' 2>/dev/null || echo "")"
+            case "$status" in
+              in_progress|completed)
+                echo "macos-build-and-test status: $status — runner is online."
+                exit 0
+                ;;
+              *)
+                echo "macos-build-and-test status: '${status:-unknown}' — waiting for a runner..."
+                sleep 30
+                ;;
+            esac
+          done
+          echo "::error::macos-build-and-test did not start within $(( grace_seconds / 60 )) minutes. The self-hosted macOS runner is likely offline. Re-run this workflow on GitHub-hosted macos-26 or bring the runner online."
+          exit 1
+
   macos-build-and-test:
     needs:
       - detect-ci-changes
@@ -109,8 +152,11 @@ jobs:
     # in deffenda/brew-sync manifests/github-runners.yaml. Falls back to
     # macos-26 (GitHub-hosted, with the 10x minute multiplier) by manual
     # workflow re-run if the self-hosted runner is offline. See the
-    # `Select Xcode` step for how this job tolerates both layouts.
+    # `Select Xcode` step for how this job tolerates both layouts. The
+    # macos-runner-watchdog job surfaces an offline runner as a hard failure.
     runs-on: [self-hosted, macOS, ARM64]
+    # Fail fast on a hung/contended build instead of running for hours.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v6
