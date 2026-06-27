@@ -202,10 +202,12 @@ actor IssueExtractionService: IssueExtracting {
     }
 
     private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {
+        let logger = DiagnosticsLogger(category: .transcription)
         var parts: [ChatMessageInputPart] = [.text(makePrompt(for: session))]
 
         var includedScreenshotCount = 0
         var omittedScreenshotCount = 0
+        var failedToLoadCount = 0
         var totalScreenshotBytes = 0
 
         for screenshot in session.screenshots.prefix(IssueExtractionRequestBudget.maximumScreenshotCount) {
@@ -216,13 +218,19 @@ actor IssueExtractionService: IssueExtracting {
                 continue
             }
 
-            parts.append(.text("Screenshot reference: \(screenshot.fileName) at \(screenshot.timeLabel)."))
-
+            // Build the image part first: a referenced-but-unattached screenshot
+            // would otherwise tell the model an image exists that it never received.
             guard let imagePart = makeScreenshotContentPart(for: screenshot) else {
-                omittedScreenshotCount += 1
+                failedToLoadCount += 1
+                logger.warning(
+                    "extraction_screenshot_load_failed",
+                    "A referenced screenshot passed the size check but could not be read or encoded for the extraction request.",
+                    metadata: ["file_name": screenshot.fileName]
+                )
                 continue
             }
 
+            parts.append(.text("Screenshot reference: \(screenshot.fileName) at \(screenshot.timeLabel)."))
             parts.append(imagePart)
             includedScreenshotCount += 1
             totalScreenshotBytes += byteCount
@@ -234,6 +242,10 @@ actor IssueExtractionService: IssueExtracting {
 
         if omittedScreenshotCount > 0 {
             parts.append(.text("Screenshot budget note: \(omittedScreenshotCount) screenshot(s) were omitted from AI extraction to keep the request reliable. Use filenames and transcript context for any omitted screenshots."))
+        }
+
+        if failedToLoadCount > 0 {
+            parts.append(.text("Screenshot attachment note: \(failedToLoadCount) referenced screenshot image(s) failed to attach; do not infer visual details from those filenames."))
         }
 
         if includedScreenshotCount > 0 {
