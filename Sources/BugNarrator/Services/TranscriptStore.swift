@@ -109,7 +109,18 @@ final class TranscriptStore: ObservableObject {
         do {
             try persistIndex(remainingEntries)
             for id in ids {
-                try? fileManager.removeItem(at: sessionFileURL(for: id))
+                let fileURL = sessionFileURL(for: id)
+                guard fileManager.fileExists(atPath: fileURL.path) else { continue }
+                do {
+                    try fileManager.removeItem(at: fileURL)
+                } catch {
+                    logStorageFailure(
+                        "session_file_delete_failed",
+                        "Failed to delete a session file during removal; it may be orphaned.",
+                        error: error,
+                        fileName: fileURL.lastPathComponent
+                    )
+                }
             }
             try cleanupUnreferencedSessionFiles(retainedIDs: Set(remainingEntries.map(\.id)))
             replaceState(
@@ -174,7 +185,15 @@ final class TranscriptStore: ObservableObject {
 
         if let backupState = loadPartitionedState(from: backupIndexURL) {
             replaceState(with: backupState.entries, loadedSessions: backupState.loadedSessions)
-            try? persistIndex(backupState.entries)
+            do {
+                try persistIndex(backupState.entries)
+            } catch {
+                logStorageFailure(
+                    "session_store_repair_failed",
+                    "Recovered from the backup index but could not re-persist the primary index; recovery will repeat on the next launch.",
+                    error: error
+                )
+            }
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
                 recoveredSessionCount: backupState.entries.count
@@ -190,7 +209,15 @@ final class TranscriptStore: ObservableObject {
         if let storedSessions = loadSessions(from: storageURL) {
             let normalizedStoredSessions = normalizedSessions(storedSessions)
             let entries = normalizedStoredSessions.map(SessionLibraryEntry.init(session:))
-            try? persist(normalizedStoredSessions)
+            do {
+                try persist(normalizedStoredSessions)
+            } catch {
+                logStorageFailure(
+                    "session_store_migration_failed",
+                    "Loaded legacy primary session history but could not migrate it to partitioned storage; migration will repeat on the next launch.",
+                    error: error
+                )
+            }
             replaceState(with: entries, loadedSessions: [])
             lastLoadRecoveryEvent = nil
             logger.info(
@@ -204,7 +231,15 @@ final class TranscriptStore: ObservableObject {
         if let backupSessions = loadSessions(from: backupStorageURL) {
             let normalizedBackupSessions = normalizedSessions(backupSessions)
             let entries = normalizedBackupSessions.map(SessionLibraryEntry.init(session:))
-            try? persist(normalizedBackupSessions)
+            do {
+                try persist(normalizedBackupSessions)
+            } catch {
+                logStorageFailure(
+                    "session_store_migration_failed",
+                    "Recovered legacy backup session history but could not migrate it to partitioned storage; migration will repeat on the next launch.",
+                    error: error
+                )
+            }
             replaceState(with: entries, loadedSessions: [])
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
@@ -290,7 +325,15 @@ final class TranscriptStore: ObservableObject {
 
             let normalizedStoredSessions = normalizedSessions(storedSessions)
             let entries = normalizedStoredSessions.map(SessionLibraryEntry.init(session:))
-            try? persistIndex(entries)
+            do {
+                try persistIndex(entries)
+            } catch {
+                logStorageFailure(
+                    "session_store_repair_failed",
+                    "Loaded partitioned session history but could not re-persist the index; recovery will repeat on the next launch.",
+                    error: error
+                )
+            }
             return (entries, [])
         } catch {
             logger.warning(
@@ -370,7 +413,31 @@ final class TranscriptStore: ObservableObject {
         let index = TranscriptStoreIndex(entries: normalizedEntries)
         let indexData = try encoder.encode(index)
         try indexData.write(to: indexURL, options: [.atomic])
-        try? indexData.write(to: backupIndexURL, options: [.atomic])
+        do {
+            try indexData.write(to: backupIndexURL, options: [.atomic])
+        } catch {
+            logStorageFailure(
+                "session_backup_index_write_failed",
+                "Wrote the primary session index but failed to write the backup index.",
+                error: error,
+                fileName: backupIndexURL.lastPathComponent
+            )
+        }
+    }
+
+    /// Logs a non-fatal storage failure (no PII beyond an optional file name) so
+    /// swallowed I/O errors are observable instead of silently dropped.
+    private func logStorageFailure(
+        _ event: String,
+        _ message: String,
+        error: Error,
+        fileName: String? = nil
+    ) {
+        var metadata: [String: String] = ["error": String(describing: type(of: error))]
+        if let fileName {
+            metadata["file_name"] = fileName
+        }
+        logger.warning(event, message, metadata: metadata)
     }
 
     private func persistSessionFile(for session: TranscriptSession) throws {
@@ -387,10 +454,18 @@ final class TranscriptStore: ObservableObject {
     }
 
     private func cleanupUnreferencedSessionFiles(retainedIDs: Set<UUID>) throws {
-        guard let fileURLs = try? fileManager.contentsOfDirectory(
-            at: sessionsDirectoryURL,
-            includingPropertiesForKeys: nil
-        ) else {
+        let fileURLs: [URL]
+        do {
+            fileURLs = try fileManager.contentsOfDirectory(
+                at: sessionsDirectoryURL,
+                includingPropertiesForKeys: nil
+            )
+        } catch {
+            logStorageFailure(
+                "session_cleanup_enumeration_failed",
+                "Could not enumerate the sessions directory to clean up unreferenced files.",
+                error: error
+            )
             return
         }
 
@@ -399,7 +474,16 @@ final class TranscriptStore: ObservableObject {
             guard let id = UUID(uuidString: rawID), !retainedIDs.contains(id) else {
                 continue
             }
-            try? fileManager.removeItem(at: fileURL)
+            do {
+                try fileManager.removeItem(at: fileURL)
+            } catch {
+                logStorageFailure(
+                    "session_orphan_delete_failed",
+                    "Failed to delete an unreferenced session file.",
+                    error: error,
+                    fileName: fileURL.lastPathComponent
+                )
+            }
         }
     }
 
