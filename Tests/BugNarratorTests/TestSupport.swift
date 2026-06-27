@@ -962,11 +962,11 @@ actor StubExportReceiptStore: ExportReceiptStoring {
         )
     }
 
-    func receipt(for fingerprint: String) async -> ExportReceipt? {
+    func receipt(for fingerprint: String) async throws -> ExportReceipt? {
         receipts[fingerprint]
     }
 
-    func allReceipts() async -> [ExportReceipt] {
+    func allReceipts() async throws -> [ExportReceipt] {
         Array(receipts.values)
     }
 

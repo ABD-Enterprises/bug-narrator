@@ -181,7 +181,8 @@ struct LocalPrivacyDataManager: @unchecked Sendable {
 
         let removableURLs = [
             appSupportURL.appendingPathComponent("RecoveredRecordings", isDirectory: true),
-            appSupportURL.appendingPathComponent("export-receipts.json", isDirectory: false)
+            appSupportURL.appendingPathComponent("export-receipts.json", isDirectory: false),
+            appSupportURL.appendingPathComponent("export-receipts.corrupt.json", isDirectory: false)
         ]
 
         for url in removableURLs where fileManager.fileExists(atPath: url.path) {
