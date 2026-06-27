@@ -72,6 +72,147 @@ final class PrivacyDataExporterTests: XCTestCase {
         XCTAssertFalse(combinedText.contains("apiKey"))
     }
 
+    func testStreamedSessionsJSONIsByteIdenticalToArrayEncoding() throws {
+        // The streaming writer must produce exactly the same bytes as encoding the
+        // whole array at once, for empty / single / multi-session libraries.
+        for sessionCount in [0, 1, 3] {
+            let sessions = (0..<sessionCount).map { makeSampleTranscriptSession(index: $0 + 1) }
+
+            let rootDirectoryURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("BugNarrator-PrivacyStreamTests-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+            let exportURL = try PrivacyDataExporter().writeBundle(
+                sessions: PrivacyDataSessionStream(
+                    count: sessions.count,
+                    forEach: { body in try sessions.forEach(body) }
+                ),
+                settings: Self.makeFixtureSettings(),
+                diagnostics: Self.makeFixtureDiagnostics(),
+                to: rootDirectoryURL
+            )
+            let streamedData = try Data(contentsOf: exportURL.appendingPathComponent("sessions.json"))
+
+            let referenceEncoder = JSONEncoder()
+            referenceEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            referenceEncoder.dateEncodingStrategy = .iso8601
+            let referenceData = try referenceEncoder.encode(sessions)
+
+            XCTAssertEqual(
+                streamedData,
+                referenceData,
+                "Streamed sessions.json for \(sessionCount) session(s) must be byte-identical to the array encoding."
+            )
+        }
+    }
+
+    func testWriteBundlePullsSessionsLazilyOneAtATime() throws {
+        // The exporter must request sessions through the stream (not a prebuilt
+        // array), and the round-trip must decode back to the same sessions.
+        let sessions = (0..<4).map { makeSampleTranscriptSession(index: $0 + 1) }
+        var maxConcurrentlyHeld = 0
+        var liveCount = 0
+
+        let rootDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-PrivacyLazyTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let stream = PrivacyDataSessionStream(count: sessions.count) { body in
+            for session in sessions {
+                liveCount += 1
+                maxConcurrentlyHeld = max(maxConcurrentlyHeld, liveCount)
+                try body(session)
+                // The exporter encodes + writes the element before pulling the
+                // next, so each yielded session is released before the next is
+                // requested.
+                liveCount -= 1
+            }
+        }
+
+        let exportURL = try PrivacyDataExporter().writeBundle(
+            sessions: stream,
+            settings: Self.makeFixtureSettings(),
+            diagnostics: Self.makeFixtureDiagnostics(),
+            to: rootDirectoryURL
+        )
+
+        XCTAssertEqual(maxConcurrentlyHeld, 1, "The exporter must consume one session at a time, not buffer the library.")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let written = try decoder.decode(
+            [TranscriptSession].self,
+            from: Data(contentsOf: exportURL.appendingPathComponent("sessions.json"))
+        )
+        XCTAssertEqual(written, sessions)
+    }
+
+    func testManifestSessionCountMatchesSessionsActuallyWrittenWhenStreamSkipsBodies() throws {
+        // A library entry whose body cannot be decoded is skipped by the stream,
+        // so `count` (library entries) overstates what lands in sessions.json. The
+        // manifest must report the number actually written, keeping it consistent
+        // with sessions.json — as it was before streaming.
+        let writable = [makeSampleTranscriptSession(index: 1), makeSampleTranscriptSession(index: 2)]
+        let stream = PrivacyDataSessionStream(count: 3) { body in
+            for session in writable {
+                try body(session)
+            }
+            // The 3rd entry is "corrupt" and never yielded.
+        }
+
+        let rootDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-PrivacyManifestTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let exportURL = try PrivacyDataExporter().writeBundle(
+            sessions: stream,
+            settings: Self.makeFixtureSettings(),
+            diagnostics: Self.makeFixtureDiagnostics(),
+            to: rootDirectoryURL
+        )
+
+        let manifest = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: exportURL.appendingPathComponent("manifest.json"))
+        ) as? [String: Any]
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let writtenSessions = try decoder.decode(
+            [TranscriptSession].self,
+            from: Data(contentsOf: exportURL.appendingPathComponent("sessions.json"))
+        )
+
+        XCTAssertEqual(writtenSessions, writable)
+        XCTAssertEqual(manifest?["sessionCount"] as? Int, writable.count)
+    }
+
+    private static func makeFixtureSettings() -> PrivacyDataExportSettingsSnapshot {
+        let settingsStore = SettingsStore(
+            defaults: UserDefaults(suiteName: "BugNarrator-PrivacyFixture-\(UUID().uuidString)") ?? .standard,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
+        return PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore)
+    }
+
+    private static func makeFixtureDiagnostics() -> PrivacyDataExportDiagnosticsSnapshot {
+        PrivacyDataExportDiagnosticsSnapshot(
+            appName: "BugNarrator",
+            versionDescription: "1.0.0 (1)",
+            macOSVersion: "macOS Test",
+            architecture: "arm64",
+            activeTranscriptionModel: "whisper-1",
+            issueExtractionModel: "gpt-4.1-mini",
+            logLevel: "info",
+            debugModeEnabled: false,
+            recentTelemetryEvents: [],
+            recentDiagnosticsLog: "",
+            exportHistory: []
+        )
+    }
+
     func testLocalPrivacyDataManagerClearsDiagnosticsTelemetryAndSupportFiles() async throws {
         let rootDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-LocalPrivacyDataManagerTests-\(UUID().uuidString)", isDirectory: true)
