@@ -24,3 +24,7 @@ func settingsSectionIntro(_ text: String) -> some View {
         .font(.footnote)
         .foregroundStyle(.secondary)
 }
+
+/// Help text shown on credential fields while secure controls are disabled
+/// (a recording/transcription is in progress).
+let settingsSecureControlsDisabledHint = "Disabled while recording or transcribing is in progress."
