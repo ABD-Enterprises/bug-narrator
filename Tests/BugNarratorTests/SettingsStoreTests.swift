@@ -266,6 +266,28 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
     }
 
+    func testRemovingAPIKeyReportsKeychainStillPresentWhenDeleteFails() {
+        let suiteName = "BugNarrator-SettingsDeleteFailTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychainService()
+        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        store.apiKey = "saved-in-keychain"
+        store.refreshOpenAISecretForUserInitiatedAccess()
+        XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
+        XCTAssertFalse(keychain.values.isEmpty)
+
+        // The Keychain delete fails (e.g. errSecInteractionNotAllowed). The
+        // secret is therefore still resident and must not be reported cleared.
+        keychain.deleteError = KeychainError.unhandledStatus(-25308)
+        store.removeAPIKey()
+
+        XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
+        XCTAssertFalse(keychain.values.isEmpty)
+    }
+
     func testJiraEmailStaysOutOfUserDefaultsWhenKeychainSucceeds() {
         let suiteName = "BugNarrator-SettingsJiraEmailNoDefaultsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
