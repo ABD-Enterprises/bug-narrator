@@ -3,12 +3,14 @@ import Foundation
 actor JiraExportProvider {
     private let session: URLSession
     private let receiptStore: any ExportReceiptStoring
+    private let retryConfiguration: ExportRetryConfiguration
     private let logger = DiagnosticsLogger(category: .export)
     private let annotationRenderer = IssueScreenshotAnnotationRenderer()
 
     init(
         session: URLSession? = nil,
-        receiptStore: any ExportReceiptStoring = ExportReceiptStore()
+        receiptStore: any ExportReceiptStoring = ExportReceiptStore(),
+        retryConfiguration: ExportRetryConfiguration = .default
     ) {
         if let session {
             self.session = session
@@ -19,6 +21,7 @@ actor JiraExportProvider {
             self.session = URLSession(configuration: configuration)
         }
         self.receiptStore = receiptStore
+        self.retryConfiguration = retryConfiguration
     }
 
     func export(
@@ -75,82 +78,14 @@ actor JiraExportProvider {
                 exportFingerprint: fingerprint
             )
 
-            do {
-                let (data, response) = try await session.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw AppError.exportFailure("Jira returned an invalid response.")
-                }
-
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    throw mapJiraError(
-                        statusCode: httpResponse.statusCode,
-                        data: data,
-                        configuration: configuration,
-                        retryAfterSeconds: TrackerExportSupport.retryAfterSeconds(from: httpResponse)
-                    )
-                }
-
-                let payload = try JSONDecoder().decode(JiraIssueResponse.self, from: data)
-                let remoteURL = configuration.baseURL.appending(path: "browse/\(payload.key)")
-                try await receiptStore.markSucceeded(
-                    fingerprint: fingerprint,
-                    sourceIssueID: issue.id,
-                    destination: .jira,
-                    targetIdentity: configuration.targetIdentity,
-                    remoteIdentifier: payload.key,
-                    remoteURL: remoteURL
-                )
-                let result = ExportResult(
-                    sourceIssueID: issue.id,
-                    destination: .jira,
-                    remoteIdentifier: payload.key,
-                    remoteURL: remoteURL
-                )
-                results.append(result)
-                logger.info(
-                    "jira_issue_exported",
-                    "Exported one issue to Jira.",
-                    metadata: [
-                        "source_issue_id": issue.id.uuidString,
-                        "remote_identifier": payload.key
-                    ]
-                )
-            } catch {
-                logger.error(
-                    "jira_export_failed",
-                    (error as? AppError)?.userMessage ?? error.localizedDescription,
-                    metadata: [
-                        "successful_count": "\(results.count)",
-                        "source_issue_id": issue.id.uuidString
-                    ]
-                )
-                do {
-                    if let reconciledResult = try await reconcilePendingExport(
-                        fingerprint: fingerprint,
-                        sourceIssueID: issue.id,
-                        configuration: configuration
-                    ) {
-                        results.append(reconciledResult)
-                        continue
-                    }
-                } catch {
-                    logger.warning(
-                        "jira_export_reconciliation_failed",
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
-                        metadata: ["source_issue_id": issue.id.uuidString]
-                    )
-                }
-
-                if error is AppError {
-                    try? await receiptStore.clearReceipt(for: fingerprint)
-                }
-                let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
-                throw TrackerExportSupport.partialExportError(
-                    mappedError,
-                    providerName: "Jira",
-                    successfulCount: results.count
-                )
-            }
+            let result = try await createWithRetry(
+                issue: issue,
+                fingerprint: fingerprint,
+                request: request,
+                configuration: configuration,
+                successfulCount: results.count
+            )
+            results.append(result)
         }
 
         logger.info(
@@ -634,6 +569,148 @@ actor JiraExportProvider {
         }
         request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         return request
+    }
+
+    /// Creates one issue with bounded retry. Transient failures (network / 5xx /
+    /// 429) are retried with backoff, but only after a marker reconciliation
+    /// confirms the issue was not already created — so a created-but-unacked issue
+    /// is never duplicated. The pending receipt is kept across transient retries;
+    /// cleared only on a confirmed permanent failure.
+    private func createWithRetry(
+        issue: ExtractedIssue,
+        fingerprint: String,
+        request: URLRequest,
+        configuration: JiraExportConfiguration,
+        successfulCount: Int
+    ) async throws -> ExportResult {
+        for attempt in 1...retryConfiguration.maxAttempts {
+            switch await attemptCreate(request, configuration: configuration) {
+            case .success(let remoteIdentifier, let remoteURL):
+                try await receiptStore.markSucceeded(
+                    fingerprint: fingerprint,
+                    sourceIssueID: issue.id,
+                    destination: .jira,
+                    targetIdentity: configuration.targetIdentity,
+                    remoteIdentifier: remoteIdentifier,
+                    remoteURL: remoteURL
+                )
+                logger.info(
+                    "jira_issue_exported",
+                    "Exported one issue to Jira.",
+                    metadata: ["source_issue_id": issue.id.uuidString, "remote_identifier": remoteIdentifier]
+                )
+                return ExportResult(
+                    sourceIssueID: issue.id,
+                    destination: .jira,
+                    remoteIdentifier: remoteIdentifier,
+                    remoteURL: remoteURL
+                )
+
+            case .transient(let createError, let retryAfterSeconds):
+                logger.error(
+                    "jira_export_failed",
+                    createError.userMessage,
+                    metadata: [
+                        "source_issue_id": issue.id.uuidString,
+                        "attempt": "\(attempt)",
+                        "transient": "true"
+                    ]
+                )
+                do {
+                    if let reconciled = try await reconcilePendingExport(
+                        fingerprint: fingerprint,
+                        sourceIssueID: issue.id,
+                        configuration: configuration
+                    ) {
+                        return reconciled
+                    }
+                } catch {
+                    logger.warning(
+                        "jira_export_reconciliation_failed",
+                        (error as? AppError)?.userMessage ?? error.localizedDescription,
+                        metadata: ["source_issue_id": issue.id.uuidString]
+                    )
+                    throw TrackerExportSupport.partialExportError(createError, providerName: "Jira", successfulCount: successfulCount)
+                }
+
+                if attempt < retryConfiguration.maxAttempts {
+                    let delay = TrackerExportSupport.retryDelay(
+                        attempt: attempt,
+                        retryAfterSeconds: retryAfterSeconds,
+                        base: retryConfiguration.baseDelay
+                    )
+                    if delay > .zero {
+                        try? await Task.sleep(for: delay)
+                    }
+                    continue
+                }
+                throw TrackerExportSupport.partialExportError(createError, providerName: "Jira", successfulCount: successfulCount)
+
+            case .permanent(let error):
+                logger.error(
+                    "jira_export_failed",
+                    error.userMessage,
+                    metadata: ["source_issue_id": issue.id.uuidString, "transient": "false"]
+                )
+                if let reconciled = try? await reconcilePendingExport(
+                    fingerprint: fingerprint,
+                    sourceIssueID: issue.id,
+                    configuration: configuration
+                ) {
+                    return reconciled
+                }
+                try? await receiptStore.clearReceipt(for: fingerprint)
+                throw TrackerExportSupport.partialExportError(error, providerName: "Jira", successfulCount: successfulCount)
+            }
+        }
+
+        throw TrackerExportSupport.partialExportError(
+            .exportFailure("Jira export did not complete."),
+            providerName: "Jira",
+            successfulCount: successfulCount
+        )
+    }
+
+    private func attemptCreate(
+        _ request: URLRequest,
+        configuration: JiraExportConfiguration
+    ) async -> ExportCreateOutcome {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .permanent(.exportFailure("Jira returned an invalid response."))
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let retryAfter = TrackerExportSupport.retryAfterSeconds(from: httpResponse)
+                let mapped = mapJiraError(
+                    statusCode: httpResponse.statusCode,
+                    data: data,
+                    configuration: configuration,
+                    retryAfterSeconds: retryAfter
+                )
+                return TrackerExportSupport.isTransientStatus(httpResponse.statusCode)
+                    ? .transient(mapped, retryAfterSeconds: retryAfter)
+                    : .permanent(mapped)
+            }
+
+            do {
+                let payload = try JSONDecoder().decode(JiraIssueResponse.self, from: data)
+                let remoteURL = configuration.baseURL.appending(path: "browse/\(payload.key)")
+                return .success(remoteIdentifier: payload.key, remoteURL: remoteURL)
+            } catch {
+                // A 2xx whose body we cannot read is a created-but-unacknowledged
+                // issue: Jira accepted the create, but we could not parse the key.
+                // Treat it as ambiguous/transient — NOT permanent — so the pending
+                // receipt is preserved and reconciliation-by-marker resolves it,
+                // instead of clearing the receipt and risking a duplicate on a
+                // later export.
+                return .transient(.exportFailure("Jira returned an unreadable response."), retryAfterSeconds: nil)
+            }
+        } catch {
+            let mapped = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
+            return .transient(mapped, retryAfterSeconds: nil)
+        }
     }
 
     private func existingExportResult(

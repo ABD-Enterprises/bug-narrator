@@ -3,12 +3,14 @@ import Foundation
 actor GitHubExportProvider {
     private let session: URLSession
     private let receiptStore: any ExportReceiptStoring
+    private let retryConfiguration: ExportRetryConfiguration
     private let logger = DiagnosticsLogger(category: .export)
     private let annotationRenderer = IssueScreenshotAnnotationRenderer()
 
     init(
         session: URLSession? = nil,
-        receiptStore: any ExportReceiptStoring = ExportReceiptStore()
+        receiptStore: any ExportReceiptStoring = ExportReceiptStore(),
+        retryConfiguration: ExportRetryConfiguration = .default
     ) {
         if let session {
             self.session = session
@@ -19,6 +21,7 @@ actor GitHubExportProvider {
             self.session = URLSession(configuration: configuration)
         }
         self.receiptStore = receiptStore
+        self.retryConfiguration = retryConfiguration
     }
 
     func fetchRepositories(token: String) async throws -> [GitHubRepositoryOption] {
@@ -139,81 +142,14 @@ actor GitHubExportProvider {
                 exportFingerprint: fingerprint
             )
 
-            do {
-                let (data, response) = try await session.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw AppError.exportFailure("GitHub returned an invalid response.")
-                }
-
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    throw mapGitHubError(
-                        statusCode: httpResponse.statusCode,
-                        data: data,
-                        configuration: configuration,
-                        retryAfterSeconds: TrackerExportSupport.retryAfterSeconds(from: httpResponse)
-                    )
-                }
-
-                let payload = try JSONDecoder().decode(GitHubIssueResponse.self, from: data)
-                try await receiptStore.markSucceeded(
-                    fingerprint: fingerprint,
-                    sourceIssueID: issue.id,
-                    destination: .github,
-                    targetIdentity: configuration.targetIdentity,
-                    remoteIdentifier: "#\(payload.number)",
-                    remoteURL: payload.htmlURL
-                )
-                let result = ExportResult(
-                    sourceIssueID: issue.id,
-                    destination: .github,
-                    remoteIdentifier: "#\(payload.number)",
-                    remoteURL: payload.htmlURL
-                )
-                results.append(result)
-                logger.info(
-                    "github_issue_exported",
-                    "Exported one issue to GitHub.",
-                    metadata: [
-                        "source_issue_id": issue.id.uuidString,
-                        "remote_identifier": "#\(payload.number)"
-                    ]
-                )
-            } catch {
-                logger.error(
-                    "github_export_failed",
-                    (error as? AppError)?.userMessage ?? error.localizedDescription,
-                    metadata: [
-                        "successful_count": "\(results.count)",
-                        "source_issue_id": issue.id.uuidString
-                    ]
-                )
-                do {
-                    if let reconciledResult = try await reconcilePendingExport(
-                        fingerprint: fingerprint,
-                        sourceIssueID: issue.id,
-                        configuration: configuration
-                    ) {
-                        results.append(reconciledResult)
-                        continue
-                    }
-                } catch {
-                    logger.warning(
-                        "github_export_reconciliation_failed",
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
-                        metadata: ["source_issue_id": issue.id.uuidString]
-                    )
-                }
-
-                if error is AppError {
-                    try? await receiptStore.clearReceipt(for: fingerprint)
-                }
-                let mappedError = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
-                throw TrackerExportSupport.partialExportError(
-                    mappedError,
-                    providerName: "GitHub",
-                    successfulCount: results.count
-                )
-            }
+            let result = try await createWithRetry(
+                issue: issue,
+                fingerprint: fingerprint,
+                request: request,
+                configuration: configuration,
+                successfulCount: results.count
+            )
+            results.append(result)
         }
 
         logger.info(
@@ -532,6 +468,156 @@ actor GitHubExportProvider {
             lines.joined(separator: "\n"),
             maxCharacters: TrackerExportPayloadBudget.gitHubBodyLimit - footer.count
         ) + footer
+    }
+
+    /// Creates one issue with bounded retry. Transient failures (network / 5xx /
+    /// 429) are retried with backoff, but ONLY after a marker reconciliation
+    /// confirms the issue was not already created — so a created-but-unacked issue
+    /// is never duplicated. The pending receipt is kept across transient retries;
+    /// it is cleared only on a confirmed permanent failure.
+    private func createWithRetry(
+        issue: ExtractedIssue,
+        fingerprint: String,
+        request: URLRequest,
+        configuration: GitHubExportConfiguration,
+        successfulCount: Int
+    ) async throws -> ExportResult {
+        for attempt in 1...retryConfiguration.maxAttempts {
+            switch await attemptCreate(request, configuration: configuration) {
+            case .success(let remoteIdentifier, let remoteURL):
+                try await receiptStore.markSucceeded(
+                    fingerprint: fingerprint,
+                    sourceIssueID: issue.id,
+                    destination: .github,
+                    targetIdentity: configuration.targetIdentity,
+                    remoteIdentifier: remoteIdentifier,
+                    remoteURL: remoteURL
+                )
+                logger.info(
+                    "github_issue_exported",
+                    "Exported one issue to GitHub.",
+                    metadata: ["source_issue_id": issue.id.uuidString, "remote_identifier": remoteIdentifier]
+                )
+                return ExportResult(
+                    sourceIssueID: issue.id,
+                    destination: .github,
+                    remoteIdentifier: remoteIdentifier,
+                    remoteURL: remoteURL
+                )
+
+            case .transient(let createError, let retryAfterSeconds):
+                logger.error(
+                    "github_export_failed",
+                    createError.userMessage,
+                    metadata: [
+                        "source_issue_id": issue.id.uuidString,
+                        "attempt": "\(attempt)",
+                        "transient": "true"
+                    ]
+                )
+                // Did the issue actually get created despite the error? If the
+                // reconcile search itself fails we cannot verify, so we must NOT
+                // retry (which could duplicate) — abort and keep the pending
+                // receipt for a future reconcile.
+                do {
+                    if let reconciled = try await reconcilePendingExport(
+                        fingerprint: fingerprint,
+                        sourceIssueID: issue.id,
+                        configuration: configuration
+                    ) {
+                        return reconciled
+                    }
+                } catch {
+                    logger.warning(
+                        "github_export_reconciliation_failed",
+                        (error as? AppError)?.userMessage ?? error.localizedDescription,
+                        metadata: ["source_issue_id": issue.id.uuidString]
+                    )
+                    throw TrackerExportSupport.partialExportError(createError, providerName: "GitHub", successfulCount: successfulCount)
+                }
+
+                if attempt < retryConfiguration.maxAttempts {
+                    let delay = TrackerExportSupport.retryDelay(
+                        attempt: attempt,
+                        retryAfterSeconds: retryAfterSeconds,
+                        base: retryConfiguration.baseDelay
+                    )
+                    if delay > .zero {
+                        try? await Task.sleep(for: delay)
+                    }
+                    continue
+                }
+                // Retries exhausted — keep the pending receipt (do not clear).
+                throw TrackerExportSupport.partialExportError(createError, providerName: "GitHub", successfulCount: successfulCount)
+
+            case .permanent(let error):
+                logger.error(
+                    "github_export_failed",
+                    error.userMessage,
+                    metadata: ["source_issue_id": issue.id.uuidString, "transient": "false"]
+                )
+                if let reconciled = try? await reconcilePendingExport(
+                    fingerprint: fingerprint,
+                    sourceIssueID: issue.id,
+                    configuration: configuration
+                ) {
+                    return reconciled
+                }
+                // A permanent rejection means the issue was not created; clear the
+                // pending receipt so a corrected re-export can proceed cleanly.
+                try? await receiptStore.clearReceipt(for: fingerprint)
+                throw TrackerExportSupport.partialExportError(error, providerName: "GitHub", successfulCount: successfulCount)
+            }
+        }
+
+        // Unreachable (the loop returns or throws), but the compiler requires it.
+        throw TrackerExportSupport.partialExportError(
+            .exportFailure("GitHub export did not complete."),
+            providerName: "GitHub",
+            successfulCount: successfulCount
+        )
+    }
+
+    private func attemptCreate(
+        _ request: URLRequest,
+        configuration: GitHubExportConfiguration
+    ) async -> ExportCreateOutcome {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .permanent(.exportFailure("GitHub returned an invalid response."))
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let retryAfter = TrackerExportSupport.retryAfterSeconds(from: httpResponse)
+                let mapped = mapGitHubError(
+                    statusCode: httpResponse.statusCode,
+                    data: data,
+                    configuration: configuration,
+                    retryAfterSeconds: retryAfter
+                )
+                return TrackerExportSupport.isTransientStatus(httpResponse.statusCode)
+                    ? .transient(mapped, retryAfterSeconds: retryAfter)
+                    : .permanent(mapped)
+            }
+
+            do {
+                let payload = try JSONDecoder().decode(GitHubIssueResponse.self, from: data)
+                return .success(remoteIdentifier: "#\(payload.number)", remoteURL: payload.htmlURL)
+            } catch {
+                // A 2xx whose body we cannot read is a created-but-unacknowledged
+                // issue: GitHub accepted the create, but we could not parse the
+                // identifier. Treat it as ambiguous/transient — NOT permanent — so
+                // the pending receipt is preserved and reconciliation-by-marker
+                // resolves it, instead of clearing the receipt and risking a
+                // duplicate on a later export.
+                return .transient(.exportFailure("GitHub returned an unreadable response."), retryAfterSeconds: nil)
+            }
+        } catch {
+            // Network/transport failure — retryable.
+            let mapped = OpenAIErrorMapper.mapTransportError(error, fallback: AppError.exportFailure)
+            return .transient(mapped, retryAfterSeconds: nil)
+        }
     }
 
     private func existingExportResult(
