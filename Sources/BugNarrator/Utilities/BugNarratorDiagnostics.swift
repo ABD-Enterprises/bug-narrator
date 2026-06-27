@@ -395,6 +395,9 @@ enum BugNarratorDiagnostics {
     }
 }
 
+// Thread-safety invariant: the only mutable state (`debugModeEnabled`) is read
+// and written exclusively under `lock`, so concurrent access from any thread is
+// serialized. The `@unchecked` is therefore sound.
 private final class DiagnosticsConfiguration: @unchecked Sendable {
     private let lock = NSLock()
     private var debugModeEnabled = false

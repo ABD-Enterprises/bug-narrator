@@ -366,6 +366,12 @@ struct MixedAudioTrackInsertionOffsets: Equatable {
     }
 }
 
+// Thread-safety invariant: a bridge instance wraps one AVAssetExportSession used
+// by exactly one mixed-audio export. The session is fully configured before
+// `exportAsynchronously` starts; thereafter the only concurrent touch is
+// `cancelExport()` from the 30s timeout task, which Apple documents as safe to
+// call while an export is in flight. No other aliasing exists, so `@unchecked`
+// holds.
 private final class MixedAssetExportSessionBridge: @unchecked Sendable {
     let session: AVAssetExportSession
 

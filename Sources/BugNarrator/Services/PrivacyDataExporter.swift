@@ -152,6 +152,11 @@ struct PrivacyDataExporter {
 
 extension PrivacyDataExporter: PrivacyDataExporting {}
 
+// Thread-safety invariant: all stored properties are immutable `let`s, so the
+// value carries no mutable shared state. The `@unchecked` only suppresses the
+// non-Sendable `FileManager`/recorder/store members; each of those is either
+// independently thread-safe or confined to the store's own actor/queue, so
+// sharing this value across tasks introduces no data race.
 struct LocalPrivacyDataManager: @unchecked Sendable {
     private let fileManager: FileManager
     private let appSupportURL: URL
