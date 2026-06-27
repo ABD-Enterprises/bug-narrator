@@ -662,6 +662,66 @@ final class SettingsStore: ObservableObject {
         return components.url ?? fallback
     }
 
+    /// Whether `host` denotes a loopback / private / link-local / `.local`
+    /// endpoint. Plaintext HTTP to such a host is acceptable because the traffic
+    /// stays on the machine or the trusted local network; plaintext HTTP to any
+    /// other host would send the API key and transcript text over the public
+    /// internet unencrypted.
+    static func isLocalEndpointHost(_ host: String) -> Bool {
+        let lowered = host
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+
+        if lowered == "localhost" || lowered.hasSuffix(".localhost") { return true }
+        if lowered.hasSuffix(".local") { return true }
+        // Single-label hostnames (e.g. "lmstudio") never resolve on public DNS.
+        if !lowered.contains(".") && !lowered.contains(":") { return true }
+        // IPv6 loopback / link-local.
+        if lowered == "::1" || lowered.hasPrefix("fe80:") { return true }
+
+        let octets = lowered.split(separator: ".").compactMap { UInt8($0) }
+        if octets.count == 4, lowered.allSatisfy({ $0.isNumber || $0 == "." }) {
+            switch (octets[0], octets[1]) {
+            case (127, _): return true        // loopback 127.0.0.0/8
+            case (10, _): return true         // private 10.0.0.0/8
+            case (192, 168): return true      // private 192.168.0.0/16
+            case (169, 254): return true      // link-local 169.254.0.0/16
+            case (172, 16...31): return true  // private 172.16.0.0/12
+            default: return false
+            }
+        }
+        return false
+    }
+
+    /// A user-facing warning when the configured base URL would transmit the API
+    /// key and transcript content to a non-local host over plaintext HTTP. Remote
+    /// HTTPS and local HTTP (loopback/private/`.local`) return `nil` so legitimate
+    /// enterprise-proxy and local-provider workflows are not nagged.
+    static func plaintextRemoteBaseURLWarning(
+        from rawValue: String,
+        provider: AIProvider = .openAI
+    ) -> String? {
+        let url = normalizedOpenAIBaseURL(from: rawValue, provider: provider)
+        guard url.scheme?.lowercased() == "http",
+              let host = url.host,
+              !isLocalEndpointHost(host) else {
+            return nil
+        }
+        return "This endpoint uses plaintext HTTP to a remote host (\(host)). "
+            + "Your API key and transcript text would be sent unencrypted. Use "
+            + "https:// unless this is a trusted local endpoint."
+    }
+
+    /// Warning to surface near the base-URL field for the active provider, or nil.
+    var aiBaseURLPlaintextWarning: String? {
+        Self.plaintextRemoteBaseURLWarning(from: openAIBaseURL, provider: aiProvider)
+    }
+
+    /// The host the configured base URL resolves to, for display near the field.
+    var effectiveAIBaseURLHost: String? {
+        openAIBaseURLValue.host
+    }
+
     var preferredModelValue: String {
         Self.normalizedTranscriptionModel(preferredModel, for: aiProvider)
     }
