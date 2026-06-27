@@ -46,13 +46,33 @@ NPM_BIN="${TOOLCHAIN_DIR}/bin/npm"
 
 install_toolchain() {
   local archive_name="node-${NODE_VERSION}-${NODE_DISTRO}.tar.gz"
-  local download_url="https://nodejs.org/dist/${NODE_VERSION}/${archive_name}"
+  local base_url="https://nodejs.org/dist/${NODE_VERSION}"
   local temp_dir
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' RETURN
 
   mkdir -p "${ROOT_DIR}/build/tooling"
-  curl -fsSL "$download_url" -o "$temp_dir/$archive_name"
+  curl -fsSL --retry 3 --retry-delay 2 "$base_url/$archive_name" -o "$temp_dir/$archive_name"
+  curl -fsSL --retry 3 --retry-delay 2 "$base_url/SHASUMS256.txt" -o "$temp_dir/SHASUMS256.txt"
+
+  # Verify the archive against Node's published SHA-256 before extracting, so a
+  # corrupted or MITM'd download cannot become the toolchain that builds the
+  # site. (SHASUMS256.txt is fetched over TLS; GPG verification of that manifest
+  # against the Node release keys would be a stronger future step.)
+  local expected_sha actual_sha
+  expected_sha="$(awk -v name="$archive_name" '$2 == name {print $1; exit}' "$temp_dir/SHASUMS256.txt")"
+  if [[ -z "$expected_sha" ]]; then
+    echo "error: no SHA-256 entry for $archive_name in SHASUMS256.txt" >&2
+    exit 1
+  fi
+  actual_sha="$(shasum -a 256 "$temp_dir/$archive_name" | awk '{print $1}')"
+  if [[ "$actual_sha" != "$expected_sha" ]]; then
+    echo "error: Node toolchain checksum mismatch for $archive_name" >&2
+    echo "  expected: $expected_sha" >&2
+    echo "  actual:   $actual_sha" >&2
+    exit 1
+  fi
+
   tar -xzf "$temp_dir/$archive_name" -C "$temp_dir"
   rm -rf "$TOOLCHAIN_DIR"
   mv "$temp_dir/node-${NODE_VERSION}-${NODE_DISTRO}" "$TOOLCHAIN_DIR"
