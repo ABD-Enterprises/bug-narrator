@@ -98,6 +98,7 @@ final class HotkeyManager: HotkeyManaging {
 
     deinit {
         unregisterAll()
+        removeEventHandler()
     }
 
     func register(shortcut: HotkeyShortcut, for action: HotkeyAction) {
@@ -139,6 +140,19 @@ final class HotkeyManager: HotkeyManaging {
         }
 
         UnregisterEventHotKey(hotKeyRef)
+    }
+
+    /// Removes the application-global Carbon event handler. Must be paired with
+    /// `installEventHandlerIfNeeded()`: the handler's `userData` is an unretained
+    /// pointer to `self`, so leaving it installed after deinit would let a global
+    /// hotkey fire the C callback against freed memory.
+    private func removeEventHandler() {
+        guard let eventHandler else {
+            return
+        }
+
+        RemoveEventHandler(eventHandler)
+        self.eventHandler = nil
     }
 
     private func installEventHandlerIfNeeded() {
