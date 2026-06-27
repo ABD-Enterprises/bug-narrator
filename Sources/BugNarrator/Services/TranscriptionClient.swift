@@ -691,25 +691,47 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
         )
         let exportBridge = AssetExportSessionBridge(exportSession)
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            exportBridge.session.exportAsynchronously {
-                switch exportBridge.session.status {
-                case .completed:
-                    continuation.resume()
-                case .failed:
-                    continuation.resume(throwing: exportBridge.session.error ?? AppError.transcriptionFailure("The recorded audio chunk export failed."))
-                case .cancelled:
-                    continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export was cancelled."))
-                default:
-                    continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export did not complete successfully."))
+        // AVAssetExportSession's completion-handler export has no internal
+        // timeout, so a hung encoder would suspend the transcription pipeline
+        // forever. Race it against a deadline (scaled to the chunk length, with
+        // a generous floor) and cancel the export if the deadline wins.
+        let timeoutSeconds = max(Self.minimumChunkExportTimeout, duration * Self.chunkExportTimeoutMultiplier)
+        do {
+            try await withAsyncTimeout(
+                seconds: timeoutSeconds,
+                operation: {
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        exportBridge.session.exportAsynchronously {
+                            switch exportBridge.session.status {
+                            case .completed:
+                                continuation.resume()
+                            case .failed:
+                                continuation.resume(throwing: exportBridge.session.error ?? AppError.transcriptionFailure("The recorded audio chunk export failed."))
+                            case .cancelled:
+                                continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export was cancelled."))
+                            default:
+                                continuation.resume(throwing: AppError.transcriptionFailure("The recorded audio chunk export did not complete successfully."))
+                            }
+                        }
+                    }
+                },
+                onTimeout: {
+                    exportBridge.session.cancelExport()
                 }
-            }
+            )
+        } catch is AsyncTimeoutError {
+            throw AppError.transcriptionFailure("The recorded audio chunk export timed out.")
         }
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw AppError.transcriptionFailure("The recorded audio chunk could not be created.")
         }
     }
+
+    /// Minimum wall-clock budget for re-encoding a single transcription chunk.
+    private static let minimumChunkExportTimeout: TimeInterval = 120
+    /// Per-second-of-audio multiplier applied on top of the floor for long chunks.
+    private static let chunkExportTimeoutMultiplier: Double = 3
 }
 
 private final class AssetExportSessionBridge: @unchecked Sendable {
