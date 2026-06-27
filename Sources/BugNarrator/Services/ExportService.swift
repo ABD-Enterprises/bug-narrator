@@ -104,7 +104,7 @@ actor ExportService: IssueExporting {
     }
 
     func exportHistory() async throws -> [ExportReceipt] {
-        await ExportReceiptStore().allReceipts()
+        try await ExportReceiptStore().allReceipts()
     }
 }
 

@@ -31,8 +31,8 @@ struct ExportReceipt: Codable, Equatable {
 }
 
 protocol ExportReceiptStoring: Sendable {
-    func receipt(for fingerprint: String) async -> ExportReceipt?
-    func allReceipts() async -> [ExportReceipt]
+    func receipt(for fingerprint: String) async throws -> ExportReceipt?
+    func allReceipts() async throws -> [ExportReceipt]
     func markPending(
         fingerprint: String,
         sourceIssueID: UUID,
@@ -58,6 +58,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
     private let storageURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let logger = DiagnosticsLogger(category: .export)
     private var cache: [String: ExportReceipt]?
 
     init(
@@ -69,12 +70,12 @@ actor ExportReceiptStore: ExportReceiptStoring {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     }
 
-    func receipt(for fingerprint: String) async -> ExportReceipt? {
-        await loadCacheIfNeeded()[fingerprint]
+    func receipt(for fingerprint: String) async throws -> ExportReceipt? {
+        try await loadCacheIfNeeded()[fingerprint]
     }
 
-    func allReceipts() async -> [ExportReceipt] {
-        await loadCacheIfNeeded()
+    func allReceipts() async throws -> [ExportReceipt] {
+        try await loadCacheIfNeeded()
             .values
             .sorted { $0.updatedAt > $1.updatedAt }
     }
@@ -85,7 +86,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
         destination: ExportDestination,
         targetIdentity: String
     ) async throws {
-        var receipts = await loadCacheIfNeeded()
+        var receipts = try await loadCacheIfNeeded()
         receipts[fingerprint] = ExportReceipt(
             fingerprint: fingerprint,
             sourceIssueID: sourceIssueID,
@@ -107,7 +108,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
         remoteIdentifier: String,
         remoteURL: URL?
     ) async throws {
-        var receipts = await loadCacheIfNeeded()
+        var receipts = try await loadCacheIfNeeded()
         receipts[fingerprint] = ExportReceipt(
             fingerprint: fingerprint,
             sourceIssueID: sourceIssueID,
@@ -122,12 +123,12 @@ actor ExportReceiptStore: ExportReceiptStoring {
     }
 
     func clearReceipt(for fingerprint: String) async throws {
-        var receipts = await loadCacheIfNeeded()
+        var receipts = try await loadCacheIfNeeded()
         receipts.removeValue(forKey: fingerprint)
         try await persist(receipts)
     }
 
-    private func loadCacheIfNeeded() async -> [String: ExportReceipt] {
+    private func loadCacheIfNeeded() async throws -> [String: ExportReceipt] {
         if let cache {
             return cache
         }
@@ -137,14 +138,58 @@ actor ExportReceiptStore: ExportReceiptStoring {
             return [:]
         }
 
+        // Fail closed on any read/decode failure. Treating a corrupt or unreadable
+        // receipt store as "no receipts" would forget prior successful exports and
+        // silently re-create duplicate issues, so we stop export instead and leave
+        // a clear, actionable error. We do NOT cache an empty dict here, so the
+        // store keeps failing closed until the file is repaired or cleared.
+        let data: Data
         do {
-            let data = try Data(contentsOf: storageURL)
+            data = try Data(contentsOf: storageURL)
+        } catch {
+            logger.error(
+                "export_receipt_store_unreadable",
+                "Could not read the export receipt store; exports are paused to avoid duplicate issues.",
+                metadata: ["error": String(describing: type(of: error))]
+            )
+            throw AppError.exportFailure(
+                "BugNarrator could not read its export history, so exports are paused to avoid creating duplicate issues. Try again, or clear local data in Settings if this persists."
+            )
+        }
+
+        do {
             let receipts = try decoder.decode([String: ExportReceipt].self, from: data)
             cache = receipts
             return receipts
         } catch {
-            cache = [:]
-            return [:]
+            backUpCorruptReceiptStore()
+            logger.error(
+                "export_receipt_store_corrupt",
+                "The export receipt store is corrupt; exports are paused to avoid duplicate issues.",
+                metadata: ["error": String(describing: type(of: error))]
+            )
+            throw AppError.exportFailure(
+                "BugNarrator's export history file is corrupt, so exports are paused to avoid creating duplicate issues. Clear local data in Settings to reset it."
+            )
+        }
+    }
+
+    /// Preserves the first corrupt snapshot for forensics without overwriting a
+    /// previously-captured one (copy only if absent).
+    private func backUpCorruptReceiptStore() {
+        let backupURL = storageURL.deletingLastPathComponent()
+            .appendingPathComponent("export-receipts.corrupt.json")
+        guard !fileManager.fileExists(atPath: backupURL.path) else {
+            return
+        }
+        do {
+            try fileManager.copyItem(at: storageURL, to: backupURL)
+        } catch {
+            logger.warning(
+                "export_receipt_backup_failed",
+                "Could not back up the corrupt export receipt store.",
+                metadata: ["error": String(describing: type(of: error))]
+            )
         }
     }
 
