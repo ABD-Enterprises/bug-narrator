@@ -576,6 +576,14 @@ actor JiraExportProvider {
     /// confirms the issue was not already created — so a created-but-unacked issue
     /// is never duplicated. The pending receipt is kept across transient retries;
     /// cleared only on a confirmed permanent failure.
+    private static let retryContext = TrackerExportRetryContext(
+        displayName: "Jira",
+        destination: .jira,
+        exportedLogEvent: "jira_issue_exported",
+        failedLogEvent: "jira_export_failed",
+        reconciliationFailedLogEvent: "jira_export_reconciliation_failed"
+    )
+
     private func createWithRetry(
         issue: ExtractedIssue,
         fingerprint: String,
@@ -583,91 +591,23 @@ actor JiraExportProvider {
         configuration: JiraExportConfiguration,
         successfulCount: Int
     ) async throws -> ExportResult {
-        for attempt in 1...retryConfiguration.maxAttempts {
-            switch await attemptCreate(request, configuration: configuration) {
-            case .success(let remoteIdentifier, let remoteURL):
-                try await receiptStore.markSucceeded(
-                    fingerprint: fingerprint,
-                    sourceIssueID: issue.id,
-                    destination: .jira,
-                    targetIdentity: configuration.targetIdentity,
-                    remoteIdentifier: remoteIdentifier,
-                    remoteURL: remoteURL
-                )
-                logger.info(
-                    "jira_issue_exported",
-                    "Exported one issue to Jira.",
-                    metadata: ["source_issue_id": issue.id.uuidString, "remote_identifier": remoteIdentifier]
-                )
-                return ExportResult(
-                    sourceIssueID: issue.id,
-                    destination: .jira,
-                    remoteIdentifier: remoteIdentifier,
-                    remoteURL: remoteURL
-                )
-
-            case .transient(let createError, let retryAfterSeconds):
-                logger.error(
-                    "jira_export_failed",
-                    createError.userMessage,
-                    metadata: [
-                        "source_issue_id": issue.id.uuidString,
-                        "attempt": "\(attempt)",
-                        "transient": "true"
-                    ]
-                )
-                do {
-                    if let reconciled = try await reconcilePendingExport(
-                        fingerprint: fingerprint,
-                        sourceIssueID: issue.id,
-                        configuration: configuration
-                    ) {
-                        return reconciled
-                    }
-                } catch {
-                    logger.warning(
-                        "jira_export_reconciliation_failed",
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
-                        metadata: ["source_issue_id": issue.id.uuidString]
-                    )
-                    throw TrackerExportSupport.partialExportError(createError, providerName: "Jira", successfulCount: successfulCount)
-                }
-
-                if attempt < retryConfiguration.maxAttempts {
-                    let delay = TrackerExportSupport.retryDelay(
-                        attempt: attempt,
-                        retryAfterSeconds: retryAfterSeconds,
-                        base: retryConfiguration.baseDelay
-                    )
-                    if delay > .zero {
-                        try? await Task.sleep(for: delay)
-                    }
-                    continue
-                }
-                throw TrackerExportSupport.partialExportError(createError, providerName: "Jira", successfulCount: successfulCount)
-
-            case .permanent(let error):
-                logger.error(
-                    "jira_export_failed",
-                    error.userMessage,
-                    metadata: ["source_issue_id": issue.id.uuidString, "transient": "false"]
-                )
-                if let reconciled = try? await reconcilePendingExport(
+        try await TrackerExportSupport.runCreateWithRetry(
+            issueID: issue.id,
+            fingerprint: fingerprint,
+            targetIdentity: configuration.targetIdentity,
+            successfulCount: successfulCount,
+            configuration: retryConfiguration,
+            receiptStore: receiptStore,
+            logger: logger,
+            context: Self.retryContext,
+            attemptCreate: { await self.attemptCreate(request, configuration: configuration) },
+            reconcile: {
+                try await self.reconcilePendingExport(
                     fingerprint: fingerprint,
                     sourceIssueID: issue.id,
                     configuration: configuration
-                ) {
-                    return reconciled
-                }
-                try? await receiptStore.clearReceipt(for: fingerprint)
-                throw TrackerExportSupport.partialExportError(error, providerName: "Jira", successfulCount: successfulCount)
+                )
             }
-        }
-
-        throw TrackerExportSupport.partialExportError(
-            .exportFailure("Jira export did not complete."),
-            providerName: "Jira",
-            successfulCount: successfulCount
         )
     }
 

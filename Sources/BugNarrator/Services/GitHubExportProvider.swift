@@ -475,6 +475,14 @@ actor GitHubExportProvider {
     /// confirms the issue was not already created — so a created-but-unacked issue
     /// is never duplicated. The pending receipt is kept across transient retries;
     /// it is cleared only on a confirmed permanent failure.
+    private static let retryContext = TrackerExportRetryContext(
+        displayName: "GitHub",
+        destination: .github,
+        exportedLogEvent: "github_issue_exported",
+        failedLogEvent: "github_export_failed",
+        reconciliationFailedLogEvent: "github_export_reconciliation_failed"
+    )
+
     private func createWithRetry(
         issue: ExtractedIssue,
         fingerprint: String,
@@ -482,99 +490,23 @@ actor GitHubExportProvider {
         configuration: GitHubExportConfiguration,
         successfulCount: Int
     ) async throws -> ExportResult {
-        for attempt in 1...retryConfiguration.maxAttempts {
-            switch await attemptCreate(request, configuration: configuration) {
-            case .success(let remoteIdentifier, let remoteURL):
-                try await receiptStore.markSucceeded(
-                    fingerprint: fingerprint,
-                    sourceIssueID: issue.id,
-                    destination: .github,
-                    targetIdentity: configuration.targetIdentity,
-                    remoteIdentifier: remoteIdentifier,
-                    remoteURL: remoteURL
-                )
-                logger.info(
-                    "github_issue_exported",
-                    "Exported one issue to GitHub.",
-                    metadata: ["source_issue_id": issue.id.uuidString, "remote_identifier": remoteIdentifier]
-                )
-                return ExportResult(
-                    sourceIssueID: issue.id,
-                    destination: .github,
-                    remoteIdentifier: remoteIdentifier,
-                    remoteURL: remoteURL
-                )
-
-            case .transient(let createError, let retryAfterSeconds):
-                logger.error(
-                    "github_export_failed",
-                    createError.userMessage,
-                    metadata: [
-                        "source_issue_id": issue.id.uuidString,
-                        "attempt": "\(attempt)",
-                        "transient": "true"
-                    ]
-                )
-                // Did the issue actually get created despite the error? If the
-                // reconcile search itself fails we cannot verify, so we must NOT
-                // retry (which could duplicate) — abort and keep the pending
-                // receipt for a future reconcile.
-                do {
-                    if let reconciled = try await reconcilePendingExport(
-                        fingerprint: fingerprint,
-                        sourceIssueID: issue.id,
-                        configuration: configuration
-                    ) {
-                        return reconciled
-                    }
-                } catch {
-                    logger.warning(
-                        "github_export_reconciliation_failed",
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
-                        metadata: ["source_issue_id": issue.id.uuidString]
-                    )
-                    throw TrackerExportSupport.partialExportError(createError, providerName: "GitHub", successfulCount: successfulCount)
-                }
-
-                if attempt < retryConfiguration.maxAttempts {
-                    let delay = TrackerExportSupport.retryDelay(
-                        attempt: attempt,
-                        retryAfterSeconds: retryAfterSeconds,
-                        base: retryConfiguration.baseDelay
-                    )
-                    if delay > .zero {
-                        try? await Task.sleep(for: delay)
-                    }
-                    continue
-                }
-                // Retries exhausted — keep the pending receipt (do not clear).
-                throw TrackerExportSupport.partialExportError(createError, providerName: "GitHub", successfulCount: successfulCount)
-
-            case .permanent(let error):
-                logger.error(
-                    "github_export_failed",
-                    error.userMessage,
-                    metadata: ["source_issue_id": issue.id.uuidString, "transient": "false"]
-                )
-                if let reconciled = try? await reconcilePendingExport(
+        try await TrackerExportSupport.runCreateWithRetry(
+            issueID: issue.id,
+            fingerprint: fingerprint,
+            targetIdentity: configuration.targetIdentity,
+            successfulCount: successfulCount,
+            configuration: retryConfiguration,
+            receiptStore: receiptStore,
+            logger: logger,
+            context: Self.retryContext,
+            attemptCreate: { await self.attemptCreate(request, configuration: configuration) },
+            reconcile: {
+                try await self.reconcilePendingExport(
                     fingerprint: fingerprint,
                     sourceIssueID: issue.id,
                     configuration: configuration
-                ) {
-                    return reconciled
-                }
-                // A permanent rejection means the issue was not created; clear the
-                // pending receipt so a corrected re-export can proceed cleanly.
-                try? await receiptStore.clearReceipt(for: fingerprint)
-                throw TrackerExportSupport.partialExportError(error, providerName: "GitHub", successfulCount: successfulCount)
+                )
             }
-        }
-
-        // Unreachable (the loop returns or throws), but the compiler requires it.
-        throw TrackerExportSupport.partialExportError(
-            .exportFailure("GitHub export did not complete."),
-            providerName: "GitHub",
-            successfulCount: successfulCount
         )
     }
 
