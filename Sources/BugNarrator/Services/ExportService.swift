@@ -118,8 +118,22 @@ struct TrackerIssueCandidate: Equatable {
 /// Helpers shared by the tracker export providers (Jira, GitHub) whose
 /// implementations are byte-identical apart from the provider's display name.
 enum TrackerExportSupport {
+    /// Reserved words that act as operators/keywords in GitHub issue search and
+    /// in Jira's JQL. The term tokenizer already strips all non-alphanumeric
+    /// characters (so quotes, colons, and slashes can never reach the query),
+    /// but a 3+ character keyword like `AND`/`NOT`/`ORDER` would otherwise
+    /// survive as a bare token and subtly broaden or alter the duplicate search.
+    /// These are common stop-words in prose, so dropping them does not weaken
+    /// the keyword match for real issue text.
+    private static let reservedSearchWords: Set<String> = [
+        "and", "or", "not", "in", "is", "was", "null", "empty",
+        "order", "by", "changed", "during", "before", "after", "on"
+    ]
+
     /// Builds a short search phrase from an issue's most significant terms, used
-    /// to look for potential duplicate issues before exporting.
+    /// to look for potential duplicate issues before exporting. The phrase is a
+    /// space-separated list of literal keyword terms; it must never be able to
+    /// introduce a search operator/qualifier.
     static func searchTerms(for issue: ExtractedIssue) -> String {
         let source = [issue.title, issue.component, issue.summary]
             .compactMap { $0 }
@@ -127,7 +141,7 @@ enum TrackerExportSupport {
         let significantTerms = source
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 3 }
+            .filter { $0.count >= 3 && !reservedSearchWords.contains($0.lowercased()) }
 
         return significantTerms.prefix(6).joined(separator: " ")
     }

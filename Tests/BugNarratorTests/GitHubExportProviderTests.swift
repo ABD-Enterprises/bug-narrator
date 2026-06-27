@@ -166,6 +166,49 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(matches.first?.title, "Login form validation broken")
     }
 
+    func testFindOpenIssuesKeepsSearchScopeWhenTermsContainReservedWordsAndOperators() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        // A hostile/awkward title that, before hardening, could try to smuggle
+        // GitHub search qualifiers and boolean operators into the dedup query.
+        let issue = ExtractedIssue(
+            title: #"repo:other/private AND NOT "secret" is:closed"#,
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout button never enabled.",
+            timestamp: nil
+        )
+
+        MockURLProtocol.requestHandler = { request in
+            let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+            let query = try XCTUnwrap(components.queryItems?.first(where: { $0.name == "q" })?.value)
+
+            // Our fixed scope qualifiers are present exactly once...
+            XCTAssertTrue(query.hasPrefix("repo:acme/bugnarrator is:issue is:open"))
+            XCTAssertEqual(query.components(separatedBy: "repo:").count - 1, 1)
+            // ...and no foreign qualifier or boolean operator survived as a bare token.
+            let terms = query
+                .replacingOccurrences(of: "repo:acme/bugnarrator is:issue is:open", with: "")
+                .split(separator: " ")
+                .map(String.init)
+            XCTAssertFalse(terms.contains("AND"))
+            XCTAssertFalse(terms.contains("NOT"))
+            XCTAssertFalse(terms.contains { $0.contains(":") })
+
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"items":[]}"#.utf8))
+        }
+
+        _ = try await provider.findOpenIssues(
+            matching: issue,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            )
+        )
+    }
+
     func testValidateConfigurationChecksRepositoryAccess() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
 
