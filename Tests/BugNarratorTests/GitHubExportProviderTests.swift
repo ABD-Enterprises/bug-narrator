@@ -262,6 +262,45 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.contains("&lt;script&gt;"))
     }
 
+    func testValidateMapsRateLimitToDistinctMessage() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 429, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"message":"API rate limit exceeded"}"#.utf8))
+        }
+
+        do {
+            try await provider.validate(
+                configuration: GitHubExportConfiguration(
+                    token: "fixture-github-token",
+                    owner: "acme",
+                    repository: "bugnarrator",
+                    labels: []
+                )
+            )
+            XCTFail("Expected a rate-limit error")
+        } catch let error as AppError {
+            XCTAssertTrue(error.userMessage.lowercased().contains("rate limited"), error.userMessage)
+            XCTAssertFalse(error.userMessage.lowercased().contains("rejected the token"))
+        }
+    }
+
+    func testRetryAfterHelpersParseHeaderAndBuildSuffix() throws {
+        let url = try XCTUnwrap(URL(string: "https://api.github.com"))
+        let withHeader = HTTPURLResponse(url: url, statusCode: 429, httpVersion: nil, headerFields: ["Retry-After": "30"])!
+        XCTAssertEqual(TrackerExportSupport.retryAfterSeconds(from: withHeader), 30)
+
+        let dateHeader = HTTPURLResponse(url: url, statusCode: 429, httpVersion: nil, headerFields: ["Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"])!
+        XCTAssertNil(TrackerExportSupport.retryAfterSeconds(from: dateHeader))
+
+        let noHeader = HTTPURLResponse(url: url, statusCode: 429, httpVersion: nil, headerFields: nil)!
+        XCTAssertNil(TrackerExportSupport.retryAfterSeconds(from: noHeader))
+
+        XCTAssertTrue(TrackerExportSupport.retryAfterSuffix(30).contains("30s"))
+        XCTAssertFalse(TrackerExportSupport.retryAfterSuffix(nil).contains("30s"))
+    }
+
     func testValidateConfigurationChecksRepositoryAccess() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
 
