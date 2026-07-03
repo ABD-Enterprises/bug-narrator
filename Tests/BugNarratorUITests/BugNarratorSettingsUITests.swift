@@ -158,7 +158,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let loadGitHubButton = button(matchingAnyOf: ["Save & Load GitHub Repos", "Load GitHub Repos", "Refresh GitHub Repos"], in: app)
         XCTAssertTrue(waitForSettingsElement(loadGitHubButton, in: settingsWindow))
-        XCTAssertTrue(loadGitHubButton.isEnabled)
+        XCTAssertTrue(waitForReady(loadGitHubButton), "Load GitHub Repos never became ready")
         loadGitHubButton.click()
         XCTAssertTrue(settingsWindow.exists)
 
@@ -176,7 +176,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let loadJiraButton = button(matchingAnyOf: ["Save & Load Jira Projects", "Load Jira Projects", "Refresh Jira Projects"], in: app)
         XCTAssertTrue(waitForSettingsElement(loadJiraButton, in: settingsWindow))
-        XCTAssertTrue(loadJiraButton.isEnabled)
+        XCTAssertTrue(waitForReady(loadJiraButton), "Load Jira Projects never became ready")
         loadJiraButton.click()
         XCTAssertTrue(settingsWindow.exists)
     }
@@ -200,7 +200,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         replaceText(in: searchField, with: "export")
         let clearSearch = app.buttons["Clear search"]
-        XCTAssertTrue(clearSearch.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForReady(clearSearch), "Clear search never became ready")
         clearSearch.click()
 
         let issueSelection = app.checkBoxes["Select issue Settings export smoke issue for export"]
@@ -250,13 +250,13 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let sendGitHub = app.buttons["Send to GitHub"]
         XCTAssertTrue(waitForElement(sendGitHub, in: sessionsWindow))
-        XCTAssertTrue(sendGitHub.isEnabled)
+        XCTAssertTrue(waitForReady(sendGitHub), "Send to GitHub never became ready")
         sendGitHub.click()
         XCTAssertTrue(sessionsWindow.exists)
 
         let sendJira = app.buttons["Send to Jira"]
         XCTAssertTrue(waitForElement(sendJira, in: sessionsWindow))
-        XCTAssertTrue(sendJira.isEnabled)
+        XCTAssertTrue(waitForReady(sendJira), "Send to Jira never became ready")
         sendJira.click()
         XCTAssertTrue(sessionsWindow.exists)
     }
@@ -278,11 +278,14 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let screenshotButton = app.buttons["Capture Screenshot"]
         let closeButton = app.buttons["Close"]
 
-        XCTAssertTrue(startButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(stopButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(screenshotButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(startButton.isEnabled)
+        // Start Recording is clicked below, so wait for it to be fully ready.
+        // The others are asserted in their (disabled) initial state, so wait only
+        // for attachment — controls in this separate window can attach well after
+        // the window exists, which was the observed flake here.
+        XCTAssertTrue(waitForReady(startButton), "Start Recording never became ready")
+        XCTAssertTrue(waitForAttachment(stopButton), "Stop Recording never attached")
+        XCTAssertTrue(waitForAttachment(screenshotButton), "Capture Screenshot never attached")
+        XCTAssertTrue(waitForAttachment(closeButton), "Close never attached")
         XCTAssertFalse(stopButton.isEnabled)
         XCTAssertFalse(screenshotButton.isEnabled)
 
@@ -405,7 +408,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
             }
         }
 
-        XCTAssertTrue(element.isHittable, file: file, line: line)
+        // Poll for readiness after scrolling rather than asserting hittability
+        // once — the single-shot assert raced layout settling.
+        XCTAssertTrue(waitForReady(element), "Element never became ready to click", file: file, line: line)
         element.click()
     }
 
@@ -441,14 +446,21 @@ final class BugNarratorSettingsUITests: XCTestCase {
     }
 
     @MainActor
-    private func replaceText(in element: XCUIElement, with text: String) {
-        XCTAssertTrue(element.exists)
-        let deadline = Date().addingTimeInterval(5)
-        while !isReadyForInput(element), Date() < deadline {
-            waitForSettingsLayout(interval: 0.15)
-        }
-        XCTAssertTrue(element.isHittable)
-        XCTAssertTrue(element.isEnabled || element.elementType == .textView)
+    private func replaceText(
+        in element: XCUIElement,
+        with text: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        // Poll for the composite input-ready state before interacting, rather than
+        // asserting `isHittable`/`isEnabled` once after a fixed deadline — the
+        // latter races element attachment/layout and was the primary flake source.
+        XCTAssertTrue(
+            waitForInputReady(element),
+            "Element never became input-ready before typing",
+            file: file,
+            line: line
+        )
         element.click()
         element.typeKey("a", modifierFlags: .command)
         NSPasteboard.general.clearContents()
@@ -459,6 +471,58 @@ final class BugNarratorSettingsUITests: XCTestCase {
     @MainActor
     private func isReadyForInput(_ element: XCUIElement) -> Bool {
         element.exists && element.isHittable && (element.isEnabled || element.elementType == .textView)
+    }
+
+    /// Polls until an element is fully ready for a positive interaction
+    /// (attached, hittable, and enabled), pumping the run loop between checks.
+    /// Use before clicking a control that is expected to be enabled — never for
+    /// controls that are expected disabled (that state is real behavior; assert
+    /// it with `waitForAttachment` + an explicit `XCTAssertFalse(isEnabled)` or
+    /// `waitUntil(_:isEnabled:false)` instead).
+    @MainActor
+    private func waitForReady(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists, element.isHittable, element.isEnabled {
+                return true
+            }
+            waitForSettingsLayout(interval: 0.15)
+        } while Date() < deadline
+
+        return element.exists && element.isHittable && element.isEnabled
+    }
+
+    /// Polls until an element is ready to receive text input (attached, hittable,
+    /// and either enabled or a text view — text views report `isEnabled == false`
+    /// while still editable). Use before typing into a field.
+    @MainActor
+    private func waitForInputReady(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if isReadyForInput(element) {
+                return true
+            }
+            waitForSettingsLayout(interval: 0.15)
+        } while Date() < deadline
+
+        return isReadyForInput(element)
+    }
+
+    /// Polls only for attachment (existence) — the correct wait before asserting a
+    /// control's *disabled*/negative state, which `waitForReady` cannot be used
+    /// for (it requires `isEnabled`). Separate windows (e.g. Recording Controls)
+    /// can attach their controls well after the window itself exists.
+    @MainActor
+    private func waitForAttachment(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists {
+                return true
+            }
+            waitForSettingsLayout(interval: 0.15)
+        } while Date() < deadline
+
+        return element.exists
     }
 
     @MainActor
