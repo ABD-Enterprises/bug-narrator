@@ -14,6 +14,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let settingsWindow = app.windows["BugNarrator Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
+        selectSettingsTab("General", in: app)
 
         let startupToggle = settingsWindow.checkBoxes["Open BugNarrator at startup"]
         XCTAssertTrue(startupToggle.waitForExistence(timeout: 5))
@@ -44,15 +45,20 @@ final class BugNarratorSettingsUITests: XCTestCase {
         waitForSettingsLayout()
 
         XCTAssertTrue(app.descendants(matching: .any)["AI provider status: Ready"].waitForExistence(timeout: 5))
+        selectSettingsTab("AI Engines", in: app)
         XCTAssertTrue(app.staticTexts["Saved key"].waitForExistence(timeout: 5))
 
+        // These buttons are only asserted present + enabled (never clicked), so
+        // wait for existence and enabled-state rather than hittability — the
+        // saved-key state is short content in a background window, so the buttons
+        // exist and are enabled but may not report hittable.
         let validateKeyButton = app.buttons["Validate Key"]
-        XCTAssertTrue(waitForSettingsElement(validateKeyButton, in: settingsWindow))
-        XCTAssertTrue(validateKeyButton.isEnabled)
+        XCTAssertTrue(validateKeyButton.waitForExistence(timeout: 5), "Validate Key not found")
+        XCTAssertTrue(waitUntil(validateKeyButton, isEnabled: true), "Validate Key never became enabled")
 
         let removeKeyButton = app.buttons["Remove Key"]
-        XCTAssertTrue(waitForSettingsElement(removeKeyButton, in: settingsWindow))
-        XCTAssertTrue(removeKeyButton.isEnabled)
+        XCTAssertTrue(removeKeyButton.waitForExistence(timeout: 5), "Remove Key not found")
+        XCTAssertTrue(waitUntil(removeKeyButton, isEnabled: true), "Remove Key never became enabled")
     }
 
     @MainActor
@@ -64,12 +70,14 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
+        selectSettingsTab("AI Engines", in: app)
         let openAIKeyField = app.textFields["OpenAI API Key"]
         XCTAssertTrue(waitForSettingsElement(openAIKeyField, in: settingsWindow))
         clickWhenHittable(openAIKeyField, in: settingsWindow)
         openAIKeyField.typeText("sk-smoke-test")
         XCTAssertTrue(settingsWindow.exists)
 
+        selectSettingsTab("Integrations", in: app)
         let gitHubTokenField = app.textFields["GitHub personal access token"]
         XCTAssertTrue(waitForSettingsElement(gitHubTokenField, in: settingsWindow))
         clickWhenHittable(gitHubTokenField, in: settingsWindow)
@@ -97,6 +105,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let settingsWindow = app.windows["BugNarrator Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
+
+        // --- AI Engines tab ---
+        selectSettingsTab("AI Engines", in: app)
         XCTAssertTrue(settingsWindow.scrollViews.firstMatch.exists)
 
         XCTAssertTrue(app.descendants(matching: .any)["AI Provider Setup section"].waitForExistence(timeout: 5))
@@ -124,8 +135,13 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(waitForSettingsElement(extractionModelSelector, in: settingsWindow))
         XCTAssertTrue(extractionModelSelector.isEnabled)
 
+        let autoExtractCheckbox = settingsWindow.checkBoxes["Run issue extraction automatically after transcription"]
+        XCTAssertTrue(waitForSettingsElement(autoExtractCheckbox, in: settingsWindow), "Run issue extraction automatically after transcription")
+        XCTAssertTrue(autoExtractCheckbox.isEnabled)
+
+        // --- General tab ---
+        selectSettingsTab("General", in: app)
         for checkboxLabel in [
-            "Run issue extraction automatically after transcription",
             "Auto-copy transcript to clipboard",
             "Open BugNarrator at startup",
             "Debug mode enables verbose local diagnostics"
@@ -140,6 +156,8 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let clearButton = app.buttons["Clear shortcut for Start Recording"].firstMatch
         XCTAssertTrue(waitForSettingsElement(clearButton, in: settingsWindow), "Clear")
 
+        // --- Integrations tab ---
+        selectSettingsTab("Integrations", in: app)
         let gitHubTokenField = app.textFields["GitHub personal access token"]
         XCTAssertTrue(waitForSettingsElement(gitHubTokenField, in: settingsWindow))
         replaceText(in: gitHubTokenField, with: "github_pat_ui_test")
@@ -553,5 +571,40 @@ final class BugNarratorSettingsUITests: XCTestCase {
     @MainActor
     private func waitForSettingsLayout(interval: TimeInterval = 0.75) {
         RunLoop.current.run(until: Date().addingTimeInterval(interval))
+    }
+
+    /// Selects a section in the segmented settings tab control (#355). Settings
+    /// fields live behind tabs, so only the selected section's controls are in the
+    /// accessibility tree — call this before accessing any field in a section. The
+    /// segmented `Picker` exposes each section as a `radioButton` labeled with the
+    /// section title (e.g. "General", "AI Engines", "Audio", "Integrations",
+    /// "Diagnostics & Privacy").
+    @MainActor
+    private func selectSettingsTab(_ section: String, in app: XCUIApplication) {
+        // Bring the settings window forward — while the test runner is key, the
+        // window's controls report disabled/non-hittable, which makes the
+        // segment (and the fields it reveals) flaky to interact with.
+        app.activate()
+        let window = app.windows["BugNarrator Settings"]
+        let tab = window.radioButtons[section]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "Settings section tab '\(section)' not found")
+
+        // The settings window may not be the key window (the test runner is), which
+        // makes its controls report disabled/non-hittable; the segmented control's
+        // segments can also report isHittable == false while still being clickable.
+        // Retry the click (falling back to a coordinate tap) until the segment
+        // reports selected (value 1), so the pane swap has actually happened before
+        // any field in the section is read.
+        let deadline = Date().addingTimeInterval(10)
+        while (tab.value as? Int) != 1, Date() < deadline {
+            if tab.isHittable {
+                tab.click()
+            } else {
+                tab.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            }
+            waitForSettingsLayout(interval: 0.3)
+        }
+        XCTAssertEqual(tab.value as? Int, 1, "Settings section '\(section)' did not become selected")
+        waitForSettingsLayout(interval: 0.3)
     }
 }
