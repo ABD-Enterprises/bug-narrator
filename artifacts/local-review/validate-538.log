@@ -1,0 +1,9 @@
+#538 Extract RecordingPreferencesStore from SettingsStore — validation evidence
+
+BugNarratorTests/SettingsStoreTests: Executed 69 tests, 0 failures (65 existing + 4 new).
+BugNarratorTests (full unit suite): passed.
+scripts/validate.sh origin/main: PASS (semgrep + swift-parse + agent-rules-sync), exit 0.
+Build: SUCCEEDED.
+
+Extraction is behavior-preserving (UserDefaults-only, no Keychain/credential state touched).
+Reviews: codex scoped the slice (issue #429 comment); Claude reviewed the diff.
