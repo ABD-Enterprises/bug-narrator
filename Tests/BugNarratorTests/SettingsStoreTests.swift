@@ -1452,4 +1452,101 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertNotNil(url.host, "fallbackBaseURL for \(provider.rawValue) has no host: \(url.absoluteString).")
         }
     }
+
+    func testDisablingSystemAudioCaptureAtRuntimeResetsSystemAudioSource() {
+        let suiteName = "BugNarrator-RecordingAudioRuntimeResetTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.systemAudioCaptureEnabled = true
+        store.recordingAudioSource = .microphoneAndSystemAudio
+        XCTAssertEqual(store.recordingAudioSource, .microphoneAndSystemAudio)
+
+        // Disabling capture at runtime must reset a system-audio source to
+        // microphone and write that normalized value back (the didSet rule).
+        store.systemAudioCaptureEnabled = false
+
+        XCTAssertEqual(store.recordingAudioSource, .microphone)
+        XCTAssertEqual(defaults.string(forKey: "settings.recordingAudioSource"), RecordingAudioSource.microphone.rawValue)
+        XCTAssertFalse(defaults.bool(forKey: "settings.systemAudioCaptureEnabled"))
+    }
+
+    func testRecordingAudioPreferencesUseUnchangedDefaultsKeys() {
+        let suiteName = "BugNarrator-RecordingAudioKeyStabilityTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // Seed the exact persisted keys as older builds wrote them; the store must
+        // still load them (no rename) after the RecordingPreferencesStore extraction.
+        defaults.set(true, forKey: "settings.systemAudioCaptureEnabled")
+        defaults.set(RecordingAudioSource.microphoneAndSystemAudio.rawValue, forKey: "settings.recordingAudioSource")
+        defaults.set(true, forKey: "settings.hasAcceptedSystemAudioRecordingConsent")
+        defaults.set(true, forKey: "settings.suppressSystemAudioExplainer")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(store.systemAudioCaptureEnabled)
+        XCTAssertEqual(store.recordingAudioSource, .microphoneAndSystemAudio)
+        XCTAssertTrue(store.hasAcceptedSystemAudioRecordingConsent)
+        XCTAssertTrue(store.suppressSystemAudioExplainer)
+
+        // Mutations write back to the identical keys and survive a reload.
+        store.hasAcceptedSystemAudioRecordingConsent = false
+        store.suppressSystemAudioExplainer = false
+        XCTAssertFalse(defaults.bool(forKey: "settings.hasAcceptedSystemAudioRecordingConsent"))
+        XCTAssertFalse(defaults.bool(forKey: "settings.suppressSystemAudioExplainer"))
+
+        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(reloaded.systemAudioCaptureEnabled)
+        XCTAssertEqual(reloaded.recordingAudioSource, .microphoneAndSystemAudio)
+        XCTAssertFalse(reloaded.hasAcceptedSystemAudioRecordingConsent)
+        XCTAssertFalse(reloaded.suppressSystemAudioExplainer)
+
+        XCTAssertEqual(RecordingPreferencesStore.Keys.systemAudioCaptureEnabled, "settings.systemAudioCaptureEnabled")
+        XCTAssertEqual(RecordingPreferencesStore.Keys.recordingAudioSource, "settings.recordingAudioSource")
+        XCTAssertEqual(RecordingPreferencesStore.Keys.hasAcceptedSystemAudioRecordingConsent, "settings.hasAcceptedSystemAudioRecordingConsent")
+        XCTAssertEqual(RecordingPreferencesStore.Keys.suppressSystemAudioExplainer, "settings.suppressSystemAudioExplainer")
+    }
+
+    func testLoadDoesNotWriteRecordingAudioSourceWhenNoNormalizationIsNeeded() {
+        let suiteName = "BugNarrator-RecordingAudioNoSpuriousWriteTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // Fresh install: nothing stored, so the source defaults to microphone and
+        // needs no normalization. load() must NOT write the key back (mirrors the
+        // old code, which only persisted inside the normalization branch).
+        _ = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertNil(defaults.object(forKey: "settings.recordingAudioSource"))
+    }
+
+    func testRecordingPreferencesStorePersistsAndNormalizesDirectly() {
+        let suiteName = "BugNarrator-RecordingPreferencesStoreTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = RecordingPreferencesStore(defaults: defaults)
+
+        // Normalization: a system-audio source with capture disabled -> microphone;
+        // otherwise the source (and microphone) is kept as-is.
+        XCTAssertEqual(store.normalizedRecordingAudioSource(.systemAudio, systemAudioCaptureEnabled: false), .microphone)
+        XCTAssertEqual(store.normalizedRecordingAudioSource(.microphoneAndSystemAudio, systemAudioCaptureEnabled: false), .microphone)
+        XCTAssertEqual(store.normalizedRecordingAudioSource(.systemAudio, systemAudioCaptureEnabled: true), .systemAudio)
+        XCTAssertEqual(store.normalizedRecordingAudioSource(.microphone, systemAudioCaptureEnabled: false), .microphone)
+
+        // Persist round-trips to the exact keys.
+        store.persist(systemAudioCaptureEnabled: true)
+        store.persist(recordingAudioSource: .microphoneAndSystemAudio)
+        store.persist(hasAcceptedSystemAudioRecordingConsent: true)
+        store.persist(suppressSystemAudioExplainer: true)
+        XCTAssertTrue(defaults.bool(forKey: "settings.systemAudioCaptureEnabled"))
+        XCTAssertEqual(defaults.string(forKey: "settings.recordingAudioSource"), RecordingAudioSource.microphoneAndSystemAudio.rawValue)
+        XCTAssertTrue(defaults.bool(forKey: "settings.hasAcceptedSystemAudioRecordingConsent"))
+        XCTAssertTrue(defaults.bool(forKey: "settings.suppressSystemAudioExplainer"))
+    }
 }

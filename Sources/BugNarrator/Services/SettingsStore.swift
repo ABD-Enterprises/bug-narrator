@@ -267,7 +267,7 @@ final class SettingsStore: ObservableObject {
     @Published var systemAudioCaptureEnabled: Bool = false {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(systemAudioCaptureEnabled, forKey: Keys.systemAudioCaptureEnabled)
+            recordingPreferences.persist(systemAudioCaptureEnabled: systemAudioCaptureEnabled)
             if !systemAudioCaptureEnabled, recordingAudioSource.usesSystemAudio {
                 recordingAudioSource = .microphone
             }
@@ -277,17 +277,14 @@ final class SettingsStore: ObservableObject {
     @Published var recordingAudioSource: RecordingAudioSource = .microphone {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(recordingAudioSource.rawValue, forKey: Keys.recordingAudioSource)
+            recordingPreferences.persist(recordingAudioSource: recordingAudioSource)
         }
     }
 
     @Published var hasAcceptedSystemAudioRecordingConsent: Bool = false {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(
-                hasAcceptedSystemAudioRecordingConsent,
-                forKey: Keys.hasAcceptedSystemAudioRecordingConsent
-            )
+            recordingPreferences.persist(hasAcceptedSystemAudioRecordingConsent: hasAcceptedSystemAudioRecordingConsent)
         }
     }
 
@@ -447,7 +444,7 @@ final class SettingsStore: ObservableObject {
     @Published var suppressSystemAudioExplainer: Bool = false {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(suppressSystemAudioExplainer, forKey: Keys.suppressSystemAudioExplainer)
+            recordingPreferences.persist(suppressSystemAudioExplainer: suppressSystemAudioExplainer)
         }
     }
 
@@ -1074,6 +1071,7 @@ final class SettingsStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let keychainService: KeychainServicing
+    private let recordingPreferences: RecordingPreferencesStore
     private let launchAtLoginService: any LaunchAtLoginControlling
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -1092,6 +1090,7 @@ final class SettingsStore: ObservableObject {
         legacyDefaultsDomains: [String]? = nil
     ) {
         self.defaults = defaults
+        self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
         self.keychainService = keychainService
         self.launchAtLoginService = launchAtLoginService
         if let legacyDefaultsDomains {
@@ -1264,17 +1263,23 @@ final class SettingsStore: ObservableObject {
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
         normalizeIssueExtractionAvailabilityForCurrentProvider(persist: true)
-        systemAudioCaptureEnabled = boolValue(forKey: Keys.systemAudioCaptureEnabled) ?? false
-        let storedAudioSource = stringValue(forKey: Keys.recordingAudioSource)
-        recordingAudioSource = storedAudioSource
+        systemAudioCaptureEnabled = boolValue(forKey: RecordingPreferencesStore.Keys.systemAudioCaptureEnabled) ?? false
+        let storedAudioSource = stringValue(forKey: RecordingPreferencesStore.Keys.recordingAudioSource)
+        let parsedAudioSource = storedAudioSource
             .flatMap(RecordingAudioSource.init(rawValue:))
             ?? .microphone
-        if !systemAudioCaptureEnabled, recordingAudioSource.usesSystemAudio {
-            recordingAudioSource = .microphone
-            defaults.set(recordingAudioSource.rawValue, forKey: Keys.recordingAudioSource)
+        let normalizedAudioSource = recordingPreferences.normalizedRecordingAudioSource(
+            parsedAudioSource,
+            systemAudioCaptureEnabled: systemAudioCaptureEnabled
+        )
+        recordingAudioSource = normalizedAudioSource
+        if normalizedAudioSource != parsedAudioSource {
+            // hasLoaded is still false here, so the property's didSet does not
+            // persist — write the normalized value back explicitly, as before.
+            recordingPreferences.persist(recordingAudioSource: normalizedAudioSource)
         }
         hasAcceptedSystemAudioRecordingConsent = boolValue(
-            forKey: Keys.hasAcceptedSystemAudioRecordingConsent
+            forKey: RecordingPreferencesStore.Keys.hasAcceptedSystemAudioRecordingConsent
         ) ?? false
         syncLaunchAtLoginState(launchAtLoginService.currentStatus())
 
@@ -1307,7 +1312,7 @@ final class SettingsStore: ObservableObject {
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
         operationalTelemetryEnabled = boolValue(forKey: Keys.operationalTelemetryEnabled) ?? true
         autoShowChangelogOnUpdate = boolValue(forKey: Keys.autoShowChangelogOnUpdate) ?? true
-        suppressSystemAudioExplainer = boolValue(forKey: Keys.suppressSystemAudioExplainer) ?? false
+        suppressSystemAudioExplainer = boolValue(forKey: RecordingPreferencesStore.Keys.suppressSystemAudioExplainer) ?? false
         migrateLegacyBuiltInHotkeysIfNeeded()
         normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
@@ -2123,9 +2128,7 @@ private enum Keys {
     static let autoCopyTranscript = "settings.autoCopyTranscript"
     static let autoSaveTranscript = "settings.autoSaveTranscript"
     static let autoExtractIssues = "settings.autoExtractIssues"
-    static let systemAudioCaptureEnabled = "settings.systemAudioCaptureEnabled"
-    static let recordingAudioSource = "settings.recordingAudioSource"
-    static let hasAcceptedSystemAudioRecordingConsent = "settings.hasAcceptedSystemAudioRecordingConsent"
+    // Recording-audio preference keys live on RecordingPreferencesStore.Keys (#429).
     static let startRecordingHotkeyShortcut = "settings.startRecordingHotkeyShortcut"
     static let legacyRecordingHotkeyShortcut = "settings.hotkeyShortcut"
     static let legacyStartRecordingHotkeyShortcut = "settings.recordingHotkeyShortcut"
@@ -2147,7 +2150,6 @@ private enum Keys {
     static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
     static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
-    static let suppressSystemAudioExplainer = "settings.suppressSystemAudioExplainer"
 }
 
 enum APIKeyPersistenceState: Equatable {
