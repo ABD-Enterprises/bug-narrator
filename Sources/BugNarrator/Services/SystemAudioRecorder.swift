@@ -259,26 +259,6 @@ final class SystemAudioRecorder: AudioRecording {
     }
 }
 
-struct SystemAudioAggregateDeviceCleanupSummary: Equatable {
-    var inspectedCount = 0
-    var destroyedCount = 0
-    var failedCount = 0
-    var scanFailed = false
-}
-
-enum SystemAudioAggregateDeviceIdentity {
-    static let name = "BugNarrator System Audio"
-    static let uidPrefix = "BugNarrator.SystemAudio."
-
-    static func makeUID() -> String {
-        "\(uidPrefix)\(UUID().uuidString)"
-    }
-
-    static func isOwnedAggregateDeviceUID(_ uid: String) -> Bool {
-        uid.hasPrefix(uidPrefix)
-    }
-}
-
 private final class SystemAudioTapSession {
     private var processTapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
