@@ -1075,30 +1075,6 @@ final class AppState: ObservableObject {
         manualIssueExtractionStatusPresenter.presentPreflightFailure(preflightError, sessionID: transcriptSession.id)
     }
 
-    func updateExtractedIssue(_ updatedIssue: ExtractedIssue, in sessionID: UUID) {
-        do {
-            try issueExtractionController.updateExtractedIssue(updatedIssue, in: sessionID)
-        } catch {
-            issueMutationFailurePresenter.presentFailure(error)
-        }
-    }
-
-    func setIssueSelection(_ isSelected: Bool, issueID: UUID, in sessionID: UUID) {
-        do {
-            try issueExtractionController.setIssueSelection(isSelected, issueID: issueID, in: sessionID)
-        } catch {
-            issueMutationFailurePresenter.presentFailure(error)
-        }
-    }
-
-    func setAllIssuesSelected(_ isSelected: Bool, in sessionID: UUID) {
-        do {
-            try issueExtractionController.setAllIssuesSelected(isSelected, in: sessionID)
-        } catch {
-            issueMutationFailurePresenter.presentFailure(error)
-        }
-    }
-
     func exportSelectedIssues(from session: TranscriptSession, to destination: ExportDestination) async {
         let context: IssueExportRequestContext
         switch issueExportController.preflightIssueExport(
