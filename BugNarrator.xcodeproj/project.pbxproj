@@ -16,6 +16,7 @@
 		099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */; };
 		09B048166CEEFA50BD278F7D /* IssueExportControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75E9A5FCC6C1D45D20E8F80 /* IssueExportControllerTests.swift */; };
 		0C27546CA8851DF57ECF8C6E /* TranscriptionClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */; };
+		0C3B061E5ECAD626CDB83B89 /* ScreenshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E849C3E02857E9CF3FDCC39A /* ScreenshotTestSupport.swift */; };
 		0D3E82C811F386795DBE5D82 /* ExportReceiptStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527C2EB86F851CAA53F3E4D3 /* ExportReceiptStoreTests.swift */; };
 		134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6131EA189B853D1B456A8D26 /* SettingsView.swift */; };
 		14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */; };
@@ -434,6 +435,7 @@
 		E500A980171E57FE562FBB7C /* TranscriptSessionSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSessionSchemaTests.swift; sourceTree = "<group>"; };
 		E59F6509D79E57A86ED795CA /* SessionLibraryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryControllerTests.swift; sourceTree = "<group>"; };
 		E75E9A5FCC6C1D45D20E8F80 /* IssueExportControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportControllerTests.swift; sourceTree = "<group>"; };
+		E849C3E02857E9CF3FDCC39A /* ScreenshotTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTestSupport.swift; sourceTree = "<group>"; };
 		E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionRequestBuilder.swift; sourceTree = "<group>"; };
 		E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCoordinator.swift; sourceTree = "<group>"; };
 		EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionService.swift; sourceTree = "<group>"; };
@@ -547,6 +549,7 @@
 				94052C02271A22E78259D71B /* ScreenshotCaptureServiceTests.swift */,
 				92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */,
 				20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */,
+				E849C3E02857E9CF3FDCC39A /* ScreenshotTestSupport.swift */,
 				27BD14AE99398DAE80181305 /* SecretSlotTests.swift */,
 				CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */,
 				D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */,
@@ -970,6 +973,7 @@
 				05491334A5AA806307646EE5 /* ScreenshotCaptureServiceTests.swift in Sources */,
 				52C0B842187598C05C4C39D2 /* ScreenshotCoordinatorTests.swift in Sources */,
 				6F0782ACEFF9342CFD3D6D87 /* ScreenshotSelectionServiceTests.swift in Sources */,
+				0C3B061E5ECAD626CDB83B89 /* ScreenshotTestSupport.swift in Sources */,
 				B771844AAE785C764AEBD7C6 /* SecretSlotTests.swift in Sources */,
 				F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */,
 				8E0DE1B3EABFCECD46EF5ED0 /* SessionDataProtectorTests.swift in Sources */,
