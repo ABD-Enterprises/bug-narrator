@@ -891,22 +891,6 @@ final class AppState: ObservableObject {
         applicationTerminationController.applicationShouldTerminate()
     }
 
-    func openMicrophonePrivacySettings() {
-        appUtilityActionPresenter.present(appUtilityActions.openMicrophonePrivacySettings())
-    }
-
-    func openScreenRecordingPrivacySettings() {
-        appUtilityActionPresenter.present(appUtilityActions.openScreenRecordingPrivacySettings())
-    }
-
-    func openSystemAudioPrivacySettings() {
-        appUtilityActionPresenter.present(appUtilityActions.openSystemAudioPrivacySettings())
-    }
-
-    func checkForUpdates() {
-        appUtilityActionPresenter.present(appUtilityActions.checkForUpdates())
-    }
-
     /// Presents the changelog once after a version bump. Records the shown
     /// version immediately so a force-quit before dismissal does not re-trigger.
     func presentChangelogIfNeeded(metadata: BugNarratorMetadata = BugNarratorMetadata()) {
