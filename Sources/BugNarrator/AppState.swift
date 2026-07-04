@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import Foundation
 
@@ -861,14 +860,6 @@ final class AppState: ObservableObject {
         recordingSessionCancelStatusPresenter.present(outcome)
     }
 
-    func openTranscriptHistory() {
-        appUtilityActions.openTranscriptHistory()
-    }
-
-    func openRecordingControls() {
-        appUtilityActions.openRecordingControls()
-    }
-
     func openRecordingControlsAndStartSession() async {
         appUtilityActions.openRecordingControls()
 
@@ -877,18 +868,6 @@ final class AppState: ObservableObject {
         }
 
         await startSession()
-    }
-
-    func openSettings() {
-        appUtilityActions.openSettings()
-    }
-
-    func requestApplicationTermination() {
-        applicationTerminationController.requestApplicationTermination()
-    }
-
-    func applicationShouldTerminate() -> NSApplication.TerminateReply {
-        applicationTerminationController.applicationShouldTerminate()
     }
 
     /// Presents the changelog once after a version bump. Records the shown
