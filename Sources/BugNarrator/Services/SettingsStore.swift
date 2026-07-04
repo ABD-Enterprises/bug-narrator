@@ -1070,7 +1070,7 @@ final class SettingsStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let keychainService: KeychainServicing
+    private let secretStore: KeychainSecretStoring
     private let recordingPreferences: RecordingPreferencesStore
     private let trackerExportSettings: TrackerExportSettingsStore
     private let launchAtLoginService: any LaunchAtLoginControlling
@@ -1093,7 +1093,7 @@ final class SettingsStore: ObservableObject {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
         self.trackerExportSettings = TrackerExportSettingsStore(defaults: defaults)
-        self.keychainService = keychainService
+        self.secretStore = KeychainSecretStore(keychainService: keychainService)
         self.launchAtLoginService = launchAtLoginService
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
@@ -1598,29 +1598,16 @@ final class SettingsStore: ObservableObject {
     /// success); a genuine failure is logged but does not block the primary
     /// operation, since the canonical service-name delete is what matters.
     private func deleteLegacySecrets(for slot: SecretSlot) {
-        for service in slot.legacyServices {
-            do {
-                try keychainService.deleteValue(service: service, account: slot.account)
-            } catch {
-                logger.warning(
-                    "secret_legacy_clear_failed",
-                    "A legacy secure value could not be removed from Keychain.",
-                    metadata: [
-                        "slot": slot.redactionSafeName,
-                        "error": Self.redactedKeychainErrorDetail(error)
-                    ]
-                )
-            }
+        for failure in secretStore.deleteLegacyValues(for: slot) {
+            logger.warning(
+                "secret_legacy_clear_failed",
+                "A legacy secure value could not be removed from Keychain.",
+                metadata: [
+                    "slot": slot.redactionSafeName,
+                    "error": failure.redactedDetail
+                ]
+            )
         }
-    }
-
-    /// Renders a Keychain error for diagnostics without including any secret
-    /// material (only the error type / OSStatus code).
-    private static func redactedKeychainErrorDetail(_ error: Error) -> String {
-        if case KeychainError.unhandledStatus(let status) = error {
-            return "osstatus_\(status)"
-        }
-        return String(describing: type(of: error))
     }
 
     @discardableResult
@@ -1630,7 +1617,7 @@ final class SettingsStore: ObservableObject {
         if trimmedValue.isEmpty {
             sessionOnlySecrets.removeValue(forKey: slot)
             do {
-                try keychainService.deleteValue(service: slot.service, account: slot.account)
+                try secretStore.deleteCanonicalValue(for: slot)
             } catch {
                 // KeychainService maps "item not found" to success, so any thrown
                 // error means the secret is still resident. Surface it instead of
@@ -1641,7 +1628,7 @@ final class SettingsStore: ObservableObject {
                     "A secure value could not be removed from Keychain.",
                     metadata: [
                         "slot": slot.redactionSafeName,
-                        "error": Self.redactedKeychainErrorDetail(error)
+                        "error": KeychainSecretStore.redactedErrorDetail(error)
                     ]
                 )
                 committedSecretStates[slot] = .keychain
@@ -1662,7 +1649,7 @@ final class SettingsStore: ObservableObject {
         }
 
         do {
-            try keychainService.setString(trimmedValue, service: slot.service, account: slot.account)
+            try secretStore.saveCanonicalValue(trimmedValue, for: slot)
             deleteLegacySecrets(for: slot)
             sessionOnlySecrets.removeValue(forKey: slot)
             logger.info(
@@ -1698,27 +1685,21 @@ final class SettingsStore: ObservableObject {
         includeLegacyServices: Bool
     ) -> (value: String, state: APIKeyPersistenceState) {
         do {
-            if let keychainValue = try keychainService.string(
-                forService: slot.service,
-                account: slot.account,
+            if let keychainValue = try secretStore.readCanonicalValue(
+                for: slot,
                 allowInteraction: allowInteraction
             ),
                !keychainValue.isEmpty {
                 return (keychainValue, .keychain)
             }
 
-            if includeLegacyServices {
-                for legacyService in slot.legacyServices {
-                    if let legacyValue = try keychainService.string(
-                        forService: legacyService,
-                        account: slot.account,
-                        allowInteraction: allowInteraction
-                    ),
-                       !legacyValue.isEmpty {
-                        _ = persistSecret(legacyValue, for: slot)
-                        return (legacyValue, .keychain)
-                    }
-                }
+            if includeLegacyServices,
+               let legacyValue = try secretStore.readFirstLegacyValue(
+                for: slot,
+                allowInteraction: allowInteraction
+               ) {
+                _ = persistSecret(legacyValue, for: slot)
+                return (legacyValue, .keychain)
             }
         } catch {
             if let sessionOnlyValue = sessionOnlySecrets[slot], !sessionOnlyValue.isEmpty {
