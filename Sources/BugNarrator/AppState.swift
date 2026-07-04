@@ -966,10 +966,6 @@ final class AppState: ObservableObject {
         await exportHistoryController.refreshExportHistory()
     }
 
-    func copyDisplayedTranscript() {
-        sessionLibraryStatusPresenter.presentDisplayedTranscriptCopyResult(sessionLibrary.copyDisplayedTranscript())
-    }
-
     func retryPendingTranscription(for sessionID: UUID) async {
         let retryContext: PendingTranscriptionRetryContext
         switch transcriptionRecovery.retryContext(
@@ -1032,30 +1028,6 @@ final class AppState: ObservableObject {
             retryPostTranscriptionResultHandler.handle(pipelineResult, context: retryContext)
         } catch {
             pendingTranscriptionRetryFailureHandler.handle(error, context: retryContext)
-        }
-    }
-
-    func saveCurrentTranscriptToHistory() {
-        do {
-            sessionLibraryStatusPresenter.presentSavedSession(try sessionLibrary.saveCurrentTranscriptToHistory())
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
-        }
-    }
-
-    func deleteDisplayedTranscript() {
-        do {
-            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteDisplayedTranscript())
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
-        }
-    }
-
-    func deleteSessions(withIDs ids: Set<UUID>) {
-        do {
-            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteSessions(withIDs: ids))
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
         }
     }
 
