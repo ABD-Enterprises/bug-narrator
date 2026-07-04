@@ -1549,4 +1549,137 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: "settings.hasAcceptedSystemAudioRecordingConsent"))
         XCTAssertTrue(defaults.bool(forKey: "settings.suppressSystemAudioExplainer"))
     }
+
+    func testGitHubRepositoryOwnerNameChangesCascadeToClearRepositoryID() {
+        let suiteName = "BugNarrator-GitHubTrackerCascadeTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.githubRepositoryOwner = "acme"
+        store.githubRepositoryName = "bugnarrator"
+        store.githubRepositoryID = "repo-123"
+
+        // A case/diacritic-only owner change must NOT clear the repository id.
+        store.githubRepositoryOwner = "ACME"
+        XCTAssertEqual(store.githubRepositoryID, "repo-123")
+
+        // A material owner change clears the id and persists the empty value.
+        store.githubRepositoryOwner = "other-org"
+        XCTAssertEqual(store.githubRepositoryID, "")
+        XCTAssertEqual(defaults.string(forKey: "settings.githubRepositoryID"), "")
+
+        // Same for the repository name: case-only keeps the id, material clears it.
+        store.githubRepositoryID = "repo-456"
+        store.githubRepositoryName = "BUGNARRATOR"
+        XCTAssertEqual(store.githubRepositoryID, "repo-456")
+        store.githubRepositoryName = "different-repo"
+        XCTAssertEqual(store.githubRepositoryID, "")
+        XCTAssertEqual(defaults.string(forKey: "settings.githubRepositoryID"), "")
+    }
+
+    func testJiraProjectKeyAndIssueTypeChangesCascadeToClearIDs() {
+        let suiteName = "BugNarrator-JiraTrackerCascadeTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.jiraProjectKey = "UCAP"
+        store.jiraProjectID = "10001"
+        // A normalized-equal project-key change (case/whitespace) keeps the id.
+        store.jiraProjectKey = " ucap "
+        XCTAssertEqual(store.jiraProjectID, "10001")
+        // A material project-key change clears the id and persists empty.
+        store.jiraProjectKey = "OPS"
+        XCTAssertEqual(store.jiraProjectID, "")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraProjectID"), "")
+
+        store.jiraIssueType = "Task"
+        store.jiraIssueTypeID = "10100"
+        // A case-only issue-type change keeps the type id.
+        store.jiraIssueType = "task"
+        XCTAssertEqual(store.jiraIssueTypeID, "10100")
+        // A material issue-type change clears the id and persists empty.
+        store.jiraIssueType = "Bug"
+        XCTAssertEqual(store.jiraIssueTypeID, "")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraIssueTypeID"), "")
+    }
+
+    func testTrackerExportSettingsUseUnchangedDefaultsKeys() {
+        let suiteName = "BugNarrator-TrackerExportKeyStabilityTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // Seed the exact literal keys as older builds wrote them.
+        defaults.set("acme", forKey: "settings.githubRepositoryOwner")
+        defaults.set("bugnarrator", forKey: "settings.githubRepositoryName")
+        defaults.set("repo-1", forKey: "settings.githubRepositoryID")
+        defaults.set("bug, ui", forKey: "settings.githubDefaultLabels")
+        defaults.set("https://example.atlassian.net", forKey: "settings.jiraBaseURL")
+        defaults.set("UCAP", forKey: "settings.jiraProjectKey")
+        defaults.set("10001", forKey: "settings.jiraProjectID")
+        defaults.set("Task", forKey: "settings.jiraIssueType")
+        defaults.set("10100", forKey: "settings.jiraIssueTypeID")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertEqual(store.githubRepositoryOwner, "acme")
+        XCTAssertEqual(store.githubRepositoryName, "bugnarrator")
+        XCTAssertEqual(store.githubRepositoryID, "repo-1")
+        XCTAssertEqual(store.githubDefaultLabels, "bug, ui")
+        XCTAssertEqual(store.jiraBaseURL, "https://example.atlassian.net")
+        XCTAssertEqual(store.jiraProjectKey, "UCAP")
+        XCTAssertEqual(store.jiraProjectID, "10001")
+        XCTAssertEqual(store.jiraIssueType, "Task")
+        XCTAssertEqual(store.jiraIssueTypeID, "10100")
+
+        // Mutations write back to the identical keys and survive a reload.
+        store.githubDefaultLabels = "bug"
+        store.jiraBaseURL = "https://other.atlassian.net"
+        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertEqual(reloaded.githubDefaultLabels, "bug")
+        XCTAssertEqual(reloaded.jiraBaseURL, "https://other.atlassian.net")
+        XCTAssertEqual(reloaded.githubRepositoryOwner, "acme")
+        XCTAssertEqual(reloaded.jiraProjectKey, "UCAP")
+
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.githubRepositoryOwner, "settings.githubRepositoryOwner")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.githubRepositoryName, "settings.githubRepositoryName")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.githubRepositoryID, "settings.githubRepositoryID")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.githubDefaultLabels, "settings.githubDefaultLabels")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.jiraBaseURL, "settings.jiraBaseURL")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.jiraProjectKey, "settings.jiraProjectKey")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.jiraProjectID, "settings.jiraProjectID")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.jiraIssueType, "settings.jiraIssueType")
+        XCTAssertEqual(TrackerExportSettingsStore.Keys.jiraIssueTypeID, "settings.jiraIssueTypeID")
+    }
+
+    func testTrackerExportSettingsStorePersistsDirectly() {
+        let suiteName = "BugNarrator-TrackerExportSettingsStoreTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = TrackerExportSettingsStore(defaults: defaults)
+        store.persist(githubRepositoryOwner: "acme")
+        store.persist(githubRepositoryName: "bugnarrator")
+        store.persist(githubRepositoryID: "r1")
+        store.persist(githubDefaultLabels: "bug")
+        store.persist(jiraBaseURL: "https://x.atlassian.net")
+        store.persist(jiraProjectKey: "UCAP")
+        store.persist(jiraProjectID: "p1")
+        store.persist(jiraIssueType: "Task")
+        store.persist(jiraIssueTypeID: "t1")
+
+        XCTAssertEqual(defaults.string(forKey: "settings.githubRepositoryOwner"), "acme")
+        XCTAssertEqual(defaults.string(forKey: "settings.githubRepositoryName"), "bugnarrator")
+        XCTAssertEqual(defaults.string(forKey: "settings.githubRepositoryID"), "r1")
+        XCTAssertEqual(defaults.string(forKey: "settings.githubDefaultLabels"), "bug")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraBaseURL"), "https://x.atlassian.net")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraProjectKey"), "UCAP")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraProjectID"), "p1")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraIssueType"), "Task")
+        XCTAssertEqual(defaults.string(forKey: "settings.jiraIssueTypeID"), "t1")
+    }
 }

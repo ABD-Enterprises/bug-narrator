@@ -329,7 +329,7 @@ final class SettingsStore: ObservableObject {
             if githubRepositoryOwner.compare(oldValue, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
                 githubRepositoryID = ""
             }
-            defaults.set(githubRepositoryOwner, forKey: Keys.githubRepositoryOwner)
+            trackerExportSettings.persist(githubRepositoryOwner: githubRepositoryOwner)
         }
     }
 
@@ -339,28 +339,28 @@ final class SettingsStore: ObservableObject {
             if githubRepositoryName.compare(oldValue, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
                 githubRepositoryID = ""
             }
-            defaults.set(githubRepositoryName, forKey: Keys.githubRepositoryName)
+            trackerExportSettings.persist(githubRepositoryName: githubRepositoryName)
         }
     }
 
     @Published var githubRepositoryID: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(githubRepositoryID, forKey: Keys.githubRepositoryID)
+            trackerExportSettings.persist(githubRepositoryID: githubRepositoryID)
         }
     }
 
     @Published var githubDefaultLabels: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(githubDefaultLabels, forKey: Keys.githubDefaultLabels)
+            trackerExportSettings.persist(githubDefaultLabels: githubDefaultLabels)
         }
     }
 
     @Published var jiraBaseURL: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(jiraBaseURL, forKey: Keys.jiraBaseURL)
+            trackerExportSettings.persist(jiraBaseURL: jiraBaseURL)
         }
     }
 
@@ -384,7 +384,7 @@ final class SettingsStore: ObservableObject {
             if normalizedJiraProjectKey != oldValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() {
                 jiraProjectID = ""
             }
-            defaults.set(jiraProjectKey, forKey: Keys.jiraProjectKey)
+            trackerExportSettings.persist(jiraProjectKey: jiraProjectKey)
         }
     }
 
@@ -394,21 +394,21 @@ final class SettingsStore: ObservableObject {
             if normalizedJiraIssueType.compare(oldValue.trimmingCharacters(in: .whitespacesAndNewlines), options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
                 jiraIssueTypeID = ""
             }
-            defaults.set(jiraIssueType, forKey: Keys.jiraIssueType)
+            trackerExportSettings.persist(jiraIssueType: jiraIssueType)
         }
     }
 
     @Published var jiraProjectID: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(jiraProjectID, forKey: Keys.jiraProjectID)
+            trackerExportSettings.persist(jiraProjectID: jiraProjectID)
         }
     }
 
     @Published var jiraIssueTypeID: String = "" {
         didSet {
             guard hasLoaded else { return }
-            defaults.set(jiraIssueTypeID, forKey: Keys.jiraIssueTypeID)
+            trackerExportSettings.persist(jiraIssueTypeID: jiraIssueTypeID)
         }
     }
 
@@ -1072,6 +1072,7 @@ final class SettingsStore: ObservableObject {
     private let defaults: UserDefaults
     private let keychainService: KeychainServicing
     private let recordingPreferences: RecordingPreferencesStore
+    private let trackerExportSettings: TrackerExportSettingsStore
     private let launchAtLoginService: any LaunchAtLoginControlling
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -1091,6 +1092,7 @@ final class SettingsStore: ObservableObject {
     ) {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
+        self.trackerExportSettings = TrackerExportSettingsStore(defaults: defaults)
         self.keychainService = keychainService
         self.launchAtLoginService = launchAtLoginService
         if let legacyDefaultsDomains {
@@ -1297,16 +1299,16 @@ final class SettingsStore: ObservableObject {
         )
         removeObsoleteMarkerHotkeyIfNeeded()
 
-        githubRepositoryOwner = stringValue(forKey: Keys.githubRepositoryOwner) ?? ""
-        githubRepositoryName = stringValue(forKey: Keys.githubRepositoryName) ?? ""
-        githubRepositoryID = stringValue(forKey: Keys.githubRepositoryID) ?? ""
-        githubDefaultLabels = stringValue(forKey: Keys.githubDefaultLabels) ?? ""
+        githubRepositoryOwner = stringValue(forKey: TrackerExportSettingsStore.Keys.githubRepositoryOwner) ?? ""
+        githubRepositoryName = stringValue(forKey: TrackerExportSettingsStore.Keys.githubRepositoryName) ?? ""
+        githubRepositoryID = stringValue(forKey: TrackerExportSettingsStore.Keys.githubRepositoryID) ?? ""
+        githubDefaultLabels = stringValue(forKey: TrackerExportSettingsStore.Keys.githubDefaultLabels) ?? ""
 
-        jiraBaseURL = stringValue(forKey: Keys.jiraBaseURL) ?? ""
-        jiraProjectID = stringValue(forKey: Keys.jiraProjectID) ?? ""
-        jiraProjectKey = stringValue(forKey: Keys.jiraProjectKey) ?? ""
-        jiraIssueTypeID = stringValue(forKey: Keys.jiraIssueTypeID) ?? ""
-        jiraIssueType = stringValue(forKey: Keys.jiraIssueType) ?? ""
+        jiraBaseURL = stringValue(forKey: TrackerExportSettingsStore.Keys.jiraBaseURL) ?? ""
+        jiraProjectID = stringValue(forKey: TrackerExportSettingsStore.Keys.jiraProjectID) ?? ""
+        jiraProjectKey = stringValue(forKey: TrackerExportSettingsStore.Keys.jiraProjectKey) ?? ""
+        jiraIssueTypeID = stringValue(forKey: TrackerExportSettingsStore.Keys.jiraIssueTypeID) ?? ""
+        jiraIssueType = stringValue(forKey: TrackerExportSettingsStore.Keys.jiraIssueType) ?? ""
         migrateLegacyPlaintextJiraEmailIfNeeded()
 
         debugMode = boolValue(forKey: Keys.debugMode) ?? false
@@ -2136,16 +2138,8 @@ private enum Keys {
     static let markerHotkeyShortcut = "settings.markerHotkeyShortcut"
     static let screenshotHotkeyShortcut = "settings.screenshotHotkeyShortcut"
     static let didMigrateLegacyBuiltInHotkeys = "settings.didMigrateLegacyBuiltInHotkeys"
-    static let githubRepositoryOwner = "settings.githubRepositoryOwner"
-    static let githubRepositoryName = "settings.githubRepositoryName"
-    static let githubRepositoryID = "settings.githubRepositoryID"
-    static let githubDefaultLabels = "settings.githubDefaultLabels"
-    static let jiraBaseURL = "settings.jiraBaseURL"
+    // GitHub/Jira tracker export config keys live on TrackerExportSettingsStore.Keys (#429).
     static let jiraEmail = "settings.jiraEmail"
-    static let jiraProjectID = "settings.jiraProjectID"
-    static let jiraProjectKey = "settings.jiraProjectKey"
-    static let jiraIssueTypeID = "settings.jiraIssueTypeID"
-    static let jiraIssueType = "settings.jiraIssueType"
     static let debugMode = "settings.debugMode"
     static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
