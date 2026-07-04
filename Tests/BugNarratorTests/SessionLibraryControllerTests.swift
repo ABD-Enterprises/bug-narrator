@@ -333,6 +333,38 @@ final class SessionLibraryControllerTests: XCTestCase {
         XCTAssertEqual(harness.clipboardService.copiedStrings, ["Displayed transcript"])
     }
 
+    // MARK: - present(_:success:) helper (#578)
+
+    func testPresentInvokesSuccessClosureWithOperationResult() {
+        let harness = makeSessionLibraryStatusPresenter()
+        var received: Int?
+
+        harness.presenter.present({ 42 }, success: { received = $0 })
+
+        XCTAssertEqual(received, 42)
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testPresentDelegatesThrownErrorToPresentFailureAndSkipsSuccessClosure() {
+        let harness = makeSessionLibraryStatusPresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 7,
+            userInfo: [NSLocalizedDescriptionKey: "Save blocked"]
+        )
+        var successInvoked = false
+
+        harness.presenter.present(
+            { () throws -> Int in throw error },
+            success: { _ in successInvoked = true }
+        )
+
+        XCTAssertFalse(successInvoked, "success closure must not fire on throw")
+        XCTAssertEqual(harness.presentationState.currentError, AppError.storageFailure("Save blocked"))
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+    }
+
     private func makeSessionLibraryStatusPresenter(
         status: AppStatus = .idle(),
         prepareErrorPresentationSideEffects: @escaping () -> Void = {}
