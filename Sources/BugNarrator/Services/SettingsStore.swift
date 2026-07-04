@@ -2059,65 +2059,6 @@ final class SettingsStore: ObservableObject {
     }
 }
 
-private enum SecretSlot: Hashable, CaseIterable {
-    case openAI
-    case github
-    case jiraEmail
-    case jira
-
-    var service: String {
-        switch self {
-        case .openAI:
-            return "BugNarrator.OpenAI"
-        case .github:
-            return "BugNarrator.GitHub"
-        case .jiraEmail:
-            return "BugNarrator.Jira"
-        case .jira:
-            return "BugNarrator.Jira"
-        }
-    }
-
-    var legacyServices: [String] {
-        switch self {
-        case .openAI:
-            return ["SessionMic.OpenAI"]
-        case .github:
-            return ["SessionMic.GitHub"]
-        case .jiraEmail:
-            return ["SessionMic.Jira"]
-        case .jira:
-            return ["SessionMic.Jira"]
-        }
-    }
-
-    var account: String {
-        switch self {
-        case .openAI:
-            return "openai-api-key"
-        case .github:
-            return "github-token"
-        case .jiraEmail:
-            return "jira-email"
-        case .jira:
-            return "jira-api-token"
-        }
-    }
-
-    var redactionSafeName: String {
-        switch self {
-        case .openAI:
-            return "openai"
-        case .github:
-            return "github"
-        case .jiraEmail:
-            return "jira-email"
-        case .jira:
-            return "jira"
-        }
-    }
-}
-
 private enum Keys {
     static let aiProvider = "settings.aiProvider"
     static let aiProviderCredentialProvider = "settings.aiProviderCredentialProvider"
