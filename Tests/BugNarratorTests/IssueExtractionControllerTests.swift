@@ -228,6 +228,42 @@ final class IssueExtractionControllerTests: XCTestCase {
         )
     }
 
+    // MARK: - attempt(_:) helper (#578)
+
+    func testAttemptDiscardsSuccessResultAndSkipsPresentFailure() {
+        let harness = makeIssueMutationFailurePresenter()
+
+        harness.presenter.attempt { true }
+
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testAttemptWithVoidOperationRunsAndSkipsPresentFailure() {
+        let harness = makeIssueMutationFailurePresenter()
+        var ran = false
+
+        harness.presenter.attempt { () -> Void in ran = true }
+
+        XCTAssertTrue(ran)
+        XCTAssertNil(harness.presentationState.currentError)
+        XCTAssertTrue(harness.telemetryRecorder.recordedEvents.isEmpty)
+    }
+
+    func testAttemptDelegatesThrownErrorToPresentFailure() {
+        let harness = makeIssueMutationFailurePresenter()
+        let error = NSError(
+            domain: "BugNarratorTests",
+            code: 9,
+            userInfo: [NSLocalizedDescriptionKey: "Mutation blocked"]
+        )
+
+        harness.presenter.attempt { () throws -> Bool in throw error }
+
+        XCTAssertEqual(harness.presentationState.currentError, AppError.storageFailure("Mutation blocked"))
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
+    }
+
     private func makeIssueMutationFailurePresenter(
         status: AppStatus = .idle(),
         prepareErrorPresentationSideEffects: @escaping () -> Void = {}

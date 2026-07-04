@@ -6,26 +6,23 @@ extension AppState {
     }
 
     func saveCurrentTranscriptToHistory() {
-        do {
-            sessionLibraryStatusPresenter.presentSavedSession(try sessionLibrary.saveCurrentTranscriptToHistory())
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
-        }
+        sessionLibraryStatusPresenter.present(
+            { try sessionLibrary.saveCurrentTranscriptToHistory() },
+            success: { sessionLibraryStatusPresenter.presentSavedSession($0) }
+        )
     }
 
     func deleteDisplayedTranscript() {
-        do {
-            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteDisplayedTranscript())
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
-        }
+        sessionLibraryStatusPresenter.present(
+            { try sessionLibrary.deleteDisplayedTranscript() },
+            success: { sessionLibraryStatusPresenter.presentDeletedCount($0) }
+        )
     }
 
     func deleteSessions(withIDs ids: Set<UUID>) {
-        do {
-            sessionLibraryStatusPresenter.presentDeletedCount(try sessionLibrary.deleteSessions(withIDs: ids))
-        } catch {
-            sessionLibraryStatusPresenter.presentFailure(error)
-        }
+        sessionLibraryStatusPresenter.present(
+            { try sessionLibrary.deleteSessions(withIDs: ids) },
+            success: { sessionLibraryStatusPresenter.presentDeletedCount($0) }
+        )
     }
 }
