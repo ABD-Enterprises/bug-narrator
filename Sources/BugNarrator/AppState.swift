@@ -57,15 +57,6 @@ final class AppState: ObservableObject {
     var showSupportWindow: (() -> Void)? { get { appUtilityActions.showSupportWindow } set { appUtilityActions.showSupportWindow = newValue } }
     var showRecordingControlWindow: (() -> Void)? { get { appUtilityActions.showRecordingControlWindow } set { appUtilityActions.showRecordingControlWindow = newValue } }
 
-    var prepareForScreenshotSelection: (() -> Void)? {
-        get { screenshotCaptureController.prepareForScreenshotSelection }
-        set { screenshotCaptureController.prepareForScreenshotSelection = newValue }
-    }
-    var restoreAfterScreenshotSelection: (() -> Void)? {
-        get { screenshotCaptureController.restoreAfterScreenshotSelection }
-        set { screenshotCaptureController.restoreAfterScreenshotSelection = newValue }
-    }
-
     private let transcriptionClient: any TranscriptionServing
     private let hotkeyManager: any HotkeyManaging
     private let hotkeySettingsBinder: HotkeySettingsBinder
@@ -613,11 +604,6 @@ final class AppState: ObservableObject {
     var activeRecordingSession: RecordingSessionDraft? {
         recordingSessionController.activeRecordingSession
     }
-
-    var isScreenshotCaptureInProgress: Bool {
-        screenshotCaptureController.isCaptureInProgress
-    }
-
     func refreshPermissionRecoveryState() {
         permissionRecoveryStatusPresenter.present(
             permissionRecoveryController.refreshRecoveryState(
@@ -891,10 +877,6 @@ final class AppState: ObservableObject {
         } catch {
             pendingTranscriptionRetryFailureHandler.handle(error, context: retryContext)
         }
-    }
-
-    func captureScreenshot() async {
-        await screenshotCaptureController.captureScreenshot()
     }
 
     func extractIssuesForDisplayedTranscript() async {
