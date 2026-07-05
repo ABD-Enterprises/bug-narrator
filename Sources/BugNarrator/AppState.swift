@@ -540,14 +540,6 @@ final class AppState: ObservableObject {
         launchDiagnosticsReporter.logLaunchDiagnostics(selectedTranscriptID: selectedTranscriptID)
     }
 
-    var elapsedTimeString: String {
-        recordingTimer.elapsedTimeString
-    }
-
-    var elapsedDuration: TimeInterval {
-        recordingTimer.elapsedDuration
-    }
-
     var activeTimelineMomentCount: Int {
         activeRecordingSession?.markers.count ?? 0
     }
