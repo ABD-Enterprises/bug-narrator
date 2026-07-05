@@ -116,10 +116,6 @@ final class AppState: ObservableObject {
         transcriptionRecovery.retryingSessionID
     }
 
-    var apiKeyValidationState: APIKeyValidationState {
-        aiProviderSettings.apiKeyValidationState
-    }
-
     convenience init(
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
