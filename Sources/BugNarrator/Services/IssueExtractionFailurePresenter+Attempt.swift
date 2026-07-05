@@ -1,6 +1,6 @@
 import Foundation
 
-extension IssueMutationFailurePresenter {
+extension IssueExtractionFailurePresenter {
     /// Runs a throwing issue-mutation operation, discarding any return value on success
     /// (the mutation controllers return `@discardableResult Bool`). On failure delegates
     /// to `presentFailure(error)`. Bridges the three do/catch delegators in
