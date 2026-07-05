@@ -102,16 +102,6 @@ final class AppState: ObservableObject {
         presentationState.transientToast
     }
 
-    var currentTranscript: TranscriptSession? {
-        get { sessionLibrary.currentTranscript }
-        set { sessionLibrary.currentTranscript = newValue }
-    }
-
-    var selectedTranscriptID: UUID? {
-        get { sessionLibrary.selectedTranscriptID }
-        set { sessionLibrary.selectedTranscriptID = newValue }
-    }
-
     var retryingSessionID: UUID? {
         transcriptionRecovery.retryingSessionID
     }

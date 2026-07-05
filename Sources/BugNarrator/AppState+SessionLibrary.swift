@@ -1,6 +1,8 @@
 import Foundation
 
 extension AppState {
+    // MARK: - Methods
+
     func copyDisplayedTranscript() {
         sessionLibraryStatusPresenter.presentDisplayedTranscriptCopyResult(sessionLibrary.copyDisplayedTranscript())
     }
@@ -24,5 +26,17 @@ extension AppState {
             { try sessionLibrary.deleteSessions(withIDs: ids) },
             success: { sessionLibraryStatusPresenter.presentDeletedCount($0) }
         )
+    }
+
+    // MARK: - Computed properties
+
+    var currentTranscript: TranscriptSession? {
+        get { sessionLibrary.currentTranscript }
+        set { sessionLibrary.currentTranscript = newValue }
+    }
+
+    var selectedTranscriptID: UUID? {
+        get { sessionLibrary.selectedTranscriptID }
+        set { sessionLibrary.selectedTranscriptID = newValue }
     }
 }
