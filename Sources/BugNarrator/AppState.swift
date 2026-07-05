@@ -78,14 +78,6 @@ final class AppState: ObservableObject {
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    var exportDestinationInProgress: ExportDestination? {
-        issueExportController.exportDestinationInProgress
-    }
-
-    var pendingExportReview: IssueExportReview? {
-        issueExportController.pendingExportReview
-    }
-
     var retryingSessionID: UUID? {
         transcriptionRecovery.retryingSessionID
     }
