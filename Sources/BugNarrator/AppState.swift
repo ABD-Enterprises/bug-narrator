@@ -894,14 +894,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    func validateAPIKey() async {
-        await aiProviderSettings.validateConnection()
-    }
-
-    func removeAPIKey() {
-        aiProviderSettings.removeCredential()
-    }
-
     func refreshExportHistory() async {
         await exportHistoryController.refreshExportHistory()
     }
