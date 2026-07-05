@@ -560,14 +560,6 @@ final class AppState: ObservableObject {
         status.phase == .recording && activeRecordingSession?.sessionID == sessionID
     }
 
-    var displayedTranscript: TranscriptSession? {
-        sessionLibrary.displayedTranscript
-    }
-
-    var currentTranscriptIsPersisted: Bool {
-        sessionLibrary.currentTranscriptIsPersisted
-    }
-
     var needsAPIKeySetup: Bool {
         settingsStore.aiProviderCompatibilityIssue != nil ||
             (settingsStore.aiProvider.requiresAPIKey && !settingsStore.hasUsableAIProviderCredential)
