@@ -78,10 +78,6 @@ final class AppState: ObservableObject {
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    var exportHistory: [ExportReceipt] {
-        exportHistoryController.exportHistory
-    }
-
     var exportDestinationInProgress: ExportDestination? {
         issueExportController.exportDestinationInProgress
     }
@@ -830,10 +826,6 @@ final class AppState: ObservableObject {
         } catch {
             supportDataActionPresenter.presentLocalDataDeletionFailure(error)
         }
-    }
-
-    func refreshExportHistory() async {
-        await exportHistoryController.refreshExportHistory()
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
