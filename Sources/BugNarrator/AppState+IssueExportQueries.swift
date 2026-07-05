@@ -1,6 +1,8 @@
 import Foundation
 
 extension AppState {
+    // MARK: - Methods
+
     func canExportIssues(from session: TranscriptSession, to destination: ExportDestination) -> Bool {
         issueExportController.canExportIssues(from: session, to: destination, statusPhase: status.phase)
     }
@@ -27,5 +29,15 @@ extension AppState {
 
     func isExporting(to destination: ExportDestination) -> Bool {
         issueExportController.isExporting(to: destination)
+    }
+
+    // MARK: - Computed properties
+
+    var exportDestinationInProgress: ExportDestination? {
+        issueExportController.exportDestinationInProgress
+    }
+
+    var pendingExportReview: IssueExportReview? {
+        issueExportController.pendingExportReview
     }
 }
