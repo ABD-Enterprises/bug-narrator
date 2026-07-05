@@ -561,14 +561,6 @@ final class AppState: ObservableObject {
         "Open the recording controls window or use the global hotkeys while you keep testing."
     }
 
-    var microphoneRecoveryGuidance: String {
-        microphoneRecoveryGuidanceDetails.message
-    }
-
-    var microphoneRecoveryLocalTestingNote: String? {
-        microphoneRecoveryGuidanceDetails.localTestingNote
-    }
-
     var debugInfoSnapshot: DebugInfoSnapshot {
         supportDataController.debugInfoSnapshot(sessionID: currentDebugSessionID)
     }
@@ -580,15 +572,6 @@ final class AppState: ObservableObject {
     var activeRecordingSession: RecordingSessionDraft? {
         recordingSessionController.activeRecordingSession
     }
-    func refreshPermissionRecoveryState() {
-        permissionRecoveryStatusPresenter.present(
-            permissionRecoveryController.refreshRecoveryState(
-                currentError: currentError,
-                statusPhase: status.phase
-            )
-        )
-    }
-
     func startSession() async {
         recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
@@ -1086,9 +1069,5 @@ final class AppState: ObservableObject {
             status: status,
             currentError: currentError
         )
-    }
-
-    private var microphoneRecoveryGuidanceDetails: MicrophoneRecoveryGuidance {
-        permissionRecoveryController.microphoneRecoveryGuidance(currentError: currentError)
     }
 }
