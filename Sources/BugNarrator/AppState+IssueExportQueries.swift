@@ -24,4 +24,8 @@ extension AppState {
     func defaultJiraIssueExportTarget() -> JiraIssueExportTarget? {
         issueExportController.defaultJiraIssueExportTarget()
     }
+
+    func isExporting(to destination: ExportDestination) -> Bool {
+        issueExportController.isExporting(to: destination)
+    }
 }
