@@ -1,5 +1,4 @@
 import Foundation
-import XCTest
 @testable import BugNarrator
 
 func makeSampleTranscriptSession(index: Int) -> TranscriptSession {
