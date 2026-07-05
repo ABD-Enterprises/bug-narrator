@@ -17,6 +17,7 @@
 		0952565F78B2C3C544A8B4FC /* MenuBarStatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */; };
 		099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */; };
 		09B048166CEEFA50BD278F7D /* IssueExportControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75E9A5FCC6C1D45D20E8F80 /* IssueExportControllerTests.swift */; };
+		0A067E5055280D7BEF9385CB /* AppState+ExportHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */; };
 		0C27546CA8851DF57ECF8C6E /* TranscriptionClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */; };
 		0C3B061E5ECAD626CDB83B89 /* ScreenshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E849C3E02857E9CF3FDCC39A /* ScreenshotTestSupport.swift */; };
 		0D3E82C811F386795DBE5D82 /* ExportReceiptStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527C2EB86F851CAA53F3E4D3 /* ExportReceiptStoreTests.swift */; };
@@ -321,6 +322,7 @@
 		3F350327BA0619E235858F82 /* ScreenshotCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureController.swift; sourceTree = "<group>"; };
 		3FDEE0092AB006832697B9BC /* KeychainSecretStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecretStoreTests.swift; sourceTree = "<group>"; };
 		40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLoggerTests.swift; sourceTree = "<group>"; };
+		411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportHistory.swift"; sourceTree = "<group>"; };
 		417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinator.swift; sourceTree = "<group>"; };
 		4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
@@ -680,6 +682,7 @@
 			children = (
 				78EFF170BAD57E66A7CB20AB /* AppState.swift */,
 				7E6BBD3839BF28AC52214FEB /* AppState+AIProviderCredential.swift */,
+				411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */,
 				7881C3E0425DCA7D35C6C10E /* AppState+ExportReview.swift */,
 				0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */,
 				776E95F5977423452961A52B /* AppState+IssueExportQueries.swift */,
@@ -1097,6 +1100,7 @@
 				5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */,
 				292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */,
 				4D1C9E0E08BD5550F0A10C10 /* AppState+AIProviderCredential.swift in Sources */,
+				0A067E5055280D7BEF9385CB /* AppState+ExportHistory.swift in Sources */,
 				0E06D8F0874CB1CBB2FEA135 /* AppState+ExportReview.swift in Sources */,
 				B697C4571507A5D3C6AA0DD4 /* AppState+FileRevealActions.swift in Sources */,
 				1BCD3E21C690E06B00319440 /* AppState+IssueExportQueries.swift in Sources */,
