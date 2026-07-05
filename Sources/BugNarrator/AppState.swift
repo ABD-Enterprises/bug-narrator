@@ -116,44 +116,8 @@ final class AppState: ObservableObject {
         transcriptionRecovery.retryingSessionID
     }
 
-    var gitHubValidationState: APIKeyValidationState {
-        trackerIntegration.gitHubValidationState
-    }
-
-    var jiraValidationState: APIKeyValidationState {
-        trackerIntegration.jiraValidationState
-    }
-
     var apiKeyValidationState: APIKeyValidationState {
         aiProviderSettings.apiKeyValidationState
-    }
-
-    var gitHubRepositories: [GitHubRepositoryOption] {
-        trackerIntegration.gitHubRepositories
-    }
-
-    var isLoadingGitHubRepositories: Bool {
-        trackerIntegration.isLoadingGitHubRepositories
-    }
-
-    var jiraProjects: [JiraProjectOption] {
-        trackerIntegration.jiraProjects
-    }
-
-    var jiraIssueTypes: [JiraIssueTypeOption] {
-        trackerIntegration.jiraIssueTypes
-    }
-
-    var isLoadingJiraIssueTypes: Bool {
-        trackerIntegration.isLoadingJiraIssueTypes
-    }
-
-    var jiraProjectMetadataIsStale: Bool {
-        trackerIntegration.jiraProjectMetadataIsStale
-    }
-
-    var jiraIssueTypeMetadataIsStale: Bool {
-        trackerIntegration.jiraIssueTypeMetadataIsStale
     }
 
     convenience init(
