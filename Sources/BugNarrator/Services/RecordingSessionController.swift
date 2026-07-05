@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class RecordingSessionController: ObservableObject {
     @Published private(set) var activeRecordingSession: RecordingSessionDraft?
 
