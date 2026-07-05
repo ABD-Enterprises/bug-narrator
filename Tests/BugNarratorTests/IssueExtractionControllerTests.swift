@@ -74,8 +74,8 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "post_transcription")
     }
 
-    func testIssueMutationFailurePresenterNormalizesStorageFailure() {
-        let harness = makeIssueMutationFailurePresenter()
+    func testIssueExtractionFailurePresenterNormalizesStorageFailure() {
+        let harness = makeIssueExtractionFailurePresenter()
         let error = NSError(
             domain: "BugNarratorTests",
             code: 1,
@@ -88,12 +88,12 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(harness.presentationState.status, .error(expectedError.userMessage))
         XCTAssertEqual(harness.presentationState.currentError, expectedError)
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
-        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "session_library")
+        XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.metadata["operation"], "issue_extraction")
     }
 
-    func testIssueMutationFailurePresenterRunsCleanupHookOnFailure() {
+    func testIssueExtractionFailurePresenterRunsCleanupHookOnFailure() {
         var cleanupCallCount = 0
-        let harness = makeIssueMutationFailurePresenter(
+        let harness = makeIssueExtractionFailurePresenter(
             prepareErrorPresentationSideEffects: { cleanupCallCount += 1 }
         )
 
@@ -231,7 +231,7 @@ final class IssueExtractionControllerTests: XCTestCase {
     // MARK: - attempt(_:) helper (#578)
 
     func testAttemptDiscardsSuccessResultAndSkipsPresentFailure() {
-        let harness = makeIssueMutationFailurePresenter()
+        let harness = makeIssueExtractionFailurePresenter()
 
         harness.presenter.attempt { true }
 
@@ -240,7 +240,7 @@ final class IssueExtractionControllerTests: XCTestCase {
     }
 
     func testAttemptWithVoidOperationRunsAndSkipsPresentFailure() {
-        let harness = makeIssueMutationFailurePresenter()
+        let harness = makeIssueExtractionFailurePresenter()
         var ran = false
 
         harness.presenter.attempt { () -> Void in ran = true }
@@ -251,7 +251,7 @@ final class IssueExtractionControllerTests: XCTestCase {
     }
 
     func testAttemptDelegatesThrownErrorToPresentFailure() {
-        let harness = makeIssueMutationFailurePresenter()
+        let harness = makeIssueExtractionFailurePresenter()
         let error = NSError(
             domain: "BugNarratorTests",
             code: 9,
@@ -264,17 +264,17 @@ final class IssueExtractionControllerTests: XCTestCase {
         XCTAssertEqual(harness.telemetryRecorder.recordedEvents.first?.name, "app_error")
     }
 
-    private func makeIssueMutationFailurePresenter(
+    private func makeIssueExtractionFailurePresenter(
         status: AppStatus = .idle(),
         prepareErrorPresentationSideEffects: @escaping () -> Void = {}
     ) -> (
-        presenter: IssueMutationFailurePresenter,
+        presenter: IssueExtractionFailurePresenter,
         presentationState: AppPresentationState,
         telemetryRecorder: MockOperationalTelemetryRecorder
     ) {
         let presentationState = AppPresentationState(status: status)
         let telemetryRecorder = MockOperationalTelemetryRecorder()
-        let presenter = IssueMutationFailurePresenter(
+        let presenter = IssueExtractionFailurePresenter(
             errorPresenter: AppErrorPresenter(
                 presentationState: presentationState,
                 telemetryRecorder: telemetryRecorder
