@@ -6,7 +6,7 @@ import XCTest
 /// Provider/tracker validation workflows extracted verbatim from AppStateTests
 /// (#431): AppState's delegation to the AI-provider and GitHub/Jira integration
 /// controllers for API-key, repository, project, and issue-type validation. No
-/// assertion changed; the AppStateHarness and mocks are shared via TestSupport.
+/// assertion changed; the AppStateHarness and mocks are shared across the test-support files.
 @MainActor
 final class AppStateProviderValidationTests: XCTestCase {
 
