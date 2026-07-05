@@ -684,10 +684,6 @@ final class AppState: ObservableObject {
         screenshotCaptureController.isCaptureInProgress
     }
 
-    func isExtractingIssues(for session: TranscriptSession) -> Bool {
-        issueExtractionController.isExtractingIssues(for: session)
-    }
-
     func isExporting(to destination: ExportDestination) -> Bool {
         issueExportController.isExporting(to: destination)
     }

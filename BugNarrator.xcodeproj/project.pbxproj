@@ -105,6 +105,7 @@
 		683F09FBC03DAD0E2FD94F64 /* IssueExtractionResponseParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9EE251C9CCE29EDED45889 /* IssueExtractionResponseParserTests.swift */; };
 		683F3BD6F8192C53766A10DC /* TranscriptExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF4558D78ECC185ECA6ED10 /* TranscriptExporterTests.swift */; };
 		68D411F355E3ED698E688D86 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AF819B9841925ACD930D0 /* PermissionRecoveryController.swift */; };
+		6B52833F68E7F99EE7D2FE07 /* AppState+IssueExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AF40FCECF7DCEDABD21EC8 /* AppState+IssueExtraction.swift */; };
 		6BFC55DEB2DE0973549D42C9 /* TranscriptRecoveryAndHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F08F18E004924B592F24DC /* TranscriptRecoveryAndHistoryViews.swift */; };
 		6D4BF7BD49B33FC81FB5B4D5 /* SessionArtifactsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5530F00F9B6ABE2F8E52B8 /* SessionArtifactsService.swift */; };
 		6D7B8D5AC8C50D7223EF2D1F /* KeychainSecretStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDEE0092AB006832697B9BC /* KeychainSecretStoreTests.swift */; };
@@ -144,7 +145,6 @@
 		8E7D49E7CCF528ACD4607327 /* DebugSessionContextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE3DDA88B639E750CD0700F /* DebugSessionContextProviderTests.swift */; };
 		8F3D88D73F1560365347F711 /* ProductInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F9B1D06622F36D479935B7D /* ProductInfoTests.swift */; };
 		8F4B3823ACB48DDF270E2BAE /* AppStateIssueExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8498A39301CC9F88F45A4D5A /* AppStateIssueExportTests.swift */; };
-		9061D144685411A6E47DB523 /* AppState+IssueMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F96CB726F53276C29E407D4F /* AppState+IssueMutation.swift */; };
 		93057BE64347AD1BF43F4FF0 /* ExportHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F3DD1ED69F4EF96A4BD44A /* ExportHistoryController.swift */; };
 		9453CE97ECC7AFBB6F35F74A /* TranscriptSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6A14B5D110D6E584678A83 /* TranscriptSession.swift */; };
 		952BBC1ED94400857FF4E837 /* RecordingStatusMessageBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F0C360F83AB792370FADAF /* RecordingStatusMessageBuilder.swift */; };
@@ -372,6 +372,7 @@
 		7322F6B6A58542DEDFC76CCA /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		76411B4F7BC170843D60D2A4 /* SessionDataProtector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataProtector.swift; sourceTree = "<group>"; };
 		776E95F5977423452961A52B /* AppState+IssueExportQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+IssueExportQueries.swift"; sourceTree = "<group>"; };
+		77AF40FCECF7DCEDABD21EC8 /* AppState+IssueExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+IssueExtraction.swift"; sourceTree = "<group>"; };
 		7881C3E0425DCA7D35C6C10E /* AppState+ExportReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportReview.swift"; sourceTree = "<group>"; };
 		78DB2CC94CABCD51955891BF /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		78EFF170BAD57E66A7CB20AB /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -486,7 +487,6 @@
 		F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionClientTests.swift; sourceTree = "<group>"; };
 		F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBundleExporterTests.swift; sourceTree = "<group>"; };
 		F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportProvider.swift; sourceTree = "<group>"; };
-		F96CB726F53276C29E407D4F /* AppState+IssueMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+IssueMutation.swift"; sourceTree = "<group>"; };
 		FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioObjectIDExtensions.swift; sourceTree = "<group>"; };
 		FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenter.swift; sourceTree = "<group>"; };
 		FCF1EE5E9EEE1A5D22F7A647 /* HotkeyShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyShortcutTests.swift; sourceTree = "<group>"; };
@@ -673,7 +673,7 @@
 				7881C3E0425DCA7D35C6C10E /* AppState+ExportReview.swift */,
 				0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */,
 				776E95F5977423452961A52B /* AppState+IssueExportQueries.swift */,
-				F96CB726F53276C29E407D4F /* AppState+IssueMutation.swift */,
+				77AF40FCECF7DCEDABD21EC8 /* AppState+IssueExtraction.swift */,
 				6161AB93D74FD6A2471534C5 /* AppState+SessionLibrary.swift */,
 				3E7CA92ED5A94500B96290D0 /* AppState+SupportNavigation.swift */,
 				B486B153518EB9E1BBC08F17 /* AppState+SystemActions.swift */,
@@ -1086,7 +1086,7 @@
 				0E06D8F0874CB1CBB2FEA135 /* AppState+ExportReview.swift in Sources */,
 				B697C4571507A5D3C6AA0DD4 /* AppState+FileRevealActions.swift in Sources */,
 				1BCD3E21C690E06B00319440 /* AppState+IssueExportQueries.swift in Sources */,
-				9061D144685411A6E47DB523 /* AppState+IssueMutation.swift in Sources */,
+				6B52833F68E7F99EE7D2FE07 /* AppState+IssueExtraction.swift in Sources */,
 				04D66F9B419137D1948D12A4 /* AppState+SessionLibrary.swift in Sources */,
 				AD5CE09A6639155D68E44618 /* AppState+SupportNavigation.swift in Sources */,
 				600F14353C222547C1284413 /* AppState+SystemActions.swift in Sources */,

@@ -18,4 +18,8 @@ extension AppState {
             try issueExtractionController.setAllIssuesSelected(isSelected, in: sessionID)
         }
     }
+
+    func isExtractingIssues(for session: TranscriptSession) -> Bool {
+        issueExtractionController.isExtractingIssues(for: session)
+    }
 }
