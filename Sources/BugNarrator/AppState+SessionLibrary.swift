@@ -39,4 +39,12 @@ extension AppState {
         get { sessionLibrary.selectedTranscriptID }
         set { sessionLibrary.selectedTranscriptID = newValue }
     }
+
+    var displayedTranscript: TranscriptSession? {
+        sessionLibrary.displayedTranscript
+    }
+
+    var currentTranscriptIsPersisted: Bool {
+        sessionLibrary.currentTranscriptIsPersisted
+    }
 }
