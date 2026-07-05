@@ -78,14 +78,6 @@ final class AppState: ObservableObject {
     private let transcriptionLogger = DiagnosticsLogger(category: .transcription)
     private let settingsLogger = DiagnosticsLogger(category: .settings)
 
-    var status: AppStatus {
-        presentationState.status
-    }
-
-    var currentError: AppError? {
-        presentationState.currentError
-    }
-
     var exportHistory: [ExportReceipt] {
         exportHistoryController.exportHistory
     }
@@ -96,10 +88,6 @@ final class AppState: ObservableObject {
 
     var pendingExportReview: IssueExportReview? {
         issueExportController.pendingExportReview
-    }
-
-    var transientToast: TransientToast? {
-        presentationState.transientToast
     }
 
     var retryingSessionID: UUID? {
