@@ -32,7 +32,7 @@ final class AppState: ObservableObject {
     let exportHistoryController: ExportHistoryController
     let issueExtractionController: IssueExtractionController
     let manualIssueExtractionStatusPresenter: ManualIssueExtractionStatusPresenter
-    let issueMutationFailurePresenter: IssueMutationFailurePresenter
+    let issueExtractionFailurePresenter: IssueExtractionFailurePresenter
     let issueExportController: IssueExportController
     let issueExportPresentationController: IssueExportPresentationController
     let permissionRecoveryController: PermissionRecoveryController
@@ -335,7 +335,7 @@ final class AppState: ObservableObject {
             showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
         )
-        self.issueMutationFailurePresenter = IssueMutationFailurePresenter(
+        self.issueExtractionFailurePresenter = IssueExtractionFailurePresenter(
             errorPresenter: self.errorPresenter
         )
         self.issueExportPresentationController = IssueExportPresentationController(
@@ -567,7 +567,7 @@ final class AppState: ObservableObject {
         recordingSessionStartStatusPresenter.prepareErrorPresentationSideEffects = { [weak self] in
             self?.prepareErrorPresentationSideEffects()
         }
-        issueMutationFailurePresenter.prepareErrorPresentationSideEffects = { [weak self] in
+        issueExtractionFailurePresenter.prepareErrorPresentationSideEffects = { [weak self] in
             self?.prepareErrorPresentationSideEffects()
         }
         sessionLibraryStatusPresenter.prepareErrorPresentationSideEffects = { [weak self] in
