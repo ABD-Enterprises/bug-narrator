@@ -28,4 +28,40 @@ extension AppState {
     func loadJiraIssueTypes(forProjectID projectID: String) async {
         await trackerIntegration.loadJiraIssueTypes(forProjectID: projectID)
     }
+
+    var gitHubValidationState: APIKeyValidationState {
+        trackerIntegration.gitHubValidationState
+    }
+
+    var jiraValidationState: APIKeyValidationState {
+        trackerIntegration.jiraValidationState
+    }
+
+    var gitHubRepositories: [GitHubRepositoryOption] {
+        trackerIntegration.gitHubRepositories
+    }
+
+    var isLoadingGitHubRepositories: Bool {
+        trackerIntegration.isLoadingGitHubRepositories
+    }
+
+    var jiraProjects: [JiraProjectOption] {
+        trackerIntegration.jiraProjects
+    }
+
+    var jiraIssueTypes: [JiraIssueTypeOption] {
+        trackerIntegration.jiraIssueTypes
+    }
+
+    var isLoadingJiraIssueTypes: Bool {
+        trackerIntegration.isLoadingJiraIssueTypes
+    }
+
+    var jiraProjectMetadataIsStale: Bool {
+        trackerIntegration.jiraProjectMetadataIsStale
+    }
+
+    var jiraIssueTypeMetadataIsStale: Bool {
+        trackerIntegration.jiraIssueTypeMetadataIsStale
+    }
 }
