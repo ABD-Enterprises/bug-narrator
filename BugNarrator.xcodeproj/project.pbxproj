@@ -227,6 +227,7 @@
 		CEDAB8D8BF65455F21123B22 /* SessionLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB292B3C69DEF8CC080283 /* SessionLibraryController.swift */; };
 		D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */; };
 		D0754552F75E1CE6B4128800 /* TranscriptExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */; };
+		D089C488B66D1CCBF625BDA9 /* TranscriptionRecoveryPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F271FCF4D5A2759B4D6DCE4 /* TranscriptionRecoveryPresenters.swift */; };
 		D1508F661FB05C078F386D60 /* AppState+WindowManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B7F0C1392B31892BE5A796 /* AppState+WindowManagement.swift */; };
 		D1816E560B00B71EB9A625EA /* SystemAudioFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCEC36FA2A05A4FD9CE5F0B /* SystemAudioFileWriter.swift */; };
 		D2AEB3EA7C80F6B47D0193C5 /* SimilarIssueReviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBF2173AAF872E97F8645F4 /* SimilarIssueReviewService.swift */; };
@@ -259,6 +260,7 @@
 		F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */; };
 		F715303DE87CE267F3336E39 /* TranscriptionSessionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305726D5E9A576C4C9729670 /* TranscriptionSessionBuilder.swift */; };
 		F8BF8DC6CA90989293D790EF /* IssueExtractionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C72E7D77CE5A2F8560651F /* IssueExtractionServiceTests.swift */; };
+		FAABB483CA602BDFE9F90FBF /* TranscriptionRecoverySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95694D28269EE30BBED24AFE /* TranscriptionRecoverySupport.swift */; };
 		FAF01A932489386F2FEFA1AB /* TransientToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF216E69324B1E22CC5FFC4 /* TransientToastTests.swift */; };
 		FB372E7045DCC67CC5321D4B /* DiagnosticsLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */; };
 		FEFF63FB3DA83F5C8BC659C1 /* AppPresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE77CF3D9076FC05278390A6 /* AppPresentationState.swift */; };
@@ -417,6 +419,7 @@
 		7EF107719ECC19DBE07A1046 /* AppSupportLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupportLocationTests.swift; sourceTree = "<group>"; };
 		7EF4558D78ECC185ECA6ED10 /* TranscriptExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExporterTests.swift; sourceTree = "<group>"; };
 		7EFD71FC016C2F699D022EDB /* RecordingPreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPreferencesStore.swift; sourceTree = "<group>"; };
+		7F271FCF4D5A2759B4D6DCE4 /* TranscriptionRecoveryPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionRecoveryPresenters.swift; sourceTree = "<group>"; };
 		800BFCC6407B534886C65D77 /* TranscriptionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionClient.swift; sourceTree = "<group>"; };
 		811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapturePermissionService.swift; sourceTree = "<group>"; };
 		820D9C79E98BC63EC8CEF7E3 /* MenuBarLabelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabelView.swift; sourceTree = "<group>"; };
@@ -441,6 +444,7 @@
 		92CFBCD444BCD3791FE18E77 /* AppState+PermissionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PermissionRecovery.swift"; sourceTree = "<group>"; };
 		92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
 		94052C02271A22E78259D71B /* ScreenshotCaptureServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureServiceTests.swift; sourceTree = "<group>"; };
+		95694D28269EE30BBED24AFE /* TranscriptionRecoverySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionRecoverySupport.swift; sourceTree = "<group>"; };
 		97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyDataExporter.swift; sourceTree = "<group>"; };
 		98A652F7AA9829954147C9A1 /* HotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerTests.swift; sourceTree = "<group>"; };
 		99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderSettingsController.swift; sourceTree = "<group>"; };
@@ -843,6 +847,8 @@
 				800BFCC6407B534886C65D77 /* TranscriptionClient.swift */,
 				83CE91359103D30C04663766 /* TranscriptionModels.swift */,
 				2C79C7B495FC353122C29F0B /* TranscriptionRecoveryController.swift */,
+				7F271FCF4D5A2759B4D6DCE4 /* TranscriptionRecoveryPresenters.swift */,
+				95694D28269EE30BBED24AFE /* TranscriptionRecoverySupport.swift */,
 				26CD9BA732E87ECCC87659E2 /* TranscriptionRequestFactory.swift */,
 				04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */,
 				7A7A34EF1391E51E6B1DB8BF /* TranscriptSectionBuilder.swift */,
@@ -1299,6 +1305,8 @@
 				33DB3B8F22BD0E75CFC65F10 /* TranscriptionClient.swift in Sources */,
 				3CA626CA4757EC95AAA8C8CF /* TranscriptionModels.swift in Sources */,
 				A2E710E8AA18115FD2B9C352 /* TranscriptionRecoveryController.swift in Sources */,
+				D089C488B66D1CCBF625BDA9 /* TranscriptionRecoveryPresenters.swift in Sources */,
+				FAABB483CA602BDFE9F90FBF /* TranscriptionRecoverySupport.swift in Sources */,
 				8507C1549A3313E2C9CD4C10 /* TranscriptionRequestFactory.swift in Sources */,
 				F715303DE87CE267F3336E39 /* TranscriptionSessionBuilder.swift in Sources */,
 				5956B9999301BDED53F3B1EC /* TransientToast.swift in Sources */,
