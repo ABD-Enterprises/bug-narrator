@@ -183,6 +183,7 @@
 		B3F726638452CBD7F5A4DC16 /* WindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */; };
 		B3FF6A0FB442CAC98A7B9E81 /* ScreenshotCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F350327BA0619E235858F82 /* ScreenshotCaptureController.swift */; };
 		B53060D07F7F2428BD78E807 /* ClipboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A663ED1B160E290FCFAC3AED /* ClipboardService.swift */; };
+		B697C4571507A5D3C6AA0DD4 /* AppState+FileRevealActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */; };
 		B771844AAE785C764AEBD7C6 /* SecretSlotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27BD14AE99398DAE80181305 /* SecretSlotTests.swift */; };
 		B7CF73E927D64502C998A0BC /* SessionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1605CDD1B7C6F848068F14 /* SessionLibrary.swift */; };
 		BA99127A39D827962D535164 /* SettingsReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = B065A5B9BE084EFE0BFE1D48 /* SettingsReadiness.swift */; };
@@ -271,6 +272,7 @@
 		0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioRecorder.swift; sourceTree = "<group>"; };
 		0DF81E6E8D3A702691797E56 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIntegrationsPanes.swift; sourceTree = "<group>"; };
+		0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+FileRevealActions.swift"; sourceTree = "<group>"; };
 		0F4260DB7346E46D2D6A9FDF /* IssueMutationFailurePresenter+Attempt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IssueMutationFailurePresenter+Attempt.swift"; sourceTree = "<group>"; };
 		1691FC9128F5B3D543C87721 /* ExportTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTestSupport.swift; sourceTree = "<group>"; };
 		16D050A90CD83BD3C04D0487 /* ScreenshotsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotsSection.swift; sourceTree = "<group>"; };
@@ -667,6 +669,7 @@
 			children = (
 				78EFF170BAD57E66A7CB20AB /* AppState.swift */,
 				7881C3E0425DCA7D35C6C10E /* AppState+ExportReview.swift */,
+				0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */,
 				776E95F5977423452961A52B /* AppState+IssueExportQueries.swift */,
 				F96CB726F53276C29E407D4F /* AppState+IssueMutation.swift */,
 				6161AB93D74FD6A2471534C5 /* AppState+SessionLibrary.swift */,
@@ -1078,6 +1081,7 @@
 				5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */,
 				292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */,
 				0E06D8F0874CB1CBB2FEA135 /* AppState+ExportReview.swift in Sources */,
+				B697C4571507A5D3C6AA0DD4 /* AppState+FileRevealActions.swift in Sources */,
 				1BCD3E21C690E06B00319440 /* AppState+IssueExportQueries.swift in Sources */,
 				9061D144685411A6E47DB523 /* AppState+IssueMutation.swift in Sources */,
 				04D66F9B419137D1948D12A4 /* AppState+SessionLibrary.swift in Sources */,
