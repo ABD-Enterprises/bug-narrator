@@ -1,99 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-struct MultipartFormDataBuilder {
-    let boundary: String
-    private var body = Data()
-
-    init(boundary: String) {
-        self.boundary = boundary
-    }
-
-    mutating func appendField(named name: String, value: String) {
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"\(name)\"")
-        appendLine("")
-        appendLine(value)
-    }
-
-    mutating func appendFile(named name: String, fileName: String, mimeType: String, data: Data) {
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(fileName)\"")
-        appendLine("Content-Type: \(mimeType)")
-        appendLine("")
-        body.append(data)
-        appendLine("")
-    }
-
-    mutating func finalizedBody() -> Data {
-        var finalizedBody = body
-        finalizedBody.append(Data("--\(boundary)--\r\n".utf8))
-        return finalizedBody
-    }
-
-    private mutating func appendLine(_ value: String) {
-        body.append(Data("\(value)\r\n".utf8))
-    }
-}
-
-struct TranscriptionRequestFactory {
-    static let defaultAPIBaseURL = URL(string: "https://api.openai.com")!
-
-    func validationRequest(
-        apiKey: String,
-        apiBaseURL: URL = Self.defaultAPIBaseURL
-    ) -> URLRequest {
-        var request = URLRequest(url: OpenAIEndpointBuilder.endpoint(for: "v1/models", baseURL: apiBaseURL))
-        request.httpMethod = "GET"
-        applyAuthorization(apiKey, to: &request)
-        return request
-    }
-
-    func transcriptionRequest(
-        apiKey: String,
-        transcriptionRequest: TranscriptionRequest,
-        boundary: String,
-        body: Data
-    ) -> URLRequest {
-        var request = URLRequest(
-            url: OpenAIEndpointBuilder.endpoint(
-                for: "v1/audio/transcriptions",
-                baseURL: transcriptionRequest.apiBaseURL
-            )
-        )
-        request.httpMethod = "POST"
-        applyAuthorization(apiKey, to: &request)
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = body
-        return request
-    }
-
-    private func applyAuthorization(_ apiKey: String, to request: inout URLRequest) {
-        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-    }
-}
-
-struct VerboseTranscriptionResponseParser {
-    let qualityInspector: TranscriptQualityInspector
-
-    func parse(_ data: Data) throws -> TranscriptionResult {
-        let result = try JSONDecoder().decode(VerboseTranscriptionResponse.self, from: data)
-        let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !transcript.isEmpty else {
-            throw AppError.emptyTranscript
-        }
-
-        return TranscriptionResult(
-            text: transcript,
-            segments: result.segments ?? [],
-            qualityFindings: qualityInspector.findings(for: transcript)
-        )
-    }
-}
-
 actor TranscriptionClient: TranscriptionServing {
     private let session: URLSession
     private let fileManager: FileManager
@@ -704,9 +611,4 @@ private final class AssetExportSessionBridge: @unchecked Sendable {
     init(_ session: AVAssetExportSession) {
         self.session = session
     }
-}
-
-private struct VerboseTranscriptionResponse: Decodable {
-    let text: String
-    let segments: [TranscriptionSegment]?
 }
