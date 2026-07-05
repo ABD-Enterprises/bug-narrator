@@ -1,6 +1,8 @@
 import Foundation
 
 extension AppState {
+    // MARK: - Methods
+
     func jiraIssueTypes(for target: JiraIssueExportTarget) -> [JiraIssueTypeOption] {
         trackerIntegration.jiraIssueTypes(for: target)
     }
@@ -28,6 +30,8 @@ extension AppState {
     func loadJiraIssueTypes(forProjectID projectID: String) async {
         await trackerIntegration.loadJiraIssueTypes(forProjectID: projectID)
     }
+
+    // MARK: - Computed properties
 
     var gitHubValidationState: APIKeyValidationState {
         trackerIntegration.gitHubValidationState
