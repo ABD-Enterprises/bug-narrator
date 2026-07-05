@@ -1,6 +1,11 @@
 import Foundation
-import XCTest
 @testable import BugNarrator
+
+// Generic test helpers shared across suites. Add here ONLY if no
+// domain-scoped test-support file (RecordingTestSupport, KeychainTestSupport,
+// IssueExportTestSupport, ExportTestSupport, ScreenshotTestSupport,
+// NetworkTestSupport, TelemetryTestSupport, UtilityTestSupport) is the right
+// home. This file replaces the pre-#434 monolithic TestSupport.swift.
 
 func makeSampleTranscriptSession(index: Int) -> TranscriptSession {
     TranscriptSession(
