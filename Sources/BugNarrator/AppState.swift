@@ -684,10 +684,6 @@ final class AppState: ObservableObject {
         screenshotCaptureController.isCaptureInProgress
     }
 
-    func isExporting(to destination: ExportDestination) -> Bool {
-        issueExportController.isExporting(to: destination)
-    }
-
     func refreshPermissionRecoveryState() {
         permissionRecoveryStatusPresenter.present(
             permissionRecoveryController.refreshRecoveryState(
