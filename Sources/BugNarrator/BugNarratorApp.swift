@@ -1,22 +1,5 @@
 import Darwin
 import SwiftUI
-
-final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
-    @MainActor
-    static var appState: AppState?
-    @MainActor
-    static var launchContinuityMonitor: LaunchContinuityMonitor?
-
-    @MainActor
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        Self.appState?.applicationShouldTerminate() ?? .terminateNow
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        Self.launchContinuityMonitor?.markGracefulTermination()
-    }
-}
-
 private struct WindowSceneRegistrar: View {
     @ObservedObject var appState: AppState
     let windowCoordinator: WindowCoordinator
