@@ -166,6 +166,7 @@
 		8419388E08492DBAC01BEEE8 /* SingleInstanceControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */; };
 		8507C1549A3313E2C9CD4C10 /* TranscriptionRequestFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26CD9BA732E87ECCC87659E2 /* TranscriptionRequestFactory.swift */; };
 		8598258404428C8692A51907 /* ExportReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */; };
+		85CAB44D4C7B4A4A0C4CC52F /* ScreenshotImageWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0402E5EE9C58162DE810165C /* ScreenshotImageWriter.swift */; };
 		8666985E2260463398766FBD /* HotkeyShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE5A3102900FD595AE2A07E /* HotkeyShortcut.swift */; };
 		8839D4116A3265DB08430846 /* SupportDataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE1E25C090853C38690595 /* SupportDataController.swift */; };
 		88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */; };
@@ -329,6 +330,7 @@
 		002A3FB6CC8E66C5C82E0B56 /* RecordingTimerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimerViewModel.swift; sourceTree = "<group>"; };
 		00F7DD790A65A410DAF9831C /* PermissionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryControllerTests.swift; sourceTree = "<group>"; };
 		01B7F0C1392B31892BE5A796 /* AppState+WindowManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+WindowManagement.swift"; sourceTree = "<group>"; };
+		0402E5EE9C58162DE810165C /* ScreenshotImageWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotImageWriter.swift; sourceTree = "<group>"; };
 		04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspector.swift; sourceTree = "<group>"; };
 		0564DB57CA0F960E25142103 /* ElapsedTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatterTests.swift; sourceTree = "<group>"; };
 		0599934D564C87030D294589 /* BugNarratorDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorDiagnostics.swift; sourceTree = "<group>"; };
@@ -928,6 +930,7 @@
 				54A8F3C1B2AFF52FBD3D8703 /* ScreenshotCaptureService.swift */,
 				998C4703160B45E816CF929F /* ScreenshotCaptureSupport.swift */,
 				440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */,
+				0402E5EE9C58162DE810165C /* ScreenshotImageWriter.swift */,
 				090874D96E31365E5A10076E /* ScreenshotSelectionGeometry.swift */,
 				EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */,
 				0B3EA5B797B5D53F17A47C8D /* SecretSlot.swift */,
@@ -1408,6 +1411,7 @@
 				6DC57655A6904ADCF5D41040 /* ScreenshotCaptureService.swift in Sources */,
 				CB86D0DD53DE4F044EC12470 /* ScreenshotCaptureSupport.swift in Sources */,
 				71EF8448D05ED4023C8D7CF0 /* ScreenshotCoordinator.swift in Sources */,
+				85CAB44D4C7B4A4A0C4CC52F /* ScreenshotImageWriter.swift in Sources */,
 				CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */,
 				5EB36B43CF762B8CBFB63704 /* ScreenshotSelectionGeometry.swift in Sources */,
 				B254C34FC1E013052F77EEA5 /* ScreenshotSelectionService.swift in Sources */,
