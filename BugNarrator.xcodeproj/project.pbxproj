@@ -193,6 +193,7 @@
 		99268A7BF811CD29DB330195 /* SessionScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B60FF3096207405A3ECB6D0 /* SessionScreenshot.swift */; };
 		994C5601BD2578CC3A980002 /* AIProviderSettingsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */; };
 		99A01D146ED4D77DA20484A5 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 792A02D8EE4EBB2A02D4043D /* CHANGELOG.md */; };
+		99DB811FD2B112D6FC92A777 /* LaunchAtLoginControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF26FD7E876F57CE14E794A /* LaunchAtLoginControlling.swift */; };
 		9BDE73A1F0BA27B80A72F736 /* SessionLibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33027EA9F37EA57406F2D1A /* SessionLibraryItem.swift */; };
 		9C875F3839EE3EE9D7AC083B /* TrackerExportPayloadBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7E7C066184078E8F7462AD /* TrackerExportPayloadBudget.swift */; };
 		9D12A5E2379C328D473E6452 /* PendingTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC43602AE7048F7313E7DF6 /* PendingTranscription.swift */; };
@@ -432,6 +433,7 @@
 		5B60FF3096207405A3ECB6D0 /* SessionScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreenshot.swift; sourceTree = "<group>"; };
 		5BCEC36FA2A05A4FD9CE5F0B /* SystemAudioFileWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioFileWriter.swift; sourceTree = "<group>"; };
 		5C5346EDB503C6B05C81C368 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		5CF26FD7E876F57CE14E794A /* LaunchAtLoginControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginControlling.swift; sourceTree = "<group>"; };
 		5D05D14432F331F83DB44AD9 /* TelemetryTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryTypes.swift; sourceTree = "<group>"; };
 		5D2173ED04BA5467313B6261 /* AppErrorPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenterTests.swift; sourceTree = "<group>"; };
 		5F27EE86CDB87DABC7401E8E /* KeychainTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTestSupport.swift; sourceTree = "<group>"; };
@@ -902,6 +904,7 @@
 				F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */,
 				CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */,
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
+				5CF26FD7E876F57CE14E794A /* LaunchAtLoginControlling.swift */,
 				417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */,
 				F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */,
 				38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */,
@@ -1366,6 +1369,7 @@
 				88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */,
 				318DB7BFA958511B51F94AA8 /* KeychainSecretStore.swift in Sources */,
 				280973289AE78D9919ECD80C /* KeychainService.swift in Sources */,
+				99DB811FD2B112D6FC92A777 /* LaunchAtLoginControlling.swift in Sources */,
 				099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */,
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
 				525C328F410D5C0BAF88FE99 /* LocalDataDeletionController.swift in Sources */,

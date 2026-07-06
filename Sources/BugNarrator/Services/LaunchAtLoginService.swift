@@ -55,11 +55,6 @@ enum LaunchAtLoginStatus: Equatable {
     }
 }
 
-protocol LaunchAtLoginControlling {
-    func currentStatus() -> LaunchAtLoginStatus
-    func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus
-}
-
 struct SystemLaunchAtLoginService: LaunchAtLoginControlling {
     func currentStatus() -> LaunchAtLoginStatus {
         guard #available(macOS 13.0, *) else {
