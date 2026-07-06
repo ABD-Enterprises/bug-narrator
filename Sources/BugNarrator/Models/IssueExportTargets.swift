@@ -85,18 +85,6 @@ struct IssueExtractionResult: Codable, Equatable {
         issues.filter(\.isSelectedForExport)
     }
 }
-
-enum ExportDestination: String, Codable, CaseIterable, Identifiable {
-    case github = "GitHub"
-    case jira = "Jira"
-
-    var id: String { rawValue }
-
-    var actionTitle: String {
-        "Export to \(rawValue)"
-    }
-}
-
 struct ExportResult: Identifiable, Equatable {
     let id: UUID
     let sourceIssueID: UUID
