@@ -16,7 +16,3 @@ enum RecordingSessionStopReadiness {
     case missingSessionMetadata
 }
 
-enum RecordingSessionCancelOutcome {
-    case cancelled(RecordingSessionDraft?)
-    case transitionInProgress
-}
