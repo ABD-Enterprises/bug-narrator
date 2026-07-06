@@ -1,12 +1,6 @@
 import Combine
 import Foundation
 
-struct AIModelChoice: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let detail: String
-}
-
 final class SettingsStore: ObservableObject {
     static let defaultLegacyDefaultsDomains = [
         "com.abdenterprises.sessionmic"
