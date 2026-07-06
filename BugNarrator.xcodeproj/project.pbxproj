@@ -80,6 +80,7 @@
 		456F9629727CC070CD248B56 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AC8EFE20212B7DE69792FB /* AudioRecorder.swift */; };
 		45DE9D5541C2B8F54019E9F7 /* BugNarratorSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FD68D81A7568355BFAB9DF /* BugNarratorSettingsUITests.swift */; };
 		45F46F4649A31F438D58E465 /* BugNarratorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD698A35E065D940A06FB72 /* BugNarratorApp.swift */; };
+		474596AEBE0A97F33B320E59 /* AppErrorTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA54521C239C09E5B94712EB /* AppErrorTypes.swift */; };
 		474B8B38A576590B2AB08D3F /* IssueExportReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */; };
 		4D1C9E0E08BD5550F0A10C10 /* AppState+AIProviderCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6BBD3839BF28AC52214FEB /* AppState+AIProviderCredential.swift */; };
 		4D9A19996F3BCEC530DEA5F8 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865C5FE84904ECA5F4379637 /* MenuBarView.swift */; };
@@ -577,6 +578,7 @@
 		E849C3E02857E9CF3FDCC39A /* ScreenshotTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTestSupport.swift; sourceTree = "<group>"; };
 		E8EF5167B9226AE01E478075 /* IssueExtractionRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionRequestBuilder.swift; sourceTree = "<group>"; };
 		E90F9F3F9007D9D9CD1FAABC /* WindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCoordinator.swift; sourceTree = "<group>"; };
+		EA54521C239C09E5B94712EB /* AppErrorTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorTypes.swift; sourceTree = "<group>"; };
 		EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionService.swift; sourceTree = "<group>"; };
 		EC896693FCB08C685103A65B /* TranscriptQualityFindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityFindingTests.swift; sourceTree = "<group>"; };
 		EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusPresentationTests.swift; sourceTree = "<group>"; };
@@ -842,6 +844,7 @@
 				99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */,
 				FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */,
 				778F1E0C90308A1D868A187E /* AppErrorSubPresenters.swift */,
+				EA54521C239C09E5B94712EB /* AppErrorTypes.swift */,
 				90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */,
 				EFCA1A4773C2BB41581B37CB /* AppUtilityActionController.swift */,
 				FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */,
@@ -1248,6 +1251,7 @@
 				CB9E1F15D2FB0B7CF38DD5F6 /* AppError.swift in Sources */,
 				D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */,
 				BC9E4D8AE8F5F1F539C5641A /* AppErrorSubPresenters.swift in Sources */,
+				474596AEBE0A97F33B320E59 /* AppErrorTypes.swift in Sources */,
 				98BEEBB0A54A385DAC55987E /* AppLaunchDiagnosticsReporter.swift in Sources */,
 				FEFF63FB3DA83F5C8BC659C1 /* AppPresentationState.swift in Sources */,
 				5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */,
