@@ -570,10 +570,6 @@ struct TranscriptView: View {
         showDeletionConfirmation = true
     }
 
-    private func isUnsaved(_ sessionID: UUID) -> Bool {
-        appState.currentTranscript?.id == sessionID && !appState.currentTranscriptIsPersisted
-    }
-
     private func transcriptDetail(for session: TranscriptSession) -> some View {
         GeometryReader { proxy in
             ScrollView {
@@ -637,7 +633,7 @@ struct TranscriptView: View {
                         .controlSize(.small)
                     }
                 }
-            } else if isUnsaved(session.id) {
+            } else if appState.isUnsaved(session.id) {
                 HStack(spacing: 10) {
                     Label("Only stored in memory until you save it.", systemImage: "tray")
                         .font(.footnote)

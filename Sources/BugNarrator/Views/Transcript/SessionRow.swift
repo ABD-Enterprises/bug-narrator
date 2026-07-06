@@ -29,7 +29,7 @@ struct SessionRow: View {
                             .background(.yellow.opacity(0.16), in: Capsule())
                     }
 
-                    if isUnsaved(entry.id) {
+                    if appState.isUnsaved(entry.id) {
                         Text("Unsaved")
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 6)
@@ -87,10 +87,6 @@ struct SessionRow: View {
             .background(.quaternary.opacity(0.45), in: Capsule())
     }
 
-    private func isUnsaved(_ sessionID: UUID) -> Bool {
-        appState.currentTranscript?.id == sessionID && !appState.currentTranscriptIsPersisted
-    }
-
     private func sessionRowAccessibilitySummary(for entry: SessionLibraryEntry) -> String {
         var components = [
             entry.createdAt.formatted(date: .abbreviated, time: .shortened),
@@ -109,7 +105,7 @@ struct SessionRow: View {
             components.append("Retry needed before transcription is complete")
         }
 
-        if isUnsaved(entry.id) {
+        if appState.isUnsaved(entry.id) {
             components.append("Unsaved")
         }
 

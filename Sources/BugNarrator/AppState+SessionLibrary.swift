@@ -28,6 +28,10 @@ extension AppState {
         )
     }
 
+    func isUnsaved(_ sessionID: UUID) -> Bool {
+        currentTranscript?.id == sessionID && !currentTranscriptIsPersisted
+    }
+
     // MARK: - Computed properties
 
     var currentTranscript: TranscriptSession? {
