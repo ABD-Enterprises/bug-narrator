@@ -53,18 +53,6 @@ final class MockClipboardService: ClipboardWriting {
         copiedStrings.append(string)
     }
 }
-
-@MainActor
-final class MockDebugBundleExporter: DebugBundleExporting {
-    var exportResult: Result<URL?, Error> = .success(nil)
-    private(set) var exportedSnapshots: [DebugBundleSnapshot] = []
-
-    func export(snapshot: DebugBundleSnapshot) throws -> URL? {
-        exportedSnapshots.append(snapshot)
-        return try exportResult.get()
-    }
-}
-
 @MainActor
 final class MockPrivacyDataExporter: PrivacyDataExporting {
     struct ExportRequest {
