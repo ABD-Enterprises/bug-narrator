@@ -7,19 +7,6 @@ protocol SessionDataProtecting {
     func protect(_ data: Data) throws -> Data
     func unprotect(_ data: Data) throws -> Data
 }
-
-struct PlaintextSessionDataProtector: SessionDataProtecting {
-    let writesEncryptedPayloads = false
-
-    func protect(_ data: Data) throws -> Data {
-        data
-    }
-
-    func unprotect(_ data: Data) throws -> Data {
-        data
-    }
-}
-
 struct KeychainSessionDataProtector: SessionDataProtecting {
     static let service = "BugNarrator.SessionData"
     static let account = "session-data-encryption-key"
