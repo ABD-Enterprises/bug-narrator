@@ -238,6 +238,7 @@
 		BBE16FF238B059EF08346355 /* ReviewWorkspaceTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70C2AF1D71698B8CB98490E /* ReviewWorkspaceTypes.swift */; };
 		BC9E4D8AE8F5F1F539C5641A /* AppErrorSubPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F1E0C90308A1D868A187E /* AppErrorSubPresenters.swift */; };
 		BE0F157736897DB21F47F8C6 /* SystemAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6047FAC93EEF81B1DB450003 /* SystemAudioRecorder.swift */; };
+		BEF8C1E782DD81076ED89635 /* PendingTranscriptionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DA1E469F13ACE58140B9820 /* PendingTranscriptionBanner.swift */; };
 		BFF29343A9B8C935D9A0B5EF /* TelemetryTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263C973B1E05430F2D14D5BE /* TelemetryTestSupport.swift */; };
 		C177672680CF960A0A36F3D0 /* SessionLibraryPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC9AEF9C67019E23C116896 /* SessionLibraryPresenters.swift */; };
 		C1FDA2B024230D874D06D08B /* ApplicationTerminationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */; };
@@ -339,6 +340,7 @@
 		0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControlPanelView.swift; sourceTree = "<group>"; };
 		0C6FB57EE70D75E47710D667 /* SettingsGeneralPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGeneralPanes.swift; sourceTree = "<group>"; };
 		0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioRecorder.swift; sourceTree = "<group>"; };
+		0DA1E469F13ACE58140B9820 /* PendingTranscriptionBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTranscriptionBanner.swift; sourceTree = "<group>"; };
 		0DF81E6E8D3A702691797E56 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIntegrationsPanes.swift; sourceTree = "<group>"; };
 		0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogEntry.swift; sourceTree = "<group>"; };
@@ -849,6 +851,7 @@
 				DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */,
 				820D9C79E98BC63EC8CEF7E3 /* MenuBarLabelView.swift */,
 				865C5FE84904ECA5F4379637 /* MenuBarView.swift */,
+				0DA1E469F13ACE58140B9820 /* PendingTranscriptionBanner.swift */,
 				0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */,
 				6131EA189B853D1B456A8D26 /* SettingsView.swift */,
 				4A9D6C752334532E660C00AF /* StorageRecoveryBanner.swift */,
@@ -1382,6 +1385,7 @@
 				7251FD6A3C965C5D9A87805F /* OpenAIErrorMapper.swift in Sources */,
 				C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */,
 				9D12A5E2379C328D473E6452 /* PendingTranscription.swift in Sources */,
+				BEF8C1E782DD81076ED89635 /* PendingTranscriptionBanner.swift in Sources */,
 				5E4490C17E49287B620FF2FA /* PermissionAndPreflightTypes.swift in Sources */,
 				68D411F355E3ED698E688D86 /* PermissionRecoveryController.swift in Sources */,
 				E60F34C1E0FED78A8F28FFDE /* PermissionRecoveryTypes.swift in Sources */,

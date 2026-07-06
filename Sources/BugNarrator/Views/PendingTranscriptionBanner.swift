@@ -1,0 +1,55 @@
+import SwiftUI
+
+struct PendingTranscriptionBanner: View {
+    let count: Int
+    let requiresProviderSetup: Bool
+    let provider: AIProvider
+    let openLatest: () -> Void
+    let openSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: "arrow.clockwise.circle")
+                .font(.subheadline.weight(.semibold))
+
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button("Open Latest Retry Needed Session") {
+                    openLatest()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+                if requiresProviderSetup {
+                    Button("Open Settings") {
+                        openSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var title: String {
+        if count == 1 {
+            return "1 session needs transcription retry"
+        }
+
+        return "\(count) sessions need transcription retry"
+    }
+
+    private var message: String {
+        if provider.requiresAPIKey {
+            return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing your \(provider.displayName) API key."
+        }
+
+        return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing the \(provider.displayName) setup."
+    }
+}
