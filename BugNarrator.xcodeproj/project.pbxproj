@@ -215,6 +215,7 @@
 		A88C8D43152C2EE414CC78D2 /* OpenAIErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */; };
 		A903B084AE51759DC0889D3A /* AppStateProviderValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D98BD0399A4FCBF9BFA27773 /* AppStateProviderValidationTests.swift */; };
 		A966688E214B8AC20FC12C22 /* SessionDataProtector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76411B4F7BC170843D60D2A4 /* SessionDataProtector.swift */; };
+		A9BC7BF540C2DAD4D145D571 /* DiagnosticsLogCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68C77E92F14A85C64433DEB /* DiagnosticsLogCategory.swift */; };
 		AA75C664726B10D24FA0393A /* TestUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8E0EE1D051EF433249045D /* TestUtilities.swift */; };
 		AB85DB15F347C75DB7C1241A /* TranscriptQualityInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */; };
 		ABA48997F0B07377178EDEE0 /* SystemAudioTapSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */; };
@@ -546,6 +547,7 @@
 		B33027EA9F37EA57406F2D1A /* SessionLibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryItem.swift; sourceTree = "<group>"; };
 		B3AE33EE76F55AE456924849 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		B486B153518EB9E1BBC08F17 /* AppState+SystemActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SystemActions.swift"; sourceTree = "<group>"; };
+		B68C77E92F14A85C64433DEB /* DiagnosticsLogCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogCategory.swift; sourceTree = "<group>"; };
 		B6EBD017E98FB65B2CD27ED3 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
 		BA49B2B79731E3A62B083174 /* IssueExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportController.swift; sourceTree = "<group>"; };
 		BB14D61549CBA990AB3FECA3 /* TranscriptStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreTests.swift; sourceTree = "<group>"; };
@@ -986,6 +988,7 @@
 				C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */,
 				33F136949087AFDDDEB2B830 /* ChangelogDocument.swift */,
 				2543B7AFD4F96F3482FE28FA /* DebugSessionContextProvider.swift */,
+				B68C77E92F14A85C64433DEB /* DiagnosticsLogCategory.swift */,
 				0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */,
 				56EE955B03EE30CC1EB568A1 /* DiagnosticsLogger.swift */,
 				93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */,
@@ -1326,6 +1329,7 @@
 				040E1F8A34C1C16904AB8370 /* DebugBundleExporter.swift in Sources */,
 				FD330322EFE5B739F3657451 /* DebugBundleTypes.swift in Sources */,
 				977D86FA0E7E2C16A5B41D4D /* DebugSessionContextProvider.swift in Sources */,
+				A9BC7BF540C2DAD4D145D571 /* DiagnosticsLogCategory.swift in Sources */,
 				11935BB2070F2A08AB015BD9 /* DiagnosticsLogEntry.swift in Sources */,
 				946F215474A2DE83AA4413C4 /* DiagnosticsLogger.swift in Sources */,
 				6AC08ACF1118EF6BDAD2E6BA /* DiagnosticsRedactor.swift in Sources */,

@@ -1,16 +1,6 @@
 import OSLog
 import Foundation
 
-enum DiagnosticsLogCategory: String, Codable, CaseIterable {
-    case recording
-    case transcription
-    case sessionLibrary = "session-library"
-    case export
-    case permissions
-    case screenshots
-    case settings
-}
-
 enum DiagnosticsLogLevel: String, Codable, CaseIterable {
     case debug
     case info
