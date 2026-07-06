@@ -17,12 +17,6 @@ enum MicrophonePermissionStatus: String, Equatable {
     case unknownError
 }
 
-struct MicrophoneRecoveryGuidance: Equatable {
-    let headline: String
-    let message: String
-    let localTestingNote: String?
-}
-
 enum RecordingStartPreflightResult: Equatable {
     case success
     case blocked(AppError)
