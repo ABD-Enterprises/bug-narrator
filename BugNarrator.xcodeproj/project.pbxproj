@@ -218,6 +218,7 @@
 		AA75C664726B10D24FA0393A /* TestUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8E0EE1D051EF433249045D /* TestUtilities.swift */; };
 		AB85DB15F347C75DB7C1241A /* TranscriptQualityInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */; };
 		ABA48997F0B07377178EDEE0 /* SystemAudioTapSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */; };
+		AD207293DCCA27AE3E298BBC /* RecordingSessionCancelStatusPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10AD318810784AA7B8D7CB5 /* RecordingSessionCancelStatusPresenter.swift */; };
 		AD2549206170CE4F862AD61B /* ApplicationTerminationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6EBD017E98FB65B2CD27ED3 /* ApplicationTerminationControllerTests.swift */; };
 		AD5CE09A6639155D68E44618 /* AppState+SupportNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7CA92ED5A94500B96290D0 /* AppState+SupportNavigation.swift */; };
 		B04FF93EC9D1DE838189B564 /* AISetupSectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB4AAA0A02B42A31386D0D7 /* AISetupSectionsView.swift */; };
@@ -570,6 +571,7 @@
 		CCCB5C9DAEB3066CA8E30234 /* SingleInstanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleInstanceController.swift; sourceTree = "<group>"; };
 		CD7E24CD9C6DBE0BF94F5A53 /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvider.swift; sourceTree = "<group>"; };
 		D0FD7C5D1FD4184BCC0CC331 /* IssueExtractionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionController.swift; sourceTree = "<group>"; };
+		D10AD318810784AA7B8D7CB5 /* RecordingSessionCancelStatusPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionCancelStatusPresenter.swift; sourceTree = "<group>"; };
 		D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataProtectorTests.swift; sourceTree = "<group>"; };
 		D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTapSession.swift; sourceTree = "<group>"; };
 		D23CC2E19AE4AA8233EE3DBE /* MixedAudioRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioRecorderTests.swift; sourceTree = "<group>"; };
@@ -919,6 +921,7 @@
 				97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */,
 				154255C955FE33FD6D016BE9 /* PrivacyDataExportTypes.swift */,
 				7EFD71FC016C2F699D022EDB /* RecordingPreferencesStore.swift */,
+				D10AD318810784AA7B8D7CB5 /* RecordingSessionCancelStatusPresenter.swift */,
 				875DD52AC7741ABC898365F4 /* RecordingSessionController.swift */,
 				FB3DE4A4EEA68D61D7E4BD14 /* RecordingSessionOutcomes.swift */,
 				DC99B0BEF616AC7161FBBC89 /* RecordingSessionPresenters.swift */,
@@ -1393,6 +1396,7 @@
 				30018202D1990BA2524B2CD6 /* RecordingAudioSource.swift in Sources */,
 				5D4B8A830EA58AFC03AE9982 /* RecordingControlPanelView.swift in Sources */,
 				7017710A0A23DB217399D8FC /* RecordingPreferencesStore.swift in Sources */,
+				AD207293DCCA27AE3E298BBC /* RecordingSessionCancelStatusPresenter.swift in Sources */,
 				EA159F21E891A76BE6A4E825 /* RecordingSessionController.swift in Sources */,
 				1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */,
 				B6F837040D5A988287E8E8FF /* RecordingSessionOutcomes.swift in Sources */,
