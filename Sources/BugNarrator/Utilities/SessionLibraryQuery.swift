@@ -31,13 +31,6 @@ enum SessionLibraryDateFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum SessionLibrarySortOrder: String, CaseIterable, Identifiable {
-    case newestFirst = "Newest First"
-    case oldestFirst = "Oldest First"
-
-    var id: String { rawValue }
-}
-
 struct SessionLibraryDateRange: Equatable {
     var startDate: Date
     var endDate: Date
