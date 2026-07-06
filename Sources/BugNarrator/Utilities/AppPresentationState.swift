@@ -3,23 +3,6 @@ import Combine
 import Foundation
 
 @MainActor
-final class ObservableObjectChangeForwarder {
-    private var cancellables = Set<AnyCancellable>()
-
-    func forward(_ publishers: [ObservableObjectPublisher], notify: @escaping () -> Void) {
-        cancellables.removeAll()
-
-        for publisher in publishers {
-            publisher
-                .sink { _ in
-                    notify()
-                }
-                .store(in: &cancellables)
-        }
-    }
-}
-
-@MainActor
 final class AppLifecycleNotificationBinder {
     private let notificationCenter: NotificationCenter
     private var cancellables = Set<AnyCancellable>()
