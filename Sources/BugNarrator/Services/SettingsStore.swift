@@ -1947,15 +1947,6 @@ private enum Keys {
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
     static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
 }
-
-enum APIKeyPersistenceState: Equatable {
-    case empty
-    case keychain
-    case keychainLocked
-    case sessionOnly
-    case pendingSave
-}
-
 enum SettingsCalloutTone: Equatable {
     case secondary
     case warning
