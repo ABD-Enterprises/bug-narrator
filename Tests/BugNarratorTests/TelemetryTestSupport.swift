@@ -24,12 +24,3 @@ final class MockOperationalTelemetryRecorder: OperationalTelemetryRecording {
         }
     }
 }
-
-final class MockLocalPrivacyDataManager: LocalPrivacyDataManaging {
-    private(set) var clearCallCount = 0
-
-    func clearLocalSupportArtifacts() async {
-        clearCallCount += 1
-    }
-}
-

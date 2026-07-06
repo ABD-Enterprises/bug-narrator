@@ -102,6 +102,7 @@
 		562BF7C0BF2A8D013BA2F63F /* BugNarratorMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */; };
 		567F87EB07251F21C61234A7 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A98C939A6ECBB0132C0305 /* AppUtilityActionControllerTests.swift */; };
 		56B6B994C39B8B439752CCA3 /* MenuProductInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */; };
+		56EE17D9C2EA02B69103FACA /* MockLocalPrivacyDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031C3DD17E505568271B7230 /* MockLocalPrivacyDataManager.swift */; };
 		56FD14656CE943A240D9DEE5 /* TranscriptSharedHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33C8794A9B95C9AF44798E3 /* TranscriptSharedHelpers.swift */; };
 		5767315B50743EA0DDEF2B64 /* KeychainTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F27EE86CDB87DABC7401E8E /* KeychainTestSupport.swift */; };
 		57C3B6C3C646F1588CF4E45C /* JiraExportProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */; };
@@ -329,6 +330,7 @@
 		002A3FB6CC8E66C5C82E0B56 /* RecordingTimerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimerViewModel.swift; sourceTree = "<group>"; };
 		00F7DD790A65A410DAF9831C /* PermissionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryControllerTests.swift; sourceTree = "<group>"; };
 		01B7F0C1392B31892BE5A796 /* AppState+WindowManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+WindowManagement.swift"; sourceTree = "<group>"; };
+		031C3DD17E505568271B7230 /* MockLocalPrivacyDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockLocalPrivacyDataManager.swift; sourceTree = "<group>"; };
 		04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspector.swift; sourceTree = "<group>"; };
 		0564DB57CA0F960E25142103 /* ElapsedTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatterTests.swift; sourceTree = "<group>"; };
 		0599934D564C87030D294589 /* BugNarratorDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorDiagnostics.swift; sourceTree = "<group>"; };
@@ -702,6 +704,7 @@
 				5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */,
 				9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */,
 				D23CC2E19AE4AA8233EE3DBE /* MixedAudioRecorderTests.swift */,
+				031C3DD17E505568271B7230 /* MockLocalPrivacyDataManager.swift */,
 				F00EA3260CCEECB3FB097702 /* NetworkTestSupport.swift */,
 				9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */,
 				D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */,
@@ -1210,6 +1213,7 @@
 				14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */,
 				C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */,
 				C36540B4BE0CB254215654AB /* MixedAudioRecorderTests.swift in Sources */,
+				56EE17D9C2EA02B69103FACA /* MockLocalPrivacyDataManager.swift in Sources */,
 				3953183BDA19D90C13449F73 /* NetworkTestSupport.swift in Sources */,
 				A88C8D43152C2EE414CC78D2 /* OpenAIErrorMapperTests.swift in Sources */,
 				00D88D70666311588A8ED4F3 /* OperationalTelemetryRecorderTests.swift in Sources */,
