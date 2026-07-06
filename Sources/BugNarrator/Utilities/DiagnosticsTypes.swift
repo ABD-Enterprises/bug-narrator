@@ -35,22 +35,6 @@ enum DiagnosticsLogLevel: String, Codable, CaseIterable {
     }
 }
 
-struct DiagnosticsEventName: RawRepresentable, ExpressibleByStringLiteral, Equatable, Hashable {
-    let rawValue: String
-
-    init(_ rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-}
-
 enum DiagnosticsEvent {
     static let appError = DiagnosticsEventName("app_error")
     static let sessionStartRequested = DiagnosticsEventName("session_start_requested")
