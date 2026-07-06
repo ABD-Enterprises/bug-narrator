@@ -39,13 +39,6 @@ enum RecordingStartPreflightResult: Equatable {
     }
 }
 
-enum ScreenCapturePermissionState: Equatable {
-    case granted
-    case notDetermined
-    case denied
-    case unavailable
-}
-
 enum ScreenCapturePermissionStatus: String, Equatable {
     case notDetermined
     case granted
