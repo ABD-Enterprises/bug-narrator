@@ -76,8 +76,3 @@ enum ScreenshotCapturePreflightResult: Equatable {
     }
 }
 
-enum ScreenshotSelectionResult: Equatable {
-    case selected(CGRect)
-    case cancelled
-}
-

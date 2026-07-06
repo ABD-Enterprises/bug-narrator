@@ -102,6 +102,7 @@
 		562BF7C0BF2A8D013BA2F63F /* BugNarratorMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */; };
 		567F87EB07251F21C61234A7 /* AppUtilityActionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A98C939A6ECBB0132C0305 /* AppUtilityActionControllerTests.swift */; };
 		56B6B994C39B8B439752CCA3 /* MenuProductInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */; };
+		56FA5DEE8405006F94D637DE /* ScreenshotSelectionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91B2E583AEC134BFE3BC3323 /* ScreenshotSelectionResult.swift */; };
 		56FD14656CE943A240D9DEE5 /* TranscriptSharedHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33C8794A9B95C9AF44798E3 /* TranscriptSharedHelpers.swift */; };
 		5767315B50743EA0DDEF2B64 /* KeychainTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F27EE86CDB87DABC7401E8E /* KeychainTestSupport.swift */; };
 		57C3B6C3C646F1588CF4E45C /* JiraExportProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */; };
@@ -508,6 +509,7 @@
 		8FB75074747EE722764CC071 /* IssueExportPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportPresenters.swift; sourceTree = "<group>"; };
 		90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuProductInfoView.swift; sourceTree = "<group>"; };
 		90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
+		91B2E583AEC134BFE3BC3323 /* ScreenshotSelectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionResult.swift; sourceTree = "<group>"; };
 		92CFBCD444BCD3791FE18E77 /* AppState+PermissionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PermissionRecovery.swift"; sourceTree = "<group>"; };
 		92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
 		93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactor.swift; sourceTree = "<group>"; };
@@ -929,6 +931,7 @@
 				998C4703160B45E816CF929F /* ScreenshotCaptureSupport.swift */,
 				440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */,
 				090874D96E31365E5A10076E /* ScreenshotSelectionGeometry.swift */,
+				91B2E583AEC134BFE3BC3323 /* ScreenshotSelectionResult.swift */,
 				EB9FC5A9F96173F2DA9C5B90 /* ScreenshotSelectionService.swift */,
 				0B3EA5B797B5D53F17A47C8D /* SecretSlot.swift */,
 				6B6F8B0D0A9D777735FD3E44 /* ServiceProtocols.swift */,
@@ -1410,6 +1413,7 @@
 				71EF8448D05ED4023C8D7CF0 /* ScreenshotCoordinator.swift in Sources */,
 				CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */,
 				5EB36B43CF762B8CBFB63704 /* ScreenshotSelectionGeometry.swift in Sources */,
+				56FA5DEE8405006F94D637DE /* ScreenshotSelectionResult.swift in Sources */,
 				B254C34FC1E013052F77EEA5 /* ScreenshotSelectionService.swift in Sources */,
 				255F6B56A8E14ED7C80DB0FA /* ScreenshotsSection.swift in Sources */,
 				609D4B42C4786F625CCD0623 /* SecretSlot.swift in Sources */,
