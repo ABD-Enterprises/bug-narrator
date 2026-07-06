@@ -1955,9 +1955,3 @@ enum APIKeyPersistenceState: Equatable {
     case sessionOnly
     case pendingSave
 }
-
-enum SettingsCalloutTone: Equatable {
-    case secondary
-    case warning
-    case error
-}
