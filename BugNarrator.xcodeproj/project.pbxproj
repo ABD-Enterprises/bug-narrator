@@ -254,6 +254,7 @@
 		CB86D0DD53DE4F044EC12470 /* ScreenshotCaptureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 998C4703160B45E816CF929F /* ScreenshotCaptureSupport.swift */; };
 		CB9E1F15D2FB0B7CF38DD5F6 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB303E43134D880AB6207D21 /* AppError.swift */; };
 		CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57AE8EA0414CE7C5271CFD16 /* ScreenshotPreviewCache.swift */; };
+		CC76E72B6BCB5FF6256256C6 /* IssueExportCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6587F627780F96A2B25653B7 /* IssueExportCompletion.swift */; };
 		CD22DEA9761A7BAD23814D52 /* SessionLibraryStatusPresenter+Attempt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313F4C6AD4D6A93E3995386E /* SessionLibraryStatusPresenter+Attempt.swift */; };
 		CEDAB8D8BF65455F21123B22 /* SessionLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB292B3C69DEF8CC080283 /* SessionLibraryController.swift */; };
 		D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */; };
@@ -448,6 +449,7 @@
 		6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySupportClasses.swift; sourceTree = "<group>"; };
 		64113E8532E84371F91096AF /* AppRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
 		64F0A81E02972573D2556B85 /* AppState+RecordingTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+RecordingTimer.swift"; sourceTree = "<group>"; };
+		6587F627780F96A2B25653B7 /* IssueExportCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportCompletion.swift; sourceTree = "<group>"; };
 		660D6357236D21D641327DEE /* SystemAudioFileWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioFileWriterTests.swift; sourceTree = "<group>"; };
 		67770387C5BA986EEB40382E /* SessionLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryTests.swift; sourceTree = "<group>"; };
 		68A79F0CD44463306F35C431 /* RecordingAudioSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioSourceTests.swift; sourceTree = "<group>"; };
@@ -887,6 +889,7 @@
 				2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */,
 				6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */,
 				6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */,
+				6587F627780F96A2B25653B7 /* IssueExportCompletion.swift */,
 				BA49B2B79731E3A62B083174 /* IssueExportController.swift */,
 				8FB75074747EE722764CC071 /* IssueExportPresenters.swift */,
 				46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */,
@@ -1345,6 +1348,7 @@
 				107C848CCE79FCFD13E3751F /* HotkeySupportClasses.swift in Sources */,
 				5E08967E498AE04D668BA680 /* IssueCore.swift in Sources */,
 				E35D7999872F814AE44B06EE /* IssueCoreSubtypes.swift in Sources */,
+				CC76E72B6BCB5FF6256256C6 /* IssueExportCompletion.swift in Sources */,
 				5AC3F76F7DCE14EA3E8D8303 /* IssueExportController.swift in Sources */,
 				20CFCC7656BA4B234DBE8004 /* IssueExportPresenters.swift in Sources */,
 				706F9177D110B5AE8B127245 /* IssueExportReview.swift in Sources */,
