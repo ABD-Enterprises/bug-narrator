@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00D88D70666311588A8ED4F3 /* OperationalTelemetryRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */; };
 		01CEE47A97CA8B7ED6B6E1B5 /* SessionLibraryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59F6509D79E57A86ED795CA /* SessionLibraryControllerTests.swift */; };
+		020A3C74AAAFF7B1370B0C36 /* DebugInfoSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88D02403FF3C2164F186CB8 /* DebugInfoSnapshot.swift */; };
 		040E1F8A34C1C16904AB8370 /* DebugBundleExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA72EF162C4C4AF53D2CB41 /* DebugBundleExporter.swift */; };
 		045DEFACC4FF761873046058 /* JiraExportConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104A00B74D18C9842D5BA11C /* JiraExportConfig.swift */; };
 		04C96DDD35BD806168921571 /* IssueExtractionRequestBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E95A3A144B00D27DA3615A /* IssueExtractionRequestBudget.swift */; };
@@ -619,6 +620,7 @@
 		F6CC17094DFD9502DBA94345 /* AppLaunchDiagnosticsReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchDiagnosticsReporter.swift; sourceTree = "<group>"; };
 		F6EFDC92FB70AFBB28EA6CF7 /* IssueExtractionFailurePresenter+Attempt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IssueExtractionFailurePresenter+Attempt.swift"; sourceTree = "<group>"; };
 		F77A3094579DB3E25D1ED0A9 /* IssueScreenshotAnnotationTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueScreenshotAnnotationTypes.swift; sourceTree = "<group>"; };
+		F88D02403FF3C2164F186CB8 /* DebugInfoSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugInfoSnapshot.swift; sourceTree = "<group>"; };
 		F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportProvider.swift; sourceTree = "<group>"; };
 		FB3DE4A4EEA68D61D7E4BD14 /* RecordingSessionOutcomes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionOutcomes.swift; sourceTree = "<group>"; };
 		FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioObjectIDExtensions.swift; sourceTree = "<group>"; };
@@ -880,6 +882,7 @@
 				A663ED1B160E290FCFAC3AED /* ClipboardService.swift */,
 				2FA72EF162C4C4AF53D2CB41 /* DebugBundleExporter.swift */,
 				5ABEC93C3EF20960325C6FF7 /* DebugBundleTypes.swift */,
+				F88D02403FF3C2164F186CB8 /* DebugInfoSnapshot.swift */,
 				70F3DD1ED69F4EF96A4BD44A /* ExportHistoryController.swift */,
 				102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */,
 				DC8C8AA3B4EEED739F198572 /* ExportReceiptStore.swift */,
@@ -1325,6 +1328,7 @@
 				B53060D07F7F2428BD78E807 /* ClipboardService.swift in Sources */,
 				040E1F8A34C1C16904AB8370 /* DebugBundleExporter.swift in Sources */,
 				FD330322EFE5B739F3657451 /* DebugBundleTypes.swift in Sources */,
+				020A3C74AAAFF7B1370B0C36 /* DebugInfoSnapshot.swift in Sources */,
 				977D86FA0E7E2C16A5B41D4D /* DebugSessionContextProvider.swift in Sources */,
 				11935BB2070F2A08AB015BD9 /* DiagnosticsLogEntry.swift in Sources */,
 				946F215474A2DE83AA4413C4 /* DiagnosticsLogger.swift in Sources */,
