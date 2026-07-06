@@ -153,9 +153,3 @@ struct DebugSessionMetadata: Codable, Equatable {
         )
     }
 }
-
-struct DebugBundleSnapshot {
-    let debugInfo: DebugInfoSnapshot
-    let sessionMetadata: DebugSessionMetadata
-    let recentLogText: String
-}
