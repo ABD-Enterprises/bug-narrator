@@ -5,13 +5,6 @@ struct IssueExportPreflightFailure: Error {
     let opensSettings: Bool
 }
 
-struct IssueExportRequestContext {
-    let destination: ExportDestination
-    let session: TranscriptSession
-    let selectedIssues: [ExtractedIssue]
-    let apiKey: String
-}
-
 struct IssueExportCompletion {
     let destination: ExportDestination
     let sessionID: UUID
