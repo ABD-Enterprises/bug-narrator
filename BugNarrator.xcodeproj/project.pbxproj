@@ -277,6 +277,7 @@
 		DC0465161F26D6650C80F1CF /* ScreenCapturePermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */; };
 		DFEC8A8B12366B1CC1ECF429 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ED768FCA5D58A5E78F24A8D /* SettingsStore.swift */; };
 		E1B0000CAD83CD900AA29EAD /* AppSupportLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF107719ECC19DBE07A1046 /* AppSupportLocationTests.swift */; };
+		E1D1457359BDB3B2C6D4F884 /* ExtractedIssueSeverity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9D185FFD68D94C7C186AF4 /* ExtractedIssueSeverity.swift */; };
 		E35D7999872F814AE44B06EE /* IssueCoreSubtypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3394CF24F8CA7410A441170E /* IssueCoreSubtypes.swift */; };
 		E3A4A5182E639F1AE4F7A773 /* IssueExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */; };
 		E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */; };
@@ -535,6 +536,7 @@
 		ABE3DDA88B639E750CD0700F /* DebugSessionContextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProviderTests.swift; sourceTree = "<group>"; };
 		AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationalTelemetryRecorder.swift; sourceTree = "<group>"; };
 		AE18D1E8901BEF5AE218942B /* PermissionRecoveryTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryTypes.swift; sourceTree = "<group>"; };
+		AE9D185FFD68D94C7C186AF4 /* ExtractedIssueSeverity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractedIssueSeverity.swift; sourceTree = "<group>"; };
 		AF86B21036E15ECF52300E09 /* SessionScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreenshotTests.swift; sourceTree = "<group>"; };
 		AFACC7533D24E7C572F411A1 /* GitHubExportProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubExportProviderTests.swift; sourceTree = "<group>"; };
 		B05AAC9DC376BDD9A17732C3 /* RecordingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraftTests.swift; sourceTree = "<group>"; };
@@ -762,6 +764,7 @@
 				084D11633172FCB62C674D40 /* APIKeyValidationState.swift */,
 				BB303E43134D880AB6207D21 /* AppError.swift */,
 				78DB2CC94CABCD51955891BF /* AppStatus.swift */,
+				AE9D185FFD68D94C7C186AF4 /* ExtractedIssueSeverity.swift */,
 				75B578DB59431378DDC84929 /* GitHubExportConfig.swift */,
 				598E006D3F529E46315F3585 /* HotkeyAction.swift */,
 				6DE5A3102900FD595AE2A07E /* HotkeyShortcut.swift */,
@@ -1336,6 +1339,7 @@
 				A73F5969DB4A2C04BC83BF45 /* ExportReceiptStore.swift in Sources */,
 				5839C40FC99D94A9C910A218 /* ExportReviewSheet.swift in Sources */,
 				5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */,
+				E1D1457359BDB3B2C6D4F884 /* ExtractedIssueSeverity.swift in Sources */,
 				BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */,
 				2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */,
 				6F50D0E752BEA3CECA1517A4 /* HotkeyAction.swift in Sources */,
