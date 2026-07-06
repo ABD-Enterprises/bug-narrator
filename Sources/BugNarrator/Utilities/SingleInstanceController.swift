@@ -1,11 +1,6 @@
 import AppKit
 import Foundation
 
-struct RunningApplicationSnapshot: Equatable {
-    let processIdentifier: pid_t
-    let bundleIdentifier: String?
-}
-
 enum SingleInstanceLaunchDisposition: Equatable {
     case primary
     case secondary(existingProcessIdentifier: pid_t)
