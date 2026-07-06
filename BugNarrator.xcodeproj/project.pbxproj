@@ -199,6 +199,7 @@
 		9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */; };
 		9EE81A76B802435C84B8032D /* IssueExtractionResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE77402A6284B705F5F4984A /* IssueExtractionResponseParser.swift */; };
 		9F837FB17474EEB037FC01B4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EFF170BAD57E66A7CB20AB /* AppState.swift */; };
+		A03B49428D65B123516664DE /* AppErrorNormalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C29DF4A6E2622A52AF0856 /* AppErrorNormalization.swift */; };
 		A0CCAAA3701FF6274B792685 /* APIKeyValidationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EDA987A6F43F0D5113D603 /* APIKeyValidationStateTests.swift */; };
 		A17B5FCA1F95211DF2321774 /* AppStateHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C367EF1F4D24E1E5819087 /* AppStateHarness.swift */; };
 		A29BE3EF9236161E2E8713CD /* PrivacyDataExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */; };
@@ -401,6 +402,7 @@
 		40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLoggerTests.swift; sourceTree = "<group>"; };
 		411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportHistory.swift"; sourceTree = "<group>"; };
 		417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
+		43C29DF4A6E2622A52AF0856 /* AppErrorNormalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorNormalization.swift; sourceTree = "<group>"; };
 		440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinator.swift; sourceTree = "<group>"; };
 		4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReviewPolicy.swift; sourceTree = "<group>"; };
@@ -868,6 +870,7 @@
 			children = (
 				CD7E24CD9C6DBE0BF94F5A53 /* AIProvider.swift */,
 				99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */,
+				43C29DF4A6E2622A52AF0856 /* AppErrorNormalization.swift */,
 				FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */,
 				778F1E0C90308A1D868A187E /* AppErrorSubPresenters.swift */,
 				EA54521C239C09E5B94712EB /* AppErrorTypes.swift */,
@@ -1282,6 +1285,7 @@
 				7FC6E70710547A486C4ED5BA /* AboutBugNarratorView.swift in Sources */,
 				19F9F231721D64A173E63F98 /* AppBootstrap.swift in Sources */,
 				CB9E1F15D2FB0B7CF38DD5F6 /* AppError.swift in Sources */,
+				A03B49428D65B123516664DE /* AppErrorNormalization.swift in Sources */,
 				D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */,
 				BC9E4D8AE8F5F1F539C5641A /* AppErrorSubPresenters.swift in Sources */,
 				474596AEBE0A97F33B320E59 /* AppErrorTypes.swift in Sources */,

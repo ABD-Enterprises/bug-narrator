@@ -15,12 +15,6 @@ enum AppErrorOperation: String {
     case issueExtraction = "issue_extraction"
 }
 
-struct AppErrorNormalization: Equatable {
-    let appError: AppError
-    let operation: AppErrorOperation
-    let underlyingErrorDescription: String?
-}
-
 struct AppErrorPresentationResult: Equatable {
     let appError: AppError
     let shouldOpenSettingsWindow: Bool
