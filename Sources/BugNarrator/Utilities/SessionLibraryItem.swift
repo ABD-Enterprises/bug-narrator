@@ -85,9 +85,3 @@ struct SessionLibraryEntry: SessionLibraryItem, Equatable, Codable {
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
     }
 }
-
-struct SessionLibrarySnapshot<Item: SessionLibraryItem> {
-    let filteredItems: [Item]
-    let counts: [SessionLibraryDateFilter: Int]
-    let emptyState: SessionLibraryEmptyState?
-}
