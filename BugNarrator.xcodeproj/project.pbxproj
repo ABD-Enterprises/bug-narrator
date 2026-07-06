@@ -29,6 +29,7 @@
 		107C848CCE79FCFD13E3751F /* HotkeySupportClasses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */; };
 		11935BB2070F2A08AB015BD9 /* DiagnosticsLogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */; };
 		11D0925211E3A8D0AC8FF219 /* AppLifecycleDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FA8C32EF0CB342E6EF41E9 /* AppLifecycleDelegate.swift */; };
+		121F09864F5553B258200321 /* IssueReproductionStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D73F19463BEBBE737A5EF96 /* IssueReproductionStep.swift */; };
 		134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6131EA189B853D1B456A8D26 /* SettingsView.swift */; };
 		14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */; };
 		15409A450769B9F9DBA0DF59 /* PostTranscriptionPipelineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84646A0490F119BBE0BBE5C9 /* PostTranscriptionPipelineControllerTests.swift */; };
@@ -503,6 +504,7 @@
 		8B9EE251C9CCE29EDED45889 /* IssueExtractionResponseParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionResponseParserTests.swift; sourceTree = "<group>"; };
 		8CC43602AE7048F7313E7DF6 /* PendingTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTranscription.swift; sourceTree = "<group>"; };
 		8D4748B8137EC364C1FD89B9 /* SettingsViewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewComponents.swift; sourceTree = "<group>"; };
+		8D73F19463BEBBE737A5EF96 /* IssueReproductionStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueReproductionStep.swift; sourceTree = "<group>"; };
 		8DBC77AC70873AF0E20A29D8 /* IssueExtractionRequestBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionRequestBuilderTests.swift; sourceTree = "<group>"; };
 		8E2A6DBFC267AEED543EC2DB /* TranscriptQualityInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspectorTests.swift; sourceTree = "<group>"; };
 		8FB75074747EE722764CC071 /* IssueExportPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportPresenters.swift; sourceTree = "<group>"; };
@@ -769,6 +771,7 @@
 				3394CF24F8CA7410A441170E /* IssueCoreSubtypes.swift */,
 				C514D909BF8C4543E740640F /* IssueExportReview.swift */,
 				F0300D3CA1B339D4D1CCAC84 /* IssueExportTargets.swift */,
+				8D73F19463BEBBE737A5EF96 /* IssueReproductionStep.swift */,
 				104A00B74D18C9842D5BA11C /* JiraExportConfig.swift */,
 				8CC43602AE7048F7313E7DF6 /* PendingTranscription.swift */,
 				BE13FAD167DA9EEEC9E83F41 /* RecordingAudioSource.swift */,
@@ -1359,6 +1362,7 @@
 				1F758F881FC9E36B8EB89C18 /* IssueExtractionRequestBuilder.swift in Sources */,
 				9EE81A76B802435C84B8032D /* IssueExtractionResponseParser.swift in Sources */,
 				E3A4A5182E639F1AE4F7A773 /* IssueExtractionService.swift in Sources */,
+				121F09864F5553B258200321 /* IssueReproductionStep.swift in Sources */,
 				82C0E2BE74D268CA44EEA500 /* IssueScreenshotAnnotationPreview.swift in Sources */,
 				A82C126F44F43B42D82EA0DF /* IssueScreenshotAnnotationRenderer.swift in Sources */,
 				B1E0999F91F9E0236146F023 /* IssueScreenshotAnnotationTypes.swift in Sources */,
