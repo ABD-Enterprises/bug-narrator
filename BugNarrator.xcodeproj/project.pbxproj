@@ -247,6 +247,7 @@
 		C4DEF637FA4D2980FA55A9C9 /* APIKeyValidationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 084D11633172FCB62C674D40 /* APIKeyValidationState.swift */; };
 		C739EC09645E2A0D6E7B52CA /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C800B9028E34058B3B1544 /* RecordingStatusMessageBuilderTests.swift */; };
 		C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */; };
+		C7CFFC91175417EFAFC49135 /* LocalDataDeletionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DD363B7FCF2C4A78A00EED /* LocalDataDeletionTypes.swift */; };
 		C892C9D265037E2DA579B336 /* AsyncTimeout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FC7CCF9369F37FE80020A9 /* AsyncTimeout.swift */; };
 		C90F9957B3AC369A5CD49C26 /* ElapsedTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0564DB57CA0F960E25142103 /* ElapsedTimeFormatterTests.swift */; };
 		C937699F6D7B77CED3A96676 /* StringExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74765CEA41F7FB191B51D03D /* StringExtensions.swift */; };
@@ -547,6 +548,7 @@
 		B3AE33EE76F55AE456924849 /* TransientToastControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastControllerTests.swift; sourceTree = "<group>"; };
 		B486B153518EB9E1BBC08F17 /* AppState+SystemActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SystemActions.swift"; sourceTree = "<group>"; };
 		B6EBD017E98FB65B2CD27ED3 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
+		B7DD363B7FCF2C4A78A00EED /* LocalDataDeletionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionTypes.swift; sourceTree = "<group>"; };
 		BA49B2B79731E3A62B083174 /* IssueExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportController.swift; sourceTree = "<group>"; };
 		BB14D61549CBA990AB3FECA3 /* TranscriptStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreTests.swift; sourceTree = "<group>"; };
 		BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExporter.swift; sourceTree = "<group>"; };
@@ -905,6 +907,7 @@
 				417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */,
 				F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */,
 				38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */,
+				B7DD363B7FCF2C4A78A00EED /* LocalDataDeletionTypes.swift */,
 				FFEDE046F0F85BBC5DD5D7D7 /* MicrophonePermissionService.swift */,
 				0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */,
 				DEBC588ED995D6DA1A06A1D7 /* MixedAudioTypes.swift */,
@@ -1369,6 +1372,7 @@
 				099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */,
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
 				525C328F410D5C0BAF88FE99 /* LocalDataDeletionController.swift in Sources */,
+				C7CFFC91175417EFAFC49135 /* LocalDataDeletionTypes.swift in Sources */,
 				E8037E3123427D9DE61D3BE7 /* MenuBarLabelView.swift in Sources */,
 				821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */,
 				4D9A19996F3BCEC530DEA5F8 /* MenuBarView.swift in Sources */,
