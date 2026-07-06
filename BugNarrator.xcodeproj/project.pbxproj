@@ -72,6 +72,7 @@
 		3893EB325B3915242FBD4BA6 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6F8B0D0A9D777735FD3E44 /* ServiceProtocols.swift */; };
 		38B00E4AA8B374646877FBFB /* TranscriptStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB14D61549CBA990AB3FECA3 /* TranscriptStoreTests.swift */; };
 		3953183BDA19D90C13449F73 /* NetworkTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00EA3260CCEECB3FB097702 /* NetworkTestSupport.swift */; };
+		3B4CB840FB345A018A079F3E /* ScreenshotCapturePreflightResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E76DB3D0D8CB30D3B82DEE /* ScreenshotCapturePreflightResult.swift */; };
 		3B4F5CCC16AB9837DD0BD0F4 /* URLHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277DC17D4084F918920CB8C5 /* URLHandler.swift */; };
 		3CA626CA4757EC95AAA8C8CF /* TranscriptionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83CE91359103D30C04663766 /* TranscriptionModels.swift */; };
 		3CDB0E66F370246528266E51 /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */; };
@@ -560,6 +561,7 @@
 		C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorMetadata.swift; sourceTree = "<group>"; };
 		C33C8794A9B95C9AF44798E3 /* TranscriptSharedHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSharedHelpers.swift; sourceTree = "<group>"; };
 		C38FE78312021B0A9C7DEBD0 /* UtilityTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityTestSupport.swift; sourceTree = "<group>"; };
+		C4E76DB3D0D8CB30D3B82DEE /* ScreenshotCapturePreflightResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCapturePreflightResult.swift; sourceTree = "<group>"; };
 		C514D909BF8C4543E740640F /* IssueExportReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReview.swift; sourceTree = "<group>"; };
 		C53226A9282239858514440C /* AppState+PresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PresentationState.swift"; sourceTree = "<group>"; };
 		C9A627A3D91ED77FE7657BAD /* AppErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorTests.swift; sourceTree = "<group>"; };
@@ -925,6 +927,7 @@
 				A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */,
 				811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */,
 				3F350327BA0619E235858F82 /* ScreenshotCaptureController.swift */,
+				C4E76DB3D0D8CB30D3B82DEE /* ScreenshotCapturePreflightResult.swift */,
 				54A8F3C1B2AFF52FBD3D8703 /* ScreenshotCaptureService.swift */,
 				998C4703160B45E816CF929F /* ScreenshotCaptureSupport.swift */,
 				440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */,
@@ -1405,6 +1408,7 @@
 				F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */,
 				DC0465161F26D6650C80F1CF /* ScreenCapturePermissionService.swift in Sources */,
 				B3FF6A0FB442CAC98A7B9E81 /* ScreenshotCaptureController.swift in Sources */,
+				3B4CB840FB345A018A079F3E /* ScreenshotCapturePreflightResult.swift in Sources */,
 				6DC57655A6904ADCF5D41040 /* ScreenshotCaptureService.swift in Sources */,
 				CB86D0DD53DE4F044EC12470 /* ScreenshotCaptureSupport.swift in Sources */,
 				71EF8448D05ED4023C8D7CF0 /* ScreenshotCoordinator.swift in Sources */,
