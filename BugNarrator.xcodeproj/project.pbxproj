@@ -62,6 +62,7 @@
 		31A36AA0F41DF712DD79262B /* TranscriptStoreRecoveryEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E813CF73D0B819D24B8C81 /* TranscriptStoreRecoveryEvent.swift */; };
 		31D0FF8CFB99E767103A0561 /* AppErrorPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2173ED04BA5467313B6261 /* AppErrorPresenterTests.swift */; };
 		31DE75541AFCD7104ED7F09E /* AppStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18BAC24C83F070C8DE32996 /* AppStatusTests.swift */; };
+		331430827CBAA7DEBC6B4570 /* TrackerExportFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9130CBCEA6751D5A45E795E8 /* TrackerExportFingerprint.swift */; };
 		334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554387017B49D9CD63967BE3 /* AppStateTests.swift */; };
 		33D0E3F65FCAE14DBC117B40 /* TranscriptionSessionBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECDD27F91ED65247C1FA689 /* TranscriptionSessionBuilderTests.swift */; };
 		33DB3B8F22BD0E75CFC65F10 /* TranscriptionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 800BFCC6407B534886C65D77 /* TranscriptionClient.swift */; };
@@ -508,6 +509,7 @@
 		8FB75074747EE722764CC071 /* IssueExportPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportPresenters.swift; sourceTree = "<group>"; };
 		90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuProductInfoView.swift; sourceTree = "<group>"; };
 		90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
+		9130CBCEA6751D5A45E795E8 /* TrackerExportFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerExportFingerprint.swift; sourceTree = "<group>"; };
 		92CFBCD444BCD3791FE18E77 /* AppState+PermissionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PermissionRecovery.swift"; sourceTree = "<group>"; };
 		92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
 		93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactor.swift; sourceTree = "<group>"; };
@@ -946,6 +948,7 @@
 				6047FAC93EEF81B1DB450003 /* SystemAudioRecorder.swift */,
 				D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */,
 				5D05D14432F331F83DB44AD9 /* TelemetryTypes.swift */,
+				9130CBCEA6751D5A45E795E8 /* TrackerExportFingerprint.swift */,
 				1C7E7C066184078E8F7462AD /* TrackerExportPayloadBudget.swift */,
 				74431871C8CB4E2F62C82213 /* TrackerExportRetryTypes.swift */,
 				70541D070FF81D54D6559524 /* TrackerExportSettingsStore.swift */,
@@ -1448,6 +1451,7 @@
 				BE0F157736897DB21F47F8C6 /* SystemAudioRecorder.swift in Sources */,
 				ABA48997F0B07377178EDEE0 /* SystemAudioTapSession.swift in Sources */,
 				2455C6B282EF275B5B55F591 /* TelemetryTypes.swift in Sources */,
+				331430827CBAA7DEBC6B4570 /* TrackerExportFingerprint.swift in Sources */,
 				9C875F3839EE3EE9D7AC083B /* TrackerExportPayloadBudget.swift in Sources */,
 				DBFA5905D305404FAD17EC5E /* TrackerExportRetryTypes.swift in Sources */,
 				289E65529C0ED7D189FCCFFF /* TrackerExportSettingsStore.swift in Sources */,
