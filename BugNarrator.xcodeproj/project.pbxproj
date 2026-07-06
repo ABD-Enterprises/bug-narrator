@@ -124,6 +124,7 @@
 		600F14353C222547C1284413 /* AppState+SystemActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B153518EB9E1BBC08F17 /* AppState+SystemActions.swift */; };
 		609D4B42C4786F625CCD0623 /* SecretSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3EA5B797B5D53F17A47C8D /* SecretSlot.swift */; };
 		61D4778489BCA1F3B7C16161 /* PrivacyDataExportTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 154255C955FE33FD6D016BE9 /* PrivacyDataExportTypes.swift */; };
+		62742BB7124B082CD1C54804 /* AppLifecycleNotificationBinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD04B3E0AD3A7DB88C9B9EF6 /* AppLifecycleNotificationBinder.swift */; };
 		634C2CA46D17B6AA571D0771 /* ReviewWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */; };
 		6470CFDC78DB57C49819E4A9 /* SupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF81E6E8D3A702691797E56 /* SupportView.swift */; };
 		67FF2F23B7542897FC6BE68E /* TransientToastController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */; };
@@ -568,6 +569,7 @@
 		CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecretStore.swift; sourceTree = "<group>"; };
 		CC1605CDD1B7C6F848068F14 /* SessionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibrary.swift; sourceTree = "<group>"; };
 		CCCB5C9DAEB3066CA8E30234 /* SingleInstanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleInstanceController.swift; sourceTree = "<group>"; };
+		CD04B3E0AD3A7DB88C9B9EF6 /* AppLifecycleNotificationBinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLifecycleNotificationBinder.swift; sourceTree = "<group>"; };
 		CD7E24CD9C6DBE0BF94F5A53 /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvider.swift; sourceTree = "<group>"; };
 		D0FD7C5D1FD4184BCC0CC331 /* IssueExtractionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionController.swift; sourceTree = "<group>"; };
 		D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataProtectorTests.swift; sourceTree = "<group>"; };
@@ -975,6 +977,7 @@
 			children = (
 				28B463E2764267ED731EDB99 /* AppBootstrap.swift */,
 				F6CC17094DFD9502DBA94345 /* AppLaunchDiagnosticsReporter.swift */,
+				CD04B3E0AD3A7DB88C9B9EF6 /* AppLifecycleNotificationBinder.swift */,
 				EE77CF3D9076FC05278390A6 /* AppPresentationState.swift */,
 				1D1805C56FBAED6588A225F0 /* AppRuntimeEnvironment.swift */,
 				5F7F5FB0F3460F31156FC805 /* AppServiceContainer.swift */,
@@ -1287,6 +1290,7 @@
 				474596AEBE0A97F33B320E59 /* AppErrorTypes.swift in Sources */,
 				98BEEBB0A54A385DAC55987E /* AppLaunchDiagnosticsReporter.swift in Sources */,
 				11D0925211E3A8D0AC8FF219 /* AppLifecycleDelegate.swift in Sources */,
+				62742BB7124B082CD1C54804 /* AppLifecycleNotificationBinder.swift in Sources */,
 				FEFF63FB3DA83F5C8BC659C1 /* AppPresentationState.swift in Sources */,
 				5015987379D4ECB7454899DA /* AppRuntimeEnvironment.swift in Sources */,
 				292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */,
