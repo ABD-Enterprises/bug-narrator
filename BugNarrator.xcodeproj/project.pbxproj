@@ -247,6 +247,7 @@
 		C4DEF637FA4D2980FA55A9C9 /* APIKeyValidationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 084D11633172FCB62C674D40 /* APIKeyValidationState.swift */; };
 		C739EC09645E2A0D6E7B52CA /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C800B9028E34058B3B1544 /* RecordingStatusMessageBuilderTests.swift */; };
 		C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */; };
+		C7F8BB86A2269B4B8BDDC481 /* PendingTranscriptionRetryFailureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42086B7ADE50CACCCD73875 /* PendingTranscriptionRetryFailureHandler.swift */; };
 		C892C9D265037E2DA579B336 /* AsyncTimeout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FC7CCF9369F37FE80020A9 /* AsyncTimeout.swift */; };
 		C90F9957B3AC369A5CD49C26 /* ElapsedTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0564DB57CA0F960E25142103 /* ElapsedTimeFormatterTests.swift */; };
 		C937699F6D7B77CED3A96676 /* StringExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74765CEA41F7FB191B51D03D /* StringExtensions.swift */; };
@@ -560,6 +561,7 @@
 		C2739FAF7F679C31F04058E0 /* BugNarratorMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorMetadata.swift; sourceTree = "<group>"; };
 		C33C8794A9B95C9AF44798E3 /* TranscriptSharedHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSharedHelpers.swift; sourceTree = "<group>"; };
 		C38FE78312021B0A9C7DEBD0 /* UtilityTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityTestSupport.swift; sourceTree = "<group>"; };
+		C42086B7ADE50CACCCD73875 /* PendingTranscriptionRetryFailureHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTranscriptionRetryFailureHandler.swift; sourceTree = "<group>"; };
 		C514D909BF8C4543E740640F /* IssueExportReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReview.swift; sourceTree = "<group>"; };
 		C53226A9282239858514440C /* AppState+PresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PresentationState.swift"; sourceTree = "<group>"; };
 		C9A627A3D91ED77FE7657BAD /* AppErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorTests.swift; sourceTree = "<group>"; };
@@ -911,6 +913,7 @@
 				518C6045D8668A1179198A6D /* MultipartFormDataBuilder.swift */,
 				60CD6EFC4CDBFE13C31BD38D /* OpenAIErrorMapper.swift */,
 				AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */,
+				C42086B7ADE50CACCCD73875 /* PendingTranscriptionRetryFailureHandler.swift */,
 				31EF5F62FF802B7B8D41022D /* PermissionAndPreflightTypes.swift */,
 				6A4AF819B9841925ACD930D0 /* PermissionRecoveryController.swift */,
 				AE18D1E8901BEF5AE218942B /* PermissionRecoveryTypes.swift */,
@@ -1382,6 +1385,7 @@
 				7251FD6A3C965C5D9A87805F /* OpenAIErrorMapper.swift in Sources */,
 				C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */,
 				9D12A5E2379C328D473E6452 /* PendingTranscription.swift in Sources */,
+				C7F8BB86A2269B4B8BDDC481 /* PendingTranscriptionRetryFailureHandler.swift in Sources */,
 				5E4490C17E49287B620FF2FA /* PermissionAndPreflightTypes.swift in Sources */,
 				68D411F355E3ED698E688D86 /* PermissionRecoveryController.swift in Sources */,
 				E60F34C1E0FED78A8F28FFDE /* PermissionRecoveryTypes.swift in Sources */,
