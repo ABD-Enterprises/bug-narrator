@@ -55,6 +55,7 @@
 		2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */; };
 		30018202D1990BA2524B2CD6 /* RecordingAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE13FAD167DA9EEEC9E83F41 /* RecordingAudioSource.swift */; };
 		318DB7BFA958511B51F94AA8 /* KeychainSecretStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */; };
+		31A36AA0F41DF712DD79262B /* TranscriptStoreRecoveryEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E813CF73D0B819D24B8C81 /* TranscriptStoreRecoveryEvent.swift */; };
 		31D0FF8CFB99E767103A0561 /* AppErrorPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2173ED04BA5467313B6261 /* AppErrorPresenterTests.swift */; };
 		31DE75541AFCD7104ED7F09E /* AppStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18BAC24C83F070C8DE32996 /* AppStatusTests.swift */; };
 		334D366819B92F5AE7F00961 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554387017B49D9CD63967BE3 /* AppStateTests.swift */; };
@@ -343,6 +344,7 @@
 		20E1935189673C2EEE16DF20 /* ScreenshotSelectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionServiceTests.swift; sourceTree = "<group>"; };
 		22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionDraft.swift; sourceTree = "<group>"; };
 		22FD68D81A7568355BFAB9DF /* BugNarratorSettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorSettingsUITests.swift; sourceTree = "<group>"; };
+		23E813CF73D0B819D24B8C81 /* TranscriptStoreRecoveryEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreRecoveryEvent.swift; sourceTree = "<group>"; };
 		254021D1AC93E8A414D26241 /* BugNarratorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BugNarratorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2543B7AFD4F96F3482FE28FA /* DebugSessionContextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSessionContextProvider.swift; sourceTree = "<group>"; };
 		263C973B1E05430F2D14D5BE /* TelemetryTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryTestSupport.swift; sourceTree = "<group>"; };
@@ -904,6 +906,7 @@
 				04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */,
 				7A7A34EF1391E51E6B1DB8BF /* TranscriptSectionBuilder.swift */,
 				9F9009216340E4AF51C9EDBA /* TranscriptStore.swift */,
+				23E813CF73D0B819D24B8C81 /* TranscriptStoreRecoveryEvent.swift */,
 				48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */,
 				277DC17D4084F918920CB8C5 /* URLHandler.swift */,
 				DAE6A1D707211E467BFD8EF0 /* VerboseTranscriptionResponseParser.swift */,
@@ -1380,6 +1383,7 @@
 				9453CE97ECC7AFBB6F35F74A /* TranscriptSession.swift in Sources */,
 				56FD14656CE943A240D9DEE5 /* TranscriptSharedHelpers.swift in Sources */,
 				A6AF1CAA204EF971F9417E63 /* TranscriptStore.swift in Sources */,
+				31A36AA0F41DF712DD79262B /* TranscriptStoreRecoveryEvent.swift in Sources */,
 				29C25E147DD0810A11C03502 /* TranscriptView.swift in Sources */,
 				EAD299D6459F609DF9A6AC7B /* TranscriptionChunker.swift in Sources */,
 				33DB3B8F22BD0E75CFC65F10 /* TranscriptionClient.swift in Sources */,
