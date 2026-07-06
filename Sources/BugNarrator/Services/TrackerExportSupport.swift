@@ -1,12 +1,5 @@
 import Foundation
 
-struct TrackerIssueCandidate: Equatable {
-    let remoteIdentifier: String
-    let title: String
-    let summary: String
-    let remoteURL: URL?
-}
-
 /// Helpers shared by the tracker export providers (Jira, GitHub) whose
 /// implementations are byte-identical apart from the provider's display name.
 enum TrackerExportSupport {
