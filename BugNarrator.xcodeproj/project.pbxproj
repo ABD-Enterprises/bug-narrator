@@ -29,6 +29,7 @@
 		107C848CCE79FCFD13E3751F /* HotkeySupportClasses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */; };
 		11935BB2070F2A08AB015BD9 /* DiagnosticsLogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */; };
 		11D0925211E3A8D0AC8FF219 /* AppLifecycleDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FA8C32EF0CB342E6EF41E9 /* AppLifecycleDelegate.swift */; };
+		1325D6B02286526BEB1506AE /* ExportResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 598B490CCEF50A676B03412E /* ExportResult.swift */; };
 		134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6131EA189B853D1B456A8D26 /* SettingsView.swift */; };
 		14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */; };
 		15409A450769B9F9DBA0DF59 /* PostTranscriptionPipelineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84646A0490F119BBE0BBE5C9 /* PostTranscriptionPipelineControllerTests.swift */; };
@@ -425,6 +426,7 @@
 		56EE955B03EE30CC1EB568A1 /* DiagnosticsLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogger.swift; sourceTree = "<group>"; };
 		57AE8EA0414CE7C5271CFD16 /* ScreenshotPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotPreviewCache.swift; sourceTree = "<group>"; };
 		58645DF704D4244897938E77 /* TranscriptSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSectionTests.swift; sourceTree = "<group>"; };
+		598B490CCEF50A676B03412E /* ExportResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportResult.swift; sourceTree = "<group>"; };
 		598E006D3F529E46315F3585 /* HotkeyAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyAction.swift; sourceTree = "<group>"; };
 		59B0A4E5E69C1FD99320DDB2 /* AboutBugNarratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutBugNarratorView.swift; sourceTree = "<group>"; };
 		5A8CB6ECBCE39874B5B432EF /* ChangelogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangelogView.swift; sourceTree = "<group>"; };
@@ -762,6 +764,7 @@
 				084D11633172FCB62C674D40 /* APIKeyValidationState.swift */,
 				BB303E43134D880AB6207D21 /* AppError.swift */,
 				78DB2CC94CABCD51955891BF /* AppStatus.swift */,
+				598B490CCEF50A676B03412E /* ExportResult.swift */,
 				75B578DB59431378DDC84929 /* GitHubExportConfig.swift */,
 				598E006D3F529E46315F3585 /* HotkeyAction.swift */,
 				6DE5A3102900FD595AE2A07E /* HotkeyShortcut.swift */,
@@ -1334,6 +1337,7 @@
 				93057BE64347AD1BF43F4FF0 /* ExportHistoryController.swift in Sources */,
 				8598258404428C8692A51907 /* ExportReceipt.swift in Sources */,
 				A73F5969DB4A2C04BC83BF45 /* ExportReceiptStore.swift in Sources */,
+				1325D6B02286526BEB1506AE /* ExportResult.swift in Sources */,
 				5839C40FC99D94A9C910A218 /* ExportReviewSheet.swift in Sources */,
 				5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */,
 				BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */,
