@@ -48,6 +48,7 @@
 		24EAF9A3DAF9624979F3F358 /* IssueExportTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D566BDB865CF9FF245BB283 /* IssueExportTestSupport.swift */; };
 		255F6B56A8E14ED7C80DB0FA /* ScreenshotsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D050A90CD83BD3C04D0487 /* ScreenshotsSection.swift */; };
 		280973289AE78D9919ECD80C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5346EDB503C6B05C81C368 /* KeychainService.swift */; };
+		282D1286AC591194C0DBF1C9 /* RetryPostTranscriptionResultHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2FBC7675F5DAAC720AAFE81 /* RetryPostTranscriptionResultHandler.swift */; };
 		289E65529C0ED7D189FCCFFF /* TrackerExportSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70541D070FF81D54D6559524 /* TrackerExportSettingsStore.swift */; };
 		28FFF0FBF53923BC686FF79D /* ScreenshotAnnotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */; };
 		292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7F5FB0F3460F31156FC805 /* AppServiceContainer.swift */; };
@@ -592,6 +593,7 @@
 		DECDD27F91ED65247C1FA689 /* TranscriptionSessionBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSessionBuilderTests.swift; sourceTree = "<group>"; };
 		DFD698A35E065D940A06FB72 /* BugNarratorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorApp.swift; sourceTree = "<group>"; };
 		E18153669404C9BD089DE846 /* PostTranscriptionPipelineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionPipelineController.swift; sourceTree = "<group>"; };
+		E2FBC7675F5DAAC720AAFE81 /* RetryPostTranscriptionResultHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryPostTranscriptionResultHandler.swift; sourceTree = "<group>"; };
 		E3114A162C2D284BD173DBC9 /* DiagnosticsTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTypes.swift; sourceTree = "<group>"; };
 		E500A980171E57FE562FBB7C /* TranscriptSessionSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSessionSchemaTests.swift; sourceTree = "<group>"; };
 		E59F6509D79E57A86ED795CA /* SessionLibraryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryControllerTests.swift; sourceTree = "<group>"; };
@@ -922,6 +924,7 @@
 				875DD52AC7741ABC898365F4 /* RecordingSessionController.swift */,
 				FB3DE4A4EEA68D61D7E4BD14 /* RecordingSessionOutcomes.swift */,
 				DC99B0BEF616AC7161FBBC89 /* RecordingSessionPresenters.swift */,
+				E2FBC7675F5DAAC720AAFE81 /* RetryPostTranscriptionResultHandler.swift */,
 				A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */,
 				811ED2635872DFF93EFE0DA1 /* ScreenCapturePermissionService.swift */,
 				3F350327BA0619E235858F82 /* ScreenshotCaptureController.swift */,
@@ -1400,6 +1403,7 @@
 				952BBC1ED94400857FF4E837 /* RecordingStatusMessageBuilder.swift in Sources */,
 				8D34D845BE5587EC9B1E1765 /* RecordingStatusMessageProvider.swift in Sources */,
 				5C18E905F94644D69AA9CB60 /* RecordingTimerViewModel.swift in Sources */,
+				282D1286AC591194C0DBF1C9 /* RetryPostTranscriptionResultHandler.swift in Sources */,
 				981A2F83EC4A0550815EF1B4 /* ReviewWorkspace.swift in Sources */,
 				BBE16FF238B059EF08346355 /* ReviewWorkspaceTypes.swift in Sources */,
 				F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */,
