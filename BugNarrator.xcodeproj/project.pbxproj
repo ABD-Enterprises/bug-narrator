@@ -237,6 +237,7 @@
 		BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B578DB59431378DDC84929 /* GitHubExportConfig.swift */; };
 		BBE16FF238B059EF08346355 /* ReviewWorkspaceTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70C2AF1D71698B8CB98490E /* ReviewWorkspaceTypes.swift */; };
 		BC9E4D8AE8F5F1F539C5641A /* AppErrorSubPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F1E0C90308A1D868A187E /* AppErrorSubPresenters.swift */; };
+		BDBBC3C9D9BEA687FFEBBF1A /* AudioFileInspection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64A5ED5A8C30BDE0B066908 /* AudioFileInspection.swift */; };
 		BE0F157736897DB21F47F8C6 /* SystemAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6047FAC93EEF81B1DB450003 /* SystemAudioRecorder.swift */; };
 		BFF29343A9B8C935D9A0B5EF /* TelemetryTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263C973B1E05430F2D14D5BE /* TelemetryTestSupport.swift */; };
 		C177672680CF960A0A36F3D0 /* SessionLibraryPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC9AEF9C67019E23C116896 /* SessionLibraryPresenters.swift */; };
@@ -615,6 +616,7 @@
 		F1FC7CCF9369F37FE80020A9 /* AsyncTimeout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncTimeout.swift; sourceTree = "<group>"; };
 		F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContinuityMonitor.swift; sourceTree = "<group>"; };
 		F5A765BE28AA15D4FFE7DAE4 /* TranscriptionClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionClientTests.swift; sourceTree = "<group>"; };
+		F64A5ED5A8C30BDE0B066908 /* AudioFileInspection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileInspection.swift; sourceTree = "<group>"; };
 		F68E6CA27B77C4512FB158FC /* DebugBundleExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBundleExporterTests.swift; sourceTree = "<group>"; };
 		F6CC17094DFD9502DBA94345 /* AppLaunchDiagnosticsReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchDiagnosticsReporter.swift; sourceTree = "<group>"; };
 		F6EFDC92FB70AFBB28EA6CF7 /* IssueExtractionFailurePresenter+Attempt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IssueExtractionFailurePresenter+Attempt.swift"; sourceTree = "<group>"; };
@@ -873,6 +875,7 @@
 				EA54521C239C09E5B94712EB /* AppErrorTypes.swift */,
 				90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */,
 				EFCA1A4773C2BB41581B37CB /* AppUtilityActionController.swift */,
+				F64A5ED5A8C30BDE0B066908 /* AudioFileInspection.swift */,
 				FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */,
 				C9AC8EFE20212B7DE69792FB /* AudioRecorder.swift */,
 				7539AEF1F536E7EDB2047D7D /* AudioRecorderTypes.swift */,
@@ -1312,6 +1315,7 @@
 				C1FDA2B024230D874D06D08B /* ApplicationTerminationController.swift in Sources */,
 				C892C9D265037E2DA579B336 /* AsyncTimeout.swift in Sources */,
 				3FA2E58DF45C2A9FEBF9FE0B /* AtomicBundleDirectoryWriter.swift in Sources */,
+				BDBBC3C9D9BEA687FFEBBF1A /* AudioFileInspection.swift in Sources */,
 				18EE2A64D0A551934978247B /* AudioObjectIDExtensions.swift in Sources */,
 				456F9629727CC070CD248B56 /* AudioRecorder.swift in Sources */,
 				A859F2836880F7D2596CD482 /* AudioRecorderTypes.swift in Sources */,
