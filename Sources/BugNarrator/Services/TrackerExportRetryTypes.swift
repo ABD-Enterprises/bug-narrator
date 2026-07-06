@@ -13,13 +13,6 @@ struct ExportRetryConfiguration: Sendable {
     static let immediate = ExportRetryConfiguration(maxAttempts: 3, baseDelay: .zero)
 }
 
-/// Outcome of a single create attempt, classified for the retry loop.
-enum ExportCreateOutcome {
-    case success(remoteIdentifier: String, remoteURL: URL?)
-    case transient(AppError, retryAfterSeconds: Int?)
-    case permanent(AppError)
-}
-
 /// The provider-specific naming the shared retry runner needs. Everything else
 /// in the retry state machine is identical across providers, so only the display
 /// name, destination, and the provider-prefixed log-event keys vary here.
