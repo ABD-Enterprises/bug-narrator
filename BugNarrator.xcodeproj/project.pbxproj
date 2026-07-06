@@ -151,6 +151,7 @@
 		7A9EE56958CFB17D59BD1253 /* TranscriptQualityFinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3104282993DE974208688237 /* TranscriptQualityFinding.swift */; };
 		7B0DA8E96C26D94D71FA557E /* MixedAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */; };
 		7BDE1E7353588D5B33CB71D9 /* PrivacyDataExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF829EF7F67E44EA637F4A4 /* PrivacyDataExporterTests.swift */; };
+		7FA40CCD991ED93EFD3DDE2A /* SettingsJiraExportPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0097D67B12C0694C69A78B39 /* SettingsJiraExportPane.swift */; };
 		7FC6E70710547A486C4ED5BA /* AboutBugNarratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59B0A4E5E69C1FD99320DDB2 /* AboutBugNarratorView.swift */; };
 		806F6B3953A77B84672AD2DA /* AppRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64113E8532E84371F91096AF /* AppRuntimeEnvironmentTests.swift */; };
 		8124F6AEFE87F470DE1D3B56 /* IssueExtractionRequestBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBC77AC70873AF0E20A29D8 /* IssueExtractionRequestBuilderTests.swift */; };
@@ -309,6 +310,7 @@
 
 /* Begin PBXFileReference section */
 		002A3FB6CC8E66C5C82E0B56 /* RecordingTimerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimerViewModel.swift; sourceTree = "<group>"; };
+		0097D67B12C0694C69A78B39 /* SettingsJiraExportPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsJiraExportPane.swift; sourceTree = "<group>"; };
 		00F7DD790A65A410DAF9831C /* PermissionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRecoveryControllerTests.swift; sourceTree = "<group>"; };
 		01B7F0C1392B31892BE5A796 /* AppState+WindowManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+WindowManagement.swift"; sourceTree = "<group>"; };
 		04945A10C723C05805325C81 /* TranscriptQualityInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptQualityInspector.swift; sourceTree = "<group>"; };
@@ -602,6 +604,7 @@
 				D58A3885853863EE9118FC63 /* SettingsDiagnosticsPrivacyPane.swift */,
 				0C6FB57EE70D75E47710D667 /* SettingsGeneralPanes.swift */,
 				0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */,
+				0097D67B12C0694C69A78B39 /* SettingsJiraExportPane.swift */,
 				B065A5B9BE084EFE0BFE1D48 /* SettingsReadiness.swift */,
 				8D4748B8137EC364C1FD89B9 /* SettingsViewComponents.swift */,
 			);
@@ -1364,6 +1367,7 @@
 				3546CF9BD922CF576E96F1C5 /* SettingsDiagnosticsPrivacyPane.swift in Sources */,
 				8E41CD2A7BE6A70F5CD9F46C /* SettingsGeneralPanes.swift in Sources */,
 				D759CEA88F50769454691AFC /* SettingsIntegrationsPanes.swift in Sources */,
+				7FA40CCD991ED93EFD3DDE2A /* SettingsJiraExportPane.swift in Sources */,
 				BA99127A39D827962D535164 /* SettingsReadiness.swift in Sources */,
 				DFEC8A8B12366B1CC1ECF429 /* SettingsStore.swift in Sources */,
 				134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */,
