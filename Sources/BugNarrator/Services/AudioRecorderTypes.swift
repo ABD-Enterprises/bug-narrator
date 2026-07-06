@@ -1,11 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-struct RecordedAudio {
-    let fileURL: URL
-    let duration: TimeInterval
-}
-
 @MainActor
 protocol AudioRecorderEngine: AnyObject {
     var delegate: (any AVAudioRecorderDelegate)? { get set }
