@@ -6,11 +6,6 @@ struct RunningApplicationSnapshot: Equatable {
     let bundleIdentifier: String?
 }
 
-enum SingleInstanceLaunchDisposition: Equatable {
-    case primary
-    case secondary(existingProcessIdentifier: pid_t)
-}
-
 enum SingleInstanceController {
     static let activationNotificationName = Notification.Name("com.abdenterprises.bugnarrator.activate-existing-instance")
 
