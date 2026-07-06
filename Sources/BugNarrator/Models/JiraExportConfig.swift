@@ -85,8 +85,3 @@ struct JiraProjectOption: Equatable, Identifiable {
     }
 }
 
-struct JiraIssueTypeOption: Equatable, Identifiable {
-    let id: String
-    let name: String
-}
-
