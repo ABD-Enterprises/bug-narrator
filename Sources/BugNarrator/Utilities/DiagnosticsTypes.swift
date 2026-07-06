@@ -11,30 +11,6 @@ enum DiagnosticsLogCategory: String, Codable, CaseIterable {
     case settings
 }
 
-enum DiagnosticsLogLevel: String, Codable, CaseIterable {
-    case debug
-    case info
-    case warning
-    case error
-
-    var label: String {
-        rawValue.uppercased()
-    }
-
-    var osLogType: OSLogType {
-        switch self {
-        case .debug:
-            return .debug
-        case .info:
-            return .info
-        case .warning:
-            return .default
-        case .error:
-            return .error
-        }
-    }
-}
-
 struct DiagnosticsEventName: RawRepresentable, ExpressibleByStringLiteral, Equatable, Hashable {
     let rawValue: String
 

@@ -293,6 +293,7 @@
 		EB26330B3289473ED7361280 /* BugNarratorDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0599934D564C87030D294589 /* BugNarratorDiagnostics.swift */; };
 		EB5DAB7367CC0E4D69D936B6 /* IssueExtractionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FD7C5D1FD4184BCC0CC331 /* IssueExtractionController.swift */; };
 		ED980E311190B73E6EB40DE5 /* RecordingTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1E780B30B585D475E33C82 /* RecordingTestSupport.swift */; };
+		EDDD94FFE25306E69023A837 /* DiagnosticsLogLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF89A76E7BE268C83F5C8E2F /* DiagnosticsLogLevel.swift */; };
 		EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B609057DB2068E0F4FD292 /* AppSupportLocation.swift */; };
 		F0C234F3BD7753A09B98A332 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE629842187FE002FE2DE05D /* SessionRow.swift */; };
 		F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */; };
@@ -607,6 +608,7 @@
 		EE77402A6284B705F5F4984A /* IssueExtractionResponseParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionResponseParser.swift; sourceTree = "<group>"; };
 		EE77CF3D9076FC05278390A6 /* AppPresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPresentationState.swift; sourceTree = "<group>"; };
 		EECE1E25C090853C38690595 /* SupportDataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataController.swift; sourceTree = "<group>"; };
+		EF89A76E7BE268C83F5C8E2F /* DiagnosticsLogLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogLevel.swift; sourceTree = "<group>"; };
 		EFCA1A4773C2BB41581B37CB /* AppUtilityActionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUtilityActionController.swift; sourceTree = "<group>"; };
 		F00EA3260CCEECB3FB097702 /* NetworkTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTestSupport.swift; sourceTree = "<group>"; };
 		F0300D3CA1B339D4D1CCAC84 /* IssueExportTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportTargets.swift; sourceTree = "<group>"; };
@@ -988,6 +990,7 @@
 				2543B7AFD4F96F3482FE28FA /* DebugSessionContextProvider.swift */,
 				0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */,
 				56EE955B03EE30CC1EB568A1 /* DiagnosticsLogger.swift */,
+				EF89A76E7BE268C83F5C8E2F /* DiagnosticsLogLevel.swift */,
 				93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */,
 				E3114A162C2D284BD173DBC9 /* DiagnosticsTypes.swift */,
 				4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */,
@@ -1327,6 +1330,7 @@
 				FD330322EFE5B739F3657451 /* DebugBundleTypes.swift in Sources */,
 				977D86FA0E7E2C16A5B41D4D /* DebugSessionContextProvider.swift in Sources */,
 				11935BB2070F2A08AB015BD9 /* DiagnosticsLogEntry.swift in Sources */,
+				EDDD94FFE25306E69023A837 /* DiagnosticsLogLevel.swift in Sources */,
 				946F215474A2DE83AA4413C4 /* DiagnosticsLogger.swift in Sources */,
 				6AC08ACF1118EF6BDAD2E6BA /* DiagnosticsRedactor.swift in Sources */,
 				15C768D62CC7119DC6F212E2 /* DiagnosticsTypes.swift in Sources */,
