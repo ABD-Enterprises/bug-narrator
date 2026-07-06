@@ -256,6 +256,7 @@
 		CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57AE8EA0414CE7C5271CFD16 /* ScreenshotPreviewCache.swift */; };
 		CD22DEA9761A7BAD23814D52 /* SessionLibraryStatusPresenter+Attempt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313F4C6AD4D6A93E3995386E /* SessionLibraryStatusPresenter+Attempt.swift */; };
 		CEDAB8D8BF65455F21123B22 /* SessionLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB292B3C69DEF8CC080283 /* SessionLibraryController.swift */; };
+		CFA843F5801FA3C1DD4D9DA7 /* LegacyDeletionFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F42A92DDEF8762872D6EE2F /* LegacyDeletionFailure.swift */; };
 		D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */; };
 		D0754552F75E1CE6B4128800 /* TranscriptExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */; };
 		D089C488B66D1CCBF625BDA9 /* TranscriptionRecoveryPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F271FCF4D5A2759B4D6DCE4 /* TranscriptionRecoveryPresenters.swift */; };
@@ -397,6 +398,7 @@
 		3E7CA92ED5A94500B96290D0 /* AppState+SupportNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SupportNavigation.swift"; sourceTree = "<group>"; };
 		3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleInstanceControllerTests.swift; sourceTree = "<group>"; };
 		3F350327BA0619E235858F82 /* ScreenshotCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureController.swift; sourceTree = "<group>"; };
+		3F42A92DDEF8762872D6EE2F /* LegacyDeletionFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDeletionFailure.swift; sourceTree = "<group>"; };
 		3FDEE0092AB006832697B9BC /* KeychainSecretStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecretStoreTests.swift; sourceTree = "<group>"; };
 		40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLoggerTests.swift; sourceTree = "<group>"; };
 		411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportHistory.swift"; sourceTree = "<group>"; };
@@ -904,6 +906,7 @@
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
 				417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */,
 				F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */,
+				3F42A92DDEF8762872D6EE2F /* LegacyDeletionFailure.swift */,
 				38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */,
 				FFEDE046F0F85BBC5DD5D7D7 /* MicrophonePermissionService.swift */,
 				0CDF1C66361AB34654415655 /* MixedAudioRecorder.swift */,
@@ -1368,6 +1371,7 @@
 				280973289AE78D9919ECD80C /* KeychainService.swift in Sources */,
 				099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */,
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
+				CFA843F5801FA3C1DD4D9DA7 /* LegacyDeletionFailure.swift in Sources */,
 				525C328F410D5C0BAF88FE99 /* LocalDataDeletionController.swift in Sources */,
 				E8037E3123427D9DE61D3BE7 /* MenuBarLabelView.swift in Sources */,
 				821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */,

@@ -1,13 +1,5 @@
 import Foundation
 
-/// A redacted description of a legacy-secret deletion that failed. Returned
-/// (never thrown) so the caller can log it without aborting the primary
-/// operation — the canonical-service delete is what actually matters.
-struct LegacyDeletionFailure: Equatable {
-    let service: String
-    let redactedDetail: String
-}
-
 /// Raw Keychain I/O for a `SecretSlot`, extracted from `SettingsStore`
 /// (#429 credential slice 3b).
 ///
