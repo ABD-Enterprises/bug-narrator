@@ -53,6 +53,7 @@
 		2CB3C3FC440FE4C08AC9AF41 /* SystemAudioExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F165EE5C53B4355CFF91393 /* SystemAudioExplainerView.swift */; };
 		2CDA374600484F9DF4079AB5 /* VerboseTranscriptionResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE6A1D707211E467BFD8EF0 /* VerboseTranscriptionResponseParser.swift */; };
 		2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */; };
+		2D6F48339AA6D7B21E4AD95E /* MenuBarLevelMeter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420FA3433CC863D0A21BD858 /* MenuBarLevelMeter.swift */; };
 		30018202D1990BA2524B2CD6 /* RecordingAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE13FAD167DA9EEEC9E83F41 /* RecordingAudioSource.swift */; };
 		318DB7BFA958511B51F94AA8 /* KeychainSecretStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */; };
 		31D0FF8CFB99E767103A0561 /* AppErrorPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2173ED04BA5467313B6261 /* AppErrorPresenterTests.swift */; };
@@ -374,6 +375,7 @@
 		40F071591002E18986EB6709 /* DiagnosticsLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLoggerTests.swift; sourceTree = "<group>"; };
 		411B7523656188E4CCDE188D /* AppState+ExportHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportHistory.swift"; sourceTree = "<group>"; };
 		417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
+		420FA3433CC863D0A21BD858 /* MenuBarLevelMeter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLevelMeter.swift; sourceTree = "<group>"; };
 		440C303A792898D3E20DA2C0 /* ScreenshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinator.swift; sourceTree = "<group>"; };
 		4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReviewPolicy.swift; sourceTree = "<group>"; };
@@ -802,6 +804,7 @@
 				4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */,
 				DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */,
 				820D9C79E98BC63EC8CEF7E3 /* MenuBarLabelView.swift */,
+				420FA3433CC863D0A21BD858 /* MenuBarLevelMeter.swift */,
 				865C5FE84904ECA5F4379637 /* MenuBarView.swift */,
 				0B43198BD8701B62D47D02F9 /* RecordingControlPanelView.swift */,
 				6131EA189B853D1B456A8D26 /* SettingsView.swift */,
@@ -1300,6 +1303,7 @@
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
 				525C328F410D5C0BAF88FE99 /* LocalDataDeletionController.swift in Sources */,
 				E8037E3123427D9DE61D3BE7 /* MenuBarLabelView.swift in Sources */,
+				2D6F48339AA6D7B21E4AD95E /* MenuBarLevelMeter.swift in Sources */,
 				821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */,
 				4D9A19996F3BCEC530DEA5F8 /* MenuBarView.swift in Sources */,
 				56B6B994C39B8B439752CCA3 /* MenuProductInfoView.swift in Sources */,
