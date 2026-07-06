@@ -1,12 +1,6 @@
 import Combine
 import Foundation
 
-enum DisplayedTranscriptCopyResult: Equatable {
-    case noDisplayedTranscript
-    case transcriptUnavailable
-    case copied
-}
-
 enum DisplayedTranscriptCopyStatusPresenter {
     static func status(for result: DisplayedTranscriptCopyResult) -> AppStatus? {
         switch result {
