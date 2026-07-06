@@ -53,20 +53,6 @@ struct PendingTranscriptionBanner: View {
         return "These sessions were recorded successfully and kept in the library because transcription could not finish. Open the latest one to retry after fixing the \(provider.displayName) setup."
     }
 }
-
-struct StorageRecoveryBanner: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "externaldrive.badge.checkmark")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
 struct TranscriptQualityFindingsView: View {
     let findings: [TranscriptQualityFinding]
 
