@@ -296,6 +296,7 @@
 		EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B609057DB2068E0F4FD292 /* AppSupportLocation.swift */; };
 		F0C234F3BD7753A09B98A332 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE629842187FE002FE2DE05D /* SessionRow.swift */; };
 		F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */; };
+		F3E757DD2873AE027434C4BE /* MockArtifactsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5292DEA55BD260C94297BE /* MockArtifactsService.swift */; };
 		F6A698B3E54CEF73047BC042 /* SessionMarkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0110337CFF56AF5224956A /* SessionMarkerTests.swift */; };
 		F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */; };
 		F715303DE87CE267F3336E39 /* TranscriptionSessionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305726D5E9A576C4C9729670 /* TranscriptionSessionBuilder.swift */; };
@@ -587,6 +588,7 @@
 		DD521B33574057DABAC05903 /* IssueExtractionPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionPresenters.swift; sourceTree = "<group>"; };
 		DD665F70FE94CB539A21B1B4 /* MenuSessionLibraryCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuSessionLibraryCardView.swift; sourceTree = "<group>"; };
 		DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueScreenshotAnnotationPreview.swift; sourceTree = "<group>"; };
+		DE5292DEA55BD260C94297BE /* MockArtifactsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockArtifactsService.swift; sourceTree = "<group>"; };
 		DEBC588ED995D6DA1A06A1D7 /* MixedAudioTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioTypes.swift; sourceTree = "<group>"; };
 		DECC036914FC012EF9F81EAB /* JiraExportProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportProviderTests.swift; sourceTree = "<group>"; };
 		DECDD27F91ED65247C1FA689 /* TranscriptionSessionBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSessionBuilderTests.swift; sourceTree = "<group>"; };
@@ -702,6 +704,7 @@
 				5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */,
 				9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */,
 				D23CC2E19AE4AA8233EE3DBE /* MixedAudioRecorderTests.swift */,
+				DE5292DEA55BD260C94297BE /* MockArtifactsService.swift */,
 				F00EA3260CCEECB3FB097702 /* NetworkTestSupport.swift */,
 				9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */,
 				D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */,
@@ -1210,6 +1213,7 @@
 				14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */,
 				C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */,
 				C36540B4BE0CB254215654AB /* MixedAudioRecorderTests.swift in Sources */,
+				F3E757DD2873AE027434C4BE /* MockArtifactsService.swift in Sources */,
 				3953183BDA19D90C13449F73 /* NetworkTestSupport.swift in Sources */,
 				A88C8D43152C2EE414CC78D2 /* OpenAIErrorMapperTests.swift in Sources */,
 				00D88D70666311588A8ED4F3 /* OperationalTelemetryRecorderTests.swift in Sources */,
