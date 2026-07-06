@@ -1,10 +1,5 @@
 import Foundation
 
-struct UncleanExitObservation: Equatable {
-    let previousLaunchStartedAt: Date
-    let detectedAt: Date
-}
-
 struct LaunchContinuityMonitor {
     private let fileManager: FileManager
     private let stateURL: URL
