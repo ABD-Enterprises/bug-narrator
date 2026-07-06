@@ -169,6 +169,7 @@
 		8666985E2260463398766FBD /* HotkeyShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE5A3102900FD595AE2A07E /* HotkeyShortcut.swift */; };
 		8839D4116A3265DB08430846 /* SupportDataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE1E25C090853C38690595 /* SupportDataController.swift */; };
 		88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */; };
+		8894F8FD4D1BC52F55A60F3E /* MockURLHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB83B97E5A64AC622671869F /* MockURLHandler.swift */; };
 		8896B923DAB4B25053694061 /* SessionLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67770387C5BA986EEB40382E /* SessionLibraryTests.swift */; };
 		8C7B9A73443F9941883AA9D5 /* SupportDataTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D40CD81DEFA2ECA16E84902 /* SupportDataTypes.swift */; };
 		8CF257839BEA4B0681BEA508 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */; };
@@ -621,6 +622,7 @@
 		F77A3094579DB3E25D1ED0A9 /* IssueScreenshotAnnotationTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueScreenshotAnnotationTypes.swift; sourceTree = "<group>"; };
 		F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportProvider.swift; sourceTree = "<group>"; };
 		FB3DE4A4EEA68D61D7E4BD14 /* RecordingSessionOutcomes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionOutcomes.swift; sourceTree = "<group>"; };
+		FB83B97E5A64AC622671869F /* MockURLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLHandler.swift; sourceTree = "<group>"; };
 		FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioObjectIDExtensions.swift; sourceTree = "<group>"; };
 		FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenter.swift; sourceTree = "<group>"; };
 		FCF1EE5E9EEE1A5D22F7A647 /* HotkeyShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyShortcutTests.swift; sourceTree = "<group>"; };
@@ -702,6 +704,7 @@
 				5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */,
 				9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */,
 				D23CC2E19AE4AA8233EE3DBE /* MixedAudioRecorderTests.swift */,
+				FB83B97E5A64AC622671869F /* MockURLHandler.swift */,
 				F00EA3260CCEECB3FB097702 /* NetworkTestSupport.swift */,
 				9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */,
 				D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */,
@@ -1210,6 +1213,7 @@
 				14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */,
 				C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */,
 				C36540B4BE0CB254215654AB /* MixedAudioRecorderTests.swift in Sources */,
+				8894F8FD4D1BC52F55A60F3E /* MockURLHandler.swift in Sources */,
 				3953183BDA19D90C13449F73 /* NetworkTestSupport.swift in Sources */,
 				A88C8D43152C2EE414CC78D2 /* OpenAIErrorMapperTests.swift in Sources */,
 				00D88D70666311588A8ED4F3 /* OperationalTelemetryRecorderTests.swift in Sources */,
