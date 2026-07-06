@@ -1,29 +1,27 @@
 import Foundation
 
-enum MicrophonePermissionState: Equatable {
-    case authorized
+enum ScreenCapturePermissionState: Equatable {
+    case granted
     case notDetermined
     case denied
-    case restricted
+    case unavailable
 }
 
-enum MicrophonePermissionStatus: String, Equatable {
+enum ScreenCapturePermissionStatus: String, Equatable {
     case notDetermined
     case granted
     case denied
-    case restricted
     case unavailable
     case captureSetupFailed
     case unknownError
 }
 
-struct MicrophoneRecoveryGuidance: Equatable {
+struct ScreenCaptureRecoveryGuidance: Equatable {
     let headline: String
     let message: String
-    let localTestingNote: String?
 }
 
-enum RecordingStartPreflightResult: Equatable {
+enum ScreenshotCapturePreflightResult: Equatable {
     case success
     case blocked(AppError)
     case needsUserAction(AppError)
@@ -38,3 +36,9 @@ enum RecordingStartPreflightResult: Equatable {
         }
     }
 }
+
+enum ScreenshotSelectionResult: Equatable {
+    case selected(CGRect)
+    case cancelled
+}
+
