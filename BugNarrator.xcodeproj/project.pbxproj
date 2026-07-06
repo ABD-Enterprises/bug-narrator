@@ -278,6 +278,7 @@
 		EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B609057DB2068E0F4FD292 /* AppSupportLocation.swift */; };
 		F0C234F3BD7753A09B98A332 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE629842187FE002FE2DE05D /* SessionRow.swift */; };
 		F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */; };
+		F3E6172AA38AB670D77832DD /* CredentialTokenField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CD781AE6ED6C80857BB809 /* CredentialTokenField.swift */; };
 		F6A698B3E54CEF73047BC042 /* SessionMarkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0110337CFF56AF5224956A /* SessionMarkerTests.swift */; };
 		F6BA3B27EE5A89BF800E6DC6 /* RoutingAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78CE9DC8EFA97D0320943DC /* RoutingAudioRecorder.swift */; };
 		F715303DE87CE267F3336E39 /* TranscriptionSessionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305726D5E9A576C4C9729670 /* TranscriptionSessionBuilder.swift */; };
@@ -541,6 +542,7 @@
 		D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTapSession.swift; sourceTree = "<group>"; };
 		D23CC2E19AE4AA8233EE3DBE /* MixedAudioRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioRecorderTests.swift; sourceTree = "<group>"; };
 		D3C3F2C78E5CE5F897E804CC /* AppState+TrackerIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+TrackerIntegration.swift"; sourceTree = "<group>"; };
+		D3CD781AE6ED6C80857BB809 /* CredentialTokenField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenField.swift; sourceTree = "<group>"; };
 		D58A3885853863EE9118FC63 /* SettingsDiagnosticsPrivacyPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDiagnosticsPrivacyPane.swift; sourceTree = "<group>"; };
 		D6C80DD2FADBED13E068990D /* BugNarratorLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugNarratorLinks.swift; sourceTree = "<group>"; };
 		D70E5A77E6D0B898A8B3FD81 /* OperationalTelemetryRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationalTelemetryRecorderTests.swift; sourceTree = "<group>"; };
@@ -805,6 +807,7 @@
 				59B0A4E5E69C1FD99320DDB2 /* AboutBugNarratorView.swift */,
 				6CB4AAA0A02B42A31386D0D7 /* AISetupSectionsView.swift */,
 				5A8CB6ECBCE39874B5B432EF /* ChangelogView.swift */,
+				D3CD781AE6ED6C80857BB809 /* CredentialTokenField.swift */,
 				4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */,
 				DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */,
 				820D9C79E98BC63EC8CEF7E3 /* MenuBarLabelView.swift */,
@@ -1267,6 +1270,7 @@
 				77CFDF30D3F7AEFA54C4E367 /* ChangelogDocument.swift in Sources */,
 				5CB8DACFD986D905D03D0E6A /* ChangelogView.swift in Sources */,
 				B53060D07F7F2428BD78E807 /* ClipboardService.swift in Sources */,
+				F3E6172AA38AB670D77832DD /* CredentialTokenField.swift in Sources */,
 				040E1F8A34C1C16904AB8370 /* DebugBundleExporter.swift in Sources */,
 				FD330322EFE5B739F3657451 /* DebugBundleTypes.swift in Sources */,
 				977D86FA0E7E2C16A5B41D4D /* DebugSessionContextProvider.swift in Sources */,
