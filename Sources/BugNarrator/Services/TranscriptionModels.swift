@@ -34,9 +34,3 @@ struct TranscriptionResult: Sendable {
         self.qualityFindings = qualityFindings
     }
 }
-
-struct TranscriptionSegment: Decodable, Sendable {
-    let start: Double
-    let end: Double
-    let text: String
-}
