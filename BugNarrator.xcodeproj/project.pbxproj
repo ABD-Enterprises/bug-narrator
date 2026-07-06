@@ -157,6 +157,7 @@
 		82C0E2BE74D268CA44EEA500 /* IssueScreenshotAnnotationPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0730768765056797499E6B /* IssueScreenshotAnnotationPreview.swift */; };
 		8419388E08492DBAC01BEEE8 /* SingleInstanceControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */; };
 		8507C1549A3313E2C9CD4C10 /* TranscriptionRequestFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26CD9BA732E87ECCC87659E2 /* TranscriptionRequestFactory.swift */; };
+		8598258404428C8692A51907 /* ExportReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */; };
 		8666985E2260463398766FBD /* HotkeyShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE5A3102900FD595AE2A07E /* HotkeyShortcut.swift */; };
 		8839D4116A3265DB08430846 /* SupportDataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE1E25C090853C38690595 /* SupportDataController.swift */; };
 		88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */; };
@@ -320,6 +321,7 @@
 		0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIntegrationsPanes.swift; sourceTree = "<group>"; };
 		0E89C1E4E72D830539D76274 /* DiagnosticsLogEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogEntry.swift; sourceTree = "<group>"; };
 		0EB2CB153890C16C2DE4C815 /* AppState+FileRevealActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+FileRevealActions.swift"; sourceTree = "<group>"; };
+		102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportReceipt.swift; sourceTree = "<group>"; };
 		104A00B74D18C9842D5BA11C /* JiraExportConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportConfig.swift; sourceTree = "<group>"; };
 		154255C955FE33FD6D016BE9 /* PrivacyDataExportTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyDataExportTypes.swift; sourceTree = "<group>"; };
 		1691FC9128F5B3D543C87721 /* ExportTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTestSupport.swift; sourceTree = "<group>"; };
@@ -828,6 +830,7 @@
 				2FA72EF162C4C4AF53D2CB41 /* DebugBundleExporter.swift */,
 				5ABEC93C3EF20960325C6FF7 /* DebugBundleTypes.swift */,
 				70F3DD1ED69F4EF96A4BD44A /* ExportHistoryController.swift */,
+				102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */,
 				DC8C8AA3B4EEED739F198572 /* ExportReceiptStore.swift */,
 				7322F6B6A58542DEDFC76CCA /* ExportService.swift */,
 				2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */,
@@ -1259,6 +1262,7 @@
 				15C768D62CC7119DC6F212E2 /* DiagnosticsTypes.swift in Sources */,
 				4F04273FAEFE2C33F78701B4 /* ElapsedTimeFormatter.swift in Sources */,
 				93057BE64347AD1BF43F4FF0 /* ExportHistoryController.swift in Sources */,
+				8598258404428C8692A51907 /* ExportReceipt.swift in Sources */,
 				A73F5969DB4A2C04BC83BF45 /* ExportReceiptStore.swift in Sources */,
 				5839C40FC99D94A9C910A218 /* ExportReviewSheet.swift in Sources */,
 				5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */,
