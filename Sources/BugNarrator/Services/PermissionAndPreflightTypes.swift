@@ -55,11 +55,6 @@ enum ScreenCapturePermissionStatus: String, Equatable {
     case unknownError
 }
 
-struct ScreenCaptureRecoveryGuidance: Equatable {
-    let headline: String
-    let message: String
-}
-
 enum ScreenshotCapturePreflightResult: Equatable {
     case success
     case blocked(AppError)
