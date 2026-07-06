@@ -133,6 +133,7 @@
 		68D411F355E3ED698E688D86 /* PermissionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AF819B9841925ACD930D0 /* PermissionRecoveryController.swift */; };
 		69F0F76E67B312F356DE7354 /* AppState+PermissionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CFBCD444BCD3791FE18E77 /* AppState+PermissionRecovery.swift */; };
 		6AC08ACF1118EF6BDAD2E6BA /* DiagnosticsRedactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */; };
+		6B42AA5E2D2D4DB18CA5C07F /* SettingsGitHubExportPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD18C5B002A14BC0CBEBC4E3 /* SettingsGitHubExportPane.swift */; };
 		6B52833F68E7F99EE7D2FE07 /* AppState+IssueExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AF40FCECF7DCEDABD21EC8 /* AppState+IssueExtraction.swift */; };
 		6BFC55DEB2DE0973549D42C9 /* TranscriptRecoveryAndHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F08F18E004924B592F24DC /* TranscriptRecoveryAndHistoryViews.swift */; };
 		6D4BF7BD49B33FC81FB5B4D5 /* SessionArtifactsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5530F00F9B6ABE2F8E52B8 /* SessionArtifactsService.swift */; };
@@ -552,6 +553,7 @@
 		BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExporter.swift; sourceTree = "<group>"; };
 		BB303E43134D880AB6207D21 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
 		BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionService.swift; sourceTree = "<group>"; };
+		BD18C5B002A14BC0CBEBC4E3 /* SettingsGitHubExportPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGitHubExportPane.swift; sourceTree = "<group>"; };
 		BE13FAD167DA9EEEC9E83F41 /* RecordingAudioSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioSource.swift; sourceTree = "<group>"; };
 		BE6D695E380D1F9B3D04BD68 /* IssueExtractionCompletionLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionCompletionLog.swift; sourceTree = "<group>"; };
 		C05CD611B03D4E8792F7CD35 /* SettingsReadinessTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsReadinessTypes.swift; sourceTree = "<group>"; };
@@ -637,6 +639,7 @@
 				9C626F1B07544DE20B370D35 /* SettingsAudioPanes.swift */,
 				D58A3885853863EE9118FC63 /* SettingsDiagnosticsPrivacyPane.swift */,
 				0C6FB57EE70D75E47710D667 /* SettingsGeneralPanes.swift */,
+				BD18C5B002A14BC0CBEBC4E3 /* SettingsGitHubExportPane.swift */,
 				0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */,
 				B065A5B9BE084EFE0BFE1D48 /* SettingsReadiness.swift */,
 				C05CD611B03D4E8792F7CD35 /* SettingsReadinessTypes.swift */,
@@ -1429,6 +1432,7 @@
 				1D7402D8CC37B5E8F4F71CD6 /* SettingsAudioPanes.swift in Sources */,
 				3546CF9BD922CF576E96F1C5 /* SettingsDiagnosticsPrivacyPane.swift in Sources */,
 				8E41CD2A7BE6A70F5CD9F46C /* SettingsGeneralPanes.swift in Sources */,
+				6B42AA5E2D2D4DB18CA5C07F /* SettingsGitHubExportPane.swift in Sources */,
 				D759CEA88F50769454691AFC /* SettingsIntegrationsPanes.swift in Sources */,
 				BA99127A39D827962D535164 /* SettingsReadiness.swift in Sources */,
 				D687F22809BF99AF4D202C1E /* SettingsReadinessTypes.swift in Sources */,
