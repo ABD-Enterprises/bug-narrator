@@ -52,6 +52,7 @@
 		28FFF0FBF53923BC686FF79D /* ScreenshotAnnotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */; };
 		292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7F5FB0F3460F31156FC805 /* AppServiceContainer.swift */; };
 		29C25E147DD0810A11C03502 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09CA463A8DF59221937A2C7 /* TranscriptView.swift */; };
+		2A46DDCBCC21ECFEE3CD6D3D /* IssueExportReviewItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E26A8BC48AD5A546887EDA /* IssueExportReviewItem.swift */; };
 		2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */; };
 		2C4B0D2F815BAB20916ABD9C /* MicrophonePermissionResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17EFDFC12818F99D04C93CC5 /* MicrophonePermissionResolver.swift */; };
 		2CB3C3FC440FE4C08AC9AF41 /* SystemAudioExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F165EE5C53B4355CFF91393 /* SystemAudioExplainerView.swift */; };
@@ -478,6 +479,7 @@
 		78DB2CC94CABCD51955891BF /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		78EFF170BAD57E66A7CB20AB /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		792A02D8EE4EBB2A02D4043D /* CHANGELOG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.md; sourceTree = "<group>"; };
+		79E26A8BC48AD5A546887EDA /* IssueExportReviewItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReviewItem.swift; sourceTree = "<group>"; };
 		7A7A34EF1391E51E6B1DB8BF /* TranscriptSectionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSectionBuilder.swift; sourceTree = "<group>"; };
 		7CE7687249AD70EDFF06A569 /* SystemAudioAggregateDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioAggregateDevice.swift; sourceTree = "<group>"; };
 		7D40CD81DEFA2ECA16E84902 /* SupportDataTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportDataTypes.swift; sourceTree = "<group>"; };
@@ -768,6 +770,7 @@
 				74F12C05B57E38EDFDCEEEEA /* IssueCore.swift */,
 				3394CF24F8CA7410A441170E /* IssueCoreSubtypes.swift */,
 				C514D909BF8C4543E740640F /* IssueExportReview.swift */,
+				79E26A8BC48AD5A546887EDA /* IssueExportReviewItem.swift */,
 				F0300D3CA1B339D4D1CCAC84 /* IssueExportTargets.swift */,
 				104A00B74D18C9842D5BA11C /* JiraExportConfig.swift */,
 				8CC43602AE7048F7313E7DF6 /* PendingTranscription.swift */,
@@ -1348,6 +1351,7 @@
 				5AC3F76F7DCE14EA3E8D8303 /* IssueExportController.swift in Sources */,
 				20CFCC7656BA4B234DBE8004 /* IssueExportPresenters.swift in Sources */,
 				706F9177D110B5AE8B127245 /* IssueExportReview.swift in Sources */,
+				2A46DDCBCC21ECFEE3CD6D3D /* IssueExportReviewItem.swift in Sources */,
 				474B8B38A576590B2AB08D3F /* IssueExportReviewPolicy.swift in Sources */,
 				E8CA54EA2B9A1E5EB6BF186D /* IssueExportSupport.swift in Sources */,
 				4F53BC049DF790848D0E7182 /* IssueExportTargets.swift in Sources */,
