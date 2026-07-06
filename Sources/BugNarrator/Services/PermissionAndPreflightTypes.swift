@@ -46,15 +46,6 @@ enum ScreenCapturePermissionState: Equatable {
     case unavailable
 }
 
-enum ScreenCapturePermissionStatus: String, Equatable {
-    case notDetermined
-    case granted
-    case denied
-    case unavailable
-    case captureSetupFailed
-    case unknownError
-}
-
 struct ScreenCaptureRecoveryGuidance: Equatable {
     let headline: String
     let message: String
