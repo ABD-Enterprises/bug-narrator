@@ -17,9 +17,17 @@ struct ChangelogView: View {
             VStack(alignment: .leading, spacing: 18) {
                 headerSection
 
-                Text(changelog.attributedMarkdown)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if changelog.releases.isEmpty {
+                    Text(changelog.attributedMarkdown)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(changelog.releases) { release in
+                            releaseCard(release)
+                        }
+                    }
+                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -49,6 +57,68 @@ struct ChangelogView: View {
             Toggle("Show automatically after each update", isOn: $settingsStore.autoShowChangelogOnUpdate)
                 .font(.subheadline)
                 .accessibilityLabel("Show the changelog automatically after each update")
+        }
+    }
+
+    private func releaseCard(_ release: ChangelogRelease) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(release.version)
+                    .font(.headline.weight(.semibold))
+
+                if let date = release.date {
+                    Text(date)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+                    releaseNoteRow(note)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
+        }
+    }
+
+    private func releaseNoteRow(_ note: ChangelogReleaseNote) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if let category = note.category {
+                Text(category)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(categoryColor(category))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(categoryColor(category).opacity(0.14), in: Capsule())
+            }
+
+            Text(note.text)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func categoryColor(_ category: String) -> Color {
+        switch category.uppercased() {
+        case "FIX":
+            return .green
+        case "CHANGE":
+            return .blue
+        case "INTERNAL":
+            return .secondary
+        default:
+            return .accentColor
         }
     }
 }
