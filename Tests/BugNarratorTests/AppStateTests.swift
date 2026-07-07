@@ -686,6 +686,30 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.transcriptStore.sessions.first?.pendingTranscription?.failureReason, .providerSetup)
     }
 
+    func testStopSessionWithParakeetUsesLocalProviderRequest() async throws {
+        let harness = AppStateHarness(apiKey: "fixture-openai-key")
+        defer { harness.cleanup() }
+
+        let recordedAudio = try harness.makeRecordedAudio(fileName: "parakeet-stop-session")
+        harness.audioRecorder.stopResults = [.success(recordedAudio)]
+        harness.settingsStore.openAIBaseURL = "https://api.openai.com"
+        harness.settingsStore.aiProvider = .parakeetLocal
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Local transcript", segments: []))
+        )
+
+        await harness.appState.startSession()
+        await harness.appState.stopSession()
+
+        let requestedAPIKeys = await harness.transcriptionClient.requestedAPIKeys
+        let requestedModels = await harness.transcriptionClient.requestedModels
+        let requestedBaseURLs = await harness.transcriptionClient.requestedBaseURLs
+        XCTAssertEqual(requestedAPIKeys, [""])
+        XCTAssertEqual(requestedModels, ["parakeet-tdt-0.6b-v3"])
+        XCTAssertEqual(requestedBaseURLs.map(\.absoluteString), ["http://localhost:8422"])
+        XCTAssertEqual(harness.transcriptStore.sessions.first?.transcript, "Local transcript")
+    }
+
     func testStopSessionWithRejectedAPIKeyPreservesRetryableSession() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

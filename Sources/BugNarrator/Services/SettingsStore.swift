@@ -513,6 +513,10 @@ final class SettingsStore: ObservableObject {
         provider: AIProvider = .openAI
     ) -> URL {
         let fallback = fallbackBaseURL(for: provider)
+        if provider == .parakeetLocal {
+            return fallback
+        }
+
         let trimmedValue = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

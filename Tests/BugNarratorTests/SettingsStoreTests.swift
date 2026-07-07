@@ -454,6 +454,24 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "whisper-1")
     }
 
+    func testParakeetProviderIgnoresPersistedOpenAIEndpointAndWhisperModel() {
+        let suiteName = "BugNarrator-SettingsParakeetEndpointTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
+        defaults.set("whisper-1", forKey: "settings.preferredModel")
+        defaults.set("https://api.openai.com", forKey: "settings.openAIBaseURL")
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
+        XCTAssertEqual(store.transcriptionRequest.model, "parakeet-tdt-0.6b-v3")
+        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://localhost:8422")
+        XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "parakeet-tdt-0.6b-v3")
+    }
+
     func testOpenAIProviderUsesCuratedTranscriptionModelChoices() {
         let suiteName = "BugNarrator-SettingsOpenAIModelChoicesTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
