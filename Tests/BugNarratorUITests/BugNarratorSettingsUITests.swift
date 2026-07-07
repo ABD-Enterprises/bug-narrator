@@ -214,7 +214,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["All Sessions"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["Sort sessions"].waitForExistence(timeout: 5))
 
-        let searchField = app.textFields["Search sessions"]
+        let searchField = app.textFields["session-library-search-field"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         replaceText(in: searchField, with: "export")
         let clearSearch = app.buttons["Clear search"]

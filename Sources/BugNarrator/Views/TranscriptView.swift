@@ -236,14 +236,16 @@ struct TranscriptView: View {
             }
 
             HStack(spacing: 10) {
-                Label {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+
                     TextField("Search title, transcript, or summary", text: $searchText)
                         .textFieldStyle(.plain)
                         .accessibilityLabel("Search sessions")
-                } icon: {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("session-library-search-field")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))

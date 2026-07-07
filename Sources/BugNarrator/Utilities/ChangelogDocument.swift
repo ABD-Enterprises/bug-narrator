@@ -4,11 +4,13 @@ struct ChangelogDocument: Equatable {
     let title: String
     let markdown: String
     let latestHighlights: [String]
+    let releases: [ChangelogRelease]
 
     init(title: String = "What’s New", markdown: String) {
         self.title = title
         self.markdown = markdown
-        self.latestHighlights = Self.extractLatestHighlights(from: markdown)
+        self.releases = Self.extractReleases(from: markdown)
+        self.latestHighlights = Array(releases.first?.notes.map(\.text).prefix(3) ?? [])
     }
 
     init(bundle: Bundle = .main) {
@@ -47,29 +49,70 @@ struct ChangelogDocument: Equatable {
         return AttributedString(markdown)
     }
 
-    private static func extractLatestHighlights(from markdown: String) -> [String] {
-        var highlights: [String] = []
-        var isInLatestSection = false
+    private static func extractReleases(from markdown: String) -> [ChangelogRelease] {
+        var releases: [ChangelogRelease] = []
+        var currentTitle: String?
+        var currentNotes: [ChangelogReleaseNote] = []
 
         for rawLine in markdown.components(separatedBy: .newlines) {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
 
             if line.hasPrefix("## ") {
-                if isInLatestSection {
-                    break
+                if let currentTitle, !currentNotes.isEmpty {
+                    releases.append(ChangelogRelease(title: currentTitle, notes: currentNotes))
                 }
 
-                isInLatestSection = true
+                currentTitle = String(line.dropFirst(3))
+                currentNotes = []
                 continue
             }
 
-            guard isInLatestSection, line.hasPrefix("- ") else {
+            guard currentTitle != nil, line.hasPrefix("- ") else {
                 continue
             }
 
-            highlights.append(String(line.dropFirst(2)))
+            currentNotes.append(ChangelogReleaseNote(rawText: String(line.dropFirst(2))))
         }
 
-        return Array(highlights.prefix(3))
+        if let currentTitle, !currentNotes.isEmpty {
+            releases.append(ChangelogRelease(title: currentTitle, notes: currentNotes))
+        }
+
+        return releases
+    }
+}
+
+struct ChangelogRelease: Equatable, Identifiable {
+    let title: String
+    let notes: [ChangelogReleaseNote]
+
+    var id: String { title }
+
+    var version: String {
+        title.components(separatedBy: " - ").first ?? title
+    }
+
+    var date: String? {
+        let parts = title.components(separatedBy: " - ")
+        return parts.count > 1 ? parts.dropFirst().joined(separator: " - ") : nil
+    }
+}
+
+struct ChangelogReleaseNote: Equatable {
+    let category: String?
+    let text: String
+
+    init(rawText: String) {
+        let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("["),
+              let endIndex = trimmed.firstIndex(of: "]") else {
+            category = nil
+            text = trimmed
+            return
+        }
+
+        category = String(trimmed[trimmed.index(after: trimmed.startIndex)..<endIndex])
+        text = String(trimmed[trimmed.index(after: endIndex)...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
