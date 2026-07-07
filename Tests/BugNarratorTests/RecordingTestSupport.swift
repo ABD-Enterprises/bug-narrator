@@ -116,7 +116,9 @@ actor MockTranscriptionClient: TranscriptionServing {
     private var validationResults: [Result<Void, Error>] = []
     private(set) var callCount = 0
     private(set) var requestedFileURLs: [URL] = []
+    private(set) var requestedAPIKeys: [String] = []
     private(set) var requestedModels: [String] = []
+    private(set) var requestedBaseURLs: [URL] = []
     private(set) var validationCallCount = 0
     private(set) var requestedValidationAPIKeys: [String] = []
     private(set) var requestedValidationBaseURLs: [URL] = []
@@ -132,7 +134,9 @@ actor MockTranscriptionClient: TranscriptionServing {
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
         callCount += 1
         requestedFileURLs.append(fileURL)
+        requestedAPIKeys.append(apiKey)
         requestedModels.append(request.model)
+        requestedBaseURLs.append(request.apiBaseURL)
 
         guard !queuedResults.isEmpty else {
             throw AppError.transcriptionFailure("No mock transcription result was configured.")
@@ -153,4 +157,3 @@ actor MockTranscriptionClient: TranscriptionServing {
         try validationResults.removeFirst().get()
     }
 }
-
