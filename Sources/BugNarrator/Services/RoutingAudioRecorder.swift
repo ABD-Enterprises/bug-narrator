@@ -6,6 +6,7 @@ final class RoutingAudioRecorder: AudioRecording {
     private let microphoneRecorder: any AudioRecording
     private let systemAudioRecorder: any AudioRecording
     private let microphoneAndSystemAudioRecorder: any AudioRecording
+    private let recordingLogger: DiagnosticsLogger
 
     private var activeRecorder: (any AudioRecording)?
 
@@ -13,7 +14,8 @@ final class RoutingAudioRecorder: AudioRecording {
         settingsStore: SettingsStore,
         microphoneRecorder: (any AudioRecording)? = nil,
         systemAudioRecorder: any AudioRecording = SystemAudioRecorder(),
-        microphoneAndSystemAudioRecorder: (any AudioRecording)? = nil
+        microphoneAndSystemAudioRecorder: (any AudioRecording)? = nil,
+        recordingLogger: DiagnosticsLogger = DiagnosticsLogger(category: .recording)
     ) {
         self.settingsStore = settingsStore
         let microphoneRecorder = microphoneRecorder ?? AudioRecorder(
@@ -25,6 +27,7 @@ final class RoutingAudioRecorder: AudioRecording {
             microphoneRecorder: microphoneRecorder,
             systemAudioRecorder: systemAudioRecorder
         )
+        self.recordingLogger = recordingLogger
     }
 
     var currentDuration: TimeInterval {
@@ -102,11 +105,23 @@ final class RoutingAudioRecorder: AudioRecording {
             return nil
         }
 
+        let source = String(describing: settingsStore.recordingAudioSource)
+
         guard settingsStore.systemAudioCaptureEnabled else {
+            recordingLogger.warning(
+                "system_audio_readiness_feature_disabled",
+                "System audio recording rejected: the experimental \"System audio capture modes\" toggle in Settings is off.",
+                metadata: ["source": source]
+            )
             return .systemAudioFeatureDisabled
         }
 
         guard settingsStore.hasAcceptedSystemAudioRecordingConsent else {
+            recordingLogger.warning(
+                "system_audio_readiness_consent_required",
+                "System audio recording rejected: the recording-notice consent toggle in Settings has not been ticked.",
+                metadata: ["source": source]
+            )
             return .systemAudioConsentRequired
         }
 
