@@ -39,6 +39,82 @@ final class RoutingAudioRecorderTests: XCTestCase {
         XCTAssertEqual(error, .systemAudioConsentRequired)
     }
 
+    func testMicAndSystemAudioRequiresFeatureFlag() async {
+        let (store, defaults, defaultsSuiteName) = makeSettingsStore()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        store.recordingAudioSource = .microphoneAndSystemAudio
+        let router = RoutingAudioRecorder(
+            settingsStore: store,
+            microphoneRecorder: MockAudioRecorder(),
+            systemAudioRecorder: MockAudioRecorder(),
+            microphoneAndSystemAudioRecorder: MockAudioRecorder()
+        )
+
+        let error = await router.validateRecordingActivation()
+
+        XCTAssertEqual(error, .systemAudioFeatureDisabled)
+    }
+
+    func testMicAndSystemAudioRequiresConsentAcknowledgement() async {
+        let (store, defaults, defaultsSuiteName) = makeSettingsStore()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        store.systemAudioCaptureEnabled = true
+        store.recordingAudioSource = .microphoneAndSystemAudio
+        let router = RoutingAudioRecorder(
+            settingsStore: store,
+            microphoneRecorder: MockAudioRecorder(),
+            systemAudioRecorder: MockAudioRecorder(),
+            microphoneAndSystemAudioRecorder: MockAudioRecorder()
+        )
+
+        let error = await router.validateRecordingActivation()
+
+        XCTAssertEqual(error, .systemAudioConsentRequired)
+    }
+
+    func testMicrophoneOnlySkipsSystemAudioReadiness() async {
+        let (store, defaults, defaultsSuiteName) = makeSettingsStore()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        store.recordingAudioSource = .microphone
+        let router = RoutingAudioRecorder(
+            settingsStore: store,
+            microphoneRecorder: MockAudioRecorder(),
+            systemAudioRecorder: MockAudioRecorder(),
+            microphoneAndSystemAudioRecorder: MockAudioRecorder()
+        )
+
+        let error = await router.validateRecordingActivation()
+
+        XCTAssertNil(error)
+    }
+
+    func testStartRecordingSurfacesReadinessErrorBeforeInvokingSourceRecorder() async {
+        let (store, defaults, defaultsSuiteName) = makeSettingsStore()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        store.systemAudioCaptureEnabled = true
+        store.recordingAudioSource = .systemAudio
+
+        let systemRecorder = MockAudioRecorder()
+        systemRecorder.requiresMicrophonePermission = false
+        let router = RoutingAudioRecorder(
+            settingsStore: store,
+            microphoneRecorder: MockAudioRecorder(),
+            systemAudioRecorder: systemRecorder,
+            microphoneAndSystemAudioRecorder: MockAudioRecorder()
+        )
+
+        do {
+            try await router.startRecording()
+            XCTFail("Expected startRecording to throw .systemAudioConsentRequired.")
+        } catch let error as AppError {
+            XCTAssertEqual(error, .systemAudioConsentRequired)
+        } catch {
+            XCTFail("Expected AppError, got \(error).")
+        }
+
+        XCTAssertEqual(systemRecorder.startCallCount, 0)
+    }
+
     func testRoutesSystemAudioStartAndStopToSystemRecorder() async throws {
         let (store, defaults, defaultsSuiteName) = makeSettingsStore()
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }

@@ -51,7 +51,7 @@ struct SettingsRecordingAudioPane: View {
                                 : Color.orange
                         )
                 } else if settingsStore.systemAudioCaptureEnabled {
-                    Text("System audio modes require a separate macOS permission prompt the first time capture starts.")
+                    Text("System audio modes need two things before you can record: tick the consent notice that appears once you pick a system-audio source, and grant BugNarrator access under System Settings > Privacy & Security > Screen & System Audio Recording (macOS prompts once, the first time capture starts).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
