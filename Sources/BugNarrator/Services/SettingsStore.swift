@@ -717,18 +717,6 @@ final class SettingsStore: ObservableObject {
 
 
 
-    var normalizedGitHubRepositoryOwner: String {
-        githubRepositoryOwner.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var normalizedGitHubRepositoryName: String {
-        githubRepositoryName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var normalizedGitHubRepositoryID: String {
-        githubRepositoryID.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     var gitHubConfigurationValidationIsReady: Bool {
         gitHubRepositoryDiscoveryIsReady &&
             !normalizedGitHubRepositoryOwner.isEmpty &&
@@ -764,16 +752,6 @@ final class SettingsStore: ObservableObject {
     }
 
 
-
-    var normalizedJiraBaseURL: String {
-        jiraBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    }
-
-    var normalizedJiraEmail: String {
-        jiraEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     var jiraProjectDiscoveryIsReady: Bool {
         credentialIsAvailableForUserAction(
@@ -826,22 +804,6 @@ final class SettingsStore: ObservableObject {
         }
 
         return components.url
-    }
-
-    var normalizedJiraProjectKey: String {
-        jiraProjectKey.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-    }
-
-    var normalizedJiraProjectID: String {
-        jiraProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var normalizedJiraIssueType: String {
-        jiraIssueType.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var normalizedJiraIssueTypeID: String {
-        jiraIssueTypeID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var jiraExportConfiguration: JiraExportConfiguration? {
