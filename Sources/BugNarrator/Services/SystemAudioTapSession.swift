@@ -66,7 +66,7 @@ final class SystemAudioTapSession {
         var tapID = AudioObjectID(kAudioObjectUnknown)
         var status = AudioHardwareCreateProcessTap(tapDescription, &tapID)
         guard status == noErr else {
-            throw AppError.systemAudioUnavailable(Self.recoveryMessage("Core Audio tap creation failed with status \(status)."))
+            throw AppError.systemAudioUnavailable(Self.tapPermissionRecoveryMessage(status: status))
         }
 
         processTapID = tapID
@@ -177,6 +177,10 @@ final class SystemAudioTapSession {
 
     private static func recoveryMessage(_ details: String) -> String {
         "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again. \(details)"
+    }
+
+    private static func tapPermissionRecoveryMessage(status: OSStatus) -> String {
+        "macOS refused to create the system audio tap. This usually means System Audio Recording permission has not been granted to BugNarrator yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again. (Core Audio status \(status).)"
     }
 
     private func installFormatChangeListener(writer: SystemAudioFileWriter) throws {
