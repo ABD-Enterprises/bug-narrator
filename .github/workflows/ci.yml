@@ -86,9 +86,10 @@ jobs:
   # effort-leak-audit, etc.). Delete this job in the follow-up flip PR once the
   # probe is proven green on 2+ consecutive PRs.
   runtime-guardrails-linux-probe:
-    needs:
-      - detect-ci-changes
-    if: needs.detect-ci-changes.outputs.swift_changed == 'true' || needs.detect-ci-changes.outputs.docs_changed == 'true'
+    # Runs unconditionally to match the source `runtime-guardrails` job's
+    # coverage — otherwise a scripts-only or root-config PR would exercise
+    # `runtime-guardrails` but skip the probe, leaving the flip-PR without
+    # parity evidence for that PR shape.
     runs-on: [self-hosted, Linux, ARM64]
     continue-on-error: true
     timeout-minutes: 15
