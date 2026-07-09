@@ -1141,147 +1141,41 @@ struct TranscriptView: View {
     private func issueGitHubTargetEditor(issue: ExtractedIssue, session: TranscriptSession) -> some View {
         let target = effectiveGitHubTarget(for: issue)
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Label("GitHub", systemImage: "shippingbox")
-                    .font(.caption.weight(.semibold))
-
-                Text(target.displayLabel)
-                    .font(.caption)
-                    .foregroundStyle(target.isComplete ? Color.secondary : Color.orange)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer(minLength: 0)
-
-                Button(appState.isLoadingGitHubRepositories ? "Loading..." : "Load Repos") {
-                    Task {
-                        await appState.loadGitHubRepositories()
-                    }
-                }
-                .disabled(!appState.settingsStore.hasGitHubToken || appState.isLoadingGitHubRepositories)
-            }
-
-            if appState.gitHubRepositories.isEmpty {
-                HStack(spacing: 8) {
-                    TextField(
-                        "owner",
-                        text: issueGitHubTargetTextBinding(
-                            sessionID: session.id,
-                            issueID: issue.id,
-                            keyPath: \.owner,
-                            fallback: target.owner
-                        )
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("GitHub repository owner for \(issue.title)")
-
-                    TextField(
-                        "repository",
-                        text: issueGitHubTargetTextBinding(
-                            sessionID: session.id,
-                            issueID: issue.id,
-                            keyPath: \.repository,
-                            fallback: target.repository
-                        )
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("GitHub repository name for \(issue.title)")
-                }
-            } else {
-                Picker("GitHub Repository", selection: issueGitHubRepositorySelection(issue: issue, session: session)) {
-                    Text("Choose repository").tag("")
-                    ForEach(appState.gitHubRepositories) { repository in
-                        Text(repository.displayLabel).tag(repository.repositoryID)
-                    }
-                }
-                .pickerStyle(.menu)
-                .accessibilityLabel("GitHub repository for \(issue.title)")
-            }
-
-            TextField(
-                "Labels, comma-separated",
-                text: issueGitHubLabelsBinding(sessionID: session.id, issueID: issue.id, fallback: target.labels)
-            )
-            .textFieldStyle(.roundedBorder)
-            .accessibilityLabel("GitHub labels for \(issue.title)")
-        }
+        return IssueGitHubTargetEditor(
+            issue: issue,
+            target: target,
+            appState: appState,
+            ownerBinding: issueGitHubTargetTextBinding(
+                sessionID: session.id,
+                issueID: issue.id,
+                keyPath: \.owner,
+                fallback: target.owner
+            ),
+            repositoryBinding: issueGitHubTargetTextBinding(
+                sessionID: session.id,
+                issueID: issue.id,
+                keyPath: \.repository,
+                fallback: target.repository
+            ),
+            repositorySelection: issueGitHubRepositorySelection(issue: issue, session: session),
+            labelsBinding: issueGitHubLabelsBinding(sessionID: session.id, issueID: issue.id, fallback: target.labels)
+        )
     }
 
     private func issueJiraTargetEditor(issue: ExtractedIssue, session: TranscriptSession) -> some View {
         let target = effectiveJiraTarget(for: issue)
         let issueTypes = appState.jiraIssueTypes(for: target)
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Label("Jira", systemImage: "list.bullet.rectangle")
-                    .font(.caption.weight(.semibold))
-
-                Text(target.isComplete ? "\(target.projectKey) / \(target.issueTypeName.isEmpty ? target.issueTypeID : target.issueTypeName)" : "Choose project and issue type")
-                    .font(.caption)
-                    .foregroundStyle(target.isComplete ? Color.secondary : Color.orange)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer(minLength: 0)
-
-                Button(appState.jiraValidationState == .validating ? "Loading..." : "Load Projects") {
-                    Task {
-                        await appState.validateJiraConfiguration()
-                    }
-                }
-                .disabled(!appState.settingsStore.jiraProjectDiscoveryIsReady || appState.jiraValidationState == .validating)
-            }
-
-            if appState.jiraProjects.isEmpty {
-                TextField(
-                    "Project key",
-                    text: issueJiraProjectKeyBinding(sessionID: session.id, issueID: issue.id, fallback: target.projectKey)
-                )
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Jira project key for \(issue.title)")
-            } else {
-                Picker("Jira Project", selection: issueJiraProjectSelection(issue: issue, session: session)) {
-                    Text("Choose project").tag("")
-                    ForEach(appState.jiraProjects) { project in
-                        Text(project.displayLabel).tag(project.projectID)
-                    }
-                }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Jira project for \(issue.title)")
-            }
-
-            if issueTypes.isEmpty {
-                HStack(spacing: 8) {
-                    TextField(
-                        "Issue type",
-                        text: issueJiraIssueTypeNameBinding(sessionID: session.id, issueID: issue.id, fallback: target.issueTypeName)
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Jira issue type for \(issue.title)")
-
-                    Button(appState.isLoadingJiraIssueTypes ? "Loading..." : "Load Types") {
-                        guard let projectID = target.projectID else {
-                            return
-                        }
-
-                        Task {
-                            await appState.loadJiraIssueTypes(forProjectID: projectID)
-                        }
-                    }
-                    .disabled(target.projectID == nil || appState.isLoadingJiraIssueTypes)
-                }
-            } else {
-                Picker("Jira Issue Type", selection: issueJiraIssueTypeSelection(issue: issue, session: session, issueTypes: issueTypes)) {
-                    Text("Choose issue type").tag("")
-                    ForEach(issueTypes) { issueType in
-                        Text(issueType.name).tag(issueType.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Jira issue type for \(issue.title)")
-            }
-        }
+        return IssueJiraTargetEditor(
+            issue: issue,
+            target: target,
+            issueTypes: issueTypes,
+            appState: appState,
+            projectKeyBinding: issueJiraProjectKeyBinding(sessionID: session.id, issueID: issue.id, fallback: target.projectKey),
+            projectSelection: issueJiraProjectSelection(issue: issue, session: session),
+            issueTypeNameBinding: issueJiraIssueTypeNameBinding(sessionID: session.id, issueID: issue.id, fallback: target.issueTypeName),
+            issueTypeSelection: issueJiraIssueTypeSelection(issue: issue, session: session, issueTypes: issueTypes)
+        )
     }
 
     @ViewBuilder
