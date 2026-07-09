@@ -510,22 +510,6 @@ final class SettingsStore: ObservableObject {
             + "unless this is a trusted local server."
     }
 
-    var normalizedLanguageHint: String? {
-        normalizeOptional(languageHint)
-    }
-
-    var normalizedPrompt: String? {
-        normalizeOptional(transcriptionPrompt)
-    }
-
-    var transcriptionRequest: TranscriptionRequest {
-        TranscriptionRequest(
-            model: preferredModelValue,
-            languageHint: normalizedLanguageHint,
-            prompt: normalizedPrompt,
-            apiBaseURL: openAIBaseURLValue
-        )
-    }
 
 
     var hasAPIKey: Bool {
@@ -1521,10 +1505,6 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    private func normalizeOptional(_ value: String) -> String? {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.isEmpty ? nil : trimmedValue
-    }
 
     private func stringValue(forKey key: String, legacyKeys: [String] = []) -> String? {
         if let value = defaults.string(forKey: key) {
