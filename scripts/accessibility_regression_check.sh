@@ -52,7 +52,7 @@ check_literal \
   '.accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])' \
   'session-library filter selected-state announcement'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/ReviewWorkspaceShell.swift" \
   '.accessibilityAddTraits(.isHeader)' \
   'review workspace section heading announcement'
 check_literal \
@@ -64,11 +64,11 @@ check_literal \
   'Export targets for ' \
   'per-issue export target labeling'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/IssueExportTargetEditors.swift" \
   'GitHub repository for ' \
   'per-issue GitHub repository labeling'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/IssueExportTargetEditors.swift" \
   'Jira project for ' \
   'per-issue Jira project labeling'
 check_literal \
@@ -76,7 +76,7 @@ check_literal \
   '.accessibilityLabel("Session detail")' \
   'session detail scroll area label'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/AISetupSectionsView.swift" \
   'accessibilityLabel: settingsStore.aiProvider.credentialFieldTitle' \
   'settings AI provider credential label'
 check_literal \
@@ -84,7 +84,7 @@ check_literal \
   '.accessibilityLabel("Settings scroll area")' \
   'settings scroll area label'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/SettingsView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Settings/SettingsIntegrationsPanes.swift" \
   '.accessibilityLabel("Jira issue type")' \
   'settings Jira issue type label'
 check_literal \

@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 1.0.40 - 2026-07-09
+
 - [FIX] Clarified the failure paths when starting a system-audio recording — reason-labelled diagnostic logs distinguish the experimental-feature-flag gate, the consent-acknowledgement gate, and macOS TCC audio-capture permission; the TCC failure path now names the exact System Settings pane to open (#856).
 - [FIX] Updated the Settings > Recording Audio > Audio Source hint to name both prerequisites (consent toggle + System Settings > Privacy & Security > Screen & System Audio Recording) so users can preempt the "first-time capture" macOS prompt.
+- [INTERNAL] Updated the accessibility regression guardrail to follow the extracted transcript and settings view files.
 - [INTERNAL] Decomposed `SettingsStore.swift` by 338 lines (1963 → 1625) across seven byte-preserving extension slices — `+Display`, `+DisplayMask`, `+Normalization`, `+Models`, `+Tokens`, `+Placeholders`, `+TranscriptionInput`.
 - [INTERNAL] Extracted `ReviewWorkspaceShell` and `IssueExportTargetEditors` (`IssueGitHubTargetEditor` + `IssueJiraTargetEditor`) from `TranscriptView`, shrinking that file by 239 lines (1882 → 1643).
 - [INTERNAL] Extracted `RawTranscriptSection` from `TranscriptView` into a dedicated view file.
