@@ -7,16 +7,6 @@ enum MicrophonePermissionState: Equatable {
     case restricted
 }
 
-enum MicrophonePermissionStatus: String, Equatable {
-    case notDetermined
-    case granted
-    case denied
-    case restricted
-    case unavailable
-    case captureSetupFailed
-    case unknownError
-}
-
 struct MicrophoneRecoveryGuidance: Equatable {
     let headline: String
     let message: String
