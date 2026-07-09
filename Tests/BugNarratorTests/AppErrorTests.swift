@@ -28,6 +28,14 @@ final class AppErrorTests: XCTestCase {
         XCTAssertEqual(AppError.screenRecordingPermissionDenied.recoveryHeadline, "Screen recording access is blocked.")
     }
 
+    func testSystemAudioUnavailableUsesSystemAudioRecoveryPresentation() {
+        let error = AppError.systemAudioUnavailable("No audio frames were captured.")
+
+        XCTAssertEqual(error.statusTitle, "System Audio Unavailable")
+        XCTAssertEqual(error.recoveryHeadline, "System audio capture is unavailable.")
+        XCTAssertTrue(error.suggestsSystemAudioPrivacySettings)
+    }
+
     func testStorageFailureGivesActionableRecoveryGuidance() {
         let error = AppError.storageFailure("Disk full")
 

@@ -184,7 +184,7 @@ final class SystemAudioRecorder: AudioRecording {
         }.value
     }
 
-    private nonisolated static func validateRecordedAudioFileSynchronously(at url: URL) throws {
+    nonisolated static func validateRecordedAudioFileSynchronously(at url: URL) throws {
         let attributes: [FileAttributeKey: Any]
 
         do {
@@ -195,19 +195,23 @@ final class SystemAudioRecorder: AudioRecording {
 
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
         guard fileSize > 0 else {
-            throw AppError.recordingFailure("The recorded system audio file was empty.")
+            throw AppError.systemAudioUnavailable(noCapturedSystemAudioMessage())
         }
 
         do {
             let audioFile = try AVAudioFile(forReading: url)
             guard audioFile.fileFormat.sampleRate > 0, audioFile.length > 0 else {
-                throw AppError.recordingFailure("The recorded system audio file did not contain playable audio.")
+                throw AppError.systemAudioUnavailable(noCapturedSystemAudioMessage())
             }
         } catch let error as AppError {
             throw error
         } catch {
             throw AppError.recordingFailure("The recorded system audio file could not be read.")
         }
+    }
+
+    private nonisolated static func noCapturedSystemAudioMessage() -> String {
+        "System audio capture started but produced no audio frames. If you meant to record your voice, switch Settings > Audio > Audio Source to Mic only. If you meant to record app or meeting audio, confirm the app is playing audio and enable BugNarrator under System Settings > Privacy & Security > Screen & System Audio Recording."
     }
 
     private func makeRecoverableRecordingURL() -> URL {
@@ -268,4 +272,3 @@ private extension DispatchQueue {
         }
     }
 }
-

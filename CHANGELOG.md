@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
+
 ## 1.0.40 - 2026-07-09
 
 - [FIX] Clarified the failure paths when starting a system-audio recording — reason-labelled diagnostic logs distinguish the experimental-feature-flag gate, the consent-acknowledgement gate, and macOS TCC audio-capture permission; the TCC failure path now names the exact System Settings pane to open (#856).

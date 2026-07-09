@@ -37,6 +37,24 @@ final class SystemAudioFileWriterTests: XCTestCase {
         XCTAssertNoThrow(try writer.close())
     }
 
+    func testZeroFrameSystemAudioFileSurfacesSystemAudioRecoveryGuidance() throws {
+        let fileURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let writer = try SystemAudioFileWriter(fileURL: fileURL, format: makeFormat())
+        try writer.close()
+
+        XCTAssertThrowsError(try SystemAudioRecorder.validateRecordedAudioFileSynchronously(at: fileURL)) { error in
+            guard case let AppError.systemAudioUnavailable(message) = error else {
+                return XCTFail("Expected systemAudioUnavailable, got \(error).")
+            }
+
+            XCTAssertTrue(message.contains("produced no audio frames"))
+            XCTAssertTrue(message.contains("Audio Source to Mic only"))
+            XCTAssertTrue(message.contains("Screen & System Audio Recording"))
+        }
+    }
+
     func testMarkFormatInvalidatedThenCloseThrowsRecordingFailure() throws {
         let fileURL = makeTempURL()
         defer { try? FileManager.default.removeItem(at: fileURL) }

@@ -185,26 +185,28 @@ struct RecordingControlPanelView: View {
     }
 
     private var footerMessage: String {
+        let source = appState.settingsStore.recordingAudioSource.title
+
         if appState.status.phase != .recording && appState.needsAPIKeySetup {
             let provider = appState.settingsStore.aiProvider
             if provider.requiresAPIKey {
-                return "Add and validate your \(provider.displayName) API key before recording so the session can be transcribed."
+                return "Recording source: \(source). Add and validate your \(provider.displayName) API key before recording so the session can be transcribed."
             }
-            return "Finish \(provider.displayName) setup before recording so the session can be transcribed."
+            return "Recording source: \(source). Finish \(provider.displayName) setup before recording so the session can be transcribed."
         }
 
         if appState.status.phase == .recording && appState.needsAPIKeySetup {
             let provider = appState.settingsStore.aiProvider
             if provider.requiresAPIKey {
-                return "You can keep recording without an API key. Add your \(provider.displayName) key in Settings before stopping if you want transcription."
+                return "Recording source: \(source). You can keep recording without an API key. Add your \(provider.displayName) key in Settings before stopping if you want transcription."
             }
-            return "You can keep recording without finishing \(provider.displayName) setup. Open Settings before stopping if you want transcription."
+            return "Recording source: \(source). You can keep recording without finishing \(provider.displayName) setup. Open Settings before stopping if you want transcription."
         }
 
         if appState.settingsStore.aiProvider == .parakeetLocal && appState.status.phase != .recording {
-            return "Transcription will use the local Parakeet server. Make sure it is running before you stop recording."
+            return "Recording source: \(source). Transcription will use the local Parakeet server. Make sure it is running before you stop recording."
         }
-        return "The controls stay open until you close them."
+        return "Recording source: \(source). The controls stay open until you close them."
     }
 
     private var canStartSession: Bool {
@@ -316,6 +318,8 @@ struct RecordingControlPanelView: View {
         switch appState.currentError {
         case .microphonePermissionDenied, .microphonePermissionRestricted, .screenRecordingPermissionDenied:
             return true
+        case let error? where error.suggestsSystemAudioSettings || error.suggestsSystemAudioPrivacySettings:
+            return true
         case let error?:
             return error.suggestsProviderSettings(for: appState.settingsStore.aiProvider)
         case nil:
@@ -335,6 +339,18 @@ struct RecordingControlPanelView: View {
         case .screenRecordingPermissionDenied:
             Button("Open Screen Recording Settings") {
                 appState.openScreenRecordingPrivacySettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case let error? where error.suggestsSystemAudioSettings:
+            Button("Open Settings") {
+                appState.openSettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case let error? where error.suggestsSystemAudioPrivacySettings:
+            Button("Open Screen & System Audio Settings") {
+                appState.openSystemAudioPrivacySettings()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
