@@ -166,6 +166,7 @@ final class AppState: ObservableObject {
         let recordingStatusMessages = RecordingStatusMessageProvider {
             RecordingStatusMessageSnapshot(
                 audioSource: settingsStore.recordingAudioSource,
+                aiProvider: settingsStore.aiProvider,
                 hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
                 aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
                 autoExtractIssues: settingsStore.autoExtractIssues,
@@ -657,7 +658,7 @@ final class AppState: ObservableObject {
             }
 
             postTranscriptionStatusPresenter.presentUploadProgress()
-            recordingSessionController.swapActivity(reason: "Uploading audio for transcription")
+            recordingSessionController.swapActivity(reason: "Transcribing recorded audio")
 
             let transcriptionResult = try await transcriptionClient.transcribe(
                 fileURL: recordedAudio.fileURL,
