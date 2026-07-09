@@ -586,152 +586,19 @@ struct TranscriptView: View {
     }
 
     private func reviewWorkspace(for session: TranscriptSession, availableWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            workspaceHeader(session, availableWidth: availableWidth)
-            dividerSection
-            workspaceActions(session, availableWidth: availableWidth)
-            dividerSection
-            workspaceSections(for: session, availableWidth: availableWidth)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func workspaceHeader(_ session: TranscriptSession, availableWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(session.title)
-                .font(availableWidth < 360 ? .title3.weight(.semibold) : .title2.weight(.semibold))
-
-            Text(sessionMetadataLine(for: session))
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-            if session.requiresTranscriptionRetry {
-                HStack(alignment: .center, spacing: 10) {
-                    Label(
-                        session.transcriptionRetryMessage(for: appState.settingsStore.aiProvider) ?? defaultRetryRecoveryMessage,
-                        systemImage: "arrow.clockwise.circle"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    if appState.needsAPIKeySetup {
-                        Button("Open Settings") {
-                            appState.openSettings()
-                        }
-                        .buttonStyle(.bordered)
-                    } else {
-                        Button("Retry Transcription") {
-                            Task {
-                                await appState.retryPendingTranscription(for: session.id)
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                }
-            } else if appState.isUnsaved(session.id) {
-                HStack(spacing: 10) {
-                    Label("Only stored in memory until you save it.", systemImage: "tray")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Button("Save to History") {
-                        appState.saveCurrentTranscriptToHistory()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            } else if appState.isActiveRecordingSession(session.id) {
-                HStack(spacing: 10) {
-                    Label("Recording is active", systemImage: "record.circle.fill")
-                        .foregroundStyle(.red)
-
-                    Text(recordingTimer.elapsedTimeString)
-                        .font(.system(.footnote, design: .monospaced))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Button("Open Recording Controls") {
-                        appState.openRecordingControls()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                .font(.footnote)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-    }
-
-    private func sessionMetadataLine(for session: TranscriptSession) -> String {
-        "\(session.createdAt.formatted(date: .abbreviated, time: .shortened)) • \(ElapsedTimeFormatter.string(from: session.duration)) • \(session.model)"
-    }
-
-    private func workspaceActions(_ session: TranscriptSession, availableWidth: CGFloat) -> some View {
-        Group {
-            if availableWidth < 420 {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        extractIssuesButton(for: session)
-                        copyTranscriptButton(for: session)
-                    }
-
-                    exportMenu(session: session)
-                }
-            } else {
-                HStack(alignment: .center, spacing: 10) {
-                    extractIssuesButton(for: session)
-                    copyTranscriptButton(for: session)
-
-                    Spacer(minLength: 12)
-
-                    exportMenu(session: session)
-                }
-            }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    private func workspaceSections(for session: TranscriptSession, availableWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            reviewSectionCard("Review Summary") {
-                reviewSummarySection(session)
-            }
-
-            if !session.transcriptQualityFindings.isEmpty {
-                reviewSectionCard("Transcript Quality") {
-                    TranscriptQualityFindingsView(findings: session.transcriptQualityFindings)
-                }
-            }
-
-            reviewSectionCard("Extracted Issues") {
-                extractedIssuesSection(session, availableWidth: availableWidth)
-            }
-
-            if session.issueExtraction == nil {
-                reviewSectionCard("Screenshots") {
-                    screenshotsSection(session, availableWidth: availableWidth)
-                }
-            }
-
-            reviewSectionCard("Transcript Timeline") {
-                RawTranscriptSection(session: session, availableWidth: availableWidth, appState: appState)
-            }
-        }
+        ReviewWorkspaceShell(
+            session: session,
+            availableWidth: availableWidth,
+            appState: appState,
+            recordingTimer: recordingTimer,
+            defaultRetryRecoveryMessage: defaultRetryRecoveryMessage,
+            extractIssuesButton: { extractIssuesButton(for: session) },
+            copyTranscriptButton: { copyTranscriptButton(for: session) },
+            exportMenu: { exportMenu(session: session) },
+            reviewSummarySection: { reviewSummarySection(session) },
+            extractedIssuesSection: { extractedIssuesSection(session, availableWidth: availableWidth) },
+            screenshotsSection: { screenshotsSection(session, availableWidth: availableWidth) }
+        )
     }
 
     @ViewBuilder
