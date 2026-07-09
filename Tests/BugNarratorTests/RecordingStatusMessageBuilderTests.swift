@@ -193,6 +193,27 @@ final class RecordingStatusMessageBuilderTests: XCTestCase {
         )
     }
 
+    func testProviderBuildsParakeetTranscriptionProgressWithoutOpenAI() {
+        let provider = RecordingStatusMessageProvider {
+            RecordingStatusMessageSnapshot(
+                audioSource: .microphone,
+                aiProvider: .parakeetLocal,
+                hasUsableAIProviderCredential: true,
+                aiProviderCompatibilityIssue: nil,
+                autoExtractIssues: false,
+                autoCopyTranscript: false
+            )
+        }
+
+        let message = provider.transcriptionUploadProgressMessage()
+
+        XCTAssertEqual(
+            message,
+            "Step 1 of 2: Sending audio to the local Parakeet server for transcription..."
+        )
+        XCTAssertFalse(message.localizedCaseInsensitiveContains("OpenAI"))
+    }
+
     @MainActor
     func testPostTranscriptionStatusPresenterPresentsProgressStatuses() {
         let harness = makePostTranscriptionStatusPresenter(autoExtractIssues: true)

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Made the recording-controls transcription progress copy provider-aware, so Local (Parakeet) sessions no longer claim audio is being uploaded to OpenAI.
 - [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
 
 ## 1.0.40 - 2026-07-09

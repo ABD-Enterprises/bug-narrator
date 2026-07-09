@@ -3,6 +3,7 @@ import Foundation
 
 struct RecordingStatusMessageSnapshot: Equatable {
     var audioSource: RecordingAudioSource
+    var aiProvider: AIProvider = .openAI
     var hasUsableAIProviderCredential: Bool
     var aiProviderCompatibilityIssue: String?
     var autoExtractIssues: Bool
@@ -38,7 +39,12 @@ final class RecordingStatusMessageProvider {
     }
 
     func transcriptionUploadProgressMessage() -> String {
-        transcriptionProgressMessage(step: 1, action: "Uploading audio to OpenAI for transcription...")
+        let snapshot = snapshot()
+        return RecordingStatusMessageBuilder.transcriptionProgressMessage(
+            step: 1,
+            action: transcriptionUploadAction(for: snapshot.aiProvider),
+            autoExtractIssues: snapshot.autoExtractIssues
+        )
     }
 
     func transcriptionRetryProgressMessage() -> String {
@@ -59,6 +65,19 @@ final class RecordingStatusMessageProvider {
             autoExtractIssues: snapshot.autoExtractIssues,
             autoCopyTranscript: snapshot.autoCopyTranscript
         )
+    }
+
+    private func transcriptionUploadAction(for provider: AIProvider) -> String {
+        switch provider {
+        case .openAI:
+            return "Uploading audio to OpenAI for transcription..."
+        case .openAICompatible:
+            return "Uploading audio to the OpenAI-compatible provider for transcription..."
+        case .localCompatible:
+            return "Sending audio to the local-compatible transcription endpoint..."
+        case .parakeetLocal:
+            return "Sending audio to the local Parakeet server for transcription..."
+        }
     }
 }
 
