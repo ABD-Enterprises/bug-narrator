@@ -316,9 +316,6 @@ final class SettingsStore: ObservableObject {
         openAtStartupSupported
     }
 
-    var trimmedAPIKey: String {
-        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     var hotkeyAssignments: [(action: HotkeyAction, shortcut: HotkeyShortcut)] {
         [
@@ -637,13 +634,6 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    var trimmedGitHubToken: String {
-        githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var hasGitHubToken: Bool {
-        !trimmedGitHubToken.isEmpty
-    }
 
     var gitHubRepositoryDiscoveryIsReady: Bool {
         credentialIsAvailableForUserAction(
@@ -660,13 +650,6 @@ final class SettingsStore: ObservableObject {
             !normalizedGitHubRepositoryName.isEmpty
     }
 
-    var githubDefaultLabelsList: [String] {
-        githubDefaultLabels
-            .split(whereSeparator: \.isNewline)
-            .flatMap { $0.split(separator: ",") }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
 
     var githubExportConfiguration: GitHubExportConfiguration? {
         let configuration = GitHubExportConfiguration(
@@ -680,13 +663,6 @@ final class SettingsStore: ObservableObject {
         return configuration.isComplete ? configuration : nil
     }
 
-    var trimmedJiraAPIToken: String {
-        jiraAPIToken.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var hasJiraAPIToken: Bool {
-        !trimmedJiraAPIToken.isEmpty
-    }
 
 
 
