@@ -12,56 +12,9 @@ final class SettingsStore: ObservableObject {
         "com.abdenterprises.sessionmic"
     ]
 
-    private static let openAITranscriptionModel = "whisper-1"
+    static let openAITranscriptionModel = "whisper-1"
     private static let defaultLanguageHint = "en"
-    private static let parakeetTranscriptionModel = "parakeet-tdt-0.6b-v3"
-    private static let openAIIssueExtractionModel = "gpt-4.1-mini"
-    private static let openAITranscriptionModelChoices = [
-        AIModelChoice(
-            id: "whisper-1",
-            title: "Whisper",
-            detail: "Stable default"
-        ),
-        AIModelChoice(
-            id: "gpt-4o-mini-transcribe",
-            title: "GPT-4o mini Transcribe",
-            detail: "Lower cost, newer speech-to-text"
-        ),
-        AIModelChoice(
-            id: "gpt-4o-transcribe",
-            title: "GPT-4o Transcribe",
-            detail: "Higher accuracy speech-to-text"
-        ),
-        AIModelChoice(
-            id: "gpt-4o-transcribe-diarize",
-            title: "GPT-4o Transcribe Diarize",
-            detail: "Adds speaker labels"
-        )
-    ]
-    private static let parakeetTranscriptionModelChoices = [
-        AIModelChoice(
-            id: parakeetTranscriptionModel,
-            title: "Parakeet TDT 0.6B v3",
-            detail: "Local transcription server"
-        )
-    ]
-    private static let openAIIssueExtractionModelChoices = [
-        AIModelChoice(
-            id: "gpt-4.1-mini",
-            title: "GPT-4.1 mini",
-            detail: "Recommended default"
-        ),
-        AIModelChoice(
-            id: "gpt-4.1-nano",
-            title: "GPT-4.1 nano",
-            detail: "Fastest and lowest cost"
-        ),
-        AIModelChoice(
-            id: "gpt-4.1",
-            title: "GPT-4.1",
-            detail: "Higher quality issue extraction"
-        )
-    ]
+    static let openAIIssueExtractionModel = "gpt-4.1-mini"
 
     private let logger = DiagnosticsLogger(category: .settings)
 
@@ -560,10 +513,6 @@ final class SettingsStore: ObservableObject {
             + "unless this is a trusted local server."
     }
 
-    var preferredModelValue: String {
-        Self.normalizedTranscriptionModel(preferredModel, for: aiProvider)
-    }
-
     var normalizedLanguageHint: String? {
         normalizeOptional(languageHint)
     }
@@ -579,18 +528,6 @@ final class SettingsStore: ObservableObject {
             prompt: normalizedPrompt,
             apiBaseURL: openAIBaseURLValue
         )
-    }
-
-    var issueExtractionModelValue: String {
-        Self.normalizedIssueExtractionModel(issueExtractionModel, for: aiProvider)
-    }
-
-    var transcriptionModelChoices: [AIModelChoice] {
-        Self.transcriptionModelChoices(for: aiProvider)
-    }
-
-    var issueExtractionModelChoices: [AIModelChoice] {
-        Self.issueExtractionModelChoices(for: aiProvider)
     }
 
     var supportsIssueExtraction: Bool {
@@ -864,52 +801,6 @@ final class SettingsStore: ObservableObject {
 
         load()
         hasLoaded = true
-    }
-
-    private static func transcriptionModelChoices(for provider: AIProvider) -> [AIModelChoice] {
-        switch provider {
-        case .openAI:
-            return openAITranscriptionModelChoices
-        case .parakeetLocal:
-            return parakeetTranscriptionModelChoices
-        case .openAICompatible, .localCompatible:
-            return []
-        }
-    }
-
-    private static func issueExtractionModelChoices(for provider: AIProvider) -> [AIModelChoice] {
-        switch provider {
-        case .openAI:
-            return openAIIssueExtractionModelChoices
-        case .openAICompatible, .localCompatible, .parakeetLocal:
-            return []
-        }
-    }
-
-    private static func normalizedTranscriptionModel(_ rawValue: String, for provider: AIProvider) -> String {
-        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        switch provider {
-        case .openAI:
-            let allowedModels = Set(openAITranscriptionModelChoices.map(\.id))
-            return allowedModels.contains(value) ? value : openAITranscriptionModel
-        case .parakeetLocal:
-            return parakeetTranscriptionModel
-        case .openAICompatible, .localCompatible:
-            return value.isEmpty ? openAITranscriptionModel : value
-        }
-    }
-
-    private static func normalizedIssueExtractionModel(_ rawValue: String, for provider: AIProvider) -> String {
-        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        switch provider {
-        case .openAI:
-            let allowedModels = Set(openAIIssueExtractionModelChoices.map(\.id))
-            return allowedModels.contains(value) ? value : openAIIssueExtractionModel
-        case .openAICompatible, .localCompatible, .parakeetLocal:
-            return value.isEmpty ? openAIIssueExtractionModel : value
-        }
     }
 
     private func normalizeTranscriptionModelForCurrentProvider(persist: Bool) {
