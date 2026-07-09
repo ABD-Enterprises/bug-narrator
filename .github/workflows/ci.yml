@@ -76,6 +76,60 @@ jobs:
           git fetch --no-tags --depth=1 origin "${{ steps.base.outputs.ref }}"
           ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
 
+  # Probe (#868, first slice of the org-runner migration): dual-run the runtime
+  # guardrails validator on the org's self-hosted `[self-hosted, Linux, ARM64]`
+  # runner (`docker-linux-arm64-orc-studio-macbookprom5`) alongside the existing
+  # `runtime-guardrails` job on `ubuntu-latest`. Marked `continue-on-error: true`
+  # so a probe failure does NOT block PR merges while we observe. Uploads
+  # `artifacts/validation/*.txt` so we can inspect what pass/skip states the
+  # probe produced (semgrep docker vs. local fallback, gh-CLI availability for
+  # effort-leak-audit, etc.). Delete this job in the follow-up flip PR once the
+  # probe is proven green on 2+ consecutive PRs.
+  runtime-guardrails-linux-probe:
+    # Runs unconditionally to match the source `runtime-guardrails` job's
+    # coverage — otherwise a scripts-only or root-config PR would exercise
+    # `runtime-guardrails` but skip the probe, leaving the flip-PR without
+    # parity evidence for that PR shape.
+    runs-on: [self-hosted, Linux, ARM64]
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Resolve base ref
+        id: base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run runtime guardrails validator (probe)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ steps.base.outputs.ref }}"
+          ./scripts/validate.sh "${{ steps.base.outputs.ref }}"
+
+      - name: Upload validation status artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-guardrails-linux-probe-artifacts
+          path: artifacts/validation/
+          if-no-files-found: warn
+          retention-days: 7
+
   docs-site-validation:
     needs:
       - detect-ci-changes
