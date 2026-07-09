@@ -271,6 +271,7 @@
 		D2AEB3EA7C80F6B47D0193C5 /* SimilarIssueReviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBF2173AAF872E97F8645F4 /* SimilarIssueReviewService.swift */; };
 		D45CDD4575F06E502855F652 /* MicrophonePermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFEDE046F0F85BBC5DD5D7D7 /* MicrophonePermissionService.swift */; };
 		D687F22809BF99AF4D202C1E /* SettingsReadinessTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05CD611B03D4E8792F7CD35 /* SettingsReadinessTypes.swift */; };
+		D726FDF0E6E8E4600ECDEC63 /* SettingsStore+Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90A1DC62D67ECDE64E5F8A17 /* SettingsStore+Models.swift */; };
 		D759CEA88F50769454691AFC /* SettingsIntegrationsPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4DEAD3D9703348B84229AC /* SettingsIntegrationsPanes.swift */; };
 		D7D868701BE0B53E59DD6DFD /* TranscriptQualityFindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC896693FCB08C685103A65B /* TranscriptQualityFindingTests.swift */; };
 		D8438A30A02978B808CE9040 /* IssueExtractionCompletionLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6D695E380D1F9B3D04BD68 /* IssueExtractionCompletionLog.swift */; };
@@ -525,6 +526,7 @@
 		8FB75074747EE722764CC071 /* IssueExportPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportPresenters.swift; sourceTree = "<group>"; };
 		90290C4DCECF33FD204DE2ED /* MenuProductInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuProductInfoView.swift; sourceTree = "<group>"; };
 		90525B5087DEF339430AF999 /* ApplicationTerminationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationController.swift; sourceTree = "<group>"; };
+		90A1DC62D67ECDE64E5F8A17 /* SettingsStore+Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStore+Models.swift"; sourceTree = "<group>"; };
 		92CFBCD444BCD3791FE18E77 /* AppState+PermissionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+PermissionRecovery.swift"; sourceTree = "<group>"; };
 		92D924BFCEE1A248BC6FEED6 /* ScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
 		93A78A37219AC79F3307E725 /* DiagnosticsRedactor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactor.swift; sourceTree = "<group>"; };
@@ -961,6 +963,7 @@
 				2ED768FCA5D58A5E78F24A8D /* SettingsStore.swift */,
 				606C8CCD0B75F5DF182C5033 /* SettingsStore+Display.swift */,
 				5387A1EF0439835D2E0B2AAF /* SettingsStore+DisplayMask.swift */,
+				90A1DC62D67ECDE64E5F8A17 /* SettingsStore+Models.swift */,
 				140D8ACAC9A9E1AE17181482 /* SettingsStore+Normalization.swift */,
 				1EBF2173AAF872E97F8645F4 /* SimilarIssueReviewService.swift */,
 				EECE1E25C090853C38690595 /* SupportDataController.swift */,
@@ -1467,6 +1470,7 @@
 				D687F22809BF99AF4D202C1E /* SettingsReadinessTypes.swift in Sources */,
 				A12389B77FFD220995DDA0A4 /* SettingsStore+Display.swift in Sources */,
 				F4EA3CE8F9D57A67DDB2937D /* SettingsStore+DisplayMask.swift in Sources */,
+				D726FDF0E6E8E4600ECDEC63 /* SettingsStore+Models.swift in Sources */,
 				A6DB23AB06C7D8F3169B3540 /* SettingsStore+Normalization.swift in Sources */,
 				DFEC8A8B12366B1CC1ECF429 /* SettingsStore.swift in Sources */,
 				134C2EC9233BF9A86E58B933 /* SettingsView.swift in Sources */,
