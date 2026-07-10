@@ -214,6 +214,7 @@
 		A29BE3EF9236161E2E8713CD /* PrivacyDataExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D1FA8DAF455B144969DFA6 /* PrivacyDataExporter.swift */; };
 		A2C76BB4E680144BF1CE9586 /* PostTranscriptionPipelineTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3D789DB36F39ADB7CC2A79 /* PostTranscriptionPipelineTypes.swift */; };
 		A2E710E8AA18115FD2B9C352 /* TranscriptionRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C79C7B495FC353122C29F0B /* TranscriptionRecoveryController.swift */; };
+		A386A52717B012400A5E4F09 /* GitHubExportProvider+WireTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */; };
 		A3FC17F4DF726FA6ACD2D125 /* IssueExportTargetEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEE7BE23DD7A74982179B08 /* IssueExportTargetEditors.swift */; };
 		A4732193A022678F45A3BCFC /* TransientToastControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3AE33EE76F55AE456924849 /* TransientToastControllerTests.swift */; };
 		A4E7DAB84ECCC217C655A67C /* TranscriptSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58645DF704D4244897938E77 /* TranscriptSectionTests.swift */; };
@@ -429,6 +430,7 @@
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
 		48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		4A9D6C752334532E660C00AF /* StorageRecoveryBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageRecoveryBanner.swift; sourceTree = "<group>"; };
+		4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+WireTypes.swift"; sourceTree = "<group>"; };
 		4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatter.swift; sourceTree = "<group>"; };
 		4C809A64CE202980AFC55953 /* PostTranscriptionResultHandlers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionResultHandlers.swift; sourceTree = "<group>"; };
 		4D566BDB865CF9FF245BB283 /* IssueExportTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportTestSupport.swift; sourceTree = "<group>"; };
@@ -922,6 +924,7 @@
 				DC8C8AA3B4EEED739F198572 /* ExportReceiptStore.swift */,
 				7322F6B6A58542DEDFC76CCA /* ExportService.swift */,
 				2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */,
+				4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */,
 				6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */,
 				6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */,
 				BA49B2B79731E3A62B083174 /* IssueExportController.swift */,
@@ -1390,6 +1393,7 @@
 				5839C40FC99D94A9C910A218 /* ExportReviewSheet.swift in Sources */,
 				5E539B43126F28E1607B5FC8 /* ExportService.swift in Sources */,
 				BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */,
+				A386A52717B012400A5E4F09 /* GitHubExportProvider+WireTypes.swift in Sources */,
 				2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */,
 				6F50D0E752BEA3CECA1517A4 /* HotkeyAction.swift in Sources */,
 				8CF257839BEA4B0681BEA508 /* HotkeyManager.swift in Sources */,
