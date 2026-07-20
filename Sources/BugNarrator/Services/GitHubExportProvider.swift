@@ -258,10 +258,6 @@ actor GitHubExportProvider {
 
 
 
-    /// Neutralizes untrusted (LLM-derived) text so it renders as literal content
-    /// in a GitHub Markdown issue body: it cannot trigger `@mentions` or `#issue`
-    /// cross-links, inject raw HTML, or start new block-level structure
-    /// (headings, quotes, lists, tables, code fences).
 
 
     /// Creates one issue with bounded retry. Transient failures (network / 5xx /

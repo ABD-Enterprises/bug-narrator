@@ -1,6 +1,10 @@
 import Foundation
 
 extension GitHubExportProvider {
+    /// Neutralizes untrusted (LLM-derived) text so it renders as literal content
+    /// in a GitHub Markdown issue body: it cannot trigger `@mentions` or `#issue`
+    /// cross-links, inject raw HTML, or start new block-level structure
+    /// (headings, quotes, lists, tables, code fences).
     static func neutralizingUntrustedMarkdown(_ text: String) -> String {
         let lines = text.components(separatedBy: "\n").map { line -> String in
             var escaped = line
