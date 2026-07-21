@@ -6,25 +6,45 @@ struct TranscriptView: View {
     @ObservedObject var recordingTimer: RecordingTimerViewModel
     @ObservedObject var transcriptStore: TranscriptStore
 
+    @StateObject private var libraryVM: SessionLibraryViewModel
+
     @State private var exportErrorMessage: String?
     @State private var pendingDeletionIDs: Set<UUID> = []
     @State private var showDeletionConfirmation = false
-    @State private var searchText = ""
-    @State private var sortOrder: SessionLibrarySortOrder = .newestFirst
-    @State private var selectedFilter: SessionLibraryDateFilter = .today
-    @State private var customStartDate = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
-    @State private var customEndDate = Date()
-    @State private var hasResolvedInitialFilter = false
 
     private let exporter = TranscriptExporter()
-    private let calendar = Calendar.current
+
+    init(
+        appState: AppState,
+        recordingTimer: RecordingTimerViewModel,
+        transcriptStore: TranscriptStore
+    ) {
+        self.appState = appState
+        self.recordingTimer = recordingTimer
+        self.transcriptStore = transcriptStore
+        _libraryVM = StateObject(
+            wrappedValue: SessionLibraryViewModel(
+                appState: appState,
+                transcriptStore: transcriptStore
+            )
+        )
+    }
+
+    private var sidebarView: SessionListSidebar {
+        SessionListSidebar(
+            appState: appState,
+            transcriptStore: transcriptStore,
+            viewModel: libraryVM,
+            requestDeletion: { requestDeletion(for: $0) }
+        )
+    }
 
     var body: some View {
         NavigationSplitView {
-            sidebar
+            sidebarView.sidebar
                 .navigationSplitViewColumnWidth(min: 210, ideal: 232, max: 260)
         } content: {
-            sessionListColumn
+            sidebarView.sessionListColumn
                 .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 420)
         } detail: {
             detailPane
@@ -34,11 +54,11 @@ struct TranscriptView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive) {
-                    requestDeletion(for: selectedSession.map { Set([$0.id]) } ?? [])
+                    requestDeletion(for: libraryVM.selectedSession.map { Set([$0.id]) } ?? [])
                 } label: {
                     Label("Delete Session", systemImage: "trash")
                 }
-                .disabled(selectedSession == nil)
+                .disabled(libraryVM.selectedSession == nil)
             }
         }
         .alert(deletionAlertTitle, isPresented: $showDeletionConfirmation) {
@@ -65,123 +85,42 @@ struct TranscriptView: View {
             exportReviewSheet(review)
         }
         .onAppear {
-            resolveInitialFilterIfNeeded()
-            syncSelection()
+            libraryVM.resolveInitialFilterIfNeeded()
+            libraryVM.syncSelection()
             Task {
                 await appState.refreshExportHistory()
             }
         }
-        .onChange(of: selectedFilter) { _, _ in
-            syncSelection()
+        .onChange(of: libraryVM.selectedFilter) { _, _ in
+            libraryVM.syncSelection()
         }
-        .onChange(of: searchText) { _, _ in
-            syncSelection()
+        .onChange(of: libraryVM.searchText) { _, _ in
+            libraryVM.syncSelection()
         }
-        .onChange(of: sortOrder) { _, _ in
-            syncSelection()
+        .onChange(of: libraryVM.sortOrder) { _, _ in
+            libraryVM.syncSelection()
         }
-        .onChange(of: customStartDate) { _, _ in
-            selectedFilter = .customRange
-            syncSelection()
+        .onChange(of: libraryVM.customStartDate) { _, _ in
+            libraryVM.selectedFilter = .customRange
+            libraryVM.syncSelection()
         }
-        .onChange(of: customEndDate) { _, _ in
-            selectedFilter = .customRange
-            syncSelection()
+        .onChange(of: libraryVM.customEndDate) { _, _ in
+            libraryVM.selectedFilter = .customRange
+            libraryVM.syncSelection()
         }
-        .onChange(of: sessionIDSignature) { _, _ in
-            resolveInitialFilterIfNeeded()
-            syncSelection()
+        .onChange(of: libraryVM.sessionIDSignature) { _, _ in
+            libraryVM.resolveInitialFilterIfNeeded()
+            libraryVM.syncSelection()
         }
     }
 
-    private var sidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Session Library")
-                        .font(.title3.weight(.semibold))
 
-                    Text("A durable archive for recorded feedback sessions, summaries, screenshots, and extracted issues.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(SessionLibraryDateFilter.allCases) { filter in
-                        filterButton(for: filter)
-                    }
-                }
-
-                if selectedFilter == .customRange {
-                    customRangeSection
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(16)
-        }
-        .accessibilityLabel("Session filters")
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private var sessionListColumn: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sessionListHeader
-            storageRecoveryBanner
-            pendingTranscriptionBanner
-
-            if let emptyState {
-                ContentUnavailableView {
-                    Label(emptyState.title, systemImage: emptyState.systemImage)
-                } description: {
-                    Text(emptyState.description)
-                } actions: {
-                    if emptyState == .noSearchResults {
-                        Button("Clear Search") {
-                            searchText = ""
-                        }
-                    } else if selectedFilter != .allSessions {
-                        Button("Show All Sessions") {
-                            selectedFilter = .allSessions
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: selectionBinding) {
-                    ForEach(filteredEntries) { entry in
-                        SessionRow(entry: entry, appState: appState, transcriptStore: transcriptStore)
-                            .tag(Optional(entry.id))
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                            .listRowBackground(Color.clear)
-                            .contextMenu {
-                                Button("Copy Transcript") {
-                                    appState.selectedTranscriptID = entry.id
-                                    appState.copyDisplayedTranscript()
-                                }
-
-                                Divider()
-
-                                Button("Delete Session", role: .destructive) {
-                                    requestDeletion(for: Set([entry.id]))
-                                }
-                            }
-                    }
-                }
-                .listStyle(.plain)
-                .accessibilityLabel("Session list")
-            }
-        }
-        .padding(16)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
 
     private var detailPane: some View {
         Group {
-            if let selectedSession {
+            if let selectedSession = libraryVM.selectedSession {
                 transcriptDetail(for: selectedSession)
-            } else if allSessions.isEmpty, appState.needsAPIKeySetup {
+            } else if libraryVM.allSessions.isEmpty, appState.needsAPIKeySetup {
                 ContentUnavailableView {
                     Label(emptyLibrarySetupTitle, systemImage: emptyLibrarySetupSymbol)
                 } description: {
@@ -191,7 +130,7 @@ struct TranscriptView: View {
                         appState.openSettings()
                     }
                 }
-            } else if allSessions.isEmpty {
+            } else if libraryVM.allSessions.isEmpty {
                 ContentUnavailableView {
                     Label("No sessions yet", systemImage: "waveform")
                 } description: {
@@ -201,7 +140,7 @@ struct TranscriptView: View {
                         appState.openRecordingControls()
                     }
                 }
-            } else if let emptyState {
+            } else if let emptyState = libraryVM.emptyState {
                 ContentUnavailableView {
                     Label(emptyState.title, systemImage: emptyState.systemImage)
                 } description: {
@@ -218,184 +157,12 @@ struct TranscriptView: View {
         .background(Color(nsColor: .textBackgroundColor))
     }
 
-    private var sessionListHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(selectedFilter.rawValue)
-                        .font(.title3.weight(.semibold))
 
-                    Text(sessionCountSummary)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
 
-                Spacer()
 
-                sortMenu
-            }
 
-            HStack(spacing: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
 
-                    TextField("Search title, transcript, or summary", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .accessibilityLabel("Search sessions")
-                        .accessibilityIdentifier("session-library-search-field")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                if !searchText.isEmpty {
-                    Button("Clear") {
-                        searchText = ""
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityLabel("Clear search")
-                }
-
-                Button(role: .destructive) {
-                    requestDeletion(for: selectedSession.map { Set([$0.id]) } ?? [])
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                .disabled(selectedSession == nil)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var pendingTranscriptionBanner: some View {
-        if transcriptStore.pendingTranscriptionSessionCount > 0 {
-            PendingTranscriptionBanner(
-                count: transcriptStore.pendingTranscriptionSessionCount,
-                requiresProviderSetup: appState.needsAPIKeySetup,
-                provider: appState.settingsStore.aiProvider,
-                openLatest: openLatestPendingTranscriptionSession,
-                openSettings: appState.openSettings
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var storageRecoveryBanner: some View {
-        if let message = appState.storageRecoveryMessage {
-            StorageRecoveryBanner(message: message)
-        }
-    }
-
-    private var sortMenu: some View {
-        VStack(alignment: .trailing, spacing: 6) {
-            Text("Sort")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Menu {
-                ForEach(SessionLibrarySortOrder.allCases) { order in
-                    Button {
-                        sortOrder = order
-                    } label: {
-                        if order == sortOrder {
-                            Label(order.rawValue, systemImage: "checkmark")
-                        } else {
-                            Text(order.rawValue)
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(sortOrder.rawValue)
-                        .lineLimit(1)
-
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityLabel("Sort sessions")
-            .accessibilityValue(sortOrder.rawValue)
-        }
-    }
-
-    private var customRangeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Custom Date Range")
-                .font(.subheadline.weight(.semibold))
-
-            DatePicker("Start", selection: $customStartDate, displayedComponents: .date)
-                .datePickerStyle(.field)
-
-            DatePicker("End", selection: $customEndDate, displayedComponents: .date)
-                .datePickerStyle(.field)
-
-            Text("\(count(for: .customRange)) sessions in range")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private func filterButton(for filter: SessionLibraryDateFilter) -> some View {
-        Button {
-            selectedFilter = filter
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: filter.systemImage)
-                    .frame(width: 18)
-                    .foregroundStyle(selectedFilter == filter ? Color.accentColor : .secondary)
-
-                Text(filter.rawValue)
-                    .foregroundStyle(.primary)
-
-                Spacer()
-
-                Text("\(count(for: filter))")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(selectedFilter == filter ? Color.accentColor : .secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        selectedFilter == filter
-                            ? Color.accentColor.opacity(0.12)
-                            : Color(nsColor: .separatorColor).opacity(0.18),
-                        in: Capsule()
-                    )
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-                .background(
-                    selectedFilter == filter
-                    ? Color.accentColor.opacity(0.09)
-                    : .clear,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(filter.rawValue)
-        .accessibilityValue("\(count(for: filter)) sessions")
-        .accessibilityHint(selectedFilter == filter ? "Current session filter." : "Filters the session list.")
-        .accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])
-    }
-
-    private var selectionBinding: Binding<UUID?> {
-        Binding(
-            get: { appState.selectedTranscriptID },
-            set: { appState.selectedTranscriptID = $0 }
-        )
-    }
 
     private var exportErrorBinding: Binding<Bool> {
         Binding(
@@ -419,101 +186,21 @@ struct TranscriptView: View {
         )
     }
 
-    private var allSessions: [TranscriptSession] {
-        var sessions = transcriptStore.sessions
 
-        if let currentTranscript = appState.currentTranscript {
-            if let existingIndex = sessions.firstIndex(where: { $0.id == currentTranscript.id }) {
-                sessions[existingIndex] = currentTranscript
-            } else if !appState.currentTranscriptIsPersisted {
-                sessions.insert(currentTranscript, at: 0)
-            }
-        }
 
-        return sessions
-    }
 
-    private var allSessionEntries: [SessionLibraryEntry] {
-        var entries = transcriptStore.libraryEntries
 
-        if let currentTranscript = appState.currentTranscript {
-            let entry = SessionLibraryEntry(session: currentTranscript)
-            if let existingIndex = entries.firstIndex(where: { $0.id == currentTranscript.id }) {
-                entries[existingIndex] = entry
-            } else if !appState.currentTranscriptIsPersisted {
-                entries.insert(entry, at: 0)
-            }
-        }
 
-        return entries
-    }
 
-    private var query: SessionLibraryQuery {
-        SessionLibraryQuery(
-            filter: selectedFilter,
-            customDateRange: SessionLibraryDateRange(startDate: customStartDate, endDate: customEndDate),
-            searchText: searchText,
-            sortOrder: sortOrder
-        )
-    }
 
-    private var librarySnapshot: SessionLibrarySnapshot<SessionLibraryEntry> {
-        SessionLibrary.snapshot(
-            from: allSessionEntries,
-            query: query,
-            calendar: calendar
-        )
-    }
 
-    private var filteredEntries: [SessionLibraryEntry] {
-        librarySnapshot.filteredItems
-    }
-
-    private var selectedSession: TranscriptSession? {
-        guard let selectedTranscriptID = appState.selectedTranscriptID else {
-            return filteredEntries.first.flatMap(resolveSession(for:))
-        }
-
-        guard let selectedEntry = filteredEntries.first(where: { $0.id == selectedTranscriptID }) else {
-            return filteredEntries.first.flatMap(resolveSession(for:))
-        }
-
-        return resolveSession(for: selectedEntry)
-    }
-
-    private var emptyState: SessionLibraryEmptyState? {
-        librarySnapshot.emptyState
-    }
-
-    private var sessionCountSummary: String {
-        let count = filteredEntries.count
-        let pendingRetryCount = transcriptStore.pendingTranscriptionSessionCount
-        let pendingRetrySuffix: String
-        if pendingRetryCount > 0 {
-            pendingRetrySuffix = pendingRetryCount == 1
-                ? " • 1 needs retry"
-                : " • \(pendingRetryCount) need retry"
-        } else {
-            pendingRetrySuffix = ""
-        }
-
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return (count == 1 ? "1 session" : "\(count) sessions") + pendingRetrySuffix
-        }
-
-        return (count == 1 ? "1 result for “\(searchText)”" : "\(count) results for “\(searchText)”") + pendingRetrySuffix
-    }
-
-    private var sessionIDSignature: String {
-        allSessionEntries.map(\.id.uuidString).joined(separator: "|")
-    }
 
     private var deletionAlertTitle: String {
         pendingDeletionIDs.count == 1 ? "Delete Session?" : "Delete \(pendingDeletionIDs.count) Sessions?"
     }
 
     private var deletionAlertMessage: String {
-        let targetSessions = allSessions.filter { pendingDeletionIDs.contains($0.id) }
+        let targetSessions = libraryVM.allSessions.filter { pendingDeletionIDs.contains($0.id) }
         let screenshotCount = targetSessions.reduce(0) { partialResult, session in
             partialResult + session.screenshotCount
         }
@@ -525,43 +212,8 @@ struct TranscriptView: View {
         return "This permanently removes the selected session from BugNarrator."
     }
 
-    private func count(for filter: SessionLibraryDateFilter) -> Int {
-        librarySnapshot.counts[filter] ?? 0
-    }
 
-    private func resolveInitialFilterIfNeeded() {
-        guard !hasResolvedInitialFilter else {
-            return
-        }
 
-        hasResolvedInitialFilter = true
-        if count(for: .today) == 0, count(for: .retryNeeded) > 0 {
-            selectedFilter = .retryNeeded
-        } else if count(for: .today) == 0, !allSessionEntries.isEmpty {
-            selectedFilter = .allSessions
-        }
-    }
-
-    private func syncSelection() {
-        guard !filteredEntries.isEmpty else {
-            appState.selectedTranscriptID = nil
-            return
-        }
-
-        if let selectedTranscriptID = appState.selectedTranscriptID,
-           filteredEntries.contains(where: { $0.id == selectedTranscriptID }) {
-            return
-        }
-
-        appState.selectedTranscriptID = filteredEntries.first?.id
-    }
-
-    private func openLatestPendingTranscriptionSession() {
-        selectedFilter = .retryNeeded
-        searchText = ""
-        appState.selectedTranscriptID = transcriptStore.latestPendingTranscriptionSession?.id
-        syncSelection()
-    }
 
     private func requestDeletion(for ids: Set<UUID>) {
         guard !ids.isEmpty else {
