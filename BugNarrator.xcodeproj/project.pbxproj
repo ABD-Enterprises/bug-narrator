@@ -35,6 +35,7 @@
 		14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */; };
 		15409A450769B9F9DBA0DF59 /* PostTranscriptionPipelineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84646A0490F119BBE0BBE5C9 /* PostTranscriptionPipelineControllerTests.swift */; };
 		15C768D62CC7119DC6F212E2 /* DiagnosticsTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3114A162C2D284BD173DBC9 /* DiagnosticsTypes.swift */; };
+		17325248438BA1D04B58DADF /* JiraExportProvider+IssueCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0E47E6E5B3DD1BBA3AB1BA /* JiraExportProvider+IssueCreation.swift */; };
 		18EE2A64D0A551934978247B /* AudioObjectIDExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB94B9DE300200CB6C35E6F1 /* AudioObjectIDExtensions.swift */; };
 		19F9F231721D64A173E63F98 /* AppBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B463E2764267ED731EDB99 /* AppBootstrap.swift */; };
 		1A14A6ECD74AF52C4068A1E7 /* RecordingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C18F22BDAC3501073F3803 /* RecordingSessionDraft.swift */; };
@@ -442,6 +443,7 @@
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
 		48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		4A9D6C752334532E660C00AF /* StorageRecoveryBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageRecoveryBanner.swift; sourceTree = "<group>"; };
+		4B0E47E6E5B3DD1BBA3AB1BA /* JiraExportProvider+IssueCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JiraExportProvider+IssueCreation.swift"; sourceTree = "<group>"; };
 		4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+WireTypes.swift"; sourceTree = "<group>"; };
 		4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatter.swift; sourceTree = "<group>"; };
 		4C809A64CE202980AFC55953 /* PostTranscriptionResultHandlers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTranscriptionResultHandlers.swift; sourceTree = "<group>"; };
@@ -969,6 +971,7 @@
 				98F6549DE55911C6918B790D /* JiraExportProvider+ADF.swift */,
 				374184FFD6308BFC41FE8366 /* JiraExportProvider+Discovery.swift */,
 				618959A44C78ED8FF5F4C1BE /* JiraExportProvider+Duplicates.swift */,
+				4B0E47E6E5B3DD1BBA3AB1BA /* JiraExportProvider+IssueCreation.swift */,
 				77909EE4BE0BACFEC08EF096 /* JiraExportProvider+Networking.swift */,
 				CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */,
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
@@ -1460,6 +1463,7 @@
 				229822482577A3A62CB41D93 /* JiraExportProvider+ADF.swift in Sources */,
 				E4BD1DEC100DB46653775986 /* JiraExportProvider+Discovery.swift in Sources */,
 				9FBE899F44D1D68C16AF1E81 /* JiraExportProvider+Duplicates.swift in Sources */,
+				17325248438BA1D04B58DADF /* JiraExportProvider+IssueCreation.swift in Sources */,
 				AB91BF15F45FBF5F28E45E7B /* JiraExportProvider+Networking.swift in Sources */,
 				88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */,
 				318DB7BFA958511B51F94AA8 /* KeychainSecretStore.swift in Sources */,
