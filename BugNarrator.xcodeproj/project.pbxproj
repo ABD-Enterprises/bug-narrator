@@ -54,6 +54,7 @@
 		280973289AE78D9919ECD80C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5346EDB503C6B05C81C368 /* KeychainService.swift */; };
 		289E65529C0ED7D189FCCFFF /* TrackerExportSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70541D070FF81D54D6559524 /* TrackerExportSettingsStore.swift */; };
 		28FFF0FBF53923BC686FF79D /* ScreenshotAnnotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8E3D66AA1E0FB9030E4A78 /* ScreenshotAnnotationTests.swift */; };
+		29143E15041EBF233B55B8E9 /* GitHubExportProvider+Preflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4B137E2FF40109F0578236 /* GitHubExportProvider+Preflight.swift */; };
 		292C923C8BBAAC790BB12BED /* AppServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7F5FB0F3460F31156FC805 /* AppServiceContainer.swift */; };
 		29C25E147DD0810A11C03502 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09CA463A8DF59221937A2C7 /* TranscriptView.swift */; };
 		2B788786CA9B2E94ECA04033 /* RecordingSessionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */; };
@@ -467,6 +468,7 @@
 		5D2173ED04BA5467313B6261 /* AppErrorPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorPresenterTests.swift; sourceTree = "<group>"; };
 		5F27EE86CDB87DABC7401E8E /* KeychainTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTestSupport.swift; sourceTree = "<group>"; };
 		5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophonePermissionResolverTests.swift; sourceTree = "<group>"; };
+		5F4B137E2FF40109F0578236 /* GitHubExportProvider+Preflight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+Preflight.swift"; sourceTree = "<group>"; };
 		5F7F5FB0F3460F31156FC805 /* AppServiceContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServiceContainer.swift; sourceTree = "<group>"; };
 		5F840A9A735AEF19BA7966A5 /* SettingsStoreTranscriptionInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTranscriptionInputTests.swift; sourceTree = "<group>"; };
 		5FC9AEF9C67019E23C116896 /* SessionLibraryPresenters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibraryPresenters.swift; sourceTree = "<group>"; };
@@ -937,6 +939,7 @@
 				AFAF2A9878CBA298777A5677 /* GitHubExportProvider+Duplicates.swift */,
 				5258D51E9104DDABF9CFD179 /* GitHubExportProvider+IssueBody.swift */,
 				7E7D91DB9FF4F48F3285C634 /* GitHubExportProvider+Networking.swift */,
+				5F4B137E2FF40109F0578236 /* GitHubExportProvider+Preflight.swift */,
 				80315D4B806299BDB1449641 /* GitHubExportProvider+RepositoryDiscovery.swift */,
 				4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */,
 				6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */,
@@ -1411,6 +1414,7 @@
 				1134B796398DF1FFBC51E738 /* GitHubExportProvider+Duplicates.swift in Sources */,
 				E74889E8810164E6EA9DCE75 /* GitHubExportProvider+IssueBody.swift in Sources */,
 				9270FCD8927ABF43CE704BD1 /* GitHubExportProvider+Networking.swift in Sources */,
+				29143E15041EBF233B55B8E9 /* GitHubExportProvider+Preflight.swift in Sources */,
 				596BBC26EE7C650862F4F22E /* GitHubExportProvider+RepositoryDiscovery.swift in Sources */,
 				A386A52717B012400A5E4F09 /* GitHubExportProvider+WireTypes.swift in Sources */,
 				2D3A2043E5E03245791F0AF5 /* GitHubExportProvider.swift in Sources */,
