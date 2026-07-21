@@ -254,6 +254,7 @@
 		BA99127A39D827962D535164 /* SettingsReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = B065A5B9BE084EFE0BFE1D48 /* SettingsReadiness.swift */; };
 		BB1F6ABF206D70F310CFC20A /* SettingsStorePlaceholdersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C14D0FD45D1AEF489AEB69 /* SettingsStorePlaceholdersTests.swift */; };
 		BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B578DB59431378DDC84929 /* GitHubExportConfig.swift */; };
+		BBD482F396C30111B59AB7A0 /* GitHubExportProvider+IssueCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B36D498154BA2E531447842 /* GitHubExportProvider+IssueCreation.swift */; };
 		BBE16FF238B059EF08346355 /* ReviewWorkspaceTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70C2AF1D71698B8CB98490E /* ReviewWorkspaceTypes.swift */; };
 		BC9E4D8AE8F5F1F539C5641A /* AppErrorSubPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F1E0C90308A1D868A187E /* AppErrorSubPresenters.swift */; };
 		BE0F157736897DB21F47F8C6 /* SystemAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6047FAC93EEF81B1DB450003 /* SystemAudioRecorder.swift */; };
@@ -422,6 +423,7 @@
 		3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionControllerTests.swift; sourceTree = "<group>"; };
 		3866CAAF8937969BAC3BFBC5 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedRecordingPostTranscriptionResultHandlerTests.swift; sourceTree = "<group>"; };
 		38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionController.swift; sourceTree = "<group>"; };
+		3B36D498154BA2E531447842 /* GitHubExportProvider+IssueCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+IssueCreation.swift"; sourceTree = "<group>"; };
 		3B66F6ADC8EDC6AA0A768F30 /* TrackerExportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerExportSupport.swift; sourceTree = "<group>"; };
 		3E7CA92ED5A94500B96290D0 /* AppState+SupportNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SupportNavigation.swift"; sourceTree = "<group>"; };
 		3ED47247E62B3FD1B25A6C8E /* SingleInstanceControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleInstanceControllerTests.swift; sourceTree = "<group>"; };
@@ -938,6 +940,7 @@
 				2EE656D8E103CE32761B9567 /* GitHubExportProvider.swift */,
 				AFAF2A9878CBA298777A5677 /* GitHubExportProvider+Duplicates.swift */,
 				5258D51E9104DDABF9CFD179 /* GitHubExportProvider+IssueBody.swift */,
+				3B36D498154BA2E531447842 /* GitHubExportProvider+IssueCreation.swift */,
 				7E7D91DB9FF4F48F3285C634 /* GitHubExportProvider+Networking.swift */,
 				5F4B137E2FF40109F0578236 /* GitHubExportProvider+Preflight.swift */,
 				80315D4B806299BDB1449641 /* GitHubExportProvider+RepositoryDiscovery.swift */,
@@ -1413,6 +1416,7 @@
 				BB84DD19E311E979D03B0147 /* GitHubExportConfig.swift in Sources */,
 				1134B796398DF1FFBC51E738 /* GitHubExportProvider+Duplicates.swift in Sources */,
 				E74889E8810164E6EA9DCE75 /* GitHubExportProvider+IssueBody.swift in Sources */,
+				BBD482F396C30111B59AB7A0 /* GitHubExportProvider+IssueCreation.swift in Sources */,
 				9270FCD8927ABF43CE704BD1 /* GitHubExportProvider+Networking.swift in Sources */,
 				29143E15041EBF233B55B8E9 /* GitHubExportProvider+Preflight.swift in Sources */,
 				596BBC26EE7C650862F4F22E /* GitHubExportProvider+RepositoryDiscovery.swift in Sources */,
