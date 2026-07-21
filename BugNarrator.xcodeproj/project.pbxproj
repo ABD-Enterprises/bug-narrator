@@ -213,6 +213,7 @@
 		9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */; };
 		9EE81A76B802435C84B8032D /* IssueExtractionResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE77402A6284B705F5F4984A /* IssueExtractionResponseParser.swift */; };
 		9F837FB17474EEB037FC01B4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EFF170BAD57E66A7CB20AB /* AppState.swift */; };
+		9FBE899F44D1D68C16AF1E81 /* JiraExportProvider+Duplicates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 618959A44C78ED8FF5F4C1BE /* JiraExportProvider+Duplicates.swift */; };
 		A0CCAAA3701FF6274B792685 /* APIKeyValidationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EDA987A6F43F0D5113D603 /* APIKeyValidationStateTests.swift */; };
 		A12389B77FFD220995DDA0A4 /* SettingsStore+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 606C8CCD0B75F5DF182C5033 /* SettingsStore+Display.swift */; };
 		A17B5FCA1F95211DF2321774 /* AppStateHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C367EF1F4D24E1E5819087 /* AppStateHarness.swift */; };
@@ -483,6 +484,7 @@
 		60CD6EFC4CDBFE13C31BD38D /* OpenAIErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIErrorMapper.swift; sourceTree = "<group>"; };
 		6131EA189B853D1B456A8D26 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6161AB93D74FD6A2471534C5 /* AppState+SessionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SessionLibrary.swift"; sourceTree = "<group>"; };
+		618959A44C78ED8FF5F4C1BE /* JiraExportProvider+Duplicates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JiraExportProvider+Duplicates.swift"; sourceTree = "<group>"; };
 		6346CF407E47D31933561CA1 /* HotkeySupportClasses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySupportClasses.swift; sourceTree = "<group>"; };
 		64113E8532E84371F91096AF /* AppRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
 		64F0A81E02972573D2556B85 /* AppState+RecordingTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+RecordingTimer.swift"; sourceTree = "<group>"; };
@@ -963,6 +965,7 @@
 				BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */,
 				F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */,
 				98F6549DE55911C6918B790D /* JiraExportProvider+ADF.swift */,
+				618959A44C78ED8FF5F4C1BE /* JiraExportProvider+Duplicates.swift */,
 				77909EE4BE0BACFEC08EF096 /* JiraExportProvider+Networking.swift */,
 				CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */,
 				5C5346EDB503C6B05C81C368 /* KeychainService.swift */,
@@ -1452,6 +1455,7 @@
 				B1E0999F91F9E0236146F023 /* IssueScreenshotAnnotationTypes.swift in Sources */,
 				045DEFACC4FF761873046058 /* JiraExportConfig.swift in Sources */,
 				229822482577A3A62CB41D93 /* JiraExportProvider+ADF.swift in Sources */,
+				9FBE899F44D1D68C16AF1E81 /* JiraExportProvider+Duplicates.swift in Sources */,
 				AB91BF15F45FBF5F28E45E7B /* JiraExportProvider+Networking.swift in Sources */,
 				88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */,
 				318DB7BFA958511B51F94AA8 /* KeychainSecretStore.swift in Sources */,
