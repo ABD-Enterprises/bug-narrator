@@ -303,6 +303,7 @@
 		E1B0000CAD83CD900AA29EAD /* AppSupportLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF107719ECC19DBE07A1046 /* AppSupportLocationTests.swift */; };
 		E35D7999872F814AE44B06EE /* IssueCoreSubtypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3394CF24F8CA7410A441170E /* IssueCoreSubtypes.swift */; };
 		E3A4A5182E639F1AE4F7A773 /* IssueExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */; };
+		E4BD1DEC100DB46653775986 /* JiraExportProvider+Discovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374184FFD6308BFC41FE8366 /* JiraExportProvider+Discovery.swift */; };
 		E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */; };
 		E5C5391682011DD604C60825 /* AudioRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CB27F6773CD9753A00DB79 /* AudioRecorderTests.swift */; };
 		E60F34C1E0FED78A8F28FFDE /* PermissionRecoveryTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE18D1E8901BEF5AE218942B /* PermissionRecoveryTypes.swift */; };
@@ -423,6 +424,7 @@
 		34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWorkspaceTests.swift; sourceTree = "<group>"; };
 		35FA8C32EF0CB342E6EF41E9 /* AppLifecycleDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLifecycleDelegate.swift; sourceTree = "<group>"; };
 		3703FAAF52D9FFFCA5E7D577 /* RecordingSessionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionControllerTests.swift; sourceTree = "<group>"; };
+		374184FFD6308BFC41FE8366 /* JiraExportProvider+Discovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JiraExportProvider+Discovery.swift"; sourceTree = "<group>"; };
 		3866CAAF8937969BAC3BFBC5 /* FinishedRecordingPostTranscriptionResultHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedRecordingPostTranscriptionResultHandlerTests.swift; sourceTree = "<group>"; };
 		38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataDeletionController.swift; sourceTree = "<group>"; };
 		3B36D498154BA2E531447842 /* GitHubExportProvider+IssueCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+IssueCreation.swift"; sourceTree = "<group>"; };
@@ -965,6 +967,7 @@
 				BC6C8D8316A46CFCBF0847F2 /* IssueExtractionService.swift */,
 				F8E37090B827BA0F599EC926 /* JiraExportProvider.swift */,
 				98F6549DE55911C6918B790D /* JiraExportProvider+ADF.swift */,
+				374184FFD6308BFC41FE8366 /* JiraExportProvider+Discovery.swift */,
 				618959A44C78ED8FF5F4C1BE /* JiraExportProvider+Duplicates.swift */,
 				77909EE4BE0BACFEC08EF096 /* JiraExportProvider+Networking.swift */,
 				CB7110BAF79EA83E3FAE6FBF /* KeychainSecretStore.swift */,
@@ -1455,6 +1458,7 @@
 				B1E0999F91F9E0236146F023 /* IssueScreenshotAnnotationTypes.swift in Sources */,
 				045DEFACC4FF761873046058 /* JiraExportConfig.swift in Sources */,
 				229822482577A3A62CB41D93 /* JiraExportProvider+ADF.swift in Sources */,
+				E4BD1DEC100DB46653775986 /* JiraExportProvider+Discovery.swift in Sources */,
 				9FBE899F44D1D68C16AF1E81 /* JiraExportProvider+Duplicates.swift in Sources */,
 				AB91BF15F45FBF5F28E45E7B /* JiraExportProvider+Networking.swift in Sources */,
 				88462910DDACB724E646495A /* JiraExportProvider.swift in Sources */,
