@@ -204,6 +204,7 @@
 		946F215474A2DE83AA4413C4 /* DiagnosticsLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56EE955B03EE30CC1EB568A1 /* DiagnosticsLogger.swift */; };
 		952BBC1ED94400857FF4E837 /* RecordingStatusMessageBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F0C360F83AB792370FADAF /* RecordingStatusMessageBuilder.swift */; };
 		954112959D643236882234B0 /* TrackerIntegrationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */; };
+		D9135343D8B59EEB725BB170 /* JiraIntegrationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FB6FFD935A1E161AC73277 /* JiraIntegrationController.swift */; };
 		9619964E0CEE6D5A039340F7 /* SessionScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF86B21036E15ECF52300E09 /* SessionScreenshotTests.swift */; };
 		977D86FA0E7E2C16A5B41D4D /* DebugSessionContextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2543B7AFD4F96F3482FE28FA /* DebugSessionContextProvider.swift */; };
 		981A2F83EC4A0550815EF1B4 /* ReviewWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60982ABA90B0CE76BF93E46A /* ReviewWorkspace.swift */; };
@@ -446,6 +447,7 @@
 		4471ECA2ACC707AB91216E17 /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		46F10666DB201C6670B751FA /* IssueExportReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportReviewPolicy.swift; sourceTree = "<group>"; };
 		48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerIntegrationController.swift; sourceTree = "<group>"; };
+		A3FB6FFD935A1E161AC73277 /* JiraIntegrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraIntegrationController.swift; sourceTree = "<group>"; };
 		48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		4A9D6C752334532E660C00AF /* StorageRecoveryBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageRecoveryBanner.swift; sourceTree = "<group>"; };
 		4B0E47E6E5B3DD1BBA3AB1BA /* JiraExportProvider+IssueCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JiraExportProvider+IssueCreation.swift"; sourceTree = "<group>"; };
@@ -1039,6 +1041,7 @@
 				70541D070FF81D54D6559524 /* TrackerExportSettingsStore.swift */,
 				3B66F6ADC8EDC6AA0A768F30 /* TrackerExportSupport.swift */,
 				48289EBDC8D8BBE0ECC802BA /* TrackerIntegrationController.swift */,
+				A3FB6FFD935A1E161AC73277 /* JiraIntegrationController.swift */,
 				BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */,
 				A1FB2471D46615DC915080D1 /* TranscriptionChunker.swift */,
 				800BFCC6407B534886C65D77 /* TranscriptionClient.swift */,
@@ -1577,6 +1580,7 @@
 				289E65529C0ED7D189FCCFFF /* TrackerExportSettingsStore.swift in Sources */,
 				E9677D3D9F4E24466B75580F /* TrackerExportSupport.swift in Sources */,
 				954112959D643236882234B0 /* TrackerIntegrationController.swift in Sources */,
+				D9135343D8B59EEB725BB170 /* JiraIntegrationController.swift in Sources */,
 				D0754552F75E1CE6B4128800 /* TranscriptExporter.swift in Sources */,
 				7A9EE56958CFB17D59BD1253 /* TranscriptQualityFinding.swift in Sources */,
 				AB85DB15F347C75DB7C1241A /* TranscriptQualityInspector.swift in Sources */,
