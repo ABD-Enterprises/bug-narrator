@@ -496,6 +496,7 @@ final class AppState: ObservableObject {
             [
                 settingsStore.objectWillChange,
                 trackerIntegration.objectWillChange,
+                trackerIntegration.jira.objectWillChange,
                 aiProviderSettings.objectWillChange,
                 presentationState.objectWillChange,
                 recordingSessionController.objectWillChange,
