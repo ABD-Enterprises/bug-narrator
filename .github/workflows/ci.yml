@@ -18,13 +18,13 @@ permissions:
 
 jobs:
   detect-ci-changes:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-latest
     outputs:
       docs_changed: ${{ steps.changes.outputs.docs_changed }}
       swift_changed: ${{ steps.changes.outputs.swift_changed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 2
 
@@ -47,15 +47,15 @@ jobs:
           fi
 
   runtime-guardrails:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 2
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
 
@@ -81,15 +81,15 @@ jobs:
       - detect-ci-changes
       - runtime-guardrails
     if: needs.detect-ci-changes.outputs.docs_changed == 'true'
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 2
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
@@ -101,65 +101,18 @@ jobs:
       - name: Build docs site
         run: npm run build --prefix site
 
-  # Makes an offline self-hosted macOS runner VISIBLE instead of letting the
-  # required macos-build-and-test job sit queued indefinitely (which reads as a
-  # perpetual "pending" check and silently stalls merges). Runs on a hosted
-  # runner and polls this run's own jobs API; if the macOS job has not started
-  # within the grace period, it fails loudly so a human re-runs on GitHub-hosted
-  # macos-26 or brings the runner back online.
-  macos-runner-watchdog:
-    # Mirror macos-build-and-test's prerequisites exactly so the grace clock
-    # starts only once the macOS job is actually runner-eligible. If the watchdog
-    # gated on fewer needs, a slow runtime-guardrails could trip the 10-minute
-    # timeout while the macOS job is still legitimately blocked, failing a healthy
-    # runner and stalling merges.
-    needs:
-      - detect-ci-changes
-      - runtime-guardrails
-    if: needs.detect-ci-changes.outputs.swift_changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Fail if the self-hosted macOS job never starts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          grace_seconds=600   # 10 minutes for the self-hosted runner to pick up
-          deadline=$(( SECONDS + grace_seconds ))
-          while (( SECONDS < deadline )); do
-            status="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-              --jq '.jobs[] | select(.name=="macos-build-and-test") | .status' 2>/dev/null || echo "")"
-            case "$status" in
-              in_progress|completed)
-                echo "macos-build-and-test status: $status — runner is online."
-                exit 0
-                ;;
-              *)
-                echo "macos-build-and-test status: '${status:-unknown}' — waiting for a runner..."
-                sleep 30
-                ;;
-            esac
-          done
-          echo "::error::macos-build-and-test did not start within $(( grace_seconds / 60 )) minutes. The self-hosted macOS runner is likely offline. Re-run this workflow on GitHub-hosted macos-26 or bring the runner online."
-          exit 1
-
   macos-build-and-test:
     needs:
       - detect-ci-changes
       - runtime-guardrails
     if: needs.detect-ci-changes.outputs.swift_changed == 'true'
-    # Self-hosted ABD-Enterprises org runner with Xcode 26.5; declared
-    # in deffenda/brew-sync manifests/github-runners.yaml. Falls back to
-    # macos-26 (GitHub-hosted, with the 10x minute multiplier) by manual
-    # workflow re-run if the self-hosted runner is offline. See the
-    # `Select Xcode` step for how this job tolerates both layouts. The
-    # macos-runner-watchdog job surfaces an offline runner as a hard failure.
-    runs-on: [self-hosted, macOS, ARM64]
+    # Public pull-request code must run on GitHub-hosted infrastructure.
+    runs-on: macos-26
     # Fail fast on a hung/contended build instead of running for hours.
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 2
 
@@ -169,10 +122,10 @@ jobs:
           # can read. Valid layouts:
           #   1. GitHub-hosted macos-26 runners: /Applications/Xcode_26*.app
           #      (multiple side-by-side versions are present; pick newest)
-          #   2. Self-hosted runners (the brew-sync fleet Mac): just
+          #   2. Alternate hosted images: just
           #      /Applications/Xcode.app, which we accept if its
           #      CFBundleShortVersionString starts with `26`.
-          #   3. Self-hosted runners with xcode-select already pointing at
+          #   3. Images with xcode-select already pointing at
           #      an Xcode 26 developer directory outside the app paths above.
           XCODE_APP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' -print | sort -V | tail -1)
 
@@ -180,7 +133,7 @@ jobs:
             VERSION=$(defaults read /Applications/Xcode.app/Contents/Info CFBundleShortVersionString 2>/dev/null || echo "")
             if [[ "$VERSION" == 26* ]]; then
               XCODE_APP=/Applications/Xcode.app
-              echo "Accepting /Applications/Xcode.app (version $VERSION) — likely self-hosted runner."
+              echo "Accepting /Applications/Xcode.app (version $VERSION)."
             fi
           fi
 
@@ -206,9 +159,7 @@ jobs:
           fi
 
           echo "Selected $XCODE_APP"
-          # Self-hosted runners may not allow passwordless sudo; only
-          # invoke `sudo xcode-select` when running as a non-root user on
-          # a hosted runner. DEVELOPER_DIR works on both.
+          # GitHub-hosted runners allow xcode-select through sudo.
           if [[ -n "$RUNNER_ENVIRONMENT" && "$RUNNER_ENVIRONMENT" == "github-hosted" ]]; then
             sudo xcode-select -s "$XCODE_APP"
           fi
