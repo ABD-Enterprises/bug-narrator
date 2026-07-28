@@ -22,16 +22,15 @@ Source of truth:
 
 - Board and provider: `.ai/config.json`
 - Task state: external ticket board, not repo markdown
-- Runtime CLI: `bin/orc`
+- Runtime CLI: `orc` on your PATH — this thin-adopted repo has no tracked bin/orc shim, so the global ORC launcher drives the loop
 
 Windows shells:
 
-- In PowerShell or `cmd.exe`, use `node tools/orc/cli.mjs <verb>` or `bin\orc.cmd <verb>` instead of the extensionless `bin/orc` bash script. Calling it directly from PowerShell or `cmd.exe` opens the Windows app-picker instead of running ORC.
-- The extensionless `bin/orc` script is fine under Git-Bash.
+- Use `orc <verb>` (the launcher on PATH); this thin-adopted repo has no `bin/orc` shim. In PowerShell or `cmd.exe`, `orc <verb>` works directly; from a full ORC engine checkout you can also run `node tools/orc/cli.mjs <verb>`.
 
 Startup:
 
-- If the branch contains a ticket id, run `bin/orc current`. On `main` / `master` or with no ticket id, run `bin/orc next`. For new work with no ticket, run `bin/orc plan "<title>"`.
+- If the branch contains a ticket id, run `orc current`. On `main` / `master` or with no ticket id, run `orc next`. For new work with no ticket, run `orc plan "<title>"`.
 - Confirm a coding backend is available before relying on the loop to implement; otherwise hand-author the change or provision a backend — do not silently treat hand-authoring as the configured-backend path.
 - Read ticket comments with `orc comments` and diffs with `orc diff` (lockfiles / generated / vendor stripped). Never re-fetch the raw thread or raw diff into the agent context.
 - Search before broad reads: use `rg` or targeted queries to locate the exact symbol/config/evidence, and read only the surrounding lines you need.
@@ -52,8 +51,9 @@ Hard rules:
 - Run configured local-first reviews before CI spend when `.ai/config.json#local_review` declares them. Track actionable findings in GitHub Issues, not markdown logs.
 - In-session subagents extend hands, not leases: they may search, read, inspect, summarize, classify, and report — they must NOT claim/transition tickets, add evidence, push, open/comment/merge PRs, or mutate provider state, and must NOT spawn further subagents. Close completed subagents immediately after consuming their results; completed subagents still count against runtime pools until closed, so a "subagent pool full" warning is usually hygiene, not repo state.
 - Before local validation, pre-push, or other expensive milestones, respect the board-state heartbeat; stop if the ticket is blocked, reassigned, or no longer in the active state for this session.
-- Do not commit local lease/controller/planner/handoff state files. `.ai/` is local-only (except the tracked `.ai/config.json`). This adapter is tracked so fresh clones discover the ORC contract; repo-specific guidance lives outside the managed block (`orc adopt --force` preserves it).
+- Do not commit local lease/controller/planner/handoff state files. `.ai/` is local-only; only repos that run their own board (ORC itself) track `.ai/config.json`, while adopted repos keep it untracked and bootstrap it via `orc adopt`. This adapter is tracked so fresh clones discover the ORC contract; repo-specific guidance lives outside the managed block (`orc adopt --force` preserves it).
 - "Get latest" means update this repo only: `git fetch origin --prune && git pull --ff-only`.
+- Secret-resolution commands run UNSANDBOXED. Any `.ai/secrets.json` `exec:` source — or any command that fetches a secret from a local secret manager, agent, keychain, or socket (whatever you use: `pass`, `gopass`, `vault`, a cloud provider's secrets CLI, an OS keychain, 1Password's `op`, …) — MUST run with the agent Bash sandbox disabled. The sandbox blocks the local socket/agent these tools rely on, so they fail misleadingly (auth timeouts, "not signed in", or hangs) even when correctly configured and unlocked. That is the sandbox, NOT a real auth failure — do not loop or ask the operator to re-authenticate; re-run unsandboxed. Only if the unsandboxed command still errors does an actual credential problem apply. See `docs/credentials.md`.
 
 <!-- END ORC-STANDARDS LOCAL ADAPTER -->
 
