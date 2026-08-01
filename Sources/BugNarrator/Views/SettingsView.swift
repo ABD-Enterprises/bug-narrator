@@ -18,8 +18,13 @@ struct SettingsView: View {
     }
 
     /// The section Settings opens on. An install with no usable AI provider
-    /// credential lands on `AI Engines` — the pane it has to visit before
-    /// recording is possible — instead of `General` (#911).
+    /// credential lands on `AI Engines` instead of `General` (#911), because the
+    /// recording gate routes exactly that user here.
+    ///
+    /// Note this keys off credential presence, not full provider readiness:
+    /// `hasUsableAIProviderCredential` returns `true` unconditionally for the
+    /// local providers, which can still fail `aiProviderCompatibilityIssue`.
+    /// Those users keep the existing `General` landing.
     ///
     /// This only seeds the initial selection. Once the window is open the user's
     /// own tab choices are never overridden.
