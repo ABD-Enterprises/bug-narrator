@@ -36,7 +36,7 @@ It helps you:
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
 
-Released builds are signed with a `Developer ID Application` certificate (Team ID `2R4WAH4R53`), notarized by Apple, and stapled, so macOS opens them without a Gatekeeper prompt.
+BugNarrator releases are signed with a `Developer ID Application` certificate (Team ID `2R4WAH4R53`), notarized by Apple, and stapled, so macOS should open them without a Gatekeeper prompt. If macOS does warn about a download, do not bypass the warning — verify the DMG against the published `.sha256` checksum and report it.
 
 ### macOS Requirements
 
