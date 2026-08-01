@@ -5,7 +5,27 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var settingsStore: SettingsStore
     @State private var showDeleteAllLocalDataConfirmation = false
-    @State private var selectedSection: SettingsSection = .general
+    @State private var selectedSection: SettingsSection
+
+    init(appState: AppState, settingsStore: SettingsStore) {
+        self.appState = appState
+        self.settingsStore = settingsStore
+        _selectedSection = State(
+            initialValue: Self.initialSection(
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential
+            )
+        )
+    }
+
+    /// The section Settings opens on. An install with no usable AI provider
+    /// credential lands on `AI Engines` — the pane it has to visit before
+    /// recording is possible — instead of `General` (#911).
+    ///
+    /// This only seeds the initial selection. Once the window is open the user's
+    /// own tab choices are never overridden.
+    static func initialSection(hasUsableAIProviderCredential: Bool) -> SettingsSection {
+        hasUsableAIProviderCredential ? .general : .aiEngines
+    }
 
     /// The tabbed sections of Settings. A segmented `Picker` drives selection —
     /// macOS `TabView` does not expose addressable tab controls in this window,
