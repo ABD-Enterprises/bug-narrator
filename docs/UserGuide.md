@@ -35,7 +35,8 @@ It helps you:
 2. Open the downloaded DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
-5. If macOS shows a Gatekeeper warning, use Finder and choose `Open` for the app you trust.
+
+Released builds are signed with a `Developer ID Application` certificate (Team ID `2R4WAH4R53`), notarized by Apple, and stapled, so macOS opens them without a Gatekeeper prompt.
 
 ### macOS Requirements
 
