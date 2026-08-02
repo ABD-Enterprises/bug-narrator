@@ -1,0 +1,77 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "915",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 4,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 4
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "The 1.0.40 heading date matches the actual GitHub release date (2026-07-23).",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "Each release entry separates user-facing changes from internal/refactor work, with user-facing changes first.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "No historical entries are deleted - internal work is reorganised, not removed.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "scripts/check_version_consistency.sh still passes.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "CHANGELOG.md"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "The 1.0.40 heading date matches the actual GitHub release date (2026-07-23).",
+      "Each release entry separates user-facing changes from internal/refactor work, with user-facing changes first.",
+      "No historical entries are deleted - internal work is reorganised, not removed.",
+      "scripts/check_version_consistency.sh still passes."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main",
+        "bash scripts/check_version_consistency.sh"
+      ]
+    },
+    "references": [
+      "Date discrepancy found by Codex; audience framing found by Claude - 3-model gap analysis 2026-08-01."
+    ],
+    "acceptance_criteria": [
+      "Dates reconcile with GitHub Releases.",
+      "A non-maintainer can read what changed for them."
+    ]
+  }
+}
