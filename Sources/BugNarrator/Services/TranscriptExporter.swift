@@ -111,8 +111,14 @@ struct TranscriptExporter {
         // issues are still worth handing to a team, so the export degrades: the
         // present files are copied and the absent ones are named in the
         // manifest instead (#914).
-        let missingScreenshots = missingScreenshots(for: session)
+        //
+        // Presence is decided by the copy attempt itself rather than by a scan
+        // beforehand. A pre-scan leaves a window in which a file can vanish
+        // between the scan and the copy, which would either undercount the
+        // missing list or let `copyItem` throw — reintroducing the exact failure
+        // this change removes.
         var copiedScreenshotCount = 0
+        var missingScreenshotNames: [String] = []
         var exportedFiles = ["transcript.md"]
 
         let bundleDirectoryURL = try bundleWriter.writeBundle(
@@ -141,14 +147,28 @@ struct TranscriptExporter {
             let screenshotsDirectoryURL = bundleDirectoryURL.appendingPathComponent("screenshots", isDirectory: true)
             try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
 
-            for screenshot in session.screenshots where fileManager.fileExists(atPath: screenshot.fileURL.path) {
+            for screenshot in session.screenshots {
                 let destinationURL = uniqueScreenshotDestinationURL(
                     for: screenshot.fileName,
                     in: screenshotsDirectoryURL
                 )
-                try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
-                copiedScreenshotCount += 1
+
+                do {
+                    try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
+                    copiedScreenshotCount += 1
+                    exportedFiles.append("screenshots/\(destinationURL.lastPathComponent)")
+                } catch {
+                    // Only an absent source degrades. A copy that failed while the
+                    // file is still on disk is a real problem — permissions, disk
+                    // space — and must not be silently reported as "missing".
+                    guard !fileManager.fileExists(atPath: screenshot.fileURL.path) else {
+                        throw error
+                    }
+                    missingScreenshotNames.append(screenshot.fileName)
+                }
             }
+
+            exportedFiles.append("manifest.json")
 
             let manifest = SessionBundleManifest(
                 generatedAt: Date(),
@@ -156,8 +176,8 @@ struct TranscriptExporter {
                 exportedFiles: exportedFiles,
                 screenshotCount: session.screenshotCount,
                 copiedScreenshotCount: copiedScreenshotCount,
-                missingScreenshots: missingScreenshots.map(\.fileName),
-                notes: Self.manifestNotes(missingScreenshotCount: missingScreenshots.count)
+                missingScreenshots: missingScreenshotNames,
+                notes: Self.manifestNotes(missingScreenshotCount: missingScreenshotNames.count)
             )
 
             let encoder = JSONEncoder()
@@ -176,7 +196,7 @@ struct TranscriptExporter {
                 "session_id": session.id.uuidString,
                 "screenshot_count": "\(session.screenshotCount)",
                 "copied_screenshot_count": "\(copiedScreenshotCount)",
-                "missing_screenshot_count": "\(missingScreenshots.count)"
+                "missing_screenshot_count": "\(missingScreenshotNames.count)"
             ]
         )
 
@@ -193,12 +213,6 @@ struct TranscriptExporter {
         }
 
         return notes
-    }
-
-    private func missingScreenshots(for session: TranscriptSession) -> [SessionScreenshot] {
-        session.screenshots.filter { screenshot in
-            !fileManager.fileExists(atPath: screenshot.fileURL.path)
-        }
     }
 
     private func uniqueScreenshotDestinationURL(for fileName: String, in directoryURL: URL) -> URL {

@@ -97,6 +97,11 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertEqual(manifest?["missingScreenshots"] as? [String], ["missing-capture.png"])
         XCTAssertEqual(manifest?["copiedScreenshotCount"] as? Int, 1)
         XCTAssertEqual(manifest?["screenshotCount"] as? Int, 2)
+        XCTAssertEqual(
+            manifest?["exportedFiles"] as? [String],
+            ["transcript.md", "screenshots/present-capture.png", "manifest.json"],
+            "exportedFiles must list what the bundle actually contains — the copied screenshot and the manifest included, the absent screenshot excluded."
+        )
     }
 
     func testWriteBundleIncludesSummaryAndIssues() throws {
@@ -139,7 +144,11 @@ final class TranscriptExporterTests: XCTestCase {
 
         let manifestData = try Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
         let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
-        XCTAssertEqual(manifest?["exportedFiles"] as? [String], ["transcript.md", "summary.md"])
+        XCTAssertEqual(
+            manifest?["exportedFiles"] as? [String],
+            ["transcript.md", "summary.md", "manifest.json"],
+            "exportedFiles must record every file the bundle contains, manifest included."
+        )
     }
 
     func testWriteBundleOmitsSummaryWhenExtractionNeverRan() throws {
@@ -169,7 +178,11 @@ final class TranscriptExporterTests: XCTestCase {
 
         let manifestData = try Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
         let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
-        XCTAssertEqual(manifest?["exportedFiles"] as? [String], ["transcript.md"])
+        XCTAssertEqual(
+            manifest?["exportedFiles"] as? [String],
+            ["transcript.md", "manifest.json"],
+            "No summary.md when extraction never ran, but the manifest is still recorded."
+        )
     }
 
     func testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames() throws {
