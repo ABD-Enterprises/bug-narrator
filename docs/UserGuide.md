@@ -192,7 +192,9 @@ Each extracted item keeps evidence from the transcript and should be reviewed be
 Use this when you want a portable local copy of the session. The bundle includes:
 
 - `transcript.md`
+- `summary.md` — the review summary and extracted issues, when issue extraction has run
 - `screenshots/`
+- `manifest.json` — what the bundle contains, including any referenced screenshot files that were no longer on disk at export time
 
 ### Export To GitHub (Experimental)
 

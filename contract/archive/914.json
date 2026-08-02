@@ -1,0 +1,86 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "914",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 5,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 5
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "The exported bundle includes the review summary and the extracted issues alongside transcript.md and screenshots/.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "A missing screenshot file degrades gracefully - the bundle still exports and the absence is recorded in the manifest rather than thrown.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "Sessions with no summary or no extracted issues export cleanly without emitting empty placeholder files.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "Existing bundle consumers are unaffected: transcript.md and screenshots/ keep their current names, locations, and format.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 5,
+        "text": "Both behaviors have targeted unit tests, including the missing-screenshot path.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "Sources/BugNarrator/Services/TranscriptExporter.swift"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "The exported bundle includes the review summary and the extracted issues alongside transcript.md and screenshots/.",
+      "A missing screenshot file degrades gracefully - the bundle still exports and the absence is recorded in the manifest rather than thrown.",
+      "Sessions with no summary or no extracted issues export cleanly without emitting empty placeholder files.",
+      "Existing bundle consumers are unaffected: transcript.md and screenshots/ keep their current names, locations, and format.",
+      "Both behaviors have targeted unit tests, including the missing-screenshot path."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main",
+        "DEVELOPER_DIR=\"${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}\" xcodebuild -quiet -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination \"platform=macOS,arch=$(uname -m)\" CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- -only-testing:BugNarratorTests test"
+      ]
+    },
+    "references": [
+      "Found by Claude in 3-model gap analysis 2026-08-01."
+    ],
+    "acceptance_criteria": [
+      "The bundle contains the work product, not just the raw inputs.",
+      "One missing file never blocks an export."
+    ]
+  }
+}

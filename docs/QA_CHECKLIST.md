@@ -132,8 +132,10 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 - Click a screenshot thumbnail in the `Screenshots` tab and verify BugNarrator opens the saved image cleanly.
 - Click `Show in Transcript` from a screenshot entry and verify the review workspace switches back to the transcript timeline.
 - Open a captured screenshot from the review window and verify Finder reveals the file.
-- Export a session bundle and verify `transcript.md` and the `screenshots` folder are present.
+- Export a session bundle and verify `transcript.md`, `summary.md`, the `screenshots` folder, and `manifest.json` are present.
 - Verify the exported `transcript.md` contains the session transcript and the exported `screenshots` folder copies only screenshots that still exist on disk.
+- Verify `summary.md` contains the review summary and the extracted issues, and that a session with no issue extraction exports without a `summary.md` at all.
+- Delete a referenced screenshot file before exporting and verify the bundle still exports, with the missing file named in `manifest.json` under `missingScreenshots`.
 - Export a debug bundle during or after a session and verify `session-metadata.json` reflects the right session ID and counts without raw transcript content.
 
 ## Session Deletion

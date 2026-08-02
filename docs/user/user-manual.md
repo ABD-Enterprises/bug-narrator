@@ -72,7 +72,8 @@ After transcription finishes, BugNarrator opens the session library so you can r
 Current export options:
 
 - `Export Session Bundle`
-  creates `transcript.md` plus a `screenshots/` folder
+  creates `transcript.md`, a `screenshots/` folder, and `manifest.json`, plus
+  `summary.md` (review summary and extracted issues) when issue extraction has run
 - `Export to GitHub (Experimental)`
 - `Export to Jira (Experimental)`
 
