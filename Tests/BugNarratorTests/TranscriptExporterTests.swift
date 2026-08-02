@@ -55,14 +55,20 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains(session.transcript))
     }
 
-    func testWriteBundleFailsWhenReferencedScreenshotFileIsMissing() throws {
+    /// Replaces an earlier test that asserted export *threw* on a missing
+    /// screenshot. #914 deliberately inverts that: one moved or pruned file must
+    /// not make an otherwise complete session unexportable.
+    func testWriteBundleDegradesWhenReferencedScreenshotFileIsMissing() throws {
         let fileManager = FileManager.default
         let rootDirectoryURL = fileManager.temporaryDirectory
             .appendingPathComponent("TranscriptExporterMissingScreenshotsTests-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: rootDirectoryURL) }
 
+        let presentScreenshotURL = rootDirectoryURL.appendingPathComponent("present-capture.png")
+        try Data("image-data".utf8).write(to: presentScreenshotURL, options: [.atomic])
         let missingScreenshotURL = rootDirectoryURL.appendingPathComponent("missing-capture.png")
+
         let session = TranscriptSession(
             createdAt: Date(timeIntervalSince1970: 1_700_000_100),
             transcript: "Transcript without an on-disk screenshot.",
@@ -71,25 +77,99 @@ final class TranscriptExporterTests: XCTestCase {
             languageHint: nil,
             prompt: nil,
             screenshots: [
-                SessionScreenshot(elapsedTime: 4, filePath: missingScreenshotURL.path)
+                SessionScreenshot(elapsedTime: 4, filePath: presentScreenshotURL.path),
+                SessionScreenshot(elapsedTime: 6, filePath: missingScreenshotURL.path)
             ]
         )
 
         let exporter = TranscriptExporter(fileManager: fileManager)
-        do {
-            _ = try exporter.writeBundle(session: session, to: rootDirectoryURL)
-            XCTFail("Expected bundle export to fail when a referenced screenshot is missing.")
-        } catch let error as AppError {
-            XCTAssertEqual(
-                error,
-                .exportFailure(
-                    "This session bundle is missing referenced screenshot files: missing-capture.png. Recreate the screenshots or remove the stale references before exporting."
-                )
-            )
-        }
+        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
 
-        let createdDirectories = try fileManager.contentsOfDirectory(atPath: rootDirectoryURL.path)
-        XCTAssertFalse(createdDirectories.contains { $0.contains(session.suggestedBundleDirectoryName) })
+        // The transcript still exports, and the screenshot that does exist is copied.
+        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.md").path))
+        let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots")
+        XCTAssertTrue(fileManager.fileExists(atPath: screenshotsDirectoryURL.appendingPathComponent("present-capture.png").path))
+        XCTAssertFalse(fileManager.fileExists(atPath: screenshotsDirectoryURL.appendingPathComponent("missing-capture.png").path))
+
+        // The absence is recorded rather than thrown.
+        let manifestData = try Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
+        let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
+        XCTAssertEqual(manifest?["missingScreenshots"] as? [String], ["missing-capture.png"])
+        XCTAssertEqual(manifest?["copiedScreenshotCount"] as? Int, 1)
+        XCTAssertEqual(manifest?["screenshotCount"] as? Int, 2)
+    }
+
+    func testWriteBundleIncludesSummaryAndIssues() throws {
+        let fileManager = FileManager.default
+        let rootDirectoryURL = fileManager.temporaryDirectory
+            .appendingPathComponent("TranscriptExporterSummaryTests-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: rootDirectoryURL) }
+
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_200),
+            transcript: "The export button is missing on the reports page.",
+            duration: 30,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(
+                summary: "One bug in the reports page.",
+                issues: [
+                    ExtractedIssue(
+                        title: "Export button missing",
+                        category: .bug,
+                        summary: "The reports page is missing an export button.",
+                        evidenceExcerpt: "Export button is missing on reports page.",
+                        timestamp: 13
+                    )
+                ]
+            )
+        )
+
+        let exporter = TranscriptExporter(fileManager: fileManager)
+        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
+
+        let summaryURL = bundleURL.appendingPathComponent("summary.md")
+        XCTAssertTrue(fileManager.fileExists(atPath: summaryURL.path), "The differentiated output must be in the bundle, not just the raw transcript.")
+
+        let summary = try String(contentsOf: summaryURL)
+        XCTAssertTrue(summary.contains("One bug in the reports page."), "Expected the review summary.")
+        XCTAssertTrue(summary.contains("Export button missing"), "Expected the extracted issue.")
+
+        let manifestData = try Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
+        let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
+        XCTAssertEqual(manifest?["exportedFiles"] as? [String], ["transcript.md", "summary.md"])
+    }
+
+    func testWriteBundleOmitsSummaryWhenExtractionNeverRan() throws {
+        let fileManager = FileManager.default
+        let rootDirectoryURL = fileManager.temporaryDirectory
+            .appendingPathComponent("TranscriptExporterNoSummaryTests-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: rootDirectoryURL) }
+
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_300),
+            transcript: "A session that never had issue extraction run.",
+            duration: 12,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil
+        )
+
+        let exporter = TranscriptExporter(fileManager: fileManager)
+        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
+
+        XCTAssertFalse(
+            fileManager.fileExists(atPath: bundleURL.appendingPathComponent("summary.md").path),
+            "A session with no extraction should get no summary file rather than a placeholder saying extraction never ran."
+        )
+        XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("transcript.md").path))
+
+        let manifestData = try Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
+        let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
+        XCTAssertEqual(manifest?["exportedFiles"] as? [String], ["transcript.md"])
     }
 
     func testWriteBundleDoesNotOverwriteDuplicateScreenshotFileNames() throws {
