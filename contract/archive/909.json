@@ -1,0 +1,78 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "909",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 4,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 4
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "The Control-click/Gatekeeper-bypass step is removed from README.md install instructions and surrounding steps are renumbered.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "A positive trust statement replaces it, naming Developer ID + notarization and Team ID 2R4WAH4R53.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "No other tracked doc instructs a Gatekeeper bypass (grep for 'Control-click' and 'Gatekeeper').",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "No source files are modified - docs-only change.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "README.md",
+      "docs/user/user-manual.md",
+      "QUICKSTART.md"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "The Control-click/Gatekeeper-bypass step is removed from README.md install instructions and surrounding steps are renumbered.",
+      "A positive trust statement replaces it, naming Developer ID + notarization and Team ID 2R4WAH4R53.",
+      "No other tracked doc instructs a Gatekeeper bypass (grep for 'Control-click' and 'Gatekeeper').",
+      "No source files are modified - docs-only change."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main"
+      ]
+    },
+    "references": [
+      "Found by 3-model gap analysis 2026-08-01; notarization verified empirically against the published v1.0.40 DMG."
+    ],
+    "acceptance_criteria": [
+      "A first-time reader is never told to bypass Gatekeeper.",
+      "Docs-only diff."
+    ]
+  }
+}
