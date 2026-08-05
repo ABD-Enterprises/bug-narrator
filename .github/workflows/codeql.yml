@@ -10,10 +10,51 @@ on:
         type: boolean
   schedule:
     - cron: '0 4 * * 1'  # Weekly on Monday at 4 AM UTC
+    - cron: '0 5 1 * *'  # Monthly on the 1st at 5 AM UTC — includes Swift
 
 jobs:
+  # Swift is the main product language (230 files under Sources/) but analyzing
+  # it needs a hosted macOS runner, which is metered. The weekly scan stays on
+  # the cheap runners; Swift rides the monthly cron and any manual dispatch that
+  # asks for it. Computing the list here keeps that policy in one readable
+  # place — the previous hard-coded matrix silently ignored the include_swift
+  # input entirely, so Swift was never analyzed at all (#919).
+  languages:
+    name: Select languages
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.select.outputs.list }}
+    steps:
+      - name: Select analysis languages
+        id: select
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INCLUDE_SWIFT: ${{ inputs.include_swift }}
+        run: |
+          set -euo pipefail
+          base='"actions","python","javascript-typescript","csharp"'
+
+          include_swift=false
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$INCLUDE_SWIFT" == "true" ]]; then
+            include_swift=true
+          elif [[ "$EVENT_NAME" == "schedule" && "$SCHEDULE" == "0 5 1 * *" ]]; then
+            include_swift=true
+          fi
+
+          if [[ "$include_swift" == "true" ]]; then
+            list="[$base,\"swift\"]"
+          else
+            list="[$base]"
+          fi
+
+          echo "Analyzing: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: languages
     runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || matrix.language == 'csharp' && 'windows-latest' || 'ubuntu-latest' }}
     permissions:
       security-events: write
@@ -23,20 +64,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ${{ fromJSON('["actions","python","javascript-typescript","csharp"]') }}
+        language: ${{ fromJSON(needs.languages.outputs.list) }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
           languages: ${{ matrix.language }}
 
       - name: Setup .NET
         if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 8.0.x
 
@@ -47,9 +88,9 @@ jobs:
 
       - name: Autobuild
         if: matrix.language != 'csharp'
-        uses: github/codeql-action/autobuild@v4
+        uses: github/codeql-action/autobuild@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
           category: /language:${{ matrix.language }}
