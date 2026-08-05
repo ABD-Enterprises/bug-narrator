@@ -45,6 +45,10 @@ local-transcription/dist/
 # Runtime logs (e.g. the local Parakeet transcription server) — never committed.
 logs/
 
-# scripts/validate.sh and scripts/swift-parse-check.sh write status/output
-# files here on every run; they should never be committed.
-artifacts/validation/
+# Local run evidence: validate.sh / swift-parse-check.sh status output, release
+# smoke logs, xcodebuild test logs, per-PR review logs. None of it is ever
+# edited after it is written, so it does not belong in git history. Attach
+# validation evidence to the issue/PR or upload it as a CI artifact instead
+# (#923).
+artifacts/
+.migrate.log
