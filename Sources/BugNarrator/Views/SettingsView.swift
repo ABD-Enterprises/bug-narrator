@@ -5,17 +5,8 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var settingsStore: SettingsStore
     @State private var showDeleteAllLocalDataConfirmation = false
-    @State private var selectedSection: SettingsSection
-
-    init(appState: AppState, settingsStore: SettingsStore) {
-        self.appState = appState
-        self.settingsStore = settingsStore
-        _selectedSection = State(
-            initialValue: Self.initialSection(
-                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential
-            )
-        )
-    }
+    @State private var selectedSection: SettingsSection = .general
+    @State private var hasAppliedInitialSection = false
 
     /// The section Settings opens on. An install with no usable AI provider
     /// credential lands on `AI Engines` instead of `General` (#911), because the
@@ -26,8 +17,14 @@ struct SettingsView: View {
     /// local providers, which can still fail `aiProviderCompatibilityIssue`.
     /// Those users keep the existing `General` landing.
     ///
-    /// This only seeds the initial selection. Once the window is open the user's
-    /// own tab choices are never overridden.
+    /// Applied once, from `.onAppear`, guarded by `hasAppliedInitialSection`.
+    ///
+    /// It is deliberately NOT seeded via `State(initialValue:)` in a custom
+    /// `init`. That approach shipped briefly and broke the Settings tabs
+    /// outright: SwiftUI re-ran the initializer as `settingsStore` published,
+    /// re-seeding the selection and snapping the segmented control back on
+    /// every render, so no tab could be selected at all. Caught by
+    /// `BugNarratorSettingsUITests` once #922 started running the UI suite.
     static func initialSection(hasUsableAIProviderCredential: Bool) -> SettingsSection {
         hasUsableAIProviderCredential ? .general : .aiEngines
     }
@@ -90,6 +87,16 @@ struct SettingsView: View {
         }
         .padding(24)
         .frame(minWidth: 660, minHeight: 580)
+        .onAppear {
+            guard !hasAppliedInitialSection else {
+                return
+            }
+
+            hasAppliedInitialSection = true
+            selectedSection = Self.initialSection(
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential
+            )
+        }
         .alert("Delete all local BugNarrator data?", isPresented: $showDeleteAllLocalDataConfirmation) {
             Button("Delete All Data", role: .destructive) {
                 Task {
