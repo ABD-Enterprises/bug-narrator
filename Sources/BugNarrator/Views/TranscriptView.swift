@@ -1281,11 +1281,7 @@ struct TranscriptView: View {
     }
 
     private var emptyLibrarySetupDescription: String {
-        let provider = appState.settingsStore.aiProvider
-        if provider.requiresAPIKey {
-            return "You can record without a \(provider.displayName) API key, but you need one in Settings before a session can be transcribed into the library."
-        }
-        return "You can record without finishing \(provider.displayName) setup, but transcription will not complete until the local server and base URL work from this Mac."
+        RecordingSetupCopy.emptyLibraryDescription(for: appState.settingsStore.aiProvider)
     }
 
     private var emptyLibrarySetupSymbol: String {

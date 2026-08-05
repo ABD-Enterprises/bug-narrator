@@ -418,11 +418,7 @@ struct MenuBarView: View {
             )
                 .font(.subheadline.weight(.semibold))
 
-            Text(
-                provider.requiresAPIKey
-                    ? "BugNarrator sends transcription requests to \(provider.displayName). You can start recording without a key, but you need your own API key in Settings before transcription or issue extraction will work. Provider usage may incur charges on your account."
-                    : "BugNarrator is configured to use \(provider.displayName) for transcription. Recording can start now, but transcription and issue extraction will not work until the local server and base URL are reachable from this Mac."
-            )
+            Text(RecordingSetupCopy.menuBannerDescription(for: provider))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 

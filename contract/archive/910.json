@@ -1,0 +1,80 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "910",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 4,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 4
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "When hasUsableAIProviderCredential is false, no surface invites the user to start a recording.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "Copy in the unconfigured state names the missing prerequisite and offers a CTA routing to AI provider setup.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "The configured-state copy and layout are unchanged.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "Presentation logic is covered by targeted unit tests for both configured and unconfigured states.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "Sources/BugNarrator/Views/MenuBarView.swift",
+      "Sources/BugNarrator/Views/TranscriptView.swift",
+      "Sources/BugNarrator/Views/RecordingControlPanelView.swift"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "When hasUsableAIProviderCredential is false, no surface invites the user to start a recording.",
+      "Copy in the unconfigured state names the missing prerequisite and offers a CTA routing to AI provider setup.",
+      "The configured-state copy and layout are unchanged.",
+      "Presentation logic is covered by targeted unit tests for both configured and unconfigured states."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main",
+        "DEVELOPER_DIR=\"${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}\" xcodebuild -quiet -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination \"platform=macOS,arch=$(uname -m)\" CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- -only-testing:BugNarratorTests test"
+      ]
+    },
+    "references": [
+      "Found by Codex in 3-model gap analysis 2026-08-01.",
+      "Related: #378 shipped the Finish setup banner; this closes the contradiction it left."
+    ],
+    "acceptance_criteria": [
+      "No dead-end invitation on first run.",
+      "No behavior change once a provider is configured."
+    ]
+  }
+}
