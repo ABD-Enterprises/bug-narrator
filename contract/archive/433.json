@@ -1,0 +1,89 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "433",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 5,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 5
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "Each low-coupling section is extracted into its own focused SwiftUI view file (suggested first cuts: MenuSetupBannerView, MenuStatusCardView + recovery subviews, MenuSessionLibraryCardView, MenuProductInfoView).",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "MenuBarView.swift is reduced to a composition root that wires the extracted subviews.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "Copy, layout, spacing, and accessibility behavior are unchanged (pixel/behavior preserving) unless a specific referenced bug is being fixed.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "No view-local state is promoted into global singletons during extraction.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 5,
+        "text": "Build is green and any presentation logic extracted into pure helpers has targeted unit tests.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "Sources/BugNarrator/Views/MenuBarView.swift",
+      "Sources/BugNarrator/Views/Menu/ (new focused subviews)"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "Each low-coupling section is extracted into its own focused SwiftUI view file (suggested first cuts: MenuSetupBannerView, MenuStatusCardView + recovery subviews, MenuSessionLibraryCardView, MenuProductInfoView).",
+      "MenuBarView.swift is reduced to a composition root that wires the extracted subviews.",
+      "Copy, layout, spacing, and accessibility behavior are unchanged (pixel/behavior preserving) unless a specific referenced bug is being fixed.",
+      "No view-local state is promoted into global singletons during extraction.",
+      "Build is green and any presentation logic extracted into pure helpers has targeted unit tests."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main",
+        "DEVELOPER_DIR=\"${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}\" xcodebuild -quiet -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination \"platform=macOS,arch=$(uname -m)\" CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- -only-testing:BugNarratorTests test"
+      ]
+    },
+    "references": [
+      "Independent of #401 (TranscriptView) — different file, safe to run concurrently.",
+      "Adjacent to onboarding work (#357/#368) which also touches the menu bar surface; coordinate copy changes."
+    ],
+    "acceptance_criteria": [
+      "Each extracted section ships as its own small, independently reviewable PR.",
+      "No behavior/pixel change in the popover (verified by existing UI tests / manual popover check).",
+      "MenuBarView.swift net line count drops materially per PR."
+    ]
+  }
+}
