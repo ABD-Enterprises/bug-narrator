@@ -2,13 +2,28 @@
 
 ## Unreleased
 
-- [FIX] Made the recording-controls transcription progress copy provider-aware, so Local (Parakeet) sessions no longer claim audio is being uploaded to OpenAI.
-- [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
+## 1.0.41 - 2026-08-05
+
+- [FIX] Settings now opens on the AI Engines pane when no usable AI provider credential is configured, instead of General — the pane a new user is sent to Settings to fix is the one they land on (#911).
+- [FIX] The menu bar and empty session library no longer invite you to start a recording while the record control is disabled. Setup copy now names the prerequisite instead of promising recording works without it (#910).
+- [CHANGE] Exported session bundles now include `summary.md` — the review summary and extracted issues — alongside `transcript.md` and `screenshots/`, plus a `manifest.json` describing the bundle's contents (#914).
+- [FIX] Exporting a session bundle no longer fails outright when a referenced screenshot file has been moved or deleted. The bundle exports with the screenshots that remain, and the missing files are listed in `manifest.json` (#914).
+- [FIX] Install instructions no longer tell you to Control-click past a Gatekeeper warning. Releases are Developer ID signed, notarized, and stapled, so that warning does not appear (#909).
+
+### Internal
+
+- [INTERNAL] Corrected the 1.0.40 release date, restored the missing 1.0.37 entry, and separated internal notes from user-facing ones in this changelog (#915).
+- [INTERNAL] CodeQL now analyzes Swift — the `include_swift` dispatch input never reached the language matrix, so Swift was silently unscanned (#919).
+- [INTERNAL] `BugNarratorUITests` are now executed by CI; the target existed but no workflow ran it (#922).
+- [INTERNAL] Stopped tracking agent scratch logs that had been committed to the repo (#923).
+- [INTERNAL] Extracted the seven permission and configuration recovery sections out of `MenuBarView.swift` into `MenuBarView+RecoverySections.swift`, 873 → 724 lines (#433).
 
 ## 1.0.40 - 2026-07-23
 
 - [FIX] Clarified the failure paths when starting a system-audio recording — reason-labelled diagnostic logs distinguish the experimental-feature-flag gate, the consent-acknowledgement gate, and macOS TCC audio-capture permission; the TCC failure path now names the exact System Settings pane to open (#856).
 - [FIX] Updated the Settings > Recording Audio > Audio Source hint to name both prerequisites (consent toggle + System Settings > Privacy & Security > Screen & System Audio Recording) so users can preempt the "first-time capture" macOS prompt.
+- [FIX] Made the recording-controls transcription progress copy provider-aware, so Local (Parakeet) sessions no longer claim audio is being uploaded to OpenAI.
+- [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
 
 ### Internal
 
