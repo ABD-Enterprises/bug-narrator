@@ -181,7 +181,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Run unit tests (BugNarratorTests only; UITests need a window server)
+      - name: Run unit tests (BugNarratorTests)
         run: |
           set -o pipefail
           xcodebuild \
@@ -192,3 +192,34 @@ jobs:
             -only-testing:BugNarratorTests \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+      # BugNarratorUITests (610 lines of Settings-flow coverage) had never been
+      # executed by any workflow or script, so it could drift out of sync with
+      # the UI silently (#922). It runs here rather than nowhere.
+      #
+      # Non-blocking on purpose: XCUITest on a hosted macOS runner depends on a
+      # usable window server and can be flaky for reasons unrelated to the diff.
+      # A red UI leg should be a visible signal to investigate, not a gate that
+      # blocks unrelated work. Promote to blocking once it has proven stable.
+      - name: Run UI tests (BugNarratorUITests, non-blocking)
+        id: ui_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BugNarrator.xcodeproj \
+            -scheme BugNarrator \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -only-testing:BugNarratorUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Report UI test outcome
+        if: always()
+        run: |
+          if [[ "${{ steps.ui_tests.outcome }}" == "success" ]]; then
+            echo "::notice::BugNarratorUITests passed."
+          else
+            echo "::warning::BugNarratorUITests did not pass (non-blocking). Outcome: ${{ steps.ui_tests.outcome }}. Investigate before promoting this leg to blocking."
+          fi
