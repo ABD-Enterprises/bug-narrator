@@ -31,6 +31,7 @@ jobs:
     outputs:
       docs_changed: ${{ steps.changes.outputs.docs_changed }}
       swift_changed: ${{ steps.changes.outputs.swift_changed }}
+      windows_changed: ${{ steps.changes.outputs.windows_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -78,6 +79,14 @@ jobs:
             echo "swift_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "swift_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # ci.yml is included so a change to this workflow exercises the
+          # Windows job itself, rather than shipping a gate nothing has run.
+          if grep -Eq '(^windows/|^\.github/workflows/ci\.yml$)' <<< "$changed_files"; then
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
   runtime-guardrails:
@@ -257,3 +266,32 @@ jobs:
           else
             echo "::warning::BugNarratorUITests did not pass (non-blocking). Outcome: ${{ steps.ui_tests.outcome }}. Investigate before promoting this leg to blocking."
           fi
+
+  windows-build-and-test:
+    needs:
+      - detect-ci-changes
+    if: needs.detect-ci-changes.outputs.windows_changed == 'true'
+    # GitHub-hosted: the self-hosted fleet has no Windows runner (#921).
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # build-windows.ps1 runs `dotnet build --no-restore`, so packages must be
+      # restored first or the build fails on a clean runner.
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore windows/BugNarrator.Windows.sln
+
+      - name: Build
+        shell: pwsh
+        run: ./windows/scripts/build-windows.ps1 -Configuration Debug
+
+      - name: Test
+        shell: pwsh
+        run: ./windows/scripts/test-windows.ps1 -Configuration Debug
