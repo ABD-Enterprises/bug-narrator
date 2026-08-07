@@ -1,0 +1,77 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "911",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 4,
+    "machine_backed": 0,
+    "checks": 0,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 4
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "Settings selects the AI Engines pane on open when hasUsableAIProviderCredential is false.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 2,
+        "text": "Settings selects General on open when a usable provider credential exists (today's behavior preserved).",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 3,
+        "text": "Manual tab selection during a session is never overridden.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      },
+      {
+        "index": 4,
+        "text": "Pane-selection logic is a pure helper with targeted unit tests for both states.",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "Sources/BugNarrator/Views/SettingsView.swift"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "Settings selects the AI Engines pane on open when hasUsableAIProviderCredential is false.",
+      "Settings selects General on open when a usable provider credential exists (today's behavior preserved).",
+      "Manual tab selection during a session is never overridden.",
+      "Pane-selection logic is a pure helper with targeted unit tests for both states."
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main",
+        "DEVELOPER_DIR=\"${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}\" xcodebuild -quiet -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination \"platform=macOS,arch=$(uname -m)\" CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- -only-testing:BugNarratorTests test"
+      ]
+    },
+    "references": [
+      "Found by Codex in 3-model gap analysis 2026-08-01."
+    ],
+    "acceptance_criteria": [
+      "Unconfigured user lands where the work is.",
+      "Configured user sees no change."
+    ]
+  }
+}

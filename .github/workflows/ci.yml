@@ -2,13 +2,22 @@ name: CI
 
 on:
   pull_request:
+  # Runs the real build/test inside a merge queue, and rebuilds main after a
+  # merge so post-merge breakage is visible rather than silent (#920).
+  merge_group:
+  push:
+    branches: [main]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 concurrency:
-  group: ci-${{ github.event.pull_request.head.repo.full_name }}-${{ github.event.pull_request.head.ref }}
-  cancel-in-progress: true
+  # pull_request.* is empty on push/merge_group; without the fallbacks every
+  # main build would share one group and cancel the previous one.
+  group: ci-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref }}
+  # Superseding an in-flight PR run is desirable; cancelling a post-merge main
+  # build is not — that is the run that tells you main is broken.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -22,6 +31,7 @@ jobs:
     outputs:
       docs_changed: ${{ steps.changes.outputs.docs_changed }}
       swift_changed: ${{ steps.changes.outputs.swift_changed }}
+      windows_changed: ${{ steps.changes.outputs.windows_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -32,8 +42,33 @@ jobs:
         id: changes
         shell: bash
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
+          # Base differs by event. pull_request has base.sha; merge_group has its
+          # own base_sha; push carries the previous head in `before`. Without
+          # this, adding push/merge_group triggers would diff against an empty
+          # ref and fail every run on main (#920).
+          case "${{ github.event_name }}" in
+            pull_request) base_sha="${{ github.event.pull_request.base.sha }}" ;;
+            merge_group)  base_sha="${{ github.event.merge_group.base_sha }}" ;;
+            *)            base_sha="${{ github.event.before }}" ;;
+          esac
+
+          # A first push, a force-push, or a squash-merge can report an
+          # all-zero or unreachable `before`. Fall back to the first parent so
+          # the job still produces a usable diff instead of erroring.
+          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]] || ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=2 origin "${{ github.sha }}" || true
+            base_sha="$(git rev-parse "${{ github.sha }}^" 2>/dev/null || echo "")"
+          else
+            git fetch --no-tags --depth=1 origin "$base_sha" || true
+          fi
+
+          if [[ -z "$base_sha" ]]; then
+            # No comparable base (e.g. an initial commit). Treat everything as
+            # changed rather than silently skipping the build.
+            changed_files="$(git ls-files)"
+          else
+            changed_files="$(git diff --name-only "$base_sha" "${{ github.sha }}")"
+          fi
           if grep -Eq '^(docs/|site/|README\.md|QUICKSTART\.md|SECURITY\.md|CONTRIBUTING\.md)' <<< "$changed_files"; then
             echo "docs_changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -44,6 +79,14 @@ jobs:
             echo "swift_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "swift_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # ci.yml is included so a change to this workflow exercises the
+          # Windows job itself, rather than shipping a gate nothing has run.
+          if grep -Eq '(^windows/|^\.github/workflows/ci\.yml$)' <<< "$changed_files"; then
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
   runtime-guardrails:
@@ -181,7 +224,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Run unit tests (BugNarratorTests only; UITests need a window server)
+      - name: Run unit tests (BugNarratorTests)
         run: |
           set -o pipefail
           xcodebuild \
@@ -192,3 +235,63 @@ jobs:
             -only-testing:BugNarratorTests \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+      # BugNarratorUITests (610 lines of Settings-flow coverage) had never been
+      # executed by any workflow or script, so it could drift out of sync with
+      # the UI silently (#922). It runs here rather than nowhere.
+      #
+      # Non-blocking on purpose: XCUITest on a hosted macOS runner depends on a
+      # usable window server and can be flaky for reasons unrelated to the diff.
+      # A red UI leg should be a visible signal to investigate, not a gate that
+      # blocks unrelated work. Promote to blocking once it has proven stable.
+      - name: Run UI tests (BugNarratorUITests, non-blocking)
+        id: ui_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BugNarrator.xcodeproj \
+            -scheme BugNarrator \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -only-testing:BugNarratorUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Report UI test outcome
+        if: always()
+        run: |
+          if [[ "${{ steps.ui_tests.outcome }}" == "success" ]]; then
+            echo "::notice::BugNarratorUITests passed."
+          else
+            echo "::warning::BugNarratorUITests did not pass (non-blocking). Outcome: ${{ steps.ui_tests.outcome }}. Investigate before promoting this leg to blocking."
+          fi
+
+  windows-build-and-test:
+    needs:
+      - detect-ci-changes
+    if: needs.detect-ci-changes.outputs.windows_changed == 'true'
+    # GitHub-hosted: the self-hosted fleet has no Windows runner (#921).
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # build-windows.ps1 runs `dotnet build --no-restore`, so packages must be
+      # restored first or the build fails on a clean runner.
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore windows/BugNarrator.Windows.sln
+
+      - name: Build
+        shell: pwsh
+        run: ./windows/scripts/build-windows.ps1 -Configuration Debug
+
+      - name: Test
+        shell: pwsh
+        run: ./windows/scripts/test-windows.ps1 -Configuration Debug

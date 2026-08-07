@@ -6,6 +6,28 @@ struct SettingsView: View {
     @ObservedObject var settingsStore: SettingsStore
     @State private var showDeleteAllLocalDataConfirmation = false
     @State private var selectedSection: SettingsSection = .general
+    @State private var hasAppliedInitialSection = false
+
+    /// The section Settings opens on. An install with no usable AI provider
+    /// credential lands on `AI Engines` instead of `General` (#911), because the
+    /// recording gate routes exactly that user here.
+    ///
+    /// Note this keys off credential presence, not full provider readiness:
+    /// `hasUsableAIProviderCredential` returns `true` unconditionally for the
+    /// local providers, which can still fail `aiProviderCompatibilityIssue`.
+    /// Those users keep the existing `General` landing.
+    ///
+    /// Applied once, from `.onAppear`, guarded by `hasAppliedInitialSection`.
+    ///
+    /// It is deliberately NOT seeded via `State(initialValue:)` in a custom
+    /// `init`. That approach shipped briefly and broke the Settings tabs
+    /// outright: SwiftUI re-ran the initializer as `settingsStore` published,
+    /// re-seeding the selection and snapping the segmented control back on
+    /// every render, so no tab could be selected at all. Caught by
+    /// `BugNarratorSettingsUITests` once #922 started running the UI suite.
+    static func initialSection(hasUsableAIProviderCredential: Bool) -> SettingsSection {
+        hasUsableAIProviderCredential ? .general : .aiEngines
+    }
 
     /// The tabbed sections of Settings. A segmented `Picker` drives selection —
     /// macOS `TabView` does not expose addressable tab controls in this window,
@@ -65,6 +87,16 @@ struct SettingsView: View {
         }
         .padding(24)
         .frame(minWidth: 660, minHeight: 580)
+        .onAppear {
+            guard !hasAppliedInitialSection else {
+                return
+            }
+
+            hasAppliedInitialSection = true
+            selectedSection = Self.initialSection(
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential
+            )
+        }
         .alert("Delete all local BugNarrator data?", isPresented: $showDeleteAllLocalDataConfirmation) {
             Button("Delete All Data", role: .destructive) {
                 Task {

@@ -28,7 +28,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Stop the session and confirm transcription succeeds with the selected provider.
 - For chat-capable providers, confirm the transcript, review summary, screenshots, and extracted issues appear in the session library.
 - For `Local (Parakeet)`, confirm the transcript and screenshots appear in the session library and automatic issue extraction stays disabled until a chat-capable provider is selected.
-- Export a session bundle and verify `transcript.md` plus the `screenshots` folder are created.
+- Export a session bundle and verify `transcript.md`, `summary.md`, the `screenshots` folder, and `manifest.json` are created.
 
 ## Export Integrations
 

@@ -2,13 +2,31 @@
 
 ## Unreleased
 
-- [FIX] Made the recording-controls transcription progress copy provider-aware, so Local (Parakeet) sessions no longer claim audio is being uploaded to OpenAI.
-- [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
+## 1.0.41 - 2026-08-05
 
-## 1.0.40 - 2026-07-09
+- [FIX] Settings now opens on the AI Engines pane when no usable AI provider credential is configured, instead of General — the pane a new user is sent to Settings to fix is the one they land on (#911).
+- [FIX] The menu bar and empty session library no longer invite you to start a recording while the record control is disabled. Setup copy now names the prerequisite instead of promising recording works without it (#910).
+- [CHANGE] Exported session bundles now include `summary.md` — the review summary and extracted issues — alongside `transcript.md` and `screenshots/`, plus a `manifest.json` describing the bundle's contents (#914).
+- [FIX] Exporting a session bundle no longer fails outright when a referenced screenshot file has been moved or deleted. The bundle exports with the screenshots that remain, and the missing files are listed in `manifest.json` (#914).
+- [FIX] Install instructions no longer tell you to Control-click past a Gatekeeper warning. Releases are Developer ID signed, notarized, and stapled, so that warning does not appear (#909).
+
+### Internal
+
+- [INTERNAL] Corrected the 1.0.40 release date, restored the missing 1.0.37 entry, and separated internal notes from user-facing ones in this changelog (#915).
+- [INTERNAL] CodeQL now analyzes Swift — the `include_swift` dispatch input never reached the language matrix, so Swift was silently unscanned (#919).
+- [INTERNAL] `BugNarratorUITests` are now executed by CI; the target existed but no workflow ran it (#922).
+- [INTERNAL] Stopped tracking agent scratch logs that had been committed to the repo (#923).
+- [INTERNAL] Extracted the seven permission and configuration recovery sections out of `MenuBarView.swift` into `MenuBarView+RecoverySections.swift`, 873 → 724 lines (#433).
+
+## 1.0.40 - 2026-07-23
 
 - [FIX] Clarified the failure paths when starting a system-audio recording — reason-labelled diagnostic logs distinguish the experimental-feature-flag gate, the consent-acknowledgement gate, and macOS TCC audio-capture permission; the TCC failure path now names the exact System Settings pane to open (#856).
 - [FIX] Updated the Settings > Recording Audio > Audio Source hint to name both prerequisites (consent toggle + System Settings > Privacy & Security > Screen & System Audio Recording) so users can preempt the "first-time capture" macOS prompt.
+- [FIX] Made the recording-controls transcription progress copy provider-aware, so Local (Parakeet) sessions no longer claim audio is being uploaded to OpenAI.
+- [FIX] Report zero-frame system-audio recordings as system-audio capture/setup failures with recovery guidance, show the active recording source in the controls window, and avoid making Local (Parakeet) look responsible for an empty system-audio file.
+
+### Internal
+
 - [INTERNAL] Updated the accessibility regression guardrail to follow the extracted transcript and settings view files.
 - [INTERNAL] Decomposed `SettingsStore.swift` by 338 lines (1963 → 1625) across seven byte-preserving extension slices — `+Display`, `+DisplayMask`, `+Normalization`, `+Models`, `+Tokens`, `+Placeholders`, `+TranscriptionInput`.
 - [INTERNAL] Extracted `ReviewWorkspaceShell` and `IssueExportTargetEditors` (`IssueGitHubTargetEditor` + `IssueJiraTargetEditor`) from `TranscriptView`, shrinking that file by 239 lines (1882 → 1643).
@@ -23,12 +41,23 @@
 
 - [FIX] Refreshed menu-bar AI setup state when the saved OpenAI credential changes, so Settings and the menu no longer disagree about a usable key.
 - [FIX] Blocked recording starts until AI transcription setup is usable, defaulted fresh installs to English transcription hints, and added transcript quality warnings for wrong-script output.
+
+### Internal
+
 - [INTERNAL] Split AI setup, transcription defaults, and issue extraction settings into an encapsulated SwiftUI section with UI coverage.
 - [INTERNAL] Added a repository docs audit to keep maintainer docs aligned with the local-first validation path and CI unit-test scope.
 - [INTERNAL] Added a cheap Windows tester release preflight so missing signing secrets fail before reserving a Windows runner.
 - [INTERNAL] Moved Swift/project change detection ahead of the self-hosted macOS CI job so config-only PRs no longer reserve macOS runner slots.
 - [INTERNAL] Added the EAS auto-merge trusted-author allowlist so eligible green PRs do not repeatedly fail on missing gate configuration.
 - [INTERNAL] Added effort-leak guardrails so stale AI issue states, duplicate PR claims, and superseded CI runs are caught before agents spend more time.
+
+## 1.0.37 - 2026-06-01
+
+- [FIX] Refreshed the menu-bar AI setup state when saved OpenAI credential readiness changes, so Settings and the menu no longer disagree about a usable key.
+
+### Internal
+
+- [INTERNAL] Added UI regression coverage proving a saved OpenAI key shows Settings as ready and keeps the Validate and Remove actions enabled.
 
 ## 1.0.36 - 2026-05-27
 

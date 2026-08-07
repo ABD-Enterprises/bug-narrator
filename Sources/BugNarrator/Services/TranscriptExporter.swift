@@ -34,6 +34,19 @@ enum TranscriptExportFormat {
     }
 }
 
+/// Records what a session bundle actually contains, including screenshots that
+/// were referenced by the session but absent from disk at export time (#914).
+/// Mirrors the `manifest.json` idiom already used by `PrivacyDataExporter`.
+struct SessionBundleManifest: Encodable {
+    let generatedAt: Date
+    let sessionID: String
+    let exportedFiles: [String]
+    let screenshotCount: Int
+    let copiedScreenshotCount: Int
+    let missingScreenshots: [String]
+    let notes: [String]
+}
+
 @MainActor
 struct TranscriptExporter {
     private let fileManager: FileManager
@@ -93,15 +106,20 @@ struct TranscriptExporter {
     }
 
     func writeBundle(session: TranscriptSession, to destinationRoot: URL) throws -> URL {
-        let missingScreenshots = missingScreenshots(for: session)
-        if !missingScreenshots.isEmpty {
-            let missingList = missingScreenshots.map(\.fileName).joined(separator: ", ")
-            throw AppError.exportFailure(
-                "This session bundle is missing referenced screenshot files: \(missingList). Recreate the screenshots or remove the stale references before exporting."
-            )
-        }
-
+        // A screenshot file that has been moved or pruned since capture used to
+        // make the whole session unexportable. The transcript, summary, and
+        // issues are still worth handing to a team, so the export degrades: the
+        // present files are copied and the absent ones are named in the
+        // manifest instead (#914).
+        //
+        // Presence is decided by the copy attempt itself rather than by a scan
+        // beforehand. A pre-scan leaves a window in which a file can vanish
+        // between the scan and the copy, which would either undercount the
+        // missing list or let `copyItem` throw — reintroducing the exact failure
+        // this change removes.
         var copiedScreenshotCount = 0
+        var missingScreenshotNames: [String] = []
+        var exportedFiles = ["transcript.md"]
 
         let bundleDirectoryURL = try bundleWriter.writeBundle(
             in: destinationRoot,
@@ -113,6 +131,19 @@ struct TranscriptExporter {
                 encoding: .utf8
             )
 
+            // `summaryMarkdownContent` renders the review summary and every
+            // extracted issue grouped by category — the differentiated output.
+            // Sessions that never ran extraction get no file rather than a
+            // placeholder saying so.
+            if session.issueExtraction != nil {
+                try session.summaryMarkdownContent.write(
+                    to: bundleDirectoryURL.appendingPathComponent("summary.md"),
+                    atomically: true,
+                    encoding: .utf8
+                )
+                exportedFiles.append("summary.md")
+            }
+
             let screenshotsDirectoryURL = bundleDirectoryURL.appendingPathComponent("screenshots", isDirectory: true)
             try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
 
@@ -121,9 +152,41 @@ struct TranscriptExporter {
                     for: screenshot.fileName,
                     in: screenshotsDirectoryURL
                 )
-                try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
-                copiedScreenshotCount += 1
+
+                do {
+                    try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
+                    copiedScreenshotCount += 1
+                    exportedFiles.append("screenshots/\(destinationURL.lastPathComponent)")
+                } catch {
+                    // Only an absent source degrades. A copy that failed while the
+                    // file is still on disk is a real problem — permissions, disk
+                    // space — and must not be silently reported as "missing".
+                    guard !fileManager.fileExists(atPath: screenshot.fileURL.path) else {
+                        throw error
+                    }
+                    missingScreenshotNames.append(screenshot.fileName)
+                }
             }
+
+            exportedFiles.append("manifest.json")
+
+            let manifest = SessionBundleManifest(
+                generatedAt: Date(),
+                sessionID: session.id.uuidString,
+                exportedFiles: exportedFiles,
+                screenshotCount: session.screenshotCount,
+                copiedScreenshotCount: copiedScreenshotCount,
+                missingScreenshots: missingScreenshotNames,
+                notes: Self.manifestNotes(missingScreenshotCount: missingScreenshotNames.count)
+            )
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            try encoder.encode(manifest).write(
+                to: bundleDirectoryURL.appendingPathComponent("manifest.json"),
+                options: [.atomic]
+            )
         }
 
         logger.info(
@@ -133,17 +196,23 @@ struct TranscriptExporter {
                 "session_id": session.id.uuidString,
                 "screenshot_count": "\(session.screenshotCount)",
                 "copied_screenshot_count": "\(copiedScreenshotCount)",
-                "missing_screenshot_count": "0"
+                "missing_screenshot_count": "\(missingScreenshotNames.count)"
             ]
         )
 
         return bundleDirectoryURL
     }
 
-    private func missingScreenshots(for session: TranscriptSession) -> [SessionScreenshot] {
-        session.screenshots.filter { screenshot in
-            !fileManager.fileExists(atPath: screenshot.fileURL.path)
+    private static func manifestNotes(missingScreenshotCount: Int) -> [String] {
+        var notes = ["This bundle contains the transcript, review output, and captured screenshots for one BugNarrator session."]
+
+        if missingScreenshotCount > 0 {
+            notes.append(
+                "\(missingScreenshotCount) referenced screenshot file(s) were not found on disk at export time and are listed in missingScreenshots. The rest of the bundle exported normally."
+            )
         }
+
+        return notes
     }
 
     private func uniqueScreenshotDestinationURL(for fileName: String, in directoryURL: URL) -> URL {

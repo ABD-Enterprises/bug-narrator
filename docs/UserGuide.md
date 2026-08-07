@@ -35,7 +35,8 @@ It helps you:
 2. Open the downloaded DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
-5. If macOS shows a Gatekeeper warning, use Finder and choose `Open` for the app you trust.
+
+BugNarrator releases are signed with a `Developer ID Application` certificate (Team ID `2R4WAH4R53`), notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
 
 ### macOS Requirements
 
@@ -191,7 +192,9 @@ Each extracted item keeps evidence from the transcript and should be reviewed be
 Use this when you want a portable local copy of the session. The bundle includes:
 
 - `transcript.md`
+- `summary.md` — the review summary and extracted issues, when issue extraction has run
 - `screenshots/`
+- `manifest.json` — what the bundle contains, including any referenced screenshot files that were no longer on disk at export time
 
 ### Export To GitHub (Experimental)
 
