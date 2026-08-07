@@ -90,6 +90,44 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    /// Whether the one-time "extract issues from this session?" offer has
+    /// already been made (#912).
+    ///
+    /// `autoExtractIssues` deliberately stays off by default — turning it on
+    /// would spend the user's provider credit on every session without asking.
+    /// Instead the offer is made once, after a transcript exists, so the
+    /// differentiating feature is discoverable without a surprise charge.
+    @Published private(set) var hasOfferedIssueExtraction: Bool = false
+
+    /// Records that the offer has been shown. Declining is permanent in the
+    /// sense that the user is never asked again; they can still enable
+    /// extraction in Settings at any time.
+    func markIssueExtractionOffered() {
+        guard !hasOfferedIssueExtraction else {
+            return
+        }
+
+        hasOfferedIssueExtraction = true
+        defaults.set(true, forKey: Keys.hasOfferedIssueExtraction)
+    }
+
+    /// Pure decision for whether to surface the one-time offer (#912).
+    ///
+    /// Deliberately keyed off `supportsIssueExtraction` rather than credential
+    /// readiness: `hasUsableAIProviderCredential` returns `true`
+    /// unconditionally for local providers, and Local (Parakeet) is
+    /// transcription-only, so keying off the credential would offer extraction
+    /// on a provider that cannot perform it.
+    static func shouldOfferIssueExtraction(
+        autoExtractIssues: Bool,
+        hasOffered: Bool,
+        supportsIssueExtraction: Bool
+    ) -> Bool {
+        guard supportsIssueExtraction else { return false }
+        guard !autoExtractIssues else { return false }
+        return !hasOffered
+    }
+
     @Published var autoExtractIssues: Bool = false {
         didSet {
             guard hasLoaded else { return }
@@ -797,6 +835,7 @@ final class SettingsStore: ObservableObject {
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
+        hasOfferedIssueExtraction = boolValue(forKey: Keys.hasOfferedIssueExtraction) ?? false
         normalizeIssueExtractionAvailabilityForCurrentProvider(persist: true)
         systemAudioCaptureEnabled = boolValue(forKey: RecordingPreferencesStore.Keys.systemAudioCaptureEnabled) ?? false
         let storedAudioSource = stringValue(forKey: RecordingPreferencesStore.Keys.recordingAudioSource)
@@ -1546,6 +1585,7 @@ private enum Keys {
     static let autoCopyTranscript = "settings.autoCopyTranscript"
     static let autoSaveTranscript = "settings.autoSaveTranscript"
     static let autoExtractIssues = "settings.autoExtractIssues"
+    static let hasOfferedIssueExtraction = "settings.hasOfferedIssueExtraction"
     // Recording-audio preference keys live on RecordingPreferencesStore.Keys (#429).
     static let startRecordingHotkeyShortcut = "settings.startRecordingHotkeyShortcut"
     static let legacyRecordingHotkeyShortcut = "settings.hotkeyShortcut"
