@@ -47,7 +47,7 @@ gh pr list \
   --repo "$REPO" \
   --state open \
   --limit 200 \
-  --json number,title,labels,url,closingIssuesReferences,author \
+  --json number,title,labels,url,closingIssuesReferences,author,body \
   >"$prs_json"
 
 jq -r -e -n \
@@ -92,6 +92,7 @@ jq -r -e -n \
         $prs_list[]
         | select(
             ((.closingIssuesReferences // []) | length) == 0 and
+            (((.body // "") | test("(?i)\\b(refs|part of)\\s+#[0-9]+")) | not) and
             (has_label("chore:trivial") | not) and
             (((.author.is_bot // false) or ((.author.login // "") | (endswith("[bot]") or . == "dependabot" or . == "app/dependabot"))) | not)
           )
