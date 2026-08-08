@@ -17,6 +17,13 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     var transcriptQualityFindings: [TranscriptQualityFinding]
     var recoveredSourceFileName: String?
     let artifactsDirectoryPath: String?
+    /// True for the bundled demo session (#374). It exists so a new user can
+    /// see what the product produces without spending provider credit — it is
+    /// not the user's own recording, and the library labels it as such.
+    ///
+    /// Decoded with `decodeIfPresent`, so sessions written before this field
+    /// existed still load, as `false`.
+    var isSampleSession: Bool
     /// Persisted-format version. Absent in files written before this field
     /// existed, which decode as `legacySchemaVersion`. A future required-field
     /// change can branch on this to migrate old sessions instead of failing to
@@ -43,6 +50,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         recoveredSourceFileName: String? = nil,
         updatedAt: Date? = nil,
         artifactsDirectoryPath: String? = nil,
+        isSampleSession: Bool = false,
         schemaVersion: Int = TranscriptSession.currentSchemaVersion
     ) {
         self.schemaVersion = schemaVersion
@@ -62,6 +70,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         self.transcriptQualityFindings = transcriptQualityFindings
         self.recoveredSourceFileName = recoveredSourceFileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.artifactsDirectoryPath = artifactsDirectoryPath
+        self.isSampleSession = isSampleSession
     }
 
     init(from decoder: any Decoder) throws {
@@ -88,6 +97,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         ) ?? []
         self.recoveredSourceFileName = try container.decodeIfPresent(String.self, forKey: .recoveredSourceFileName)
         self.artifactsDirectoryPath = try container.decodeIfPresent(String.self, forKey: .artifactsDirectoryPath)
+        self.isSampleSession = try container.decodeIfPresent(Bool.self, forKey: .isSampleSession) ?? false
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -109,6 +119,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         try container.encode(transcriptQualityFindings, forKey: .transcriptQualityFindings)
         try container.encodeIfPresent(recoveredSourceFileName, forKey: .recoveredSourceFileName)
         try container.encodeIfPresent(artifactsDirectoryPath, forKey: .artifactsDirectoryPath)
+        try container.encode(isSampleSession, forKey: .isSampleSession)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -124,6 +135,7 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
         case screenshots
         case sections
         case issueExtraction
+        case isSampleSession
         case pendingTranscription
         case transcriptQualityFindings
         case recoveredSourceFileName
@@ -153,7 +165,9 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
 
     var metadataSummary: String {
         let formattedDate = createdAt.formatted(date: .abbreviated, time: .shortened)
-        return "\(formattedDate)  •  \(ElapsedTimeFormatter.string(from: duration))  •  \(model)"
+        let base = "\(formattedDate)  •  \(ElapsedTimeFormatter.string(from: duration))  •  \(model)"
+        // The bundled demo must never read as the user's own recording (#374).
+        return isSampleSession ? "Sample  •  \(base)" : base
     }
 
     var markerCount: Int {
