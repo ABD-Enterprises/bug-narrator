@@ -93,7 +93,7 @@ jq -r -e -n \
         | select(
             ((.closingIssuesReferences // []) | length) == 0 and
             (has_label("chore:trivial") | not) and
-            ((.author.login // "") | (endswith("[bot]") or . == "dependabot") | not)
+            (((.author.is_bot // false) or ((.author.login // "") | (endswith("[bot]") or . == "dependabot" or . == "app/dependabot"))) | not)
           )
         | "PR #\(.number) has no linked closing issue and is not labeled chore:trivial."
       ]
