@@ -196,6 +196,7 @@
 		8C7B9A73443F9941883AA9D5 /* SupportDataTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D40CD81DEFA2ECA16E84902 /* SupportDataTypes.swift */; };
 		8CF257839BEA4B0681BEA508 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB4BF3587D332E1E9B2D70F /* HotkeyManager.swift */; };
 		8D34D845BE5587EC9B1E1765 /* RecordingStatusMessageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125C92DA82CC9990EA847AA7 /* RecordingStatusMessageProvider.swift */; };
+		58CD33EE2705671BD8623722 /* SampleSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A3071DC1AAEAFA95B55CDF0 /* SampleSession.swift */; };
 		92B57B9DB98B752189400DED /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865C8411BBEF6C03DA03FAFD /* OnboardingFlow.swift */; };
 		8E0DE1B3EABFCECD46EF5ED0 /* SessionDataProtectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */; };
 		8E21137F54B8CC5D96258B8D /* SettingsViewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4748B8137EC364C1FD89B9 /* SettingsViewComponents.swift */; };
@@ -311,6 +312,7 @@
 		DABA5D4856C56172E1DFB2FF /* RetryPostTranscriptionResultHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EEE520F730E7A4C0B32FE9 /* RetryPostTranscriptionResultHandlerTests.swift */; };
 		DB44B00A8FFA358E3239DA48 /* RecordingAudioSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A79F0CD44463306F35C431 /* RecordingAudioSourceTests.swift */; };
 		DBED32896E81F9C7422A48BC /* SettingsStoreDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72FED1F76E79D004AD1CF56 /* SettingsStoreDisplayTests.swift */; };
+		1615DFA8FF4C5F4473141F67 /* SampleSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BEB66730FABC64ABF7B7EE /* SampleSessionTests.swift */; };
 		00FFAD6EE44AC23B191FDCD9 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08237E675AFBE2915161473C /* OnboardingFlowTests.swift */; };
 		E09F1593B3306631A5EA09E1 /* IssueExtractionOfferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D76C5EA98B342841803F11 /* IssueExtractionOfferTests.swift */; };
 		DBFA5905D305404FAD17EC5E /* TrackerExportRetryTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74431871C8CB4E2F62C82213 /* TrackerExportRetryTypes.swift */; };
@@ -393,6 +395,7 @@
 		102DE8AAA101EED5CB2B6A11 /* ExportReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportReceipt.swift; sourceTree = "<group>"; };
 		104A00B74D18C9842D5BA11C /* JiraExportConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JiraExportConfig.swift; sourceTree = "<group>"; };
 		125C92DA82CC9990EA847AA7 /* RecordingStatusMessageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusMessageProvider.swift; sourceTree = "<group>"; };
+		7A3071DC1AAEAFA95B55CDF0 /* SampleSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleSession.swift; sourceTree = "<group>"; };
 		865C8411BBEF6C03DA03FAFD /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		140D8ACAC9A9E1AE17181482 /* SettingsStore+Normalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStore+Normalization.swift"; sourceTree = "<group>"; };
 		154255C955FE33FD6D016BE9 /* PrivacyDataExportTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyDataExportTypes.swift; sourceTree = "<group>"; };
@@ -631,6 +634,7 @@
 		B486B153518EB9E1BBC08F17 /* AppState+SystemActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+SystemActions.swift"; sourceTree = "<group>"; };
 		B6EBD017E98FB65B2CD27ED3 /* ApplicationTerminationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTerminationControllerTests.swift; sourceTree = "<group>"; };
 		B72FED1F76E79D004AD1CF56 /* SettingsStoreDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreDisplayTests.swift; sourceTree = "<group>"; };
+		D3BEB66730FABC64ABF7B7EE /* SampleSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleSessionTests.swift; sourceTree = "<group>"; };
 		08237E675AFBE2915161473C /* OnboardingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowTests.swift; sourceTree = "<group>"; };
 		79D76C5EA98B342841803F11 /* IssueExtractionOfferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionOfferTests.swift; sourceTree = "<group>"; };
 		BA49B2B79731E3A62B083174 /* IssueExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportController.swift; sourceTree = "<group>"; };
@@ -824,6 +828,7 @@
 				AF86B21036E15ECF52300E09 /* SessionScreenshotTests.swift */,
 				72E40C471334C91DCE931AA9 /* SettingsStoreDisplayMaskTests.swift */,
 				B72FED1F76E79D004AD1CF56 /* SettingsStoreDisplayTests.swift */,
+				D3BEB66730FABC64ABF7B7EE /* SampleSessionTests.swift */,
 				08237E675AFBE2915161473C /* OnboardingFlowTests.swift */,
 				79D76C5EA98B342841803F11 /* IssueExtractionOfferTests.swift */,
 				2DCF18FBCE4EAE1F20EE8C38 /* SettingsStoreNormalizationTests.swift */,
@@ -1124,6 +1129,7 @@
 				E6F91AF8040F5D9B6BD0C8F1 /* RecordingSetupCopy.swift */,
 				B2F0C360F83AB792370FADAF /* RecordingStatusMessageBuilder.swift */,
 				125C92DA82CC9990EA847AA7 /* RecordingStatusMessageProvider.swift */,
+				7A3071DC1AAEAFA95B55CDF0 /* SampleSession.swift */,
 				865C8411BBEF6C03DA03FAFD /* OnboardingFlow.swift */,
 				002A3FB6CC8E66C5C82E0B56 /* RecordingTimerViewModel.swift */,
 				60982ABA90B0CE76BF93E46A /* ReviewWorkspace.swift */,
@@ -1376,6 +1382,7 @@
 				9619964E0CEE6D5A039340F7 /* SessionScreenshotTests.swift in Sources */,
 				435FE280CAB12DF2C2184BCC /* SettingsStoreDisplayMaskTests.swift in Sources */,
 				DBED32896E81F9C7422A48BC /* SettingsStoreDisplayTests.swift in Sources */,
+				1615DFA8FF4C5F4473141F67 /* SampleSessionTests.swift in Sources */,
 				00FFAD6EE44AC23B191FDCD9 /* OnboardingFlowTests.swift in Sources */,
 				E09F1593B3306631A5EA09E1 /* IssueExtractionOfferTests.swift in Sources */,
 				465C1973DFA15D7501AEA274 /* SettingsStoreNormalizationTests.swift in Sources */,
@@ -1562,6 +1569,7 @@
 				9B55193838FDEC8E03DE78B5 /* RecordingSetupCopy.swift in Sources */,
 				952BBC1ED94400857FF4E837 /* RecordingStatusMessageBuilder.swift in Sources */,
 				8D34D845BE5587EC9B1E1765 /* RecordingStatusMessageProvider.swift in Sources */,
+				58CD33EE2705671BD8623722 /* SampleSession.swift in Sources */,
 				92B57B9DB98B752189400DED /* OnboardingFlow.swift in Sources */,
 				5C18E905F94644D69AA9CB60 /* RecordingTimerViewModel.swift in Sources */,
 				981A2F83EC4A0550815EF1B4 /* ReviewWorkspace.swift in Sources */,
