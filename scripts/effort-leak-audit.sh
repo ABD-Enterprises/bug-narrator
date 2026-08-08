@@ -107,6 +107,37 @@ jq -r -e -n \
     if type == "string" then . else empty end
   ' | tee "$audit_output"
 
-if grep -qv '^PASS:' "$audit_output"; then
+# Enforcement is scoped to the PR under test; reporting is not (#941).
+#
+# The audit deliberately looks at every open PR, because effort leak is a
+# repo-wide property. But this script also backs `runtime-guardrails`, a
+# REQUIRED per-PR check — so an unrelated non-conforming PR used to turn the
+# gate red on every open PR at once, blocking authors on a condition they
+# could only fix by editing someone else's PR.
+#
+# Every finding is still printed above. What changes is which ones fail the
+# run: when a PR context is known, only findings naming that PR do.
+# Unscoped runs (local, manual, scheduled) keep failing on anything, so
+# repo-wide enforcement is not lost — it just moves off the per-PR gate.
+scope_pr="${EFFORT_LEAK_PR:-}"
+if [[ -z "$scope_pr" && "${GITHUB_REF:-}" =~ ^refs/pull/([0-9]+)/ ]]; then
+  scope_pr="${BASH_REMATCH[1]}"
+fi
+
+findings="$(grep -v '^PASS:' "$audit_output" || true)"
+[[ -z "$findings" ]] && exit 0
+
+if [[ -n "$scope_pr" ]]; then
+  # Word-boundary match so #94 does not match #941.
+  own_findings="$(printf '%s\n' "$findings" | grep -E "(^|[^0-9])#${scope_pr}([^0-9]|$)" || true)"
+
+  if [[ -z "$own_findings" ]]; then
+    echo "::notice::effort-leak: findings exist for other open PRs but none name PR #${scope_pr}; not failing this check. Run the audit unscoped to see them all."
+    exit 0
+  fi
+
+  echo "::error::effort-leak: PR #${scope_pr} has its own finding(s) above."
   exit 1
 fi
+
+exit 1
