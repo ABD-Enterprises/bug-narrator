@@ -9,6 +9,7 @@ final class WindowCoordinator {
         static let about = "about"
         static let changelog = "changelog"
         static let support = "support"
+        static let welcome = "welcome"
     }
 
     private let appState: AppState
@@ -23,6 +24,7 @@ final class WindowCoordinator {
     private var showAboutSceneAction: (() -> Void)?
     private var showChangelogSceneAction: (() -> Void)?
     private var showSupportSceneAction: (() -> Void)?
+    private var showWelcomeSceneAction: (() -> Void)?
 
     private let recordingControlSize = NSSize(width: 336, height: 220)
     private let recordingControlAutosaveName = "BugNarratorRecordingControlsWindow"
@@ -53,13 +55,15 @@ final class WindowCoordinator {
         showSettings: @escaping () -> Void,
         showAbout: @escaping () -> Void,
         showChangelog: @escaping () -> Void,
-        showSupport: @escaping () -> Void
+        showSupport: @escaping () -> Void,
+        showWelcome: @escaping () -> Void
     ) {
         showTranscriptSceneAction = showTranscript
         showSettingsSceneAction = showSettings
         showAboutSceneAction = showAbout
         showChangelogSceneAction = showChangelog
         showSupportSceneAction = showSupport
+        showWelcomeSceneAction = showWelcome
 
         let pendingSceneIDs = self.pendingSceneIDs
         self.pendingSceneIDs.removeAll()
@@ -86,6 +90,10 @@ final class WindowCoordinator {
 
     func showSupportWindow() {
         openScene(id: SceneID.support)
+    }
+
+    func showWelcomeWindow() {
+        openScene(id: SceneID.welcome)
     }
 
     func showRecordingControlWindow() {
@@ -209,6 +217,8 @@ final class WindowCoordinator {
             showChangelogSceneAction
         case SceneID.support:
             showSupportSceneAction
+        case SceneID.welcome:
+            showWelcomeSceneAction
         default:
             nil
         }

@@ -1,8 +1,16 @@
+import AVFoundation
 import Darwin
 import SwiftUI
 private struct WindowSceneRegistrar: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var settingsStore: SettingsStore
+    @ObservedObject var transcriptStore: TranscriptStore
     let windowCoordinator: WindowCoordinator
+    /// True under an isolated test runtime. UI tests launch straight into a
+    /// specific window with an unconfigured store, which is exactly the state
+    /// that triggers the tour — auto-presenting it would drop a window on top
+    /// of the surface under test.
+    let suppressesAutomaticWelcome: Bool
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -15,7 +23,8 @@ private struct WindowSceneRegistrar: View {
                     showSettings: { openWindow(id: WindowCoordinator.SceneID.settings) },
                     showAbout: { openWindow(id: WindowCoordinator.SceneID.about) },
                     showChangelog: { openWindow(id: WindowCoordinator.SceneID.changelog) },
-                    showSupport: { openWindow(id: WindowCoordinator.SceneID.support) }
+                    showSupport: { openWindow(id: WindowCoordinator.SceneID.support) },
+                    showWelcome: { openWindow(id: WindowCoordinator.SceneID.welcome) }
                 )
 
                 appState.showTranscriptWindow = { [weak windowCoordinator] in
@@ -34,8 +43,52 @@ private struct WindowSceneRegistrar: View {
                     windowCoordinator?.showSupportWindow()
                 }
 
-                appState.presentChangelogIfNeeded()
+                presentLaunchWindowIfNeeded()
             }
+    }
+
+    /// Opens at most one window unprompted on launch: the first-run tour
+    /// (#357) or the What's New sheet (#386), never both.
+    ///
+    /// An earlier version called each independently and argued they could not
+    /// overlap. `OnboardingFlow.launchPresentation` records the case that broke
+    /// that argument; the precedence is now explicit rather than emergent.
+    ///
+    /// The onboarding flag is stamped here, at presentation, rather than on the
+    /// tour's Done button, so every exit path counts as shown — including the
+    /// window's close box, and the second registrar (this view is attached to
+    /// both the MenuBarExtra content and its label, so `onAppear` runs twice
+    /// per launch and would otherwise reopen the tour the user just closed).
+    private func presentLaunchWindowIfNeeded() {
+        let presentation = OnboardingFlow.launchPresentation(
+            shouldPresentWelcome: shouldPresentWelcome,
+            shouldAutoShowChangelog: appState.shouldAutoShowChangelogOnLaunch()
+        )
+
+        switch presentation {
+        case .welcome:
+            settingsStore.markFirstRunOnboardingCompleted()
+            windowCoordinator.showWelcomeWindow()
+        case .changelog:
+            appState.presentChangelogIfNeeded()
+        case .none:
+            break
+        }
+    }
+
+    private var shouldPresentWelcome: Bool {
+        guard !suppressesAutomaticWelcome else { return false }
+
+        return OnboardingFlow.shouldPresentOnLaunch(
+            hasCompletedFirstRunOnboarding: settingsStore.hasCompletedFirstRunOnboarding,
+            hasExistingUserState: !transcriptStore.libraryEntries.isEmpty,
+            snapshot: OnboardingSnapshot(
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+                providerConfigurationIsCompatible: settingsStore.aiProviderCompatibilityIssue == nil,
+                microphoneAuthorized: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+                hasAnyCaptureHotkeyAssigned: settingsStore.hasAnyCaptureHotkeyAssigned
+            )
+        )
     }
 }
 
@@ -47,6 +100,7 @@ struct BugNarratorApp: App {
     @StateObject private var appState: AppState
 
     private let windowCoordinator: WindowCoordinator
+    private let suppressesAutomaticWelcome: Bool
 
     init() {
         let runtimeEnvironment = AppRuntimeEnvironment()
@@ -120,6 +174,7 @@ struct BugNarratorApp: App {
         AppLifecycleDelegate.appState = appState
         AppLifecycleDelegate.launchContinuityMonitor = launchContinuityMonitor
         self.windowCoordinator = windowCoordinator
+        self.suppressesAutomaticWelcome = runtimeEnvironment.usesIsolatedRuntime
 
         if let observation = launchContinuityMonitor.beginLaunch() {
             let timestampFormatter = BugNarratorDiagnostics.makeTimestampFormatter()
@@ -161,17 +216,36 @@ struct BugNarratorApp: App {
                 recordingTimer: appState.recordingTimer,
                 transcriptStore: transcriptStore
             )
-            .background(WindowSceneRegistrar(appState: appState, windowCoordinator: windowCoordinator))
+            .background(
+                WindowSceneRegistrar(
+                    appState: appState,
+                    settingsStore: settingsStore,
+                    transcriptStore: transcriptStore,
+                    windowCoordinator: windowCoordinator,
+                    suppressesAutomaticWelcome: suppressesAutomaticWelcome
+                )
+            )
         } label: {
             MenuBarLabelView(
                 status: appState.status,
                 recordingTimer: appState.recordingTimer
             )
-            .background(WindowSceneRegistrar(appState: appState, windowCoordinator: windowCoordinator))
+            .background(
+                WindowSceneRegistrar(
+                    appState: appState,
+                    settingsStore: settingsStore,
+                    transcriptStore: transcriptStore,
+                    windowCoordinator: windowCoordinator,
+                    suppressesAutomaticWelcome: suppressesAutomaticWelcome
+                )
+            )
         }
         .menuBarExtraStyle(.window)
         .commands {
             CommandGroup(replacing: .help) {
+                Button("Show Welcome Tour") {
+                    windowCoordinator.showWelcomeWindow()
+                }
                 Button("BugNarrator User Guide") {
                     NSWorkspace.shared.open(BugNarratorLinks.documentation)
                 }
@@ -207,6 +281,11 @@ struct BugNarratorApp: App {
             ChangelogView(appState: appState)
         }
         .defaultSize(width: 760, height: 760)
+
+        Window("Welcome to BugNarrator", id: WindowCoordinator.SceneID.welcome) {
+            WelcomeView(appState: appState, settingsStore: settingsStore)
+        }
+        .defaultSize(width: 560, height: 520)
 
         Window("Support BugNarrator", id: WindowCoordinator.SceneID.support) {
             SupportView(appState: appState)

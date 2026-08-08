@@ -1700,4 +1700,57 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "settings.jiraIssueType"), "Task")
         XCTAssertEqual(defaults.string(forKey: "settings.jiraIssueTypeID"), "t1")
     }
+
+    // MARK: - First-run onboarding (#357)
+
+    func testFirstRunOnboardingFlagStartsFalseAndPersists() {
+        let suiteName = "BugNarrator-FirstRunOnboarding-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertFalse(
+            first.hasCompletedFirstRunOnboarding,
+            "A fresh install has not been through the tour."
+        )
+
+        first.markFirstRunOnboardingCompleted()
+        XCTAssertTrue(first.hasCompletedFirstRunOnboarding)
+
+        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(
+            second.hasCompletedFirstRunOnboarding,
+            "Skipping has to survive a relaunch, or an unconfigured user is re-prompted every launch."
+        )
+    }
+
+    /// Reads the live assignments rather than a stored flag, so it stays honest
+    /// after `migrateLegacyBuiltInHotkeysIfNeeded` strips the 1.0.11 built-ins.
+    func testHasAnyCaptureHotkeyAssignedTracksLiveAssignments() {
+        let suiteName = "BugNarrator-CaptureHotkeyAssigned-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertFalse(
+            store.hasAnyCaptureHotkeyAssigned,
+            "Capture hotkeys ship unbound by the 1.0.11 decision."
+        )
+
+        guard let suggestion = store.suggestedShortcutIfAvailable(for: .captureScreenshot) else {
+            return XCTFail("Expected a suggested shortcut for the screenshot action.")
+        }
+
+        store.screenshotHotkeyShortcut = suggestion
+        XCTAssertTrue(store.hasAnyCaptureHotkeyAssigned)
+
+        store.screenshotHotkeyShortcut = .disabled
+        XCTAssertFalse(
+            store.hasAnyCaptureHotkeyAssigned,
+            "Clearing the last binding must report unassigned again, not latch on."
+        )
+    }
+
 }

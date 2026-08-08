@@ -717,8 +717,23 @@ final class AppState: ObservableObject {
 
     /// Presents the changelog once after a version bump. Records the shown
     /// version immediately so a force-quit before dismissal does not re-trigger.
+    /// Whether the What's New sheet would auto-present, without presenting it.
+    /// Lets the launch path pick between this and the first-run tour rather
+    /// than firing both (#357).
+    func shouldAutoShowChangelogOnLaunch(metadata: BugNarratorMetadata = BugNarratorMetadata()) -> Bool {
+        settingsStore.shouldAutoShowChangelog(
+            currentVersion: metadata.version,
+            hasExistingUserState: !transcriptStore.libraryEntries.isEmpty
+        )
+    }
+
     func presentChangelogIfNeeded(metadata: BugNarratorMetadata = BugNarratorMetadata()) {
-        let hasExistingUserState = !transcriptStore.sessions.isEmpty
+        // `libraryEntries`, not `sessions`: a partitioned store loads session
+        // bodies lazily, so `sessions` is empty on a cold launch however much
+        // history exists. Reading it here told an established user they were
+        // brand new, which both suppressed their changelog and — once #357
+        // landed — offered them a first-run tour (found in review of #357).
+        let hasExistingUserState = !transcriptStore.libraryEntries.isEmpty
         guard settingsStore.shouldAutoShowChangelog(
             currentVersion: metadata.version,
             hasExistingUserState: hasExistingUserState

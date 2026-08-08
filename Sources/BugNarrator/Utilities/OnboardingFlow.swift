@@ -60,6 +60,13 @@ struct OnboardingSnapshot: Equatable, Sendable {
     }
 }
 
+/// What a launch is allowed to open unprompted — at most one thing (#357).
+enum LaunchPresentation: Equatable, Sendable {
+    case welcome
+    case changelog
+    case none
+}
+
 /// Pure step-gating for the first-run flow (#357).
 ///
 /// Every decision the welcome sheet makes lives here so it can be tested
@@ -96,16 +103,49 @@ enum OnboardingFlow {
 
     /// Whether to present the flow unprompted on launch.
     ///
-    /// Two independent reasons not to: the user has already been through it
-    /// (or skipped it), or there is nothing left to tell them. The second case
-    /// matters for an existing install upgrading into this feature — it must
-    /// not greet a long-time user with a setup tour.
+    /// Three independent reasons not to: the user has already been through it
+    /// (or skipped it), there is nothing left to tell them, or they already
+    /// have recorded sessions.
+    ///
+    /// That last gate is load-bearing, not belt-and-braces. Capture hotkeys
+    /// ship unbound by the 1.0.11 decision — `migrateLegacyBuiltInHotkeysIfNeeded`
+    /// strips the old built-ins — so `isFullyConfigured` is false for very
+    /// nearly every existing install. Without `hasExistingUserState`, upgrading
+    /// into this feature would greet every long-time user with a setup tour,
+    /// which is exactly what this ticket forbids.
+    ///
+    /// It also keeps this flow and the What's New sheet (#386) mutually
+    /// exclusive by construction: the changelog auto-shows only when there *is*
+    /// existing user state, and this one only when there is not, so a launch can
+    /// never open both windows at once.
     static func shouldPresentOnLaunch(
         hasCompletedFirstRunOnboarding: Bool,
+        hasExistingUserState: Bool,
         snapshot: OnboardingSnapshot
     ) -> Bool {
         guard !hasCompletedFirstRunOnboarding else { return false }
+        guard !hasExistingUserState else { return false }
         return !isFullyConfigured(snapshot)
+    }
+
+    /// The single window a launch may open unprompted.
+    ///
+    /// Originally the tour and the What's New sheet (#386) were argued to be
+    /// mutually exclusive because their gates are opposites. A review of #357
+    /// broke that reasoning: a pre-#357 user who saw the changelog (so a version
+    /// is recorded), then deleted all local data (so there is no user state),
+    /// then upgraded, satisfies both gates and gets two windows. Rather than
+    /// patch that path, the precedence is made explicit here — the tour wins,
+    /// because someone who still needs setup does not need release notes.
+    static func launchPresentation(
+        shouldPresentWelcome: Bool,
+        shouldAutoShowChangelog: Bool
+    ) -> LaunchPresentation {
+        if shouldPresentWelcome {
+            return .welcome
+        }
+
+        return shouldAutoShowChangelog ? .changelog : .none
     }
 
     /// Steps that still block recording if left undone — what a skip warning

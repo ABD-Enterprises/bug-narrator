@@ -29,6 +29,30 @@ final class SettingsViewInitialSectionTests: XCTestCase {
         )
     }
 
+    /// #357 extended the rule: the welcome tour's provider step routes here, and
+    /// a provider that has a credential but fails `aiProviderCompatibilityIssue`
+    /// would otherwise land on `General`, which cannot resolve it.
+    func testCredentialWithACompatibilityIssueStillOpensOnAIEngines() {
+        XCTAssertEqual(
+            SettingsView.initialSection(
+                hasUsableAIProviderCredential: true,
+                hasProviderCompatibilityIssue: true
+            ),
+            .aiEngines,
+            "A configured-but-incompatible provider is not a working setup; General cannot fix it."
+        )
+    }
+
+    func testCompatibleCredentialKeepsGeneralLanding() {
+        XCTAssertEqual(
+            SettingsView.initialSection(
+                hasUsableAIProviderCredential: true,
+                hasProviderCompatibilityIssue: false
+            ),
+            .general
+        )
+    }
+
     // MARK: - Wiring against a real SettingsStore
 
     func testStoreWithNoCredentialResolvesToAIEngines() {
