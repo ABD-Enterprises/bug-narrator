@@ -111,6 +111,25 @@ final class SettingsStore: ObservableObject {
         defaults.set(true, forKey: Keys.hasOfferedIssueExtraction)
     }
 
+    /// Whether the session-library offer banner should be visible (#912).
+    ///
+    /// Adds the "a transcript already exists" condition to
+    /// `shouldOfferIssueExtraction`, so the offer follows real work the user
+    /// can see rather than greeting an empty library.
+    static func shouldShowIssueExtractionOfferBanner(
+        autoExtractIssues: Bool,
+        hasOffered: Bool,
+        supportsIssueExtraction: Bool,
+        hasAnySession: Bool
+    ) -> Bool {
+        guard hasAnySession else { return false }
+        return shouldOfferIssueExtraction(
+            autoExtractIssues: autoExtractIssues,
+            hasOffered: hasOffered,
+            supportsIssueExtraction: supportsIssueExtraction
+        )
+    }
+
     /// Pure decision for whether to surface the one-time offer (#912).
     ///
     /// Deliberately keyed off `supportsIssueExtraction` rather than credential
