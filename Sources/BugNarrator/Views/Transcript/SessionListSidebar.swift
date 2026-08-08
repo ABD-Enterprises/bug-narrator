@@ -75,6 +75,16 @@ struct SessionListSidebar: View {
                             viewModel.selectedFilter = .allSessions
                         }
                     }
+
+                    // Lets a brand-new user see what a session produces before
+                    // configuring a provider or spending anything (#374).
+                    if transcriptStore.sessions.isEmpty {
+                        Button("See a Sample Session") {
+                            try? transcriptStore.add(SampleSession.make())
+                            appState.selectedTranscriptID = SampleSession.id
+                        }
+                        .accessibilityIdentifier("load-sample-session-button")
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
