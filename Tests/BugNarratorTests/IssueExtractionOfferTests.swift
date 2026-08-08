@@ -115,6 +115,50 @@ final class IssueExtractionOfferTests: XCTestCase {
         XCTAssertTrue(harness.settingsStore.hasOfferedIssueExtraction)
     }
 
+    // MARK: - Banner visibility (#912 surfacing)
+
+    func testBannerHiddenWhenLibraryIsEmpty() {
+        XCTAssertFalse(
+            SettingsStore.shouldShowIssueExtractionOfferBanner(
+                autoExtractIssues: false,
+                hasOffered: false,
+                supportsIssueExtraction: true,
+                hasAnySession: false
+            ),
+            "The offer should follow real work the user can see, not greet an empty library."
+        )
+    }
+
+    func testBannerShownOnceThereIsASession() {
+        XCTAssertTrue(
+            SettingsStore.shouldShowIssueExtractionOfferBanner(
+                autoExtractIssues: false,
+                hasOffered: false,
+                supportsIssueExtraction: true,
+                hasAnySession: true
+            )
+        )
+    }
+
+    func testBannerInheritsEveryOfferRule() {
+        // A session existing must not override any of the underlying guards.
+        for (auto, offered, supports) in [
+            (true, false, true),    // already extracting
+            (false, true, true),    // already offered
+            (false, false, false)   // transcription-only provider
+        ] {
+            XCTAssertFalse(
+                SettingsStore.shouldShowIssueExtractionOfferBanner(
+                    autoExtractIssues: auto,
+                    hasOffered: offered,
+                    supportsIssueExtraction: supports,
+                    hasAnySession: true
+                ),
+                "auto=\(auto) offered=\(offered) supports=\(supports) should stay hidden"
+            )
+        }
+    }
+
     // MARK: - Default preserved
 
     func testAutoExtractRemainsOffByDefault() {

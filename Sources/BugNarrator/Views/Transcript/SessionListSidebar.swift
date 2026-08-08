@@ -58,6 +58,7 @@ struct SessionListSidebar: View {
             sessionListHeader
             storageRecoveryBanner
             pendingTranscriptionBanner
+            issueExtractionOfferBanner
 
             if let emptyState = viewModel.emptyState {
                 ContentUnavailableView {
@@ -166,6 +167,26 @@ struct SessionListSidebar: View {
                 provider: appState.settingsStore.aiProvider,
                 openLatest: viewModel.openLatestPendingTranscriptionSession,
                 openSettings: appState.openSettings
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var issueExtractionOfferBanner: some View {
+        if SettingsStore.shouldShowIssueExtractionOfferBanner(
+            autoExtractIssues: appState.settingsStore.autoExtractIssues,
+            hasOffered: appState.settingsStore.hasOfferedIssueExtraction,
+            supportsIssueExtraction: appState.settingsStore.supportsIssueExtraction,
+            hasAnySession: !transcriptStore.sessions.isEmpty
+        ) {
+            IssueExtractionOfferBanner(
+                enable: {
+                    appState.settingsStore.autoExtractIssues = true
+                    appState.settingsStore.markIssueExtractionOffered()
+                },
+                dismiss: {
+                    appState.settingsStore.markIssueExtractionOffered()
+                }
             )
         }
     }
