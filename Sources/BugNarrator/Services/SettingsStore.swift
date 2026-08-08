@@ -360,6 +360,25 @@ final class SettingsStore: ObservableObject {
         defaults.set(version, forKey: Keys.lastShownChangelogVersion)
     }
 
+    /// Whether the first-run welcome tour has already been shown, completed, or
+    /// skipped (#357). Skipping is durable: it sets the same flag completion
+    /// does, so a user who dismissed the tour is not re-prompted every launch.
+    var hasCompletedFirstRunOnboarding: Bool {
+        boolValue(forKey: Keys.hasCompletedFirstRunOnboarding) ?? false
+    }
+
+    func markFirstRunOnboardingCompleted() {
+        defaults.set(true, forKey: Keys.hasCompletedFirstRunOnboarding)
+    }
+
+    /// True when at least one of the three capture actions has a shortcut bound.
+    ///
+    /// Reads the live assignments rather than a stored flag so it stays honest
+    /// after `migrateLegacyBuiltInHotkeysIfNeeded` strips the 1.0.11 built-ins.
+    var hasAnyCaptureHotkeyAssigned: Bool {
+        hotkeyAssignments.contains { $0.shortcut.isEnabled }
+    }
+
     @Published private(set) var apiKeyPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var githubTokenPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var jiraTokenPersistenceState: APIKeyPersistenceState = .empty
@@ -1619,6 +1638,7 @@ private enum Keys {
     static let operationalTelemetryEnabled = OperationalTelemetryRecorder.enabledDefaultsKey
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
     static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
+    static let hasCompletedFirstRunOnboarding = "settings.hasCompletedFirstRunOnboarding"
 }
 
 enum APIKeyPersistenceState: Equatable {

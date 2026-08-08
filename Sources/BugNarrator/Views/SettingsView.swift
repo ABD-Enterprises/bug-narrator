@@ -25,8 +25,18 @@ struct SettingsView: View {
     /// re-seeding the selection and snapping the segmented control back on
     /// every render, so no tab could be selected at all. Caught by
     /// `BugNarratorSettingsUITests` once #922 started running the UI suite.
-    static func initialSection(hasUsableAIProviderCredential: Bool) -> SettingsSection {
-        hasUsableAIProviderCredential ? .general : .aiEngines
+    ///
+    /// `hasProviderCompatibilityIssue` was added by #357: the welcome tour's
+    /// provider step routes here, and a provider that has a credential but
+    /// fails `aiProviderCompatibilityIssue` (whisper-1 on a local provider, an
+    /// empty compatible-base-URL) would otherwise land on `General`, which
+    /// cannot resolve it. It defaults to `false` so the #911 call sites and
+    /// their meaning are unchanged.
+    static func initialSection(
+        hasUsableAIProviderCredential: Bool,
+        hasProviderCompatibilityIssue: Bool = false
+    ) -> SettingsSection {
+        hasUsableAIProviderCredential && !hasProviderCompatibilityIssue ? .general : .aiEngines
     }
 
     /// The tabbed sections of Settings. A segmented `Picker` drives selection —
@@ -94,7 +104,8 @@ struct SettingsView: View {
 
             hasAppliedInitialSection = true
             selectedSection = Self.initialSection(
-                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential
+                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
+                hasProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue != nil
             )
         }
         .alert("Delete all local BugNarrator data?", isPresented: $showDeleteAllLocalDataConfirmation) {
