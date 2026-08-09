@@ -13,30 +13,30 @@ final class SessionLibraryTests: XCTestCase {
             endDate: referenceDate
         )
 
-        let todaySessions = SessionLibrary.filteredSessions(
+        let todaySessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(filter: .today, customDateRange: dateRange),
             calendar: calendar,
             referenceDate: referenceDate
-        )
-        let yesterdaySessions = SessionLibrary.filteredSessions(
+        ).filteredItems
+        let yesterdaySessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(filter: .yesterday, customDateRange: dateRange),
             calendar: calendar,
             referenceDate: referenceDate
-        )
-        let last7DaysSessions = SessionLibrary.filteredSessions(
+        ).filteredItems
+        let last7DaysSessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(filter: .last7Days, customDateRange: dateRange),
             calendar: calendar,
             referenceDate: referenceDate
-        )
-        let last30DaysSessions = SessionLibrary.filteredSessions(
+        ).filteredItems
+        let last30DaysSessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(filter: .last30Days, customDateRange: dateRange),
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(todaySessions.map(\.transcript), ["Today transcript"])
         XCTAssertEqual(yesterdaySessions.map(\.transcript), ["Yesterday transcript"])
@@ -66,12 +66,12 @@ final class SessionLibraryTests: XCTestCase {
             sortOrder: .newestFirst
         )
 
-        let filteredSessions = SessionLibrary.filteredSessions(
+        let filteredSessions = SessionLibrary.snapshot(
             from: [sessionOutOfRange, sessionInRange],
             query: query,
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(filteredSessions, [sessionInRange])
     }
@@ -94,7 +94,7 @@ final class SessionLibraryTests: XCTestCase {
             summary: "The summary mentions tooltip behavior."
         )
 
-        let filteredSessions = SessionLibrary.filteredSessions(
+        let filteredSessions = SessionLibrary.snapshot(
             from: [titleMatch, transcriptMatch, summaryMatch],
             query: SessionLibraryQuery(
                 filter: .allSessions,
@@ -104,11 +104,11 @@ final class SessionLibraryTests: XCTestCase {
             ),
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(filteredSessions, [transcriptMatch, summaryMatch])
 
-        let titleFilteredSessions = SessionLibrary.filteredSessions(
+        let titleFilteredSessions = SessionLibrary.snapshot(
             from: [titleMatch, transcriptMatch, summaryMatch],
             query: SessionLibraryQuery(
                 filter: .allSessions,
@@ -118,7 +118,7 @@ final class SessionLibraryTests: XCTestCase {
             ),
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(titleFilteredSessions, [titleMatch])
     }
@@ -127,7 +127,7 @@ final class SessionLibraryTests: XCTestCase {
         let calendar = makeCalendar()
         let sessions = makeDatedSessions()
 
-        let filteredSessions = SessionLibrary.filteredSessions(
+        let filteredSessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(
                 filter: .last30Days,
@@ -136,7 +136,7 @@ final class SessionLibraryTests: XCTestCase {
             ),
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(
             filteredSessions.map(\.transcript),
@@ -198,12 +198,12 @@ final class SessionLibraryTests: XCTestCase {
             sortOrder: .newestFirst
         )
 
-        let filteredSessions = SessionLibrary.filteredSessions(
+        let filteredSessions = SessionLibrary.snapshot(
             from: [retryOlder, normalSession, retryNewest],
             query: query,
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
         let filteredEntries = SessionLibrary.filteredEntries(
             from: [retryOlder, normalSession, retryNewest].map(SessionLibraryEntry.init(session:)),
             query: query,
@@ -239,13 +239,13 @@ final class SessionLibraryTests: XCTestCase {
             customDateRange: SessionLibraryDateRange(startDate: referenceDate, endDate: referenceDate)
         )
 
-        let todaySessions = SessionLibrary.filteredSessions(
+        let todaySessions = SessionLibrary.snapshot(
             from: sessions,
             query: query,
             calendar: calendar,
             referenceDate: referenceDate
-        )
-        let yesterdaySessions = SessionLibrary.filteredSessions(
+        ).filteredItems
+        let yesterdaySessions = SessionLibrary.snapshot(
             from: sessions,
             query: SessionLibraryQuery(
                 filter: .yesterday,
@@ -253,7 +253,7 @@ final class SessionLibraryTests: XCTestCase {
             ),
             calendar: calendar,
             referenceDate: referenceDate
-        )
+        ).filteredItems
 
         XCTAssertEqual(todaySessions.map(\.transcript), ["Just after midnight transcript"])
         XCTAssertEqual(yesterdaySessions.map(\.transcript), ["Just before midnight transcript"])
@@ -465,4 +465,50 @@ final class SessionLibraryTests: XCTestCase {
             updatedAt: createdAt
         )
     }
+
+    // MARK: - Full-transcript search (#957)
+
+    /// The bug this ticket is about: the library entry indexed
+    /// `preview` (160 characters), so anything said after the first sentence
+    /// was unfindable — while the product is sold on a searchable library.
+    func testWordSpokenAfterThePreviewCutoffIsFindable() {
+        let filler = String(repeating: "the tester keeps narrating steadily. ", count: 12)
+        XCTAssertGreaterThan(filler.count, 160, "Precondition: the needle must sit past the preview cutoff.")
+
+        let session = TranscriptSession(
+            id: UUID(),
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            transcript: filler + "the checkout button renders offscreen",
+            duration: 60,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil
+        )
+        let entry = SessionLibraryEntry(session: session)
+
+        XCTAssertFalse(
+            entry.preview.contains("offscreen"),
+            "Precondition: the preview must not already contain the needle."
+        )
+
+        let snapshot = SessionLibrary.snapshot(
+            from: [entry],
+            query: SessionLibraryQuery(
+                filter: .allSessions,
+                customDateRange: SessionLibraryDateRange(
+                    startDate: Date(timeIntervalSince1970: 0),
+                    endDate: Date(timeIntervalSince1970: 2_000)
+                ),
+                searchText: "offscreen",
+                sortOrder: .newestFirst
+            )
+        )
+
+        XCTAssertEqual(
+            snapshot.filteredItems.map(\.id),
+            [entry.id],
+            "A word spoken mid-session must be findable through the shipped entry path."
+        )
+    }
+
 }
