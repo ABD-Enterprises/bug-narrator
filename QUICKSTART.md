@@ -6,7 +6,7 @@
 2. Open the DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch BugNarrator from `Applications`.
-5. If macOS warns about the app, use the normal Finder `Open` flow for apps you trust.
+5. Verify the download against the published `.sha256` checksum on the release page.
 6. If you launch BugNarrator again while it is already open, the existing menu bar instance should be reactivated instead of creating a second copy.
 
 ## First Run
@@ -23,6 +23,7 @@
 
 ## Important Notes
 
+- Releases are Developer ID signed, notarized, and stapled, so macOS does not show an "unidentified developer" warning. If you ever see one, **do not bypass it** — the download is not the release. Verify the checksum and report it.
 - BugNarrator does not include a built-in OpenAI API key.
 - Global hotkeys start disabled until you assign them yourself.
 - OpenAI transcription and issue extraction use your own OpenAI account and may cost money.

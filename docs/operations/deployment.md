@@ -55,11 +55,26 @@ The Docusaurus docs site is published separately from the macOS app release flow
 Current manual publish path:
 
 1. run `npm run build --prefix site`
-2. run `cd site && GIT_USER=deffenda USE_SSH=false npx docusaurus deploy`
+2. run `cd site && GIT_USER=<your-github-username> USE_SSH=false npx docusaurus deploy`
 3. if the `gh-pages` branch does not exist yet, publish the built `site/build` output to a new `gh-pages` branch first, then rerun the deploy command
-4. confirm the site resolves at `https://deffenda.github.io/bug-narrator/`
+4. confirm the site resolves at `https://abd-enterprises.github.io/bug-narrator/`
+
+Before deploying, regenerate the site mirrors so the published pages match the
+canonical repo docs:
+
+```
+python3 scripts/sync_site_docs.py
+```
+
+`scripts/validate.sh` fails when a mirror is stale, so this should already be a
+no-op on a clean tree.
 
 This keeps docs publication reproducible without adding new recurring GitHub Actions jobs.
+
+> **Deployment is manual and currently lags the repo.** Pages serves the
+> `gh-pages` branch (legacy build, no deploy workflow), so nothing publishes on
+> merge. Repo-side link and content fixes do not reach visitors until a
+> maintainer runs the publish path above.
 
 ## Terraform Scope
 
