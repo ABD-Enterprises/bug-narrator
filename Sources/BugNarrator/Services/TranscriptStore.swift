@@ -332,7 +332,10 @@ final class TranscriptStore: ObservableObject {
         }
 
         do {
-            let indexData = try Data(contentsOf: indexURL)
+            // `unprotect` passes non-prefixed payloads straight through, so an
+            // index written by an older build still loads and is rewritten
+            // protected on the next save. No migration step needed.
+            let indexData = try sessionDataProtector.unprotect(try Data(contentsOf: indexURL))
             let index = try decoder.decode(TranscriptStoreIndex.self, from: indexData)
 
             if !index.entries.isEmpty {
@@ -434,7 +437,12 @@ final class TranscriptStore: ObservableObject {
 
         let normalizedEntries = normalizedEntries(entries)
         let index = TranscriptStoreIndex(entries: normalizedEntries)
-        let indexData = try encoder.encode(index)
+        // Protected at rest like the session bodies. The index carries the
+        // full-transcript search text since #957; before that it held a
+        // 160-character preview and was written in the clear. Either way it is
+        // transcript content, and it sat unencrypted beside encrypted session
+        // files — the inconsistency #954 names.
+        let indexData = try sessionDataProtector.protect(encoder.encode(index))
         try indexData.write(to: indexURL, options: [.atomic])
         do {
             try indexData.write(to: backupIndexURL, options: [.atomic])
