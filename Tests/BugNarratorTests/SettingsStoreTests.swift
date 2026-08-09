@@ -1753,4 +1753,42 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+
+    // MARK: - Privacy defaults (#952)
+
+    /// Copying a full transcript to the system pasteboard on every save is a
+    /// privacy-adjacent side effect, so it is opt-in. Pinned because a silent
+    /// flip back to `true` would re-introduce undisclosed clipboard exposure.
+    func testAutoCopyTranscriptIsOffByDefault() {
+        let suiteName = "BugNarrator-AutoCopyDefault-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        XCTAssertFalse(
+            store.autoCopyTranscript,
+            "A fresh install must not put transcripts on the clipboard without being asked."
+        )
+    }
+
+    /// The other half of the default flip: someone who deliberately turned
+    /// auto-copy ON keeps it. Only users who never touched the toggle move.
+    func testExplicitAutoCopyChoiceSurvivesTheNewDefault() {
+        let suiteName = "BugNarrator-AutoCopyExplicit-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        first.autoCopyTranscript = true
+
+        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertTrue(
+            second.autoCopyTranscript,
+            "An explicit opt-in must outlive the default change."
+        )
+    }
+
 }

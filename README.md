@@ -207,7 +207,11 @@ Data sent to the configured AI provider:
 
 BugNarrator does not continuously upload audio while you are still recording.
 
-BugNarrator does not include automatic telemetry or remote log collection. Diagnostics stay local on your Mac until you explicitly copy debug info or export a debug bundle for support.
+BugNarrator sends no telemetry off your Mac. There is no remote log collection, no analytics service, and no crash reporter.
+
+It does keep a local-only operational log at `~/Library/Application Support/BugNarrator/operational-telemetry.jsonl`, recording named events such as recordings started, transcriptions completed, app errors, and unclean-exit detection. That file stays on disk and is never transmitted; it is read only when you explicitly copy debug info, export a debug bundle, or run Export Data. Turn it off with **Settings > Diagnostics & Privacy > "Record local usage analytics"**, and delete the file at any time.
+
+Transcripts are **not** copied to the clipboard unless you ask. **Settings > General > "Auto-copy transcript to clipboard"** is off by default; turning it on puts the full transcript on the system pasteboard every time a session is saved, where clipboard managers may retain it.
 
 ## Reporting Problems
 

@@ -76,7 +76,12 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    @Published var autoCopyTranscript: Bool = true {
+    /// Default-off since #952. Copying a full transcript to the system
+    /// pasteboard on every save is a privacy-adjacent side effect — clipboard
+    /// managers persist it and an accidental paste leaks it — so it is opt-in
+    /// rather than opt-out. An explicit choice is stored and still honored, so
+    /// only users who never touched the toggle see the new default.
+    @Published var autoCopyTranscript: Bool = false {
         didSet {
             guard hasLoaded else { return }
             defaults.set(autoCopyTranscript, forKey: Keys.autoCopyTranscript)
@@ -870,7 +875,7 @@ final class SettingsStore: ObservableObject {
         normalizeTranscriptionModelForCurrentProvider(persist: true)
         normalizeIssueExtractionModelForCurrentProvider(persist: true)
 
-        autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? true
+        autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? false
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
         hasOfferedIssueExtraction = boolValue(forKey: Keys.hasOfferedIssueExtraction) ?? false

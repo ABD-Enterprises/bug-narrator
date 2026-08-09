@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [CHANGE] **Transcripts are no longer copied to the clipboard automatically.** "Auto-copy transcript to clipboard" (Settings > General) now defaults to off — it put the full transcript on the system pasteboard after every save, where clipboard managers retain it, and that was never disclosed. If you deliberately turned it on, your choice is preserved; if you never touched it and want the old behavior, turn it on (#952).
+- [FIX] The README no longer claims BugNarrator "does not include automatic telemetry" while writing `operational-telemetry.jsonl`. Nothing is transmitted — that part was true — but the local log, what it records, where it lives, and how to turn it off are now stated plainly (#952).
+
 - [FIX] An OpenAI account with no credits left now says so, instead of reporting a rate limit and retrying three times. New OpenAI accounts start with no credits, so this was the likeliest outcome of a fresh key's first transcription. Genuine rate limits still back off and retry, and the recording is still preserved for retry either way (#958).
 
 - [NEW] First-run welcome tour. A new install is walked through choosing an AI provider, granting microphone access, and assigning the three capture hotkeys, instead of landing in a blank menu bar. It is skippable at every step, reopenable from Help > Show Welcome Tour, and never appears for someone who already has recorded sessions. Nothing is bound or configured without an explicit press (#357).
