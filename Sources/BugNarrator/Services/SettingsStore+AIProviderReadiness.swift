@@ -19,11 +19,41 @@ extension SettingsStore {
         }
     }
 
+    /// Rejects a remote `http://` base URL. Loopback, private-range,
+    /// link-local, `.local`, and single-label hosts stay allowed — that is the
+    /// whole Parakeet / LM Studio / Ollama story, and the shipped defaults are
+    /// themselves `http://localhost`. Parakeet is exempt outright because
+    /// `normalizedOpenAIBaseURL` ignores the typed value for that provider.
+    var remotePlaintextEndpointIssue: String? {
+        guard aiProvider != .parakeetLocal else {
+            return nil
+        }
+
+        let url = SettingsStore.normalizedOpenAIBaseURL(from: openAIBaseURL, provider: aiProvider)
+        guard url.scheme?.lowercased() == "http",
+              let host = url.host,
+              !SettingsStore.isLocalEndpointHost(host) else {
+            return nil
+        }
+
+        return "Use https:// for \(host), or point this at a local address. "
+            + "Over plaintext HTTP your API key and your recordings would cross the network unencrypted."
+    }
+
     var aiProviderConfigurationIsReady: Bool {
         aiProviderCompatibilityIssue == nil && hasUsableAIProviderCredential
     }
 
     var aiProviderCompatibilityIssue: String? {
+        // Security first, ahead of every configuration check: a remote
+        // plaintext endpoint is not a preference, it is a credential and audio
+        // leak. Warning about it was not enough — nothing consumed the warning
+        // as a gate, so one mistyped scheme shipped the API key and the
+        // recording over the network in the clear (#953).
+        if let plaintextIssue = remotePlaintextEndpointIssue {
+            return plaintextIssue
+        }
+
         switch aiProvider {
         case .openAI:
             return nil
