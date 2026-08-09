@@ -8,6 +8,7 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
     case networkTimeout
     case networkFailure
     case rateLimited
+    case providerQuotaExhausted
     case providerRejected
     case transcriptionFailure
     case emptyTranscript
@@ -27,6 +28,13 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             self = .networkFailure
         case .rateLimited:
             self = .rateLimited
+        case .providerQuotaExhausted:
+            // Must stay mapped. Before #958 a spent account surfaced as
+            // .rateLimited, which preserved the recording as a retryable
+            // pending transcription. Letting the new case fall through to
+            // `default: return nil` would silently stop preserving a first-run
+            // user's first recording — a worse outcome than the bug being fixed.
+            self = .providerQuotaExhausted
         case .openAIRequestRejected:
             self = .providerRejected
         case .emptyTranscript:
@@ -67,6 +75,8 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             return "Recording saved locally. BugNarrator could not reach \(provider.displayName), so retry transcription from this session when the connection is available."
         case .rateLimited:
             return "Recording saved locally. \(provider.displayName) rate limited the request, so wait a moment and retry transcription from this session."
+        case .providerQuotaExhausted:
+            return "Recording saved locally. Your \(provider.displayName) account has no credits left — add credits, then retry transcription from this session."
         case .providerRejected:
             return "Recording saved locally. \(provider.displayName) rejected the transcription request, so review settings or retry from this session."
         case .transcriptionFailure:
@@ -102,6 +112,8 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             return .networkFailure
         case .rateLimited:
             return .rateLimited(retryAfter: nil)
+        case .providerQuotaExhausted:
+            return .providerQuotaExhausted
         case .providerRejected:
             return .openAIRequestRejected("The preserved recording is waiting for transcription retry.")
         case .transcriptionFailure:
