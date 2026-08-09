@@ -1,10 +1,25 @@
+<!-- GENERATED FILE — DO NOT EDIT.
+     Source: docs/user/user-manual.md
+     Regenerate with: scripts/sync_site_docs.py
+     Checked by scripts/validate.sh; edit the source instead. -->
+
 # User Manual
 
-BugNarrator is organized around one durable workflow:
+This is the canonical structured user manual for BugNarrator.
 
-`record -> review -> refine -> export`
+Detailed companion guide:
 
-This site page mirrors the canonical user manual in the repository and stays focused on end-user behavior.
+- [docs/UserGuide.md](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
+
+## What BugNarrator Is
+
+BugNarrator is a macOS menu bar app for narrated software testing sessions. It helps you:
+
+- record a spoken review session
+- capture screenshots as evidence during the session
+- transcribe the session
+- review transcript, screenshots, summary, and extracted issues
+- export a session bundle or selected issues
 
 ## Before You Start
 
@@ -15,34 +30,55 @@ You need:
 - microphone permission for recording
 - Screen Recording permission if you want screenshots
 
-## Recording Workflow
+## Install
+
+1. Download the latest DMG from GitHub Releases.
+2. Open the DMG.
+3. Drag `BugNarrator.app` into `Applications`.
+4. Launch the installed app from `Applications`.
+
+## First-Run Setup
 
 1. Open the menu bar item.
-2. Open `Settings` and configure your AI provider.
-3. Click `Show Recording Controls`.
-4. Click `Start Recording`.
-5. Narrate what you are doing and capture screenshots when important evidence appears.
-6. Click `Stop Recording`.
+2. Open `Settings`.
+3. Choose an AI provider.
+4. Enter the required API key or base URL, or leave the key blank for `Local (Parakeet)`.
+5. Optionally validate the key or connection.
 
-OpenAI remains the default provider. OpenAI-compatible enterprise or local-compatible endpoints can be configured when they expose the transcription and chat APIs BugNarrator needs.
+BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs BugNarrator needs. `Local (Parakeet)` transcribes on this Mac through `http://localhost:8422`, does not use an API key, and does not upload audio.
 
-If the AI provider configuration is missing, invalid, or revoked when recording stops, BugNarrator preserves the finished session so you can restore the configuration and retry transcription later.
+`Local (Parakeet)` is transcription-only. Review summary and issue extraction still require an OpenAI-compatible chat provider.
+
+## Recording Workflow
+
+1. Click `Show Recording Controls`.
+2. Click `Start Recording`.
+3. Speak while you continue using the app you are reviewing.
+4. Use `Capture Screenshot` when something important or broken appears.
+5. Click `Stop Recording`.
+
+The recording controls window stays open until you close it.
+
+If the AI provider configuration is missing, invalid, or revoked when the recording finishes, BugNarrator preserves the finished session in the library so you can restore the configuration and retry transcription later.
+
+Finished sessions waiting for transcription retry are surfaced in the menu bar window and at the top of the session-library list after relaunch.
 
 ## Review Workflow
 
 After transcription finishes, BugNarrator opens the session library so you can review:
 
-- `Transcript`
-- `Screenshots`
-- `Extracted Issues`
-- `Summary`
-
-Sessions waiting for transcription retry are surfaced in both the menu bar window and the session library until you retry them successfully.
+- Transcript
+- Screenshots
+- Extracted Issues
+- Summary
 
 ## Export Options
 
+Current export options:
+
 - `Export Session Bundle`
-  creates `transcript.md` plus a `screenshots/` folder
+  creates `transcript.md`, a `screenshots/` folder, and `manifest.json`, plus
+  `summary.md` (review summary and extracted issues) when issue extraction has run
 - `Export to GitHub (Experimental)`
 - `Export to Jira (Experimental)`
 
@@ -50,12 +86,24 @@ Sessions waiting for transcription retry are surfaced in both the menu bar windo
 
 BugNarrator supports keyboard-first use across the menu bar window, recording controls, session library, and settings.
 
-- recording controls expose default and cancel actions
-- session-library filters and review tabs announce selected state
-- settings and hotkey controls use explicit accessibility labels
+- the recording controls window exposes a default action for the main enabled recording button and uses `Esc` to close
+- custom session-library filters, tabs, and export controls announce labels and selected state for VoiceOver
+- settings fields and hotkey controls use explicit labels instead of relying only on placeholder text
 
-## More Detail
+Accessibility validation is still an active maintenance area. If a screen reader or keyboard-only flow feels unclear, export a debug bundle and report the issue so the exact surface can be audited.
 
-- [Canonical user manual in the repo](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/user/user-manual.md)
-- [Detailed user guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
+## Troubleshooting
+
+Common fixes:
+
+- microphone blocked: use `Open Microphone Settings`
+- screenshot blocked: use `Open Screen Recording Settings`
+- invalid AI provider setup: open `Settings`, replace the credential or fix the endpoint/model, and retry
+
+For support, hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
+
+## Related Docs
+
+- [Detailed User Guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
 - [Tester Narration Guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md#tester-narration-guide)
+- [Onboarding Guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/onboarding/getting-started.md)

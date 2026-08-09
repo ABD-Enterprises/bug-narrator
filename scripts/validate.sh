@@ -177,6 +177,12 @@ if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   fi
 fi
 
+if [[ -x "$ROOT/scripts/sync_site_docs.py" ]] && command -v python3 >/dev/null 2>&1; then
+  if ! python3 "$ROOT/scripts/sync_site_docs.py" --check; then
+    exit 1
+  fi
+fi
+
 if [[ -f "$ROOT/local-transcription/server.py" ]]; then
   if command -v python3 >/dev/null 2>&1; then
     python3 -m py_compile \
