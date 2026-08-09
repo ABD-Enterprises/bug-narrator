@@ -141,7 +141,7 @@ These are drafts. Review them before export.
 The session library is designed for repeated daily use and supports:
 
 - `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `All Sessions`, and `Custom Date Range`
-- search across transcript text, titles, and summaries
+- search across full transcript text, titles, summaries, marker notes, and extracted issues
 - newest-first or oldest-first sorting
 - inline detail review with a clearer workspace for the transcript timeline, screenshots, review summary, and extracted issues
 - permanent deletion of sessions you no longer want to keep

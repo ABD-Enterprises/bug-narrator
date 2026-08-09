@@ -76,15 +76,6 @@ enum SessionLibrary {
         )
     }
 
-    static func filteredSessions(
-        from sessions: [TranscriptSession],
-        query: SessionLibraryQuery,
-        calendar: Calendar = .current,
-        referenceDate: Date = Date()
-    ) -> [TranscriptSession] {
-        snapshot(from: sessions, query: query, calendar: calendar, referenceDate: referenceDate).filteredItems
-    }
-
     static func filteredEntries(
         from entries: [SessionLibraryEntry],
         query: SessionLibraryQuery,

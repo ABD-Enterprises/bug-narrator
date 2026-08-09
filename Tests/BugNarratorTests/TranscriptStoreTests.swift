@@ -281,4 +281,45 @@ final class TranscriptStoreTests: XCTestCase {
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         return directoryURL
     }
+
+    /// #957 put the full transcript into the library index so mid-session words
+    /// are searchable. That is only acceptable because the index is protected
+    /// at rest — a plaintext index would have traded a search bug for a much
+    /// larger disclosure than the 160-character preview it used to leak.
+    func testSessionIndexIsProtectedAtRestAndStillLoads() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let protector = KeychainSessionDataProtector(keychainService: MockKeychainService())
+        let store = TranscriptStore(storageURL: storageURL, sessionDataProtector: protector)
+
+        let secret = "the checkout button renders offscreen"
+        try store.add(
+            TranscriptSession(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 1_000),
+                transcript: String(repeating: "narrating steadily. ", count: 20) + secret,
+                duration: 60,
+                model: "whisper-1",
+                languageHint: nil,
+                prompt: nil
+            )
+        )
+
+        let indexURL = rootDirectoryURL.appendingPathComponent("sessions.index.json")
+        let indexData = try Data(contentsOf: indexURL)
+        XCTAssertNil(
+            indexData.range(of: Data(secret.utf8)),
+            "The search index must not carry transcript text in the clear."
+        )
+
+        let reloaded = TranscriptStore(storageURL: storageURL, sessionDataProtector: protector)
+        XCTAssertEqual(reloaded.libraryEntries.count, 1, "A protected index must still load.")
+        XCTAssertTrue(
+            reloaded.libraryEntries[0].searchIndexText.contains("offscreen"),
+            "And it must still carry the full-transcript search text."
+        )
+    }
+
 }

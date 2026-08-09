@@ -35,9 +35,16 @@ struct SessionLibraryEntry: SessionLibraryItem, Equatable, Codable {
         issueCount = session.issueCount
         isPendingTranscription = session.requiresTranscriptionRetry
         recoveredSourceFileName = session.recoveredSourceFileName ?? session.pendingTranscription?.recoveredSourceFileName
-        searchIndexText = Self.makeMetadataSearchIndexText(
-            title: title,
-            preview: preview,
+        // The full transcript, not `preview`. Indexing the 160-character
+        // preview meant any word spoken after the first sentence was
+        // unfindable, while the product is sold on a searchable library (#957).
+        //
+        // This is only safe because the index file is now protected at rest the
+        // same way session bodies are (TranscriptStore.writeIndex). Persisting
+        // full transcripts into a plaintext index would have traded a search
+        // bug for a much larger disclosure.
+        searchIndexText = TranscriptSession.makeSearchIndexText(
+            transcript: session.transcript,
             summaryText: summaryText,
             markers: session.markers,
             issues: session.issueExtraction?.issues ?? [],

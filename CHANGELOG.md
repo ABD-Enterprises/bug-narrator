@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [FIX] Library search now searches the **whole** transcript. It only ever indexed the first 160 characters, so anything said after the opening sentence was unfindable — in the feature the product is built around (#957).
+- [CHANGE] The session index (`sessions.index.json`) is now encrypted at rest like session bodies are. It previously held transcript text in the clear beside encrypted session files; making search full-text without this would have widened that from a 160-character preview to entire transcripts. Indexes written by older builds still load and are re-written protected on the next save (#957, part of #954).
+
 - [FIX] QUICKSTART no longer tells you to click past a Gatekeeper warning. Releases are signed, notarized, and stapled, so that warning means the download is not the release — verify the checksum instead. This is the guidance #909 corrected in the README; QUICKSTART had been left behind (#964).
 - [FIX] The docs-site publish runbook pointed at the pre-transfer `deffenda.github.io` URL and hardcoded a maintainer username (#964).
 - [INTERNAL] `site/docs/user/user-manual.md` is now generated from the canonical `docs/user/user-manual.md` by `scripts/sync_site_docs.py`, and `validate.sh` fails when it drifts. It previously claimed to mirror the canonical manual while being a separately written document that had diverged (#964).
