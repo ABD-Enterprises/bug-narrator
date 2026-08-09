@@ -22,7 +22,8 @@ enum OpenAIErrorMapper {
         fallback: (String) -> AppError,
         responseHeaders: [AnyHashable: Any]? = nil
     ) -> AppError {
-        let message = decodeAPIError(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: statusCode)
+        let payload = decodeAPIErrorPayload(from: data)
+        let message = payload?.message ?? HTTPURLResponse.localizedString(forStatusCode: statusCode)
         let normalizedMessage = message.lowercased()
 
         if statusCode == 401 {
@@ -36,6 +37,15 @@ enum OpenAIErrorMapper {
         if statusCode == 403,
            normalizedMessage.contains("revoked") || normalizedMessage.contains("deactivated") {
             return .revokedAPIKey
+        }
+
+        // Before the generic 429 path: a spent account also answers 429, but
+        // retrying it can never succeed. New OpenAI accounts ship with no
+        // credits, so this is the likeliest outcome of a fresh key's first
+        // transcription (#958).
+        if (400...499).contains(statusCode),
+           indicatesExhaustedQuota(payload: payload, normalizedMessage: normalizedMessage) {
+            return .providerQuotaExhausted
         }
 
         if statusCode == 429 {
@@ -114,8 +124,32 @@ enum OpenAIErrorMapper {
         return fallback(error.localizedDescription)
     }
 
-    private static func decodeAPIError(from data: Data) -> String? {
-        (try? JSONDecoder().decode(APIErrorEnvelope.self, from: data))?.error.message
+    /// Deliberately narrow. A genuine rate-limit message can mention "quota" or
+    /// "billing" in passing, and misreading one as a spent account would strip
+    /// the retry that would have succeeded — so this matches the structured
+    /// `code`/`type` first and only falls back to unambiguous phrases.
+    static func indicatesExhaustedQuota(payload: APIErrorPayload?, normalizedMessage: String) -> Bool {
+        if let code = payload?.code?.lowercased(), quotaCodes.contains(code) {
+            return true
+        }
+
+        if let type = payload?.type?.lowercased(), quotaCodes.contains(type) {
+            return true
+        }
+
+        return normalizedMessage.contains("insufficient_quota")
+            || normalizedMessage.contains("exceeded your current quota")
+            || normalizedMessage.contains("billing hard limit")
+    }
+
+    private static let quotaCodes: Set<String> = [
+        "insufficient_quota",
+        "billing_hard_limit_reached",
+        "quota_exceeded"
+    ]
+
+    private static func decodeAPIErrorPayload(from data: Data) -> APIErrorPayload? {
+        (try? JSONDecoder().decode(APIErrorEnvelope.self, from: data))?.error
     }
 }
 
@@ -123,6 +157,25 @@ private struct APIErrorEnvelope: Decodable {
     let error: APIErrorPayload
 }
 
-private struct APIErrorPayload: Decodable {
+struct APIErrorPayload: Decodable {
     let message: String
+    let type: String?
+    let code: String?
+
+    /// `message` stays required so an undecodable body still falls back to the
+    /// HTTP status text, exactly as before. `type`/`code` are best-effort:
+    /// some OpenAI-compatible servers return `code` as a number, and letting
+    /// that throw would discard the message too.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decode(String.self, forKey: .message)
+        type = try? container.decode(String.self, forKey: .type)
+        code = try? container.decode(String.self, forKey: .code)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case type
+        case code
+    }
 }

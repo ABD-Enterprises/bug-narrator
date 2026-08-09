@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] An OpenAI account with no credits left now says so, instead of reporting a rate limit and retrying three times. New OpenAI accounts start with no credits, so this was the likeliest outcome of a fresh key's first transcription. Genuine rate limits still back off and retry, and the recording is still preserved for retry either way (#958).
+
 - [NEW] First-run welcome tour. A new install is walked through choosing an AI provider, granting microphone access, and assigning the three capture hotkeys, instead of landing in a blank menu bar. It is skippable at every step, reopenable from Help > Show Welcome Tour, and never appears for someone who already has recorded sessions. Nothing is bound or configured without an explicit press (#357).
 - [FIX] Settings now also opens on the AI Engines pane when a provider has a credential but fails its compatibility check, rather than landing on General — which cannot resolve it (#357, extending #911).
 - [FIX] What's New now appears after an update for users whose session history is stored in the partitioned format. The check read a cache that loads lazily and is empty at launch, so an established library looked like a brand-new install and the release notes were skipped (#357).

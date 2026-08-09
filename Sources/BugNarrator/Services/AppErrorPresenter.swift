@@ -125,7 +125,7 @@ final class AppErrorPresenter {
             settingsLogger.warning(.appError, message, metadata: metadata)
         case .recordingFailure:
             recordingLogger.error(.appError, message, metadata: metadata)
-        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited:
+        case .transcriptionFailure, .openAIRequestRejected, .issueExtractionFailure, .emptyTranscript, .networkTimeout, .networkFailure, .rateLimited, .providerQuotaExhausted:
             transcriptionLogger.error(.appError, message, metadata: metadata)
         case .screenshotCaptureFailure:
             screenshotLogger.error(.appError, message, metadata: metadata)
@@ -204,6 +204,8 @@ final class AppErrorPresenter {
             return "network_failure"
         case .rateLimited:
             return "rate_limited"
+        case .providerQuotaExhausted:
+            return "provider_quota_exhausted"
         case .screenshotCaptureFailure:
             return "screenshot_capture_failure"
         case .exportConfigurationMissing:
