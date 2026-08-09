@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] A remote `http://` AI endpoint is now rejected instead of warned about. Previously the warning was advisory and nothing consumed it as a gate, so one mistyped scheme could send your API key and your recordings across the network unencrypted. Loopback, private-range, `.local`, and single-label hosts are unaffected — the local LM Studio / Ollama / Parakeet paths and the shipped `http://localhost` defaults all still work (#953).
+
 - [CHANGE] **Transcripts are no longer copied to the clipboard automatically.** "Auto-copy transcript to clipboard" (Settings > General) now defaults to off — it put the full transcript on the system pasteboard after every save, where clipboard managers retain it, and that was never disclosed. If you deliberately turned it on, your choice is preserved; if you never touched it and want the old behavior, turn it on (#952).
 - [FIX] The README no longer claims BugNarrator "does not include automatic telemetry" while writing `operational-telemetry.jsonl`. Nothing is transmitted — that part was true — but the local log, what it records, where it lives, and how to turn it off are now stated plainly (#952).
 
