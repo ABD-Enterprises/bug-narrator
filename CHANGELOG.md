@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- [FIX] QUICKSTART no longer tells you to click past a Gatekeeper warning. Releases are signed, notarized, and stapled, so that warning means the download is not the release — verify the checksum instead. This is the guidance #909 corrected in the README; QUICKSTART had been left behind (#964).
+- [FIX] The docs-site publish runbook pointed at the pre-transfer `deffenda.github.io` URL and hardcoded a maintainer username (#964).
+- [INTERNAL] `site/docs/user/user-manual.md` is now generated from the canonical `docs/user/user-manual.md` by `scripts/sync_site_docs.py`, and `validate.sh` fails when it drifts. It previously claimed to mirror the canonical manual while being a separately written document that had diverged (#964).
+
 - [FIX] A remote `http://` AI endpoint is now rejected instead of warned about. Previously the warning was advisory and nothing consumed it as a gate, so one mistyped scheme could send your API key and your recordings across the network unencrypted. Loopback, private-range, `.local`, and single-label hosts are unaffected — the local LM Studio / Ollama / Parakeet paths and the shipped `http://localhost` defaults all still work (#953).
 
 - [CHANGE] **Transcripts are no longer copied to the clipboard automatically.** "Auto-copy transcript to clipboard" (Settings > General) now defaults to off — it put the full transcript on the system pasteboard after every save, where clipboard managers retain it, and that was never disclosed. If you deliberately turned it on, your choice is preserved; if you never touched it and want the old behavior, turn it on (#952).
