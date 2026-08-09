@@ -21,6 +21,7 @@ enum AppError: LocalizedError, Equatable {
     case networkTimeout
     case networkFailure
     case rateLimited(retryAfter: TimeInterval?)
+    case providerQuotaExhausted
     case exportConfigurationMissing(String)
     case exportFailure(String)
     case storageFailure(String)
@@ -88,6 +89,14 @@ enum AppError: LocalizedError, Equatable {
                 return "\(providerName) rate limit reached. Try again in \(Int(retryAfter)) seconds."
             }
             return "\(providerName) rate limit reached. Wait a moment and try again."
+        case .providerQuotaExhausted:
+            if provider == .openAI {
+                return "Your OpenAI account has no credits left, so transcription cannot run. Add credits at platform.openai.com/settings/organization/billing, then retry — new OpenAI accounts start with none."
+            }
+            if provider.requiresAPIKey {
+                return "Your \(providerName) account has no credits left, so transcription cannot run. Add credits with \(providerName), then retry."
+            }
+            return "The \(providerName) server refused the request because its account has no credits left. Top it up, then retry."
         case .exportConfigurationMissing(let message):
             return "Export setup is incomplete: \(message)"
         case .exportFailure(let message):
@@ -133,6 +142,8 @@ enum AppError: LocalizedError, Equatable {
             return "Issue Extraction Failed"
         case .networkTimeout, .networkFailure, .rateLimited:
             return "Network Issue"
+        case .providerQuotaExhausted:
+            return "Account Out of Credits"
         case .exportConfigurationMissing:
             return "Export Setup Needed"
         case .exportFailure:
@@ -176,6 +187,8 @@ enum AppError: LocalizedError, Equatable {
                 : "Repair the \(provider.displayName) setup before continuing."
         case .networkTimeout, .networkFailure, .rateLimited:
             return "BugNarrator could not reach \(provider.displayName)."
+        case .providerQuotaExhausted:
+            return "Your \(provider.displayName) account has no credits left."
         case .exportConfigurationMissing:
             return "Finish export setup before continuing."
         case .storageFailure:
