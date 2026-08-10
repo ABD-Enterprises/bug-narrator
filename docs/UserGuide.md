@@ -324,6 +324,26 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - for Jira, verify the base URL, email, API token, project key, and issue type
 - confirm your Mac still has network access
 
+## Recording Consent
+
+BugNarrator records your microphone by default. It can also record **system
+audio** — everything your Mac is playing, which on a call or in a meeting means
+other people's voices — and a **mixed** mode that captures both.
+
+System audio capture is off unless you turn on the experimental toggle, pick a
+system-audio source, and tick the consent notice. Until you do all three,
+recording is refused.
+
+**Getting consent is your responsibility.** Many jurisdictions — including
+California, Illinois, Washington, and much of the EU — require *every*
+participant to agree before a conversation is recorded, not just the person
+doing the recording. BugNarrator cannot ask them for you and does not try to.
+Tell people they are being recorded before you start.
+
+Recorded audio follows the normal path: stored locally, and sent to your
+configured AI provider only when transcription runs. If that provider is
+`Local (Parakeet)`, the audio never leaves your Mac.
+
 ## Privacy
 
 What stays local on your Mac:
