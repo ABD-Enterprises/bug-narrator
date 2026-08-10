@@ -3,6 +3,10 @@ import Foundation
 
 enum AppUtilityActionResult: Equatable {
     case opened
+    /// A result worth telling the user about that is not a failure — the
+    /// update check needs to say "you are current" or "1.0.42 is available",
+    /// and the presenter previously surfaced failures only (#961).
+    case informed(message: String)
     case failed(message: String)
 }
 
@@ -23,11 +27,15 @@ final class AppUtilityActionResultPresenter {
     }
 
     func present(_ result: AppUtilityActionResult) {
-        guard case .failed(let message) = result else {
+        switch result {
+        case .opened:
             return
+        case .informed(let message):
+            logger.info("utility_action_informed", message)
+            setStatus(.idle(message))
+        case .failed(let message):
+            presentFailure(message)
         }
-
-        presentFailure(message)
     }
 
     func present(_ result: PermissionSettingsOpenResult) {
@@ -129,8 +137,27 @@ final class AppUtilityActionController {
         permissionRecoveryController.openSystemAudioPrivacySettings()
     }
 
-    func checkForUpdates() -> AppUtilityActionResult {
-        openExternalURL(BugNarratorLinks.releases, label: "releases page")
+    /// Asks the public releases feed rather than sending the user to look.
+    /// A failed check falls back to the old behavior — opening the releases
+    /// page — so the button never becomes a dead end.
+    /// Asks the public releases feed rather than sending the user to look.
+    /// The URL decision is `ReleaseUpdateOutcome.urlToOpen`, so a failed check
+    /// still opens the releases page and the button never dead-ends.
+    func checkForUpdates(
+        checker: ReleaseUpdateChecker = ReleaseUpdateChecker(),
+        metadata: BugNarratorMetadata = BugNarratorMetadata()
+    ) async -> AppUtilityActionResult {
+        let outcome = await checker.check(currentVersion: metadata.version)
+
+        guard let url = outcome.urlToOpen(fallback: BugNarratorLinks.releases) else {
+            return .informed(message: outcome.userMessage)
+        }
+
+        if case .failed(let message) = openExternalURL(url, label: "release page") {
+            return .failed(message: message)
+        }
+
+        return .informed(message: outcome.userMessage)
     }
 
     func openScreenshot(_ screenshot: SessionScreenshot) -> AppUtilityActionResult {
