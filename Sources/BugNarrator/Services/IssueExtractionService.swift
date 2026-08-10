@@ -23,7 +23,8 @@ actor IssueExtractionService: IssueExtracting {
         from reviewSession: TranscriptSession,
         apiKey: String,
         model: String,
-        apiBaseURL: URL = URL(string: "https://api.openai.com")!
+        apiBaseURL: URL = URL(string: "https://api.openai.com")!,
+        includeScreenshots: Bool = false
     ) async throws -> IssueExtractionResult {
         logger.info(
             "issue_extraction_request_started",
@@ -40,7 +41,8 @@ actor IssueExtractionService: IssueExtracting {
                 endpoint: OpenAIEndpointBuilder.endpoint(for: "v1/chat/completions", baseURL: apiBaseURL),
                 reviewSession: reviewSession,
                 apiKey: apiKey,
-                model: model
+                model: model,
+                includeScreenshots: includeScreenshots
             )
 
             let result = try await withThrowingTaskGroup(of: IssueExtractionResult.self) { group in

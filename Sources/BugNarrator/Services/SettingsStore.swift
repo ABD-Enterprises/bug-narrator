@@ -81,6 +81,18 @@ final class SettingsStore: ObservableObject {
     /// managers persist it and an accidental paste leaks it — so it is opt-in
     /// rather than opt-out. An explicit choice is stored and still honored, so
     /// only users who never touched the toggle see the new default.
+    /// Off by default (#950). Issue extraction used to base64-embed up to four
+    /// screenshots into the provider request unconditionally, while the README
+    /// listed screenshots under "Data that stays local on your Mac". Sending a
+    /// picture of the user's screen to a third party is not a default anyone
+    /// agreed to, so it is opt-in.
+    @Published var uploadScreenshotsForExtraction: Bool = false {
+        didSet {
+            guard hasLoaded else { return }
+            defaults.set(uploadScreenshotsForExtraction, forKey: Keys.uploadScreenshotsForExtraction)
+        }
+    }
+
     @Published var autoCopyTranscript: Bool = false {
         didSet {
             guard hasLoaded else { return }
@@ -876,6 +888,7 @@ final class SettingsStore: ObservableObject {
         normalizeIssueExtractionModelForCurrentProvider(persist: true)
 
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? false
+        uploadScreenshotsForExtraction = boolValue(forKey: Keys.uploadScreenshotsForExtraction) ?? false
         autoSaveTranscript = boolValue(forKey: Keys.autoSaveTranscript) ?? true
         autoExtractIssues = boolValue(forKey: Keys.autoExtractIssues) ?? false
         hasOfferedIssueExtraction = boolValue(forKey: Keys.hasOfferedIssueExtraction) ?? false
@@ -1644,6 +1657,7 @@ private enum Keys {
     static let autoShowChangelogOnUpdate = "settings.autoShowChangelogOnUpdate"
     static let lastShownChangelogVersion = "settings.lastShownChangelogVersion"
     static let hasCompletedFirstRunOnboarding = "settings.hasCompletedFirstRunOnboarding"
+    static let uploadScreenshotsForExtraction = "settings.uploadScreenshotsForExtraction"
 }
 
 enum APIKeyPersistenceState: Equatable {

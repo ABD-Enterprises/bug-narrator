@@ -101,6 +101,16 @@ struct SettingsDiagnosticsPrivacyPane: View {
 
                     Divider()
 
+                    Toggle("Send screenshots to the AI provider", isOn: $settingsStore.uploadScreenshotsForExtraction)
+                        .help("Off by default. When on, issue extraction uploads up to four screenshots with the transcript so the model can see what you described.")
+
+                    Text("Issue extraction always sends the transcript and screenshot filenames. Turning this on additionally uploads the screenshot images themselves to \(settingsStore.aiProvider.displayName). Leave it off to keep the images on this Mac.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Divider()
+
                     Toggle("Record local usage analytics", isOn: $settingsStore.operationalTelemetryEnabled)
                         .help("Records named app events (recordings started, transcriptions completed, errors) to a local file. Nothing is uploaded.")
 

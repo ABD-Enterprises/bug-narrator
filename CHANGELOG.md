@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- [CHANGE] **Screenshots are no longer uploaded to your AI provider by default.** Issue extraction embedded up to four screenshot images in every request, while the README listed screenshots under "Data that stays local on your Mac". Uploading is now opt-in via Settings > Diagnostics & Privacy > "Send screenshots to the AI provider"; filenames and timestamps still travel so the model can tie narration to a capture (#950).
+- [FIX] README, SECURITY.md, and the User Guide now list exactly what leaves the machine per feature, including screenshot images and the tracker issue text used for duplicate review — the latter was disclosed nowhere (#950).
+- [FIX] Issue titles and summaries fetched from GitHub or Jira are now delimited and labeled untrusted in the duplicate-review prompt. Anyone able to file an issue in a configured tracker could otherwise place instructions into a prompt sent to your AI provider (#950).
+
 - [FIX] Reaching the 500-session retention limit no longer strands data. The evicted session's screenshots and preserved audio used to stay on disk with nothing referencing them — invisible, unreachable, and never cleaned up. They are now removed with the session, and BugNarrator says how many sessions the limit dropped instead of doing it silently. The limit is now documented (#960).
 - [FIX] A failed artifacts deletion is no longer logged as a success. The error was swallowed and the "removed" line was written regardless, so the logs claimed screenshots were deleted while they were still on disk (#960).
 
