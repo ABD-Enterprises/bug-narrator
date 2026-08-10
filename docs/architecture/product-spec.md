@@ -221,6 +221,19 @@ Older sessions with legacy standalone marker data must remain readable in the cu
 
 ## Evidence Capture Contract
 
+### Audio Sources
+
+BugNarrator records the microphone by default. Two additional sources are
+available behind the experimental system-audio capture flag:
+
+- system audio — what the Mac is playing, including other participants in a
+  call or meeting
+- mixed — microphone and system audio together
+
+Both are off unless the user enables the experimental flag AND selects a
+system-audio source AND ticks the recording-notice consent toggle. All three
+are required; recording is refused with a consent error otherwise.
+
 ### Narration
 
 BugNarrator is optimized for short, factual spoken narration during live testing.
@@ -306,6 +319,28 @@ It must not include:
 
 ## Credentials, Permissions, And Privacy Model
 
+### Recording Consent
+
+System-audio and mixed capture record voices other than the operator's. Whether
+that is lawful depends on where every participant is, and in all-party-consent
+jurisdictions it requires everyone's agreement — not just the person running
+BugNarrator.
+
+The product's contract is therefore:
+
+- the capability is off by default and gated behind an experimental flag
+- selecting a system-audio source surfaces a consent notice naming other
+  people's voices explicitly
+- the acknowledgment is persisted per user, and capture is refused until it is
+  given (`AppError.systemAudioConsentRequired`)
+- the acknowledgment is an acknowledgment of the operator's responsibility.
+  BugNarrator cannot obtain consent from the other participants and does not
+  claim to
+
+Captured audio follows the same egress rules as any other recording: local
+until transcription runs, then sent to the configured AI provider unless that
+provider is local.
+
 ### Credentials
 
 BugNarrator does not ship with built-in AI access or credits.
@@ -371,6 +406,8 @@ Validation remains partly manual, but these expectations are product requirement
 
 Current experimental areas:
 
+- system-audio and mixed audio capture (off by default; requires an explicit
+  recording-consent acknowledgment — see Recording Consent above)
 - GitHub issue export
 - Jira issue export
 

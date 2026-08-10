@@ -38,12 +38,12 @@ struct SettingsRecordingAudioPane: View {
 
                 if settingsStore.recordingAudioSource.usesSystemAudio {
                     Toggle(
-                        "I understand system audio can include meeting audio and other people's voices",
+                        "I am responsible for getting everyone's consent before recording system audio",
                         isOn: $settingsStore.hasAcceptedSystemAudioRecordingConsent
                     )
                     .disabled(secureControlsDisabled)
 
-                    Text("Get consent before recording system audio. BugNarrator stores finished sessions locally and \(settingsStore.aiProvider == .parakeetLocal ? "processes audio on this Mac" : "sends recorded audio to \(settingsStore.aiProvider.displayName)") only when transcription runs.")
+                    Text("System audio captures whatever your Mac is playing — including other people on a call. Many places require every participant's consent to record, so getting it is your responsibility, not BugNarrator's. Finished sessions are stored locally, and \(settingsStore.aiProvider == .parakeetLocal ? "audio is processed on this Mac" : "recorded audio is sent to \(settingsStore.aiProvider.displayName)") only when transcription runs.")
                         .font(.footnote)
                         .foregroundStyle(
                             settingsStore.hasAcceptedSystemAudioRecordingConsent

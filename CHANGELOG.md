@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [CHANGE] The system-audio consent notice now names the obligation rather than just the fact: it reads "I am responsible for getting everyone's consent before recording system audio", and the explanation says outright that many places require every participant's agreement and that BugNarrator cannot obtain it for you (#951).
+- [DOCS] The User Guide has a Recording Consent section, and the product spec documents system-audio capture in its evidence-capture, privacy, and experimental-features contracts — the capability shipped without appearing in any of them (#951).
+
 - [FIX] Issue extraction now works against local models. Every request carried `image_url` screenshot parts and forced `response_format: json_object`, both of which standard Ollama / LM Studio models reject with a 400 — so extraction failed outright for the Local-Compatible provider the README recommends. Requests are now shaped to the provider's actual capabilities (#956).
 - [FIX] Extraction no longer gives up after 10 seconds. The application cap discarded slow-but-valid answers even though the transport allowed 120s. Hosted providers now get 60s and local providers 120s (#956).
 
