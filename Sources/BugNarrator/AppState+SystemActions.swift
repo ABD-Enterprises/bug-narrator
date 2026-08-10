@@ -14,6 +14,8 @@ extension AppState {
     }
 
     func checkForUpdates() {
-        appUtilityActionPresenter.present(appUtilityActions.checkForUpdates())
+        Task { @MainActor in
+            appUtilityActionPresenter.present(await appUtilityActions.checkForUpdates())
+        }
     }
 }

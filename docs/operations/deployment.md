@@ -76,6 +76,28 @@ Before this workflow existed, publication was manual and had not run since
 months while `main` was correct. That is the failure mode automating this
 removes.
 
+## Update Channel
+
+Installed copies check for updates by reading the repository's public
+`releases/latest` endpoint when the user picks **Check for Updates**. There is
+no appcast, no background polling, and no launch-time check — the read happens
+only on that explicit action.
+
+The request is unauthenticated and carries no identifiers: no token, no install
+id, no version reporting. Nothing about the user is transmitted; the app reads
+a public JSON document and compares tag to bundle version locally.
+
+Behavior:
+
+- newer release published → opens that release's page
+- already current → says so, opens nothing
+- check fails → says the check failed and opens the releases page, so the
+  action never dead-ends
+
+Because the channel is the GitHub releases feed, **publishing a release is what
+ships an update notice**. A build that is never released is invisible to
+installed users.
+
 ## Terraform Scope
 
 `infra/terraform` currently provides reproducibility scaffolding for future distribution automation and environment metadata. It does not yet provision active runtime infrastructure because the product is a local desktop application.

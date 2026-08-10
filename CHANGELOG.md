@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [NEW] "Check for Updates" now tells you whether a newer version exists instead of just opening the releases page. It reads the public releases feed, compares it to your build, and opens the new release if there is one — or says you are current and opens nothing. A failed check says so and still opens the releases page. The request is unauthenticated and carries no identifiers (#961).
+
 - [CHANGE] The system-audio consent notice now names the obligation rather than just the fact: it reads "I am responsible for getting everyone's consent before recording system audio", and the explanation says outright that many places require every participant's agreement and that BugNarrator cannot obtain it for you (#951).
 - [DOCS] The User Guide has a Recording Consent section, and the product spec documents system-audio capture in its evidence-capture, privacy, and experimental-features contracts — the capability shipped without appearing in any of them (#951).
 
