@@ -212,6 +212,8 @@ Issue extraction is shaped to what the provider can accept. Hosted providers (Op
 
 BugNarrator does not continuously upload audio while you are still recording.
 
+"Check for Updates" reads BugNarrator's public GitHub releases feed to see whether a newer version exists. The request is unauthenticated and carries no identifiers — nothing about you or your install is sent, and it happens only when you click it.
+
 BugNarrator sends no telemetry off your Mac. There is no remote log collection, no analytics service, and no crash reporter.
 
 It does keep a local-only operational log at `~/Library/Application Support/BugNarrator/operational-telemetry.jsonl`, recording named events such as recordings started, transcriptions completed, app errors, and unclean-exit detection. That file stays on disk and is never transmitted; it is read only when you explicitly copy debug info, export a debug bundle, or run Export Data. Turn it off with **Settings > Diagnostics & Privacy > "Record local usage analytics"**, and delete the file at any time.

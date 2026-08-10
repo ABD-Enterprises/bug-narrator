@@ -834,15 +834,19 @@ final class AppStateTests: XCTestCase {
         harness.appState.openGitHubRepository()
         harness.appState.openDocumentation()
         harness.appState.openIssueReporter()
-        harness.appState.checkForUpdates()
 
+        // checkForUpdates() is deliberately absent here. Since #961 it queries
+        // the releases feed before deciding what to open, so asserting a URL
+        // synchronously would either assert removed behavior or make this a
+        // network test. Its behavior is covered against a stubbed feed in
+        // ReleaseUpdateCheckTests, including the fallback that keeps the
+        // button from dead-ending.
         XCTAssertEqual(
             harness.urlHandler.openedURLs,
             [
                 BugNarratorLinks.repository,
                 BugNarratorLinks.documentation,
-                BugNarratorLinks.issues,
-                BugNarratorLinks.releases
+                BugNarratorLinks.issues
             ]
         )
     }
