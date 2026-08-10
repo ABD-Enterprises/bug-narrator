@@ -13,7 +13,8 @@ actor MockIssueExtractionService: IssueExtracting {
         apiKey: String,
         model: String,
         apiBaseURL: URL,
-        includeScreenshots: Bool
+        includeScreenshots: Bool,
+        capabilities: IssueExtractionCapabilities
     ) async throws -> IssueExtractionResult {
         result
     }
