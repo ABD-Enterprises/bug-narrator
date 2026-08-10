@@ -146,7 +146,14 @@ fi
 # syntax errors — never on missing toolchains or missing imports.
 "${ROOT}/scripts/swift-parse-check.sh"
 
-if [[ -x "$ROOT/scripts/effort-leak-audit.sh" ]]; then
+# The board audit talks to the live GitHub board, so it cannot be part of a
+# hermetic merge gate: a board hiccup or a mislabeled issue would fail every
+# open PR and train reviewers to read red as noise (#962). CI runs it in its own
+# advisory job. It still runs by default here, so local validation is unchanged.
+if [[ "${VALIDATE_SKIP_BOARD_AUDIT:-0}" == "1" ]]; then
+  printf 'SKIPPED: board-state audit not run (VALIDATE_SKIP_BOARD_AUDIT=1); it runs as an advisory CI job\n' \
+    >"$EFFORT_LEAK_STATUS_FILE"
+elif [[ -x "$ROOT/scripts/effort-leak-audit.sh" ]]; then
   if "$ROOT/scripts/effort-leak-audit.sh" >"$EFFORT_LEAK_OUTPUT_FILE" 2>&1; then
     if grep -q '^PASS:' "$EFFORT_LEAK_OUTPUT_FILE"; then
       printf 'PASS: effort-leak audit found no duplicate, blocked-active, or unlinkable PR state\n' \
