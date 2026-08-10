@@ -879,6 +879,7 @@ final class AppState: ObservableObject {
                     apiKey: apiKey,
                     model: settingsStore.issueExtractionModelValue,
                     apiBaseURL: settingsStore.openAIBaseURLValue,
+                    includeScreenshots: settingsStore.uploadScreenshotsForExtraction,
                     completionLog: .manual
                 )
 

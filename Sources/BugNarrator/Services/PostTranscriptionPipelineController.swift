@@ -128,6 +128,7 @@ final class PostTranscriptionPipelineController {
             apiKey: apiKey,
             model: settingsStore.issueExtractionModelValue,
             apiBaseURL: settingsStore.openAIBaseURLValue,
+            includeScreenshots: settingsStore.uploadScreenshotsForExtraction,
             completionLog: .postTranscription
         )
         session.issueExtraction = extraction

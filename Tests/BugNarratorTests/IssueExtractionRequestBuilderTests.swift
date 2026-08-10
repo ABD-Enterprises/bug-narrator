@@ -159,7 +159,11 @@ final class IssueExtractionRequestBuilderTests: XCTestCase {
             endpoint: URL(string: "https://api.openai.com/v1/chat/completions")!,
             reviewSession: session,
             apiKey: "fixture-openai-key",
-            model: "gpt-4.1-mini"
+            model: "gpt-4.1-mini",
+            // Opt in explicitly: this test pins the attachment machinery, which
+            // since #950 only runs with consent. The no-consent behavior has
+            // its own tests above.
+            includeScreenshots: true
         )
 
         let parts = try XCTUnwrap(try Self.messages(request).last?["content"] as? [[String: Any]])
@@ -225,4 +229,84 @@ final class IssueExtractionRequestBuilderTests: XCTestCase {
     private static func messages(_ request: URLRequest) throws -> [[String: Any]] {
         try XCTUnwrap(try decodeBody(request)["messages"] as? [[String: Any]])
     }
+
+    // MARK: - Screenshot upload consent (#950)
+
+    private func bodyString(includeScreenshots: Bool, session: TranscriptSession) throws -> String {
+        let request = try IssueExtractionRequestBuilder.makeRequest(
+            endpoint: URL(string: "https://api.openai.com/v1/chat/completions")!,
+            reviewSession: session,
+            apiKey: "sk-test",
+            model: "gpt-4.1-mini",
+            includeScreenshots: includeScreenshots
+        )
+        return String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+    }
+
+    /// The defect: screenshots were base64-embedded unconditionally while the
+    /// README listed them under "Data that stays local on your Mac".
+    func testNoImagePartsAreSentWithoutConsent() throws {
+        let session = makeSessionWithScreenshot()
+        let body = try bodyString(includeScreenshots: false, session: session)
+
+        XCTAssertFalse(body.contains("image_url"), "No image may leave the machine without consent.")
+        XCTAssertFalse(body.contains("data:image"), "No base64 image payload may be embedded without consent.")
+    }
+
+    /// Filenames still go, because the transcript already references them and
+    /// the model needs to tie narration to a capture. That is disclosed.
+    func testFilenamesStillTravelWithoutConsentSoNarrationStaysAnchored() throws {
+        let session = makeSessionWithScreenshot()
+        let body = try bodyString(includeScreenshots: false, session: session)
+
+        XCTAssertTrue(body.contains("shot.png"), "Screenshot filenames remain, and the docs say so.")
+    }
+
+    func testConsentEnablesImageParts() throws {
+        let session = makeSessionWithScreenshot()
+        let body = try bodyString(includeScreenshots: true, session: session)
+
+        XCTAssertTrue(body.contains("image_url"), "With consent the image is attached as before.")
+    }
+
+    /// The default is the safe one — a caller that forgets the argument must not
+    /// silently upload.
+    func testDefaultIsNoUpload() throws {
+        let session = makeSessionWithScreenshot()
+        let request = try IssueExtractionRequestBuilder.makeRequest(
+            endpoint: URL(string: "https://api.openai.com/v1/chat/completions")!,
+            reviewSession: session,
+            apiKey: "sk-test",
+            model: "gpt-4.1-mini"
+        )
+        let body = String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+
+        XCTAssertFalse(body.contains("image_url"))
+    }
+
+
+    private func makeSessionWithScreenshot() -> TranscriptSession {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-ConsentTests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+
+        let pngData = Data(
+            base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="
+        )!
+        let screenshotURL = directory.appendingPathComponent("shot.png")
+        try? pngData.write(to: screenshotURL)
+
+        return TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 10),
+            transcript: "The save button is clipped.",
+            duration: 18,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            markers: [],
+            screenshots: [SessionScreenshot(elapsedTime: 8, filePath: screenshotURL.path)]
+        )
+    }
+
 }

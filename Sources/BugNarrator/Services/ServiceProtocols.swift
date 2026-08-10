@@ -81,7 +81,8 @@ protocol IssueExtracting: Sendable {
         from reviewSession: TranscriptSession,
         apiKey: String,
         model: String,
-        apiBaseURL: URL
+        apiBaseURL: URL,
+        includeScreenshots: Bool
     ) async throws -> IssueExtractionResult
 }
 
