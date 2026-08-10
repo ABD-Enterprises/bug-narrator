@@ -208,6 +208,8 @@ Data sent to the configured AI provider:
 - the screenshot **images themselves**, but only if you turn on Settings > Diagnostics & Privacy > "Send screenshots to the AI provider". This is off by default.
 - when duplicate review is enabled, the titles and summaries of candidate issues fetched from your configured GitHub or Jira tracker
 
+Issue extraction is shaped to what the provider can accept. Hosted providers (OpenAI, OpenAI-Compatible) get JSON response mode, plus screenshot images if you opted in, with a 60-second budget. The Local-Compatible provider gets neither — most local models reject `image_url` parts and `response_format: json_object` outright — and gets 120 seconds, because a local model being slow is not a failure.
+
 BugNarrator does not continuously upload audio while you are still recording.
 
 BugNarrator sends no telemetry off your Mac. There is no remote log collection, no analytics service, and no crash reporter.
