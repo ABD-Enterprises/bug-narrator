@@ -1,0 +1,72 @@
+name: docs-site
+
+# Publishes the Docusaurus site. Before this existed the site was deployed by
+# hand and had not been republished since 2026-05-11, so the live pages served
+# pre-transfer `deffenda/bug-narrator` links while main had none (#964).
+#
+# Uses the first-party Pages actions, which requires the repository's Pages
+# source to be "GitHub Actions" rather than the legacy gh-pages branch.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - '.github/workflows/docs-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: site/.node-version
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      # The site mirrors are generated from the canonical repo docs. If a mirror
+      # is stale the published pages would silently disagree with the repo, so
+      # this fails the deploy rather than publishing the drift.
+      - name: Verify generated site doc mirrors are current
+        run: python3 scripts/sync_site_docs.py --check
+
+      - name: Install dependencies
+        run: npm ci --prefix site
+
+      - name: Build the site
+        run: npm run build --prefix site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload the built site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
