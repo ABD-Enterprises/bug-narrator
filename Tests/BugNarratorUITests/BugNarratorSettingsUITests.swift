@@ -151,10 +151,30 @@ final class BugNarratorSettingsUITests: XCTestCase {
             XCTAssertTrue(checkbox.isEnabled, checkboxLabel)
         }
 
-        let assignButton = app.buttons["Assign shortcut for Start Recording"].firstMatch
-        XCTAssertTrue(waitForSettingsElement(assignButton, in: settingsWindow), "Assign")
-        let clearButton = app.buttons["Clear shortcut for Start Recording"].firstMatch
-        XCTAssertTrue(waitForSettingsElement(clearButton, in: settingsWindow), "Clear")
+        // Window-scoped, like every other lookup in this test. The app-scoped
+        // query was the odd one out and could match outside the settings window.
+        //
+        // The capture button's accessibility label is dynamic — "Assign shortcut
+        // for X" when nothing is bound, "Change shortcut for X" once it is, and
+        // "Press shortcut for X" mid-capture (HotkeyRecorderView.swift:29). The
+        // old assertion hard-coded "Assign" and so depended on the seeded store
+        // having no hotkey bound. Accept whichever of the stable two is showing;
+        // that is the control's identity, not its state.
+        let captureButton = settingsWindow.buttons
+            .matching(NSPredicate(format: "label ENDSWITH %@", "shortcut for Start Recording"))
+            .firstMatch
+        XCTAssertTrue(
+            waitForSettingsElement(captureButton, in: settingsWindow),
+            "No shortcut capture button for Start Recording. Buttons present in the settings window: "
+                + describeButtons(in: settingsWindow)
+        )
+
+        let clearButton = settingsWindow.buttons["Clear shortcut for Start Recording"].firstMatch
+        XCTAssertTrue(
+            waitForSettingsElement(clearButton, in: settingsWindow),
+            "No clear-shortcut button for Start Recording. Buttons present in the settings window: "
+                + describeButtons(in: settingsWindow)
+        )
 
         // --- Integrations tab ---
         selectSettingsTab("Integrations", in: app)
@@ -479,7 +499,14 @@ final class BugNarratorSettingsUITests: XCTestCase {
             file: file,
             line: line
         )
-        element.click()
+        if !focusForTyping(element, in: XCUIApplication()) {
+            XCTFail(
+                "Element never took keyboard focus, so typing would be dropped: \(element.label)",
+                file: file,
+                line: line
+            )
+            return
+        }
         element.typeKey("a", modifierFlags: .command)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -607,4 +634,32 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertEqual(tab.value as? Int, 1, "Settings section '\(section)' did not become selected")
         waitForSettingsLayout(interval: 0.3)
     }
+
+    /// Lists the buttons actually present, so a missing-control failure says what
+    /// the window contained instead of just naming what it wanted (#949).
+    @MainActor
+    private func describeButtons(in settingsWindow: XCUIElement) -> String {
+        let labels = settingsWindow.buttons.allElementsBoundByIndex
+            .prefix(40)
+            .map { $0.label.isEmpty ? "<unlabeled>" : $0.label }
+        return labels.isEmpty ? "<none>" : labels.joined(separator: " | ")
+    }
+
+    /// Clicking a control does not reliably make it first responder while the
+    /// test runner holds key window, which is what produced "Neither element nor
+    /// any descendant has keyboard focus" before typing (#949).
+    @MainActor
+    @discardableResult
+    private func focusForTyping(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        for _ in 0..<5 {
+            app.activate()
+            element.click()
+            waitForSettingsLayout(interval: 0.2)
+            if (element.value(forKey: "hasKeyboardFocus") as? Bool) == true {
+                return true
+            }
+        }
+        return (element.value(forKey: "hasKeyboardFocus") as? Bool) == true
+    }
+
 }
