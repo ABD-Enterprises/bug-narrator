@@ -371,7 +371,8 @@ private actor UITestIssueExtractionService: IssueExtracting {
         from reviewSession: TranscriptSession,
         apiKey: String,
         model: String,
-        apiBaseURL: URL
+        apiBaseURL: URL,
+        includeScreenshots: Bool
     ) async throws -> IssueExtractionResult {
         IssueExtractionResult(
             summary: "UI test extraction completed.",

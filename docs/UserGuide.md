@@ -330,7 +330,7 @@ What stays local on your Mac:
 
 - saved session history
 - screenshot-driven timeline markers and older marker data from existing sessions
-- screenshots and screenshot metadata
+- screenshot image files, unless you turn on screenshot upload (see below)
 - extracted issue drafts
 - exported session bundles
 
@@ -339,6 +339,9 @@ What is sent to the configured AI provider:
 - for hosted or compatible providers, recorded audio after you stop a session and request transcription
 - for `Local (Parakeet)`, audio is processed by the local server on this Mac instead of uploaded
 - transcript context used for review summary or issue extraction when a chat-capable provider is selected
+- screenshot filenames and timestamps during issue extraction, so the model can tie your narration to a capture
+- the screenshot images themselves, but only when Settings > Diagnostics & Privacy > "Send screenshots to the AI provider" is on. It is off by default
+- when duplicate review runs, the titles and summaries of candidate issues fetched from your GitHub or Jira tracker
 
 BugNarrator does not continuously stream live audio to any AI provider while you are still recording.
 

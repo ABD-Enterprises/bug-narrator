@@ -13,7 +13,8 @@ enum IssueExtractionRequestBuilder {
         endpoint: URL,
         reviewSession: TranscriptSession,
         apiKey: String,
-        model: String
+        model: String,
+        includeScreenshots: Bool = false
     ) throws -> URLRequest {
         let body = try JSONEncoder().encode(
             ChatCompletionRequest(
@@ -42,7 +43,15 @@ enum IssueExtractionRequestBuilder {
                         Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
                         """)
                     ),
-                    .init(role: "user", content: .parts(makeUserMessageParts(for: reviewSession)))
+                    .init(
+                        role: "user",
+                        content: .parts(
+                            makeUserMessageParts(
+                                for: reviewSession,
+                                includeScreenshots: includeScreenshots
+                            )
+                        )
+                    )
                 ]
             )
         )
@@ -107,9 +116,25 @@ enum IssueExtractionRequestBuilder {
         return lines.joined(separator: "\n")
     }
 
-    private static func makeUserMessageParts(for session: TranscriptSession) -> [ChatMessageInputPart] {
+    private static func makeUserMessageParts(
+        for session: TranscriptSession,
+        includeScreenshots: Bool
+    ) -> [ChatMessageInputPart] {
         let logger = DiagnosticsLogger(category: .transcription)
         var parts: [ChatMessageInputPart] = [.text(makePrompt(for: session))]
+
+        // Without consent the images never leave the machine. Filenames and
+        // timestamps still go, because the transcript already references them
+        // and the model needs to tie narration to a capture (#950).
+        guard includeScreenshots else {
+            if !session.screenshots.isEmpty {
+                let names = session.screenshots
+                    .map { "\($0.fileName) at \($0.timeLabel)" }
+                    .joined(separator: ", ")
+                parts.append(.text("Screenshot references (images not provided): \(names)."))
+            }
+            return parts
+        }
 
         var includedScreenshotCount = 0
         var omittedScreenshotCount = 0

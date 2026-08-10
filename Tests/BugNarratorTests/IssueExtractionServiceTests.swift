@@ -69,7 +69,12 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
 
         let service = IssueExtractionService(session: makeMockURLSession())
-        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+        let result = try await service.extractIssues(
+            from: session,
+            apiKey: "fixture-openai-key",
+            model: "gpt-4.1-mini",
+            includeScreenshots: true
+        )
 
         XCTAssertEqual(result.summary, "Two draft review items were extracted.")
         XCTAssertEqual(result.guidanceNote, "Review these before export.")
@@ -310,7 +315,12 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
 
         let service = IssueExtractionService(session: makeMockURLSession())
-        let result = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+        let result = try await service.extractIssues(
+            from: session,
+            apiKey: "fixture-openai-key",
+            model: "gpt-4.1-mini",
+            includeScreenshots: true
+        )
 
         XCTAssertEqual(result.summary, "Budgeted.")
     }
@@ -357,7 +367,12 @@ final class IssueExtractionServiceTests: XCTestCase {
         }
 
         let service = IssueExtractionService(session: makeMockURLSession())
-        _ = try await service.extractIssues(from: session, apiKey: "fixture-openai-key", model: "gpt-4.1-mini")
+        _ = try await service.extractIssues(
+            from: session,
+            apiKey: "fixture-openai-key",
+            model: "gpt-4.1-mini",
+            includeScreenshots: true
+        )
     }
 
     func testExtractIssuesTimesOutAfterConfiguredBudget() async throws {

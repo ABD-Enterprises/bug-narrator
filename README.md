@@ -196,7 +196,7 @@ Data that stays local on your Mac:
 - session history
 - transcripts after they return from the configured AI provider
 - screenshot-driven timeline markers and older marker data from existing sessions
-- screenshots and screenshot metadata
+- screenshot image files, unless you opt in to uploading them (see the next list)
 - extracted issue drafts
 - exported bundles you explicitly create
 
@@ -204,6 +204,9 @@ Data sent to the configured AI provider:
 
 - recorded audio when you stop a session and request transcription
 - transcript context used for issue extraction or summary generation
+- screenshot **filenames and timestamps** during issue extraction, so the model can tie narration to a capture
+- the screenshot **images themselves**, but only if you turn on Settings > Diagnostics & Privacy > "Send screenshots to the AI provider". This is off by default.
+- when duplicate review is enabled, the titles and summaries of candidate issues fetched from your configured GitHub or Jira tracker
 
 BugNarrator does not continuously upload audio while you are still recording.
 

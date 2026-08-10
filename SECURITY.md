@@ -34,7 +34,9 @@ That includes:
 
 - recorded session audio after you stop a session and request transcription
 - transcript context when you request a review summary
-- transcript, markers, and screenshot references when you run issue extraction
+- transcript, markers, and screenshot filenames/timestamps when you run issue extraction
+- the screenshot images themselves during issue extraction, but only when you enable Settings > Diagnostics & Privacy > "Send screenshots to the AI provider". That setting is off by default; before it existed, up to four screenshots were uploaded unconditionally
+- titles and summaries of candidate issues fetched from your GitHub or Jira tracker, when duplicate review runs. That text originates outside BugNarrator, so it is delimited and marked untrusted in the prompt
 
 The app does not stream live dictation into other apps and does not upload audio continuously while you are still recording.
 
