@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [INTERNAL] A PR that breaks the build can no longer merge. Branch protection required only two ubuntu jobs that never compile Swift, so the 797-test macOS suite ran and gated nothing. A `required-checks` job now aggregates every CI job and is the required context (#962).
+- [INTERNAL] The blocking CI gate is hermetic. It ran the board-state audit, which queries the live GitHub board, so a board hiccup or one mislabeled issue could fail every open PR. That audit now runs as its own advisory job; local `validate.sh` still runs it by default (#962).
+
 - [CHANGE] **Screenshots are no longer uploaded to your AI provider by default.** Issue extraction embedded up to four screenshot images in every request, while the README listed screenshots under "Data that stays local on your Mac". Uploading is now opt-in via Settings > Diagnostics & Privacy > "Send screenshots to the AI provider"; filenames and timestamps still travel so the model can tie narration to a capture (#950).
 - [FIX] README, SECURITY.md, and the User Guide now list exactly what leaves the machine per feature, including screenshot images and the tracker issue text used for duplicate review — the latter was disclosed nowhere (#950).
 - [FIX] Issue titles and summaries fetched from GitHub or Jira are now delimited and labeled untrusted in the duplicate-review prompt. Anyone able to file an issue in a configured tracker could otherwise place instructions into a prompt sent to your AI provider (#950).
