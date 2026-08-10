@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [FIX] Reaching the 500-session retention limit no longer strands data. The evicted session's screenshots and preserved audio used to stay on disk with nothing referencing them — invisible, unreachable, and never cleaned up. They are now removed with the session, and BugNarrator says how many sessions the limit dropped instead of doing it silently. The limit is now documented (#960).
+- [FIX] A failed artifacts deletion is no longer logged as a success. The error was swallowed and the "removed" line was written regardless, so the logs claimed screenshots were deleted while they were still on disk (#960).
+
 - [INTERNAL] The docs site now deploys from CI (`.github/workflows/docs-site.yml`) on pushes to `main` that touch `site/` or `docs/`. It was published by hand and had not been republished since 2026-05-11, so the live pages served pre-transfer repository links for three months while the repo was correct. The build refuses to publish when a generated doc mirror is stale (#964).
 
 - [FIX] Library search now searches the **whole** transcript. It only ever indexed the first 160 characters, so anything said after the opening sentence was unfindable — in the feature the product is built around (#957).

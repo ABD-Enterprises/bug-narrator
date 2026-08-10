@@ -39,7 +39,8 @@ struct AppBootstrap {
             )
             self.transcriptStore = TranscriptStore(
                 fileManager: fileManager,
-                storageURL: storageRootURL.appendingPathComponent("sessions.json")
+                storageURL: storageRootURL.appendingPathComponent("sessions.json"),
+                artifactsRemover: Self.makeArtifactsRemover()
             )
             self.isolatedDefaultsSuiteName = defaultsSuiteName
             self.isolatedStorageRootURL = storageRootURL
@@ -49,9 +50,20 @@ struct AppBootstrap {
         launchAtLoginService = SystemLaunchAtLoginService()
         self.storageMode = .production
         self.settingsStore = SettingsStore(launchAtLoginService: launchAtLoginService)
-        self.transcriptStore = TranscriptStore()
+        self.transcriptStore = TranscriptStore(artifactsRemover: Self.makeArtifactsRemover())
         self.isolatedDefaultsSuiteName = nil
         self.isolatedStorageRootURL = nil
+    }
+
+    /// Lets the store clean up a dropped session's screenshots and audio when
+    /// the retention cap evicts it (#960). Routed through the artifacts service
+    /// so the managed-directory guard still applies — the store must not be
+    /// able to delete an arbitrary path.
+    private static func makeArtifactsRemover() -> (URL) -> ArtifactsRemovalOutcome {
+        let artifactsService = SessionArtifactsService()
+        return { directoryURL in
+            artifactsService.removeArtifactsDirectory(at: directoryURL)
+        }
     }
 }
 
@@ -493,5 +505,6 @@ private final class UITestURLHandler: URLOpening {
     func open(_ url: URL) -> Bool {
         true
     }
+
 }
 #endif

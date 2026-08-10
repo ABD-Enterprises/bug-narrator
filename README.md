@@ -53,7 +53,7 @@ It can:
 - extract draft bugs, UX issues, enhancements, and follow-up questions
 - export selected issues to GitHub Issues or Jira Cloud with experimental integrations
 - export a local session bundle with transcript and screenshot artifacts
-- keep a searchable session library with date filters and deletion
+- keep a searchable session library with date filters and deletion (the 500 most recent sessions are retained; older ones are removed along with their screenshots and audio, and BugNarrator tells you when that happens)
 - stay responsive with larger local histories by caching session-library metadata for faster filtering, search, and selection changes
 
 ## Bring Your Own AI Provider
