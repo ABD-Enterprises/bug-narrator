@@ -322,4 +322,76 @@ final class TranscriptStoreTests: XCTestCase {
         )
     }
 
+
+    /// #960: the 500-session retention cap dropped the oldest session's JSON but
+    /// left its artifacts directory — screenshots and preserved audio — on disk
+    /// with nothing referencing it, and told the user nothing.
+    ///
+    /// This drives the real eviction path (adding past the cap), not explicit
+    /// deletion. Explicit deletion removes the session file before the orphan
+    /// sweep runs, and already cleans artifacts via SessionLibraryController.
+    func testRetentionEvictionRemovesArtifactsAndSurfacesTheCap() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let artifactsRootURL = rootDirectoryURL.appendingPathComponent("SessionAssets", isDirectory: true)
+        let artifactsService = SessionArtifactsService(rootDirectoryURL: artifactsRootURL)
+
+        let store = TranscriptStore(
+            storageURL: storageURL,
+            artifactsRemover: { artifactsService.removeArtifactsDirectory(at: $0) }
+        )
+
+        // The oldest session owns an artifacts directory; it is the one the cap
+        // will drop once we exceed 500.
+        let evictedID = UUID()
+        let evictedArtifactsURL = artifactsRootURL.appendingPathComponent(evictedID.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: evictedArtifactsURL, withIntermediateDirectories: true)
+        try Data("screenshot".utf8).write(to: evictedArtifactsURL.appendingPathComponent("shot.png"))
+
+        try store.add(
+            TranscriptSession(
+                id: evictedID,
+                createdAt: Date(timeIntervalSince1970: 1),
+                transcript: "oldest",
+                duration: 1,
+                model: "whisper-1",
+                languageHint: nil,
+                prompt: nil,
+                artifactsDirectoryPath: evictedArtifactsURL.path
+            )
+        )
+
+        for index in 1...500 {
+            try store.add(
+                TranscriptSession(
+                    id: UUID(),
+                    createdAt: Date(timeIntervalSince1970: TimeInterval(1_000 + index)),
+                    transcript: "s\(index)",
+                    duration: 1,
+                    model: "whisper-1",
+                    languageHint: nil,
+                    prompt: nil
+                )
+            )
+        }
+
+        XCTAssertEqual(store.sessionCount, 500, "Precondition: the cap held.")
+        XCTAssertNil(
+            store.libraryEntries.first(where: { $0.id == evictedID }),
+            "Precondition: the oldest session was the one evicted."
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: evictedArtifactsURL.path),
+            "Eviction must take the dropped session's screenshots and audio with it."
+        )
+        XCTAssertEqual(
+            store.lastLoadRecoveryEvent?.source,
+            .retentionEviction,
+            "The cap must be visible to the user, not silent data loss."
+        )
+    }
+
 }

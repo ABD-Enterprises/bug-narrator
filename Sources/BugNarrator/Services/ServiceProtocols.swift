@@ -153,7 +153,8 @@ protocol SessionArtifactsManaging {
         index: Int,
         elapsedTime: TimeInterval
     ) -> URL
-    func removeArtifactsDirectory(at directoryURL: URL)
+    @discardableResult
+    func removeArtifactsDirectory(at directoryURL: URL) -> ArtifactsRemovalOutcome
 }
 
 protocol ClipboardWriting {
