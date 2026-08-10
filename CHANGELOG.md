@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [INTERNAL] The docs site now deploys from CI (`.github/workflows/docs-site.yml`) on pushes to `main` that touch `site/` or `docs/`. It was published by hand and had not been republished since 2026-05-11, so the live pages served pre-transfer repository links for three months while the repo was correct. The build refuses to publish when a generated doc mirror is stale (#964).
+
 - [FIX] Library search now searches the **whole** transcript. It only ever indexed the first 160 characters, so anything said after the opening sentence was unfindable — in the feature the product is built around (#957).
 - [CHANGE] The session index (`sessions.index.json`) is now encrypted at rest like session bodies are. It previously held transcript text in the clear beside encrypted session files; making search full-text without this would have widened that from a 160-character preview to entire transcripts. Indexes written by older builds still load and are re-written protected on the next save (#957, part of #954).
 
