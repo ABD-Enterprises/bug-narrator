@@ -4,10 +4,10 @@ actor IssueExtractionService: IssueExtracting {
     static let defaultTimeoutDuration: Duration = .seconds(10)
 
     private let session: URLSession
-    private let timeoutDuration: Duration
+    private let injectedTimeoutDuration: Duration?
     private let logger = DiagnosticsLogger(category: .transcription)
 
-    init(session: URLSession? = nil, timeoutDuration: Duration = IssueExtractionService.defaultTimeoutDuration) {
+    init(session: URLSession? = nil, timeoutDuration: Duration? = nil) {
         if let session {
             self.session = session
         } else {
@@ -16,7 +16,7 @@ actor IssueExtractionService: IssueExtracting {
             configuration.timeoutIntervalForResource = 180
             self.session = URLSession(configuration: configuration)
         }
-        self.timeoutDuration = timeoutDuration
+        self.injectedTimeoutDuration = timeoutDuration
     }
 
     func extractIssues(
@@ -24,7 +24,8 @@ actor IssueExtractionService: IssueExtracting {
         apiKey: String,
         model: String,
         apiBaseURL: URL = URL(string: "https://api.openai.com")!,
-        includeScreenshots: Bool = false
+        includeScreenshots: Bool = false,
+        capabilities: IssueExtractionCapabilities = .hosted
     ) async throws -> IssueExtractionResult {
         logger.info(
             "issue_extraction_request_started",
@@ -42,12 +43,16 @@ actor IssueExtractionService: IssueExtracting {
                 reviewSession: reviewSession,
                 apiKey: apiKey,
                 model: model,
-                includeScreenshots: includeScreenshots
+                includeScreenshots: includeScreenshots,
+                capabilities: capabilities
             )
 
             let result = try await withThrowingTaskGroup(of: IssueExtractionResult.self) { group in
                 let session = self.session
-                let timeoutDuration = self.timeoutDuration
+                // The injected value wins (tests pin it); otherwise the provider's
+                // budget applies. A 10s app cap discarded slow-but-valid local
+                // model answers even though URLSession allows 120s (#956).
+                let timeoutDuration = self.injectedTimeoutDuration ?? capabilities.timeout
 
                 group.addTask {
                     try await Self.performRequest(request, using: session, reviewSession: reviewSession)

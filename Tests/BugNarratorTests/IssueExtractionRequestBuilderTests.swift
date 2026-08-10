@@ -309,4 +309,66 @@ final class IssueExtractionRequestBuilderTests: XCTestCase {
         )
     }
 
+
+    // MARK: - Local-model capability gating (#956)
+
+    private func body(capabilities: IssueExtractionCapabilities, includeScreenshots: Bool) throws -> String {
+        let request = try IssueExtractionRequestBuilder.makeRequest(
+            endpoint: URL(string: "http://localhost:1234/v1/chat/completions")!,
+            reviewSession: makeSessionWithScreenshot(),
+            apiKey: "sk-test",
+            model: "local-model",
+            includeScreenshots: includeScreenshots,
+            capabilities: capabilities
+        )
+        return String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+    }
+
+    /// A standard non-vision local model rejects `image_url` parts with a 400 and
+    /// fails the whole request — so consent alone is not enough to send them.
+    func testLocalModelNeverReceivesImagePartsEvenWithConsent() throws {
+        let json = try body(capabilities: .localModel, includeScreenshots: true)
+
+        XCTAssertFalse(json.contains("image_url"), "A text-only endpoint must not be sent image parts.")
+        XCTAssertFalse(json.contains("data:image"))
+        XCTAssertTrue(json.contains("shot.png"), "Filenames still anchor the narration.")
+    }
+
+    /// Many local endpoints reject `response_format: json_object`. The field must
+    /// be absent, not sent with a different value.
+    func testLocalModelRequestOmitsJSONResponseFormat() throws {
+        let json = try body(capabilities: .localModel, includeScreenshots: false)
+
+        XCTAssertFalse(json.contains("response_format"), json)
+        XCTAssertFalse(json.contains("json_object"), json)
+    }
+
+    /// The OpenAI path must not regress: JSON mode stays, and consent still
+    /// attaches screenshots.
+    func testHostedProviderKeepsJSONModeAndHonorsConsent() throws {
+        let withConsent = try body(capabilities: .hosted, includeScreenshots: true)
+        XCTAssertTrue(withConsent.contains("json_object"), withConsent)
+        XCTAssertTrue(withConsent.contains("image_url"))
+
+        let withoutConsent = try body(capabilities: .hosted, includeScreenshots: false)
+        XCTAssertTrue(withoutConsent.contains("json_object"))
+        XCTAssertFalse(withoutConsent.contains("image_url"))
+    }
+
+    func testCapabilitiesMapFromProvider() {
+        XCTAssertEqual(IssueExtractionCapabilities.forProvider(.openAI), .hosted)
+        XCTAssertEqual(IssueExtractionCapabilities.forProvider(.openAICompatible), .hosted)
+        XCTAssertEqual(IssueExtractionCapabilities.forProvider(.localCompatible), .localModel)
+        XCTAssertEqual(IssueExtractionCapabilities.forProvider(.parakeetLocal), .localModel)
+    }
+
+    /// The 10s application cap discarded slow-but-valid local answers while
+    /// URLSession allowed 120s. Both budgets must stay within that transport
+    /// ceiling so a real timeout surfaces as a transport error.
+    func testTimeoutBudgetsAreLocalFriendlyAndWithinTheTransportCeiling() {
+        XCTAssertGreaterThan(IssueExtractionCapabilities.localModel.timeout, .seconds(10))
+        XCTAssertGreaterThanOrEqual(IssueExtractionCapabilities.localModel.timeout, IssueExtractionCapabilities.hosted.timeout)
+        XCTAssertLessThanOrEqual(IssueExtractionCapabilities.localModel.timeout, .seconds(120))
+    }
+
 }

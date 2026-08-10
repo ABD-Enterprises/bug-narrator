@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [FIX] Issue extraction now works against local models. Every request carried `image_url` screenshot parts and forced `response_format: json_object`, both of which standard Ollama / LM Studio models reject with a 400 — so extraction failed outright for the Local-Compatible provider the README recommends. Requests are now shaped to the provider's actual capabilities (#956).
+- [FIX] Extraction no longer gives up after 10 seconds. The application cap discarded slow-but-valid answers even though the transport allowed 120s. Hosted providers now get 60s and local providers 120s (#956).
+
 - [INTERNAL] A PR that breaks the build can no longer merge. Branch protection required only two ubuntu jobs that never compile Swift, so the 797-test macOS suite ran and gated nothing. A `required-checks` job now aggregates every CI job and is the required context (#962).
 - [INTERNAL] The blocking CI gate is hermetic. It ran the board-state audit, which queries the live GitHub board, so a board hiccup or one mislabeled issue could fail every open PR. That audit now runs as its own advisory job; local `validate.sh` still runs it by default (#962).
 

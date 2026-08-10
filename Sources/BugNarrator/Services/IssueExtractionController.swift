@@ -59,6 +59,7 @@ final class IssueExtractionController: ObservableObject {
         model: String,
         apiBaseURL: URL,
         includeScreenshots: Bool,
+        capabilities: IssueExtractionCapabilities,
         completionLog: IssueExtractionCompletionLog
     ) async throws -> IssueExtractionResult {
         issueExtractionSessionID = session.id
@@ -69,7 +70,8 @@ final class IssueExtractionController: ObservableObject {
             apiKey: apiKey,
             model: model,
             apiBaseURL: apiBaseURL,
-            includeScreenshots: includeScreenshots
+            includeScreenshots: includeScreenshots,
+            capabilities: capabilities
         )
 
         var updatedSession = session
