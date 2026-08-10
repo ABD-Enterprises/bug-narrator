@@ -86,4 +86,59 @@ final class SessionArtifactsServiceTests: XCTestCase {
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         return directoryURL
     }
+
+    // MARK: - Honest deletion reporting (#960)
+
+    /// The service used to swallow the error with `try?` and log
+    /// "Removed a BugNarrator-managed artifacts directory" regardless, so a
+    /// failed deletion produced a success log while the spec promises deletion
+    /// removes managed screenshots.
+    func testFailedRemovalIsReportedRatherThanLoggedAsSuccess() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer {
+            try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: rootDirectoryURL.path)
+            try? FileManager.default.removeItem(at: rootDirectoryURL)
+        }
+
+        let managedRootURL = rootDirectoryURL.appendingPathComponent("SessionAssets", isDirectory: true)
+        let managedDirectoryURL = managedRootURL.appendingPathComponent("session", isDirectory: true)
+        try FileManager.default.createDirectory(at: managedDirectoryURL, withIntermediateDirectories: true)
+
+        // Make the parent immutable so the child cannot be unlinked.
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: managedRootURL.path)
+        defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: managedRootURL.path) }
+
+        let service = SessionArtifactsService(rootDirectoryURL: managedRootURL)
+        let outcome = service.removeArtifactsDirectory(at: managedDirectoryURL)
+
+        guard case .failed = outcome else {
+            return XCTFail("Expected a failure outcome, got \(outcome). The directory is still on disk.")
+        }
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: managedDirectoryURL.path),
+            "Precondition: the removal really did fail."
+        )
+    }
+
+    func testRemovalOutcomesDistinguishManagedMissingAndRejected() throws {
+        let rootDirectoryURL = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        let managedRootURL = rootDirectoryURL.appendingPathComponent("SessionAssets", isDirectory: true)
+        let managedDirectoryURL = managedRootURL.appendingPathComponent("session", isDirectory: true)
+        let externalDirectoryURL = rootDirectoryURL.appendingPathComponent("External", isDirectory: true)
+        try FileManager.default.createDirectory(at: managedDirectoryURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: externalDirectoryURL, withIntermediateDirectories: true)
+
+        let service = SessionArtifactsService(rootDirectoryURL: managedRootURL)
+
+        XCTAssertEqual(service.removeArtifactsDirectory(at: managedDirectoryURL), .removed)
+        XCTAssertEqual(service.removeArtifactsDirectory(at: managedDirectoryURL), .nothingToRemove)
+        XCTAssertEqual(
+            service.removeArtifactsDirectory(at: externalDirectoryURL),
+            .rejectedUnmanagedDirectory
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: externalDirectoryURL.path))
+    }
+
 }

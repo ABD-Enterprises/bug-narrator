@@ -40,9 +40,15 @@ final class MockArtifactsService: SessionArtifactsManaging {
         directoryURL.appendingPathComponent("\(prefix)-\(index)").appendingPathExtension("png")
     }
 
-    func removeArtifactsDirectory(at directoryURL: URL) {
+    @discardableResult
+    func removeArtifactsDirectory(at directoryURL: URL) -> ArtifactsRemovalOutcome {
         removedDirectories.append(directoryURL)
-        try? fileManager.removeItem(at: directoryURL)
+        do {
+            try fileManager.removeItem(at: directoryURL)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        return .removed
     }
 }
 

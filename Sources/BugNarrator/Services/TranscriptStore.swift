@@ -32,6 +32,10 @@ final class TranscriptStore: ObservableObject {
     }
 
     private let fileManager: FileManager
+    /// Injected so eviction can delete a dropped session's screenshots and
+    /// audio. Without it the retention cap deleted the session JSON and left
+    /// its artifacts directory on disk, unreachable and invisible (#960).
+    private let artifactsRemover: ((URL) -> ArtifactsRemovalOutcome)?
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let storageURL: URL
@@ -45,9 +49,11 @@ final class TranscriptStore: ObservableObject {
     init(
         fileManager: FileManager = .default,
         storageURL: URL? = nil,
-        sessionDataProtector: (any SessionDataProtecting)? = nil
+        sessionDataProtector: (any SessionDataProtecting)? = nil,
+        artifactsRemover: ((URL) -> ArtifactsRemovalOutcome)? = nil
     ) {
         self.fileManager = fileManager
+        self.artifactsRemover = artifactsRemover
         self.sessionDataProtector = sessionDataProtector ?? SessionDataProtectorFactory.automatic()
 
         if let storageURL {
@@ -500,11 +506,32 @@ final class TranscriptStore: ObservableObject {
             return
         }
 
+        var evictedCount = 0
+
         for fileURL in fileURLs where fileURL.pathExtension == "json" {
             let rawID = fileURL.deletingPathExtension().lastPathComponent
             guard let id = UUID(uuidString: rawID), !retainedIDs.contains(id) else {
                 continue
             }
+
+            // Read the session before deleting its file: the artifacts
+            // directory path lives inside it, and once the JSON is gone the
+            // screenshots and audio are unreachable forever.
+            if let artifactsRemover,
+               let session = loadSessionFile(with: id),
+               let artifactsDirectoryURL = session.artifactsDirectoryURL {
+                if case .failed(let message) = artifactsRemover(artifactsDirectoryURL) {
+                    logStorageFailure(
+                        "session_artifacts_evict_failed",
+                        "Removed an unreferenced session but could not remove its artifacts.",
+                        error: AppError.storageFailure(message),
+                        fileName: artifactsDirectoryURL.lastPathComponent
+                    )
+                }
+            }
+
+            evictedCount += 1
+
             do {
                 try fileManager.removeItem(at: fileURL)
             } catch {
@@ -515,6 +542,16 @@ final class TranscriptStore: ObservableObject {
                     fileName: fileURL.lastPathComponent
                 )
             }
+        }
+
+        // Surface the retention cap. It is documented nowhere in the UI and the
+        // spec frames deletion as user-driven only, so dropping sessions
+        // without saying so is data loss the user never agreed to.
+        if evictedCount > 0 {
+            lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
+                source: .retentionEviction,
+                recoveredSessionCount: evictedCount
+            )
         }
     }
 
