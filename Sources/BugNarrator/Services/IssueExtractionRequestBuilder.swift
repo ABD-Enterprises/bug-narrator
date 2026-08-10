@@ -1,5 +1,43 @@
 import Foundation
 
+/// What an extraction endpoint can actually accept (#956).
+///
+/// The builder used to send `image_url` parts and `response_format:
+/// json_object` to every provider. Standard non-vision local models
+/// (Ollama / LM Studio behind the Local-Compatible provider) reject one or
+/// both with a 400, which failed the whole request — so extraction was close
+/// to unusable for exactly the local/BYO users the product courts.
+struct IssueExtractionCapabilities: Equatable {
+    let acceptsImageParts: Bool
+    let acceptsJSONResponseFormat: Bool
+    /// Application-level cap. The hosted default stays tight; local models are
+    /// slow but valid, and discarding a good answer at 10s is not a timeout,
+    /// it is a lost result. Both stay at or under URLSession's 120s request
+    /// timeout so the transport error surfaces rather than a phantom app one.
+    let timeout: Duration
+
+    static let hosted = IssueExtractionCapabilities(
+        acceptsImageParts: true,
+        acceptsJSONResponseFormat: true,
+        timeout: .seconds(60)
+    )
+
+    static let localModel = IssueExtractionCapabilities(
+        acceptsImageParts: false,
+        acceptsJSONResponseFormat: false,
+        timeout: .seconds(120)
+    )
+
+    static func forProvider(_ provider: AIProvider) -> IssueExtractionCapabilities {
+        switch provider {
+        case .openAI, .openAICompatible:
+            return .hosted
+        case .localCompatible, .parakeetLocal:
+            return .localModel
+        }
+    }
+}
+
 /// Builds the OpenAI chat-completions request for issue extraction from a
 /// `TranscriptSession`: the system/user prompt, the screenshot attachment budget,
 /// and the encoded JSON body. This is the no-network "request building" half of
@@ -14,13 +52,14 @@ enum IssueExtractionRequestBuilder {
         reviewSession: TranscriptSession,
         apiKey: String,
         model: String,
-        includeScreenshots: Bool = false
+        includeScreenshots: Bool = false,
+        capabilities: IssueExtractionCapabilities = .hosted
     ) throws -> URLRequest {
         let body = try JSONEncoder().encode(
             ChatCompletionRequest(
                 model: model,
                 temperature: 0.1,
-                responseFormat: .jsonObject,
+                responseFormat: capabilities.acceptsJSONResponseFormat ? .jsonObject : nil,
                 messages: [
                     .init(
                         role: "system",
@@ -48,7 +87,10 @@ enum IssueExtractionRequestBuilder {
                         content: .parts(
                             makeUserMessageParts(
                                 for: reviewSession,
-                                includeScreenshots: includeScreenshots
+                                // Consent AND capability. A user who opted in to
+                                // screenshot upload still must not have the whole
+                                // request rejected by a text-only endpoint.
+                                includeScreenshots: includeScreenshots && capabilities.acceptsImageParts
                             )
                         )
                     )
@@ -215,7 +257,7 @@ enum IssueExtractionRequestBuilder {
 private struct ChatCompletionRequest: Encodable {
     let model: String
     let temperature: Double
-    let responseFormat: ResponseFormat
+    let responseFormat: ResponseFormat?
     let messages: [ChatMessage]
 
     enum CodingKeys: String, CodingKey {

@@ -291,7 +291,8 @@ private actor FailingIssueExtractionService: IssueExtracting {
         apiKey: String,
         model: String,
         apiBaseURL: URL,
-        includeScreenshots: Bool
+        includeScreenshots: Bool,
+        capabilities: IssueExtractionCapabilities
     ) async throws -> IssueExtractionResult {
         throw error
     }

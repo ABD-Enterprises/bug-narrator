@@ -880,6 +880,7 @@ final class AppState: ObservableObject {
                     model: settingsStore.issueExtractionModelValue,
                     apiBaseURL: settingsStore.openAIBaseURLValue,
                     includeScreenshots: settingsStore.uploadScreenshotsForExtraction,
+                    capabilities: .forProvider(settingsStore.aiProvider),
                     completionLog: .manual
                 )
 

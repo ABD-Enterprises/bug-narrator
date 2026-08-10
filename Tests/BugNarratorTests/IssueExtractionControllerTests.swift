@@ -162,6 +162,7 @@ final class IssueExtractionControllerTests: XCTestCase {
             model: "gpt-test",
             apiBaseURL: URL(string: "https://api.example.test")!,
             includeScreenshots: false,
+            capabilities: .hosted,
             completionLog: .manual
         )
 

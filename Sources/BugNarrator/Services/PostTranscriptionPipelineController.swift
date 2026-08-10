@@ -129,6 +129,7 @@ final class PostTranscriptionPipelineController {
             model: settingsStore.issueExtractionModelValue,
             apiBaseURL: settingsStore.openAIBaseURLValue,
             includeScreenshots: settingsStore.uploadScreenshotsForExtraction,
+            capabilities: .forProvider(settingsStore.aiProvider),
             completionLog: .postTranscription
         )
         session.issueExtraction = extraction
