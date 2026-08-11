@@ -324,6 +324,18 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - for Jira, verify the base URL, email, API token, project key, and issue type
 - confirm your Mac still has network access
 
+## Backups And Moving To A New Mac
+
+Your sessions are encrypted on disk with a key that is tied to this Mac. If you
+restore from Time Machine, move with Migration Assistant, or lose the machine,
+the session files come back but the key does not — and the library cannot be
+read.
+
+Before you migrate or retire a Mac, run **Settings > Diagnostics & Privacy >
+Export Data**. That writes your sessions as plain JSON that opens anywhere.
+Because it is plain, keep it somewhere you would be comfortable keeping the
+transcripts themselves.
+
 ## Recording Consent
 
 BugNarrator records your microphone by default. It can also record **system

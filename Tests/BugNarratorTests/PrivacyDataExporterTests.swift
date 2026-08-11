@@ -256,4 +256,68 @@ final class PrivacyDataExporterTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: recoveredRecordingsURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: exportReceiptsURL.path))
     }
+
+    /// #955: the library is AES-GCM encrypted with a Keychain key stored
+    /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, so a Time Machine
+    /// restore, a Migration Assistant move, or a dead logic board leaves the
+    /// encrypted store undecryptable. The escape hatch is this export.
+    ///
+    /// What makes it an escape hatch is that the written bundle is readable
+    /// WITHOUT the device key. That property is what this pins — the other
+    /// tests here cover shape and streaming, none of them assert the bytes are
+    /// actually plaintext on disk.
+    func testExportedSessionsAreReadableWithoutTheDeviceKey() throws {
+        let rootDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-ExportEscapeHatch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
+
+        // A store whose bodies really are encrypted at rest.
+        let storageURL = rootDirectoryURL.appendingPathComponent("sessions.json")
+        let protector = KeychainSessionDataProtector(keychainService: MockKeychainService())
+        let store = TranscriptStore(storageURL: storageURL, sessionDataProtector: protector)
+
+        let secret = "the checkout button renders offscreen"
+        try store.add(
+            TranscriptSession(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 1_000),
+                transcript: secret,
+                duration: 12,
+                model: "whisper-1",
+                languageHint: nil,
+                prompt: nil
+            )
+        )
+
+        let onDisk = try Data(
+            contentsOf: rootDirectoryURL
+                .appendingPathComponent("Sessions", isDirectory: true)
+                .appendingPathComponent(store.libraryEntries[0].id.uuidString)
+                .appendingPathExtension("json")
+        )
+        XCTAssertNil(
+            onDisk.range(of: Data(secret.utf8)),
+            "Precondition: the stored body is encrypted, which is what makes migration lossy."
+        )
+
+        let settingsStore = SettingsStore(
+            defaults: UserDefaults(suiteName: "BugNarrator-ExportEscapeHatch-\(UUID().uuidString)") ?? .standard,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
+        let bundleURL = try PrivacyDataExporter().writeBundle(
+            sessions: store.privacyExportSessionStream(),
+            settings: PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore),
+            diagnostics: Self.makeFixtureDiagnostics(),
+            to: rootDirectoryURL
+        )
+
+        let exported = try Data(contentsOf: bundleURL.appendingPathComponent("sessions.json"))
+        XCTAssertNotNil(
+            exported.range(of: Data(secret.utf8)),
+            "The export must be readable without the device-only key, or it is not an escape hatch."
+        )
+    }
+
 }

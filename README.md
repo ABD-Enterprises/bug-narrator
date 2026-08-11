@@ -191,6 +191,19 @@ BugNarrator does not require Accessibility permission for its core workflow beca
 
 ## Privacy And Data Handling
 
+### Backups and moving to another Mac
+
+Session bodies are encrypted with a key kept in your login Keychain as
+*this-device-only*. That is deliberate — it means a copy of the files alone is
+useless to anyone else — but it has a consequence worth knowing before you need
+it: **a Time Machine restore, a Migration Assistant move, or a dead machine
+leaves the encrypted library unreadable.** The files come back; the key does not.
+
+The escape hatch is **Settings > Diagnostics & Privacy > Export Data**, which
+writes your sessions as plain JSON that does not depend on that key. Run it
+before you migrate or retire a Mac. Treat the export accordingly — it is
+readable by anything that can read the file.
+
 Data that stays local on your Mac:
 
 - session history

@@ -40,6 +40,22 @@ That includes:
 
 The app does not stream live dictation into other apps and does not upload audio continuously while you are still recording.
 
+## At-Rest Encryption And Recoverability
+
+Session bodies are AES-GCM encrypted with a key held in the login Keychain under
+`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The key never leaves the machine
+and is not included in any export.
+
+The tradeoff is explicit: the encrypted store is **not recoverable on a
+different machine**. Restoring the files from Time Machine, migrating with
+Migration Assistant, or recovering a disk from a dead Mac all produce a library
+that cannot be decrypted, because the key was device-scoped by design.
+
+Use **Settings > Diagnostics & Privacy > Export Data** to produce a
+key-independent copy before migrating. That export is plaintext by necessity —
+it exists precisely so it does not depend on the device key — so store it with
+the same care as the transcripts themselves.
+
 ## What Is Sent To GitHub Or Jira
 
 GitHub or Jira data is sent only when you explicitly export selected extracted issues.

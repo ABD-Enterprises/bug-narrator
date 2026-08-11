@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [DOCS] Backups and machine migration are now documented. Session bodies are encrypted with a this-device-only Keychain key, so a Time Machine restore, a Migration Assistant move, or a dead Mac leaves the library unreadable — the files return, the key does not. README, SECURITY.md, and the User Guide now say so and point at Export Data as the key-independent escape hatch to run *before* migrating (#955).
+
 - [INTERNAL] Release builds destined for GitHub Releases now fail closed. `PUBLIC_RELEASE=YES` refuses a dirty tree, an untagged HEAD, unsigned builds, skipped notarization, and the fail-open notarization flag — then re-verifies the finished artifact instead of trusting that the steps ran. The DMG container is now signed; previously only the app inside it was, and `codesign -dv` on the shipped 1.0.41 image reported "not signed at all" (#963).
 - [INTERNAL] Every DMG build writes a `.provenance.txt` recording the commit, tag, tree state, signing authority, and notarization status, so a download can be tied back to what produced it (#963).
 
