@@ -86,6 +86,24 @@ final class BugNarratorSettingsUITests: XCTestCase {
     // different things. That residual question is tracked separately rather
     // than being closed by assumption.
     @MainActor
+    /// Typing is deliberately absent from this test (#949, operator decision
+    /// 2026-08-10). Every field it used to type into is still asserted present
+    /// and enabled; only the keystrokes are gone.
+    ///
+    /// I misdiagnosed this twice before removing them wholesale, and the
+    /// correction is worth recording. First I attributed it to hosted runners
+    /// generally — wrong: `testSessionLibraryDialogCoversIssueEditingAndExportActions`
+    /// types into nine fields on the same runner and passes. Then to
+    /// `CredentialTokenField`, the AppKit-bridged control — also wrong: with
+    /// that one removed, the next run failed on "GitHub repository owner", a
+    /// plain SwiftUI TextField. The test aborts at the first failure, so each
+    /// fix only exposed the next site.
+    ///
+    /// What is actually true: keyboard focus in the Settings window is
+    /// unreliable under XCUITest here, not tied to one control. Chasing it one
+    /// CI round-trip at a time was the wrong move; this leg now gates merges,
+    /// so it has to be stable rather than nearly passing. The Session Library
+    /// test keeps its typing because it demonstrably works.
     func testSettingsDialogCoversControlsFieldsButtonsAndScrollContainer() throws {
         let app = launchSettingsApp(scope: "settings-dialog-full-coverage")
         defer { app.terminate() }
@@ -117,11 +135,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let languageField = app.textFields["Transcription language hint"]
         XCTAssertTrue(waitForSettingsElement(languageField, in: settingsWindow))
-        replaceText(in: languageField, with: "en")
 
         let promptEditor = app.textViews["Transcription prompt"]
         XCTAssertTrue(waitForSettingsElement(promptEditor, in: settingsWindow))
-        replaceText(in: promptEditor, with: "Capture product defects and exact reproduction steps.")
 
         let extractionModelSelector = modelControl(named: "Issue extraction model", in: app)
         XCTAssertTrue(waitForSettingsElement(extractionModelSelector, in: settingsWindow))
@@ -184,19 +200,15 @@ final class BugNarratorSettingsUITests: XCTestCase {
         selectSettingsTab("Integrations", in: app)
         let gitHubTokenField = app.textFields["GitHub personal access token"]
         XCTAssertTrue(waitForSettingsElement(gitHubTokenField, in: settingsWindow))
-        replaceText(in: gitHubTokenField, with: "github_pat_ui_test")
 
         let gitHubOwnerField = app.textFields["GitHub repository owner"]
         XCTAssertTrue(waitForSettingsElement(gitHubOwnerField, in: settingsWindow))
-        replaceText(in: gitHubOwnerField, with: "ABD-Enterprises")
 
         let gitHubRepoField = app.textFields["GitHub repository name"]
         XCTAssertTrue(waitForSettingsElement(gitHubRepoField, in: settingsWindow))
-        replaceText(in: gitHubRepoField, with: "bug-narrator")
 
         let gitHubLabelsField = app.textFields["GitHub default labels"]
         XCTAssertTrue(waitForSettingsElement(gitHubLabelsField, in: settingsWindow))
-        replaceText(in: gitHubLabelsField, with: "bug, ui-test")
 
         let loadGitHubButton = button(matchingAnyOf: ["Save & Load GitHub Repos", "Load GitHub Repos", "Refresh GitHub Repos"], in: app)
         XCTAssertTrue(waitForSettingsElement(loadGitHubButton, in: settingsWindow))
@@ -206,15 +218,12 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         let jiraURLField = app.textFields["Jira Cloud URL"]
         XCTAssertTrue(waitForSettingsElement(jiraURLField, in: settingsWindow))
-        replaceText(in: jiraURLField, with: "https://example.atlassian.net")
 
         let jiraEmailField = app.textFields["Jira email"]
         XCTAssertTrue(waitForSettingsElement(jiraEmailField, in: settingsWindow))
-        replaceText(in: jiraEmailField, with: "tester@example.com")
 
         let jiraTokenField = app.textFields["Jira API token"]
         XCTAssertTrue(waitForSettingsElement(jiraTokenField, in: settingsWindow))
-        replaceText(in: jiraTokenField, with: "jira-ui-test-token")
 
         let loadJiraButton = button(matchingAnyOf: ["Save & Load Jira Projects", "Load Jira Projects", "Refresh Jira Projects"], in: app)
         XCTAssertTrue(waitForSettingsElement(loadJiraButton, in: settingsWindow))
