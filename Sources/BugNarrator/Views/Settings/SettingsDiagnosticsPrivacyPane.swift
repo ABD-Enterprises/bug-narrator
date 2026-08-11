@@ -76,6 +76,8 @@ struct SettingsDiagnosticsPrivacyPane: View {
                     settingsSectionIntro("Export or remove local session data without exposing stored credentials.")
 
                     HStack(spacing: 12) {
+                        // Named as the migration path, because that is the only
+                        // way session bodies survive a move to another Mac (#955).
                         Button("Export Data") {
                             Task {
                                 await appState.exportPrivacyData()
