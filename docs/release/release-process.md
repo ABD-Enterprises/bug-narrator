@@ -9,6 +9,48 @@ Detailed companion docs:
 - [docs/RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md)
 - [CHANGELOG.md](../../CHANGELOG.md)
 
+## Release Guardrails (#963)
+
+A build destined for GitHub Releases must set `PUBLIC_RELEASE=YES`. With it set,
+`scripts/build_dmg.sh` refuses to produce an artifact unless all of the
+following hold, and it verifies the finished artifact rather than trusting that
+the steps ran:
+
+| Requirement | Why |
+|---|---|
+| clean working tree | an uncommitted change would otherwise ship inside a notarized DMG with nothing recording it |
+| `HEAD` exactly on a tag | so a download can be tied to a release |
+| `CODE_SIGNING_ALLOWED=YES` | the script's default is `NO`, which produced unsigned artifacts indistinguishable downstream |
+| `NOTARIZE=YES` | |
+| `ALLOW_NOTARIZATION_FAILURE` unset | that flag combined with a public release is exactly how an unnotarized DMG reaches users |
+
+After building it re-checks the output: the DMG container carries a valid
+signature, the DMG has a stapled ticket, and the app bundle is validly signed.
+Any of those failing aborts before the artifact is written.
+
+Every build — public or not — writes `dist/<dmg>.provenance.txt` recording the
+commit, tag, tree state, signing authority, and whether notarization ran. A
+non-public build says so in its summary line.
+
+**The DMG container is now signed.** Previously only the app inside it was;
+`codesign -dv` on the shipped 1.0.41 DMG reported "not signed at all".
+Notarizing and stapling an image is not the same as signing it.
+
+### Recovering this process on another Mac
+
+The build is not tied to this machine beyond credentials. Another Mac needs:
+
+- Xcode with the matching toolchain, and `DEVELOPER_DIR` pointed at it
+- the `Developer ID Application` certificate + private key for team `2R4WAH4R53`
+  imported into the login keychain
+- a `notarytool` keychain profile named `BugNarratorNotary`
+- `python3` (the script bootstraps its own `dmgbuild` virtualenv)
+
+With those in place `PUBLIC_RELEASE=YES CODE_SIGNING_ALLOWED=YES NOTARIZE=YES
+./scripts/build_dmg.sh` reproduces a publishable artifact. The remaining
+single-point-of-failure is credential custody, not the script.
+
+
 ## Current Release Model
 
 BugNarrator is currently released as a macOS DMG through GitHub Releases.
