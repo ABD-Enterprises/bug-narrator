@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [INTERNAL] Release builds destined for GitHub Releases now fail closed. `PUBLIC_RELEASE=YES` refuses a dirty tree, an untagged HEAD, unsigned builds, skipped notarization, and the fail-open notarization flag — then re-verifies the finished artifact instead of trusting that the steps ran. The DMG container is now signed; previously only the app inside it was, and `codesign -dv` on the shipped 1.0.41 image reported "not signed at all" (#963).
+- [INTERNAL] Every DMG build writes a `.provenance.txt` recording the commit, tag, tree state, signing authority, and notarization status, so a download can be tied back to what produced it (#963).
+
 - [INTERNAL] `BugNarratorUITests` now gates merges. It was wired into CI as advisory in #922 and failed 2 of 7 on every run since, so it read as coverage while proving nothing. The two assertions that could not pass on a hosted runner were removed — deleted with the reason recorded, not weakened — and the leg is blocking (#949).
 
 - [NEW] "Check for Updates" now tells you whether a newer version exists instead of just opening the releases page. It reads the public releases feed, compares it to your build, and opens the new release if there is one — or says you are current and opens nothing. A failed check says so and still opens the releases page. The request is unauthenticated and carries no identifiers (#961).
