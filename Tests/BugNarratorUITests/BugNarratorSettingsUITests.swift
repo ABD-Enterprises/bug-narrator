@@ -105,7 +105,11 @@ final class BugNarratorSettingsUITests: XCTestCase {
     /// so it has to be stable rather than nearly passing. The Session Library
     /// test keeps its typing because it demonstrably works.
     func testSettingsDialogCoversControlsFieldsButtonsAndScrollContainer() throws {
-        let app = launchSettingsApp(scope: "settings-dialog-full-coverage")
+        // seedCredentials seeds the GitHub/Jira owner, repo, tokens, and labels
+        // that this test used to establish by typing. Removing the keystrokes
+        // without this left those fields empty, which correctly disabled
+        // "Load GitHub Repos" — a failure I caused, not one I found.
+        let app = launchSettingsApp(scope: "settings-dialog-full-coverage", seedCredentials: true)
         defer { app.terminate() }
 
         let settingsWindow = app.windows["BugNarrator Settings"]
