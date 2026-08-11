@@ -22,10 +22,60 @@ EXPECTED_SIGNING_TEAM="${EXPECTED_SIGNING_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:-}"
 ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-NO}"
+# Fail-closed switch for anything destined for GitHub Releases (#963). Off by
+# default so local unsigned dev builds keep working unchanged; the documented
+# publish path sets it, and with it set an unsigned, unnotarized, or
+# dirty-tree artifact cannot be produced at all.
+PUBLIC_RELEASE="${PUBLIC_RELEASE:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
 ALLOW_NOTARIZATION_FAILURE="${ALLOW_NOTARIZATION_FAILURE:-NO}"
 ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/Resources/BugNarrator.entitlements}"
+# Provenance, recorded for every build so a DMG can be tied back to a commit.
+# Previously nothing in the artifact identified what it was built from, so a
+# stray uncommitted change could ship inside a notarized release undetectably.
+RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")"
+RELEASE_TAG="$(git -C "$ROOT_DIR" describe --exact-match --tags HEAD 2>/dev/null || echo "")"
+if [[ -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
+    RELEASE_TREE_STATE="dirty"
+else
+    RELEASE_TREE_STATE="clean"
+fi
+
+if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
+    if [[ "$RELEASE_TREE_STATE" != "clean" ]]; then
+        echo "error: PUBLIC_RELEASE=YES requires a clean working tree; uncommitted changes would ship inside a notarized artifact with nothing recording them." >&2
+        git -C "$ROOT_DIR" status --porcelain >&2
+        exit 1
+    fi
+
+    if [[ "$RELEASE_COMMIT" == "unknown" ]]; then
+        echo "error: PUBLIC_RELEASE=YES requires a git checkout so the artifact can be tied to a commit." >&2
+        exit 1
+    fi
+
+    if [[ -z "$RELEASE_TAG" ]]; then
+        echo "error: PUBLIC_RELEASE=YES requires HEAD to be exactly on a tag, so a download can be tied to a release." >&2
+        echo "hint: tag the release commit first, or build without PUBLIC_RELEASE for an internal artifact." >&2
+        exit 1
+    fi
+
+    if [[ "$CODE_SIGNING_ALLOWED" != "YES" ]]; then
+        echo "error: PUBLIC_RELEASE=YES requires CODE_SIGNING_ALLOWED=YES. The default is NO, which produced unsigned artifacts indistinguishable from signed ones downstream." >&2
+        exit 1
+    fi
+
+    if [[ "$NOTARIZE" != "YES" ]]; then
+        echo "error: PUBLIC_RELEASE=YES requires NOTARIZE=YES." >&2
+        exit 1
+    fi
+
+    if [[ "$ALLOW_NOTARIZATION_FAILURE" == "YES" ]]; then
+        echo "error: ALLOW_NOTARIZATION_FAILURE=YES cannot be combined with PUBLIC_RELEASE=YES — that combination is exactly how an unnotarized DMG reaches users." >&2
+        exit 1
+    fi
+fi
+
 VOLUME_NAME="${VOLUME_NAME:-BugNarrator}"
 APP_NAME="${APP_NAME:-BugNarrator}"
 BACKGROUND_DIR_NAME=".background"
@@ -129,6 +179,22 @@ verify_notarization_access() {
     fi
 }
 
+# The DMG container itself was never signed — only the app inside it was, then
+# the image was notarized and stapled. `codesign -dv` on a shipped 1.0.41 DMG
+# reported "not signed at all" (#963). Notarization is not a container
+# signature, and Gatekeeper treats them differently.
+sign_dmg_container() {
+    local dmg_path="$1"
+
+    if [[ "$CODE_SIGNING_ALLOWED" != "YES" || -z "$CODE_SIGN_IDENTITY" ]]; then
+        return 0
+    fi
+
+    echo "Signing DMG container with '$CODE_SIGN_IDENTITY'..."
+    codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp "$dmg_path"
+    codesign --verify --strict --verbose=2 "$dmg_path"
+}
+
 write_release_artifacts() {
     cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
@@ -137,6 +203,22 @@ write_release_artifacts() {
         shasum -a 256 "$VERSIONED_DMG_NAME" >"$(basename "$VERSIONED_DMG_CHECKSUM_PATH")"
         shasum -a 256 "$STABLE_DMG_NAME" >"$(basename "$STABLE_DMG_CHECKSUM_PATH")"
     )
+
+    # Provenance travels with the artifact so a download can be tied to a commit
+    # and a tag without trusting the uploader's memory (#963).
+    {
+        echo "app: $APP_NAME"
+        echo "version: $VERSION"
+        echo "build: $BUILD_NUMBER"
+        echo "commit: $RELEASE_COMMIT"
+        echo "tag: ${RELEASE_TAG:-<none>}"
+        echo "tree_state: $RELEASE_TREE_STATE"
+        echo "public_release: $PUBLIC_RELEASE"
+        echo "code_signing_allowed: $CODE_SIGNING_ALLOWED"
+        echo "signing_authority: ${SIGNING_AUTHORITY:-<unsigned>}"
+        echo "notarized: $NOTARIZE"
+        echo "built_by: $(uname -s) $(uname -m)"
+    } >"$RELEASE_PROVENANCE_PATH"
 }
 
 emit_release_summary() {
@@ -154,6 +236,13 @@ emit_release_summary() {
     fi
     if [[ -f "$STABLE_DMG_CHECKSUM_PATH" ]]; then
         echo "Stable DMG checksum: $STABLE_DMG_CHECKSUM_PATH"
+    fi
+    if [[ -f "$RELEASE_PROVENANCE_PATH" ]]; then
+        echo "Provenance: $RELEASE_PROVENANCE_PATH"
+    fi
+    echo "Built from commit $RELEASE_COMMIT (${RELEASE_TAG:-no tag}, tree $RELEASE_TREE_STATE)"
+    if [[ "$PUBLIC_RELEASE" != "YES" ]]; then
+        echo "note: PUBLIC_RELEASE is not set — this artifact is NOT cleared for GitHub Releases."
     fi
 }
 
@@ -387,8 +476,9 @@ VERSIONED_DMG_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME"
 STABLE_DMG_PATH="$OUTPUT_DIR/$STABLE_DMG_NAME"
 VERSIONED_DMG_CHECKSUM_PATH="$OUTPUT_DIR/${VERSIONED_DMG_NAME}.sha256"
 STABLE_DMG_CHECKSUM_PATH="$OUTPUT_DIR/${STABLE_DMG_NAME}.sha256"
+RELEASE_PROVENANCE_PATH="$OUTPUT_DIR/${VERSIONED_DMG_NAME}.provenance.txt"
 
-rm -f "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH" "$VERSIONED_DMG_CHECKSUM_PATH" "$STABLE_DMG_CHECKSUM_PATH"
+rm -f "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH" "$VERSIONED_DMG_CHECKSUM_PATH" "$STABLE_DMG_CHECKSUM_PATH" "$RELEASE_PROVENANCE_PATH"
 
 mkdir -p "$STAGING_BACKGROUND_DIR"
 swift "$BACKGROUND_RENDER_SCRIPT" "$STAGING_BACKGROUND_PATH"
@@ -412,6 +502,8 @@ swift "$BACKGROUND_RENDER_SCRIPT" "$STAGING_BACKGROUND_PATH"
     "$VERSIONED_DMG_PATH"
 
 rm -rf "$STAGING_DIR"
+
+sign_dmg_container "$VERSIONED_DMG_PATH"
 
 VERIFY_MOUNTPOINT="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-dmg-check.XXXXXX")"
 VERIFY_MOUNTPOINT="$(cd "$VERIFY_MOUNTPOINT" && pwd -P)"
@@ -534,6 +626,8 @@ if [[ "$NOTARIZE" == "YES" ]]; then
 
     rm -rf "$STAGING_DIR"
 
+    sign_dmg_container "$VERSIONED_DMG_PATH"
+
     # The rebuilt DMG has a different hash than the originally notarized one,
     # so it must be submitted for notarization separately.
     echo "Submitting rebuilt DMG for notarization..."
@@ -566,6 +660,27 @@ if [[ "$NOTARIZE" == "YES" ]]; then
     fi
 
     spctl -a -vv "$APP_PATH"
+fi
+
+if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
+    # Verify the artifact we are about to hand over, rather than trusting that
+    # the steps above all ran. Every one of these was silently skippable before.
+    if ! codesign --verify --strict "$VERSIONED_DMG_PATH" 2>/dev/null; then
+        echo "error: PUBLIC_RELEASE=YES but the DMG container is not validly signed: $VERSIONED_DMG_PATH" >&2
+        exit 1
+    fi
+
+    if ! xcrun stapler validate "$VERSIONED_DMG_PATH" >/dev/null 2>&1; then
+        echo "error: PUBLIC_RELEASE=YES but the DMG carries no stapled notarization ticket: $VERSIONED_DMG_PATH" >&2
+        exit 1
+    fi
+
+    if ! codesign --verify --strict --deep "$APP_PATH" 2>/dev/null; then
+        echo "error: PUBLIC_RELEASE=YES but the app bundle is not validly signed: $APP_PATH" >&2
+        exit 1
+    fi
+
+    echo "PUBLIC_RELEASE checks passed: signed container, stapled ticket, signed app."
 fi
 
 write_release_artifacts
