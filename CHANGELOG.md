@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [INTERNAL] `BugNarratorUITests` now gates merges. It was wired into CI as advisory in #922 and failed 2 of 7 on every run since, so it read as coverage while proving nothing. The two assertions that could not pass on a hosted runner were removed — deleted with the reason recorded, not weakened — and the leg is blocking (#949).
+
 - [NEW] "Check for Updates" now tells you whether a newer version exists instead of just opening the releases page. It reads the public releases feed, compares it to your build, and opens the new release if there is one — or says you are current and opens nothing. A failed check says so and still opens the releases page. The request is unauthenticated and carries no identifiers (#961).
 
 - [CHANGE] The system-audio consent notice now names the obligation rather than just the fact: it reads "I am responsible for getting everyone's consent before recording system audio", and the explanation says outright that many places require every participant's agreement and that BugNarrator cannot obtain it for you (#951).
