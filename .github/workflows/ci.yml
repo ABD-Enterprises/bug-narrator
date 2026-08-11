@@ -260,6 +260,58 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             test
 
+  board-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Run effort-leak / board-state audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/effort-leak-audit.sh
+
+  # The single required context. macos-build-and-test and windows-build-and-test
+  # are path-gated, so requiring them directly would leave a docs-only PR waiting
+  # on a check that never reports. This always runs, and fails if any upstream
+  # job actually failed or was cancelled — a skipped job is a legitimate pass.
+  required-checks:
+    if: always()
+    needs:
+      - detect-ci-changes
+      - runtime-guardrails
+      - docs-site-validation
+      - macos-build-and-test
+      - windows-build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no required job failed
+        env:
+          RESULTS: >-
+            detect-ci-changes=${{ needs.detect-ci-changes.result }}
+            runtime-guardrails=${{ needs.runtime-guardrails.result }}
+            docs-site-validation=${{ needs.docs-site-validation.result }}
+            macos-build-and-test=${{ needs.macos-build-and-test.result }}
+            windows-build-and-test=${{ needs.windows-build-and-test.result }}
+        run: |
+          set -euo pipefail
+          echo "upstream results: $RESULTS"
+          failed=0
+          for entry in $RESULTS; do
+            name="${entry%%=*}"
+            result="${entry#*=}"
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::$name reported '$result'"; failed=1 ;;
+            esac
+          done
+          if [[ "$failed" -ne 0 ]]; then
+            echo "A required job did not pass. This gate exists so a compile-breaking PR cannot merge (#962)."
+            exit 1
+          fi
+          echo "All required jobs passed or were legitimately skipped."
+
   windows-build-and-test:
     needs:
       - detect-ci-changes
