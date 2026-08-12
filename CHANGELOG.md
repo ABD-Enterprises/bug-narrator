@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [DOCS] At-rest encryption is now described exactly as shipped. Session bodies and the search index are encrypted; screenshots, recorded audio, and the operational log are not. SECURITY.md carries a per-file table, and the previous broader wording ("your sessions are encrypted on disk") is corrected in the README and User Guide. The asymmetry is a deliberate decision — screenshots have to stay openable by Finder and Preview, audio has to stay re-readable for retry — and FileVault is named as the control that covers the rest (#954).
+
 - [DOCS] Backups and machine migration are now documented. Session bodies are encrypted with a this-device-only Keychain key, so a Time Machine restore, a Migration Assistant move, or a dead Mac leaves the library unreadable — the files return, the key does not. README, SECURITY.md, and the User Guide now say so and point at Export Data as the key-independent escape hatch to run *before* migrating (#955).
 
 - [INTERNAL] Release builds destined for GitHub Releases now fail closed. `PUBLIC_RELEASE=YES` refuses a dirty tree, an untagged HEAD, unsigned builds, skipped notarization, and the fail-open notarization flag — then re-verifies the finished artifact instead of trusting that the steps ran. The DMG container is now signed; previously only the app inside it was, and `codesign -dv` on the shipped 1.0.41 image reported "not signed at all" (#963).

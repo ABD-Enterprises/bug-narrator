@@ -319,6 +319,22 @@ It must not include:
 
 ## Credentials, Permissions, And Privacy Model
 
+### At-Rest Protection Scope
+
+Encryption at rest is partial by decision (#954). Session bodies and the
+library index are AES-GCM encrypted with a device-scoped Keychain key;
+screenshots, preserved recording audio, and the operational log are plaintext
+files.
+
+The asymmetry is deliberate: screenshots must remain openable by Finder and
+Preview and renderable by the thumbnail cache, and preserved audio must be
+re-readable for retry transcription. A decrypt-to-temp scheme would place a
+plaintext copy on disk during use anyway.
+
+The contract this sets: **no BugNarrator surface may claim encryption broader
+than the table in SECURITY.md.** Whole-directory protection is FileVault's job,
+and the docs say so rather than implying the app provides it.
+
 ### Recording Consent
 
 System-audio and mixed capture record voices other than the operator's. Whether

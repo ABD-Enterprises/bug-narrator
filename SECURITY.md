@@ -42,9 +42,33 @@ The app does not stream live dictation into other apps and does not upload audio
 
 ## At-Rest Encryption And Recoverability
 
-Session bodies are AES-GCM encrypted with a key held in the login Keychain under
-`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The key never leaves the machine
-and is not included in any export.
+Encryption at rest is **partial, and deliberately so**. Exactly this is
+encrypted, and nothing else:
+
+| File | Encrypted | Contents |
+|---|---|---|
+| `Sessions/<id>.json` | **yes** | transcript, summary, markers, extracted issues |
+| `sessions.index.json` (+ backup) | **yes** | full-transcript search text, titles, previews |
+| `Screenshots/*.png` | no | screen captures you took |
+| preserved recording audio | no | the raw session audio |
+| `operational-telemetry.jsonl` | no | event names and timestamps, no transcript content |
+| `launch-state.json` | no | launch bookkeeping |
+
+Session bodies and the index are AES-GCM encrypted with a key held in the login
+Keychain under `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The key never
+leaves the machine and is not included in any export.
+
+**Screenshots and recordings are plaintext on disk.** That is a decision, not
+an oversight: screenshots are opened by Finder and Preview from the Reveal in
+Finder action and rendered by the thumbnail cache, and preserved audio is
+re-read for retry transcription. Encrypting them would break those paths, and a
+decrypt-to-temp workaround would put a plaintext copy on disk anyway during use.
+
+So the honest threat model is: **the derived text is protected from casual
+file-level access; the source media is not.** Anyone who can read your home
+directory can look at your screenshots and listen to your recordings. If that
+matters for your work, the control that actually covers it is FileVault, which
+encrypts the whole volume including everything above.
 
 The tradeoff is explicit: the encrypted store is **not recoverable on a
 different machine**. Restoring the files from Time Machine, migrating with

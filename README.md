@@ -193,8 +193,10 @@ BugNarrator does not require Accessibility permission for its core workflow beca
 
 ### Backups and moving to another Mac
 
-Session bodies are encrypted with a key kept in your login Keychain as
-*this-device-only*. That is deliberate — it means a copy of the files alone is
+Session bodies and the search index are encrypted with a key kept in your login
+Keychain as *this-device-only*. Screenshots and recorded audio are **not**
+encrypted — see [SECURITY.md](SECURITY.md) for exactly what is and is not
+covered, and why. That is deliberate — it means a copy of the files alone is
 useless to anyone else — but it has a consequence worth knowing before you need
 it: **a Time Machine restore, a Migration Assistant move, or a dead machine
 leaves the encrypted library unreadable.** The files come back; the key does not.
