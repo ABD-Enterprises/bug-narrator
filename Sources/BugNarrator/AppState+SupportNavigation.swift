@@ -17,6 +17,10 @@ extension AppState {
         appUtilityActionPresenter.present(appUtilityActions.openDocumentation())
     }
 
+    func openLocalTranscriptionDownload() {
+        appUtilityActionPresenter.present(appUtilityActions.openLocalTranscriptionDownload())
+    }
+
     func openIssueReporter() {
         appUtilityActionPresenter.present(appUtilityActions.openIssueReporter())
     }

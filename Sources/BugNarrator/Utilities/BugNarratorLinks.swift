@@ -5,6 +5,11 @@ enum BugNarratorLinks {
     static let documentation = URL(string: "https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md")!
     static let issues = URL(string: "https://github.com/ABD-Enterprises/bug-narrator/issues/new")!
     static let releases = URL(string: "https://github.com/ABD-Enterprises/bug-narrator/releases")!
+    /// The signed, notarized local transcription server (#959). Published as a
+    /// release asset so Parakeet no longer requires a source checkout — the
+    /// only install guidance used to point at `local-transcription/venv/...`,
+    /// a path a DMG user does not have.
+    static let localTranscriptionDownload = URL(string: "https://github.com/ABD-Enterprises/bug-narrator/releases/latest")!
     static let supportDevelopment = URL(string: "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8")!
     static let generateGitHubToken = URL(string: "https://github.com/settings/tokens/new?scopes=repo&description=BugNarrator")!
     static let generateJiraToken = URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!

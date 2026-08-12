@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [NEW] The local Parakeet transcription server is now a signed, notarized download published with each release (`bugnarrator-transcription-macos-arm64.zip`). Every in-app instruction previously named `local-transcription/venv/...` — a path only a source checkout has — so the free, no-upload transcription option was unreachable for anyone who installed from the DMG. Settings > AI Engines now links straight to it (#959).
+
 - [CHANGE] You can now record before configuring an AI provider. Recording was blocked until a provider was set up, walling the entire first run behind a paid API key — even though the record-now/transcribe-later path already existed and preserves the session for retry. The start button now says the session will be saved and kept ready to transcribe (#959).
 - [NEW] The menu bar offers the bundled sample session while your library is empty. The sample shipped with a button in the session library's empty state, but a new install opens the menu bar, not that window — so the one surface a first-time user sees had no route to it (#959).
 
