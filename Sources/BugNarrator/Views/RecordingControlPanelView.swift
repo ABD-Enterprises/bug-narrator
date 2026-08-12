@@ -212,14 +212,23 @@ struct RecordingControlPanelView: View {
     private var canStartSession: Bool {
         switch appState.status.phase {
         case .idle, .success, .error:
-            return !appState.needsAPIKeySetup
+            // A provider is needed to transcribe, not to record (#959). A stop
+            // without one preserves the session as a retryable pending
+            // transcription, so blocking the start only cost the user the
+            // recording.
+            return FirstRunFunnel.canStartRecording(phaseAllowsStart: true)
         case .recording, .transcribing:
-            return false
+            return FirstRunFunnel.canStartRecording(phaseAllowsStart: false)
         }
     }
 
     private var startRecordingHint: String {
         if canStartSession {
+            guard !appState.needsAPIKeySetup else {
+                return FirstRunFunnel.startWithoutProviderNotice(
+                    providerName: appState.settingsStore.aiProvider.displayName
+                )
+            }
             return "Start a narrated recording session."
         }
         switch appState.status.phase {

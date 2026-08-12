@@ -33,6 +33,8 @@ struct MenuBarView: View {
 
             if !transcriptStore.libraryEntries.isEmpty {
                 MenuSessionLibraryCardView(appState: appState, transcriptStore: transcriptStore)
+            } else if FirstRunFunnel.shouldOfferSampleSession(libraryIsEmpty: true) {
+                sampleSessionOffer
             }
 
             MenuProductInfoView(appState: appState, isOptionKeyPressed: isOptionKeyPressed)
