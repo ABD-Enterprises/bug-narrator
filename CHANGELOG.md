@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [CHANGE] You can now record before configuring an AI provider. Recording was blocked until a provider was set up, walling the entire first run behind a paid API key — even though the record-now/transcribe-later path already existed and preserves the session for retry. The start button now says the session will be saved and kept ready to transcribe (#959).
+- [NEW] The menu bar offers the bundled sample session while your library is empty. The sample shipped with a button in the session library's empty state, but a new install opens the menu bar, not that window — so the one surface a first-time user sees had no route to it (#959).
+
 - [DOCS] At-rest encryption is now described exactly as shipped. Session bodies and the search index are encrypted; screenshots, recorded audio, and the operational log are not. SECURITY.md carries a per-file table, and the previous broader wording ("your sessions are encrypted on disk") is corrected in the README and User Guide. The asymmetry is a deliberate decision — screenshots have to stay openable by Finder and Preview, audio has to stay re-readable for retry — and FileVault is named as the control that covers the rest (#954).
 
 - [DOCS] Backups and machine migration are now documented. Session bodies are encrypted with a this-device-only Keychain key, so a Time Machine restore, a Migration Assistant move, or a dead Mac leaves the library unreadable — the files return, the key does not. README, SECURITY.md, and the User Guide now say so and point at Export Data as the key-independent escape hatch to run *before* migrating (#955).
