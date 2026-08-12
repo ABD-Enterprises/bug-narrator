@@ -68,6 +68,26 @@ Important:
 - `OpenAI-Compatible` is for enterprise gateways or hosted providers that expose compatible transcription and chat endpoints
 - `Local-Compatible` is for local or self-hosted OpenAI-compatible endpoints such as LM Studio or Ollama
 - `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio
+
+#### Installing the local Parakeet server
+
+The server ships as a signed, notarized download — no source checkout, no
+Python, no build step:
+
+1. Download `bugnarrator-transcription-macos-arm64.zip` from the
+   [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest),
+   and verify it against the published `.sha256` if you want to.
+2. Unzip it and run it in Terminal:
+
+```bash
+./bugnarrator-transcription --preload
+```
+
+3. In BugNarrator, choose `Local (Parakeet)`. It uses `http://localhost:8422`
+   automatically and needs no API key.
+
+Leave that Terminal window running while you record. Apple Silicon only; the
+first `--preload` downloads the speech model.
 - transcription requires a provider endpoint compatible with `/v1/audio/transcriptions`
 - review summary and issue extraction require a provider endpoint compatible with `/v1/chat/completions`
 - unsupported provider/model combinations show clear setup guidance in Settings instead of starting a broken transcription

@@ -58,7 +58,7 @@ BugNarrator releases are signed with a `Developer ID Application` certificate (T
 
 BugNarrator does not ship with built-in AI access or credits. `OpenAI` is the hosted default provider and requires your own API key. You can also select `OpenAI-Compatible` for an enterprise gateway or hosted compatible provider, `Local-Compatible` for local or self-hosted OpenAI-compatible endpoints, or `Local (Parakeet)` for transcription on this Mac through `http://localhost:8422`.
 
-`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
+`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. Install it by downloading `bugnarrator-transcription-macos-arm64.zip` from the [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest), unzipping, and running `./bugnarrator-transcription --preload` in Terminal — it is signed and notarized, and needs no Python or source checkout. Settings > AI Engines has a direct download link. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
 
 ## Core Workflow
 

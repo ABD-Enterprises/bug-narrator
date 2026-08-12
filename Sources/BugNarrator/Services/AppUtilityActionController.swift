@@ -113,6 +113,10 @@ final class AppUtilityActionController {
         openExternalURL(BugNarratorLinks.documentation, label: "documentation")
     }
 
+    func openLocalTranscriptionDownload() -> AppUtilityActionResult {
+        openExternalURL(BugNarratorLinks.localTranscriptionDownload, label: "local transcription download")
+    }
+
     func openIssueReporter() -> AppUtilityActionResult {
         openExternalURL(BugNarratorLinks.issues, label: "issue tracker")
     }
