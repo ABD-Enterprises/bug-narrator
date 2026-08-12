@@ -69,4 +69,40 @@ final class FirstRunFunnelTests: XCTestCase {
         XCTAssertFalse(sample.transcript.isEmpty)
         XCTAssertFalse(sample.issueExtraction?.issues.isEmpty ?? true)
     }
+
+    // MARK: - Parakeet install path (#959)
+
+    /// The free/local option was unobtainable from a DMG: every instruction
+    /// named `local-transcription/venv/...`, a path only a source checkout has.
+    /// The server is now published as a signed, notarized release asset.
+    func testNoUserFacingGuidanceStillNamesTheSourceCheckoutPath() {
+        let guidance = [
+            AppError.networkFailure.userMessage(for: .parakeetLocal),
+            AIProvider.parakeetLocal.baseURLHint
+        ]
+
+        for message in guidance {
+            XCTAssertFalse(
+                message.contains("local-transcription/venv"),
+                "A DMG user has no such path: \(message)"
+            )
+        }
+    }
+
+    func testTheLocalTranscriptionDownloadPointsAtReleases() {
+        XCTAssertTrue(
+            BugNarratorLinks.localTranscriptionDownload.absoluteString.contains("releases"),
+            BugNarratorLinks.localTranscriptionDownload.absoluteString
+        )
+    }
+
+    /// The offline error is the message a user actually hits when the server is
+    /// not running, so it has to name how to get it.
+    func testTheOfflineMessageTellsTheUserWhereToGetTheServer() {
+        let message = AppError.networkFailure.userMessage(for: .parakeetLocal)
+
+        XCTAssertTrue(message.lowercased().contains("download"), message)
+        XCTAssertTrue(message.contains("bugnarrator-transcription"), message)
+    }
+
 }

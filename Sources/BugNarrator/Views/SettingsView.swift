@@ -145,7 +145,7 @@ struct SettingsView: View {
                         Text("BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Start the local transcription server before recording.")
                             .foregroundStyle(.secondary)
 
-                        Text("Run in Terminal: local-transcription/venv/bin/python local-transcription/server.py --preload")
+                        Text("Download bugnarrator-transcription from the releases page, then run in Terminal: ./bugnarrator-transcription --preload")
                             .font(.footnote.monospaced())
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)

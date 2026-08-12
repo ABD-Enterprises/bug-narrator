@@ -72,13 +72,25 @@ struct AISetupSectionsView: View {
                         .disabled(secureControlsDisabled || settingsStore.aiProvider == .parakeetLocal)
                         .accessibilityLabel("AI provider base URL")
                         .help(settingsStore.aiProvider == .parakeetLocal
-                            ? "Parakeet uses localhost:8422 automatically. Start the server with: local-transcription/venv/bin/python local-transcription/server.py --preload"
+                            ? "Parakeet uses localhost:8422 automatically. Download bugnarrator-transcription from the releases page and run it with --preload."
                             : "The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
                 }
 
                 Text(settingsStore.aiProvider.baseURLHint)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                // One click to the signed, notarized server build (#959). The
+                // old guidance named a repo path a DMG user does not have.
+                if settingsStore.aiProvider == .parakeetLocal {
+                    Button("Download the local transcription server") {
+                        appState.openLocalTranscriptionDownload()
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .help("Opens the BugNarrator releases page, where bugnarrator-transcription is published.")
+                    .accessibilityLabel("Download the local transcription server")
+                }
 
                 if let warning = settingsStore.aiBaseURLPlaintextWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")

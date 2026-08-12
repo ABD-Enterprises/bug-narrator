@@ -81,7 +81,7 @@ enum AppError: LocalizedError, Equatable {
             return "The request to \(providerName) timed out. Check the connection and try again."
         case .networkFailure:
             if provider == .parakeetLocal {
-                return "BugNarrator could not reach the local transcription server. Start it with: local-transcription/venv/bin/python local-transcription/server.py --preload"
+                return "BugNarrator could not reach the local transcription server. Download bugnarrator-transcription from the BugNarrator releases page, then run it in Terminal with --preload."
             }
             return "BugNarrator could not reach \(providerName). Check the connection and try again."
         case .rateLimited(let retryAfter):
