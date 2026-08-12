@@ -326,7 +326,9 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 
 ## Backups And Moving To A New Mac
 
-Your sessions are encrypted on disk with a key that is tied to this Mac. If you
+Your transcripts and the search index are encrypted on disk with a key that is
+tied to this Mac. Screenshots and recorded audio are stored as ordinary files
+and are not encrypted. If you
 restore from Time Machine, move with Migration Assistant, or lose the machine,
 the session files come back but the key does not — and the library cannot be
 read.
