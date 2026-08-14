@@ -28,7 +28,7 @@ xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Deb
 xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Release CODE_SIGNING_ALLOWED=NO build
 ```
 
-`build_standalone.sh` creates a clean pinned environment and sends generated speech through the packaged Parakeet executable. The CI macOS job intentionally runs `BugNarratorTests` only; UI tests require a usable window server and remain a targeted local/manual validation path.
+`build_standalone.sh` installs the hash-locked Python 3.12 dependency graph into a clean environment and sends generated speech through the packaged Parakeet executable. The CI macOS job runs unit and UI tests on its windowed runner; release smoke testing remains headless and runs `BugNarratorTests` only.
 
 Current Windows workspace validation baseline on Windows:
 

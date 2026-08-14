@@ -5,17 +5,16 @@ set -euo pipefail
 #
 # Output: dist/bugnarrator-transcription (single executable, no Python required)
 #
-# Prerequisites: Python 3.11 or 3.12, Xcode command-line tools, and ffmpeg.
+# Prerequisites: Python 3.12, Xcode command-line tools, and ffmpeg.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PYTHON="${PYTHON:-}"
 BUILD_VENV_DIR="${BUILD_VENV_DIR:-$SCRIPT_DIR/build/standalone-venv}"
-REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
+REQUIREMENTS_LOCK="$SCRIPT_DIR/requirements-standalone.lock"
 DIST_DIR="$SCRIPT_DIR/dist"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 APP_NAME="bugnarrator-transcription"
-PYINSTALLER_VERSION="6.20.0"
 RUN_TRANSCRIPTION_SMOKE_TEST="${RUN_TRANSCRIPTION_SMOKE_TEST:-YES}"
 CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
@@ -72,7 +71,7 @@ if [[ "$NOTARIZE" == "YES" ]]; then
 fi
 
 if [[ -z "$PYTHON" ]]; then
-    for candidate in python3.12 python3.11; do
+    for candidate in python3.12; do
         if command -v "$candidate" >/dev/null 2>&1; then
             PYTHON="$(command -v "$candidate")"
             break
@@ -81,26 +80,27 @@ if [[ -z "$PYTHON" ]]; then
 fi
 
 if [[ -z "$PYTHON" ]]; then
-    echo "error: Python 3.11 or 3.12 is required to build the standalone server." >&2
+    echo "error: Python 3.12 is required to build the standalone server." >&2
     exit 1
 fi
 
 PYTHON_VERSION="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-case "$PYTHON_VERSION" in
-    3.11|3.12) ;;
-    *)
-        echo "error: standalone builds require Python 3.11 or 3.12; found $PYTHON_VERSION at $PYTHON." >&2
-        exit 1
-        ;;
-esac
+if [[ "$PYTHON_VERSION" != "3.12" ]]; then
+    echo "error: standalone builds require Python 3.12; found $PYTHON_VERSION at $PYTHON." >&2
+    exit 1
+fi
 
 echo "Creating clean standalone build environment with Python $PYTHON_VERSION..."
 "$PYTHON" -m venv --clear "$BUILD_VENV_DIR"
-"$BUILD_VENV_DIR/bin/python" -m pip install --upgrade pip --quiet
 "$BUILD_VENV_DIR/bin/python" -m pip install \
-    --requirement "$REQUIREMENTS" \
-    "pyinstaller==$PYINSTALLER_VERSION" \
+    --require-hashes \
+    --only-binary=:all: \
+    --requirement "$REQUIREMENTS_LOCK" \
     --quiet
+PYINSTALLER_VERSION="$(
+    "$BUILD_VENV_DIR/bin/python" -c \
+        'from importlib.metadata import version; print(version("pyinstaller"))'
+)"
 
 echo "Building standalone binary..."
 "$BUILD_VENV_DIR/bin/python" -m PyInstaller \
@@ -187,6 +187,7 @@ if [[ -f "$BINARY_PATH" ]]; then
         echo "python: $PYTHON_VERSION"
         echo "parakeet_mlx: 0.5.1"
         echo "pyinstaller: $PYINSTALLER_VERSION"
+        echo "dependency_lock_sha256: $(shasum -a 256 "$REQUIREMENTS_LOCK" | awk '{print $1}')"
         echo "signing_authority: $SIGNING_AUTHORITY"
         echo "notarized: $NOTARIZE"
         echo "transcription_smoke_test: $RUN_TRANSCRIPTION_SMOKE_TEST"

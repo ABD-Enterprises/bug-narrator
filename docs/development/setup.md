@@ -67,7 +67,7 @@ Recommended release-readiness baseline:
 ./scripts/release_smoke_test.sh
 ```
 
-When the Local Parakeet server changes, build it from a clean pinned environment
+When the Local Parakeet server changes, build it from its hash-locked Python 3.12 environment
 and run its packaged speech-transcription gate:
 
 ```bash

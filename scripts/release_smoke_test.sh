@@ -25,7 +25,9 @@ echo "Checking local transcription release inputs..."
 bash -n \
     "$ROOT_DIR/local-transcription/build_standalone.sh" \
     "$ROOT_DIR/local-transcription/smoke_test.sh"
-python3 - "$ROOT_DIR/local-transcription/requirements.txt" <<'PY'
+python3 - \
+    "$ROOT_DIR/local-transcription/requirements.txt" \
+    "$ROOT_DIR/local-transcription/requirements-standalone.lock" <<'PY'
 from pathlib import Path
 import sys
 
@@ -36,6 +38,17 @@ requirements = [
 ]
 if not requirements or any("==" not in requirement for requirement in requirements):
     raise SystemExit("local transcription runtime dependencies must be exactly pinned")
+
+lock = Path(sys.argv[2]).read_text(encoding="utf-8")
+locked_packages = [
+    line
+    for line in lock.splitlines()
+    if line and not line.startswith(("#", " ", "--"))
+]
+if not locked_packages or any("==" not in package for package in locked_packages):
+    raise SystemExit("standalone transcription dependencies must be exactly locked")
+if lock.count("--hash=sha256:") < len(locked_packages):
+    raise SystemExit("standalone transcription dependencies must be hash locked")
 PY
 
 if [[ ! -x "$ROOT_DIR/local-transcription/smoke_test.sh" ]]; then

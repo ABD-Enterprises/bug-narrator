@@ -144,6 +144,20 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertEqual(first[2], {"chunk_duration": 120})
         self.assertEqual(second[2], {"chunk_duration": 120})
 
+    def test_shutdown_terminates_process_even_during_active_inference(self):
+        with (
+            patch.object(server.os, "getpid", return_value=2468),
+            patch.object(server.os, "kill") as kill,
+            patch.object(server.signal, "signal") as restore_signal,
+        ):
+            server._shutdown_handler(server.signal.SIGTERM, None)
+
+        restore_signal.assert_called_once_with(
+            server.signal.SIGTERM,
+            server.signal.SIG_DFL,
+        )
+        kill.assert_called_once_with(2468, server.signal.SIGTERM)
+
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
             Path(__file__).with_name("requirements.txt").read_text().splitlines()
@@ -152,6 +166,19 @@ class ServerModelConfigurationTests(unittest.TestCase):
 
         self.assertTrue(packages)
         self.assertTrue(all("==" in package for package in packages))
+
+    def test_standalone_dependencies_are_hash_locked(self):
+        lockfile = Path(__file__).with_name("requirements-standalone.lock")
+        contents = lockfile.read_text()
+        packages = [
+            line
+            for line in contents.splitlines()
+            if line and not line.startswith(("#", " ", "--"))
+        ]
+
+        self.assertTrue(packages)
+        self.assertTrue(all("==" in package for package in packages))
+        self.assertGreaterEqual(contents.count("--hash=sha256:"), len(packages))
 
 
 if __name__ == "__main__":

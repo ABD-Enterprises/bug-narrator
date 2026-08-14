@@ -19,7 +19,6 @@ import json
 import logging
 import os
 import signal
-import sys
 import tempfile
 import time
 from pathlib import Path
@@ -231,8 +230,11 @@ def _transcription_failure_response() -> JSONResponse:
 
 
 def _shutdown_handler(signum, frame):
-    logger.info("Shutting down gracefully...")
-    sys.exit(0)
+    logger.info("Stopping transcription server...")
+    # MLX inference cannot be cancelled safely from another Python thread. Restore
+    # the default handler and re-send the signal so the entire process exits.
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
 
 
 def main():
