@@ -42,7 +42,12 @@ a clean checkout at tag `v<VERSION>`, Developer ID signing, notarization, and th
 packaged transcription smoke test. It produces stable and versioned zip assets,
 SHA-256 files, and provenance under `dist/`. Apple does not support stapling a
 ticket to a bare Mach-O executable, so the notarized server is verified online
-by Gatekeeper rather than stapled.
+by Gatekeeper rather than stapled. PyInstaller receives the Developer ID
+identity during assembly so its embedded Python framework and native libraries
+share the outer executable's Team ID; signing only the finished executable is
+not sufficient. The server also carries the narrow unsigned-executable-memory
+entitlement required by MLX's runtime kernel compilation; the public release
+gate verifies that entitlement is present after final signing.
 
 ### Recovering this process on another Mac
 
