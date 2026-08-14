@@ -164,32 +164,52 @@ if [[ -f "$BINARY_PATH" ]]; then
     fi
 
     mkdir -p "$OUTPUT_DIR"
-    VERSIONED_ZIP_NAME="$APP_NAME-v$VERSION-macos-arm64.zip"
-    STABLE_ZIP_NAME="$APP_NAME-macos-arm64.zip"
-    VERSIONED_ZIP_PATH="$OUTPUT_DIR/$VERSIONED_ZIP_NAME"
-    STABLE_ZIP_PATH="$OUTPUT_DIR/$STABLE_ZIP_NAME"
+    VERSIONED_DMG_NAME="$APP_NAME-v$VERSION-macos-arm64.dmg"
+    STABLE_DMG_NAME="$APP_NAME-macos-arm64.dmg"
+    VERSIONED_DMG_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME"
+    STABLE_DMG_PATH="$OUTPUT_DIR/$STABLE_DMG_NAME"
+    STAGING_DIR="$SCRIPT_DIR/build/release-staging"
 
-    echo "Packaging standalone release archives..."
-    ditto -c -k --keepParent "$BINARY_PATH" "$VERSIONED_ZIP_PATH"
-    cp "$VERSIONED_ZIP_PATH" "$STABLE_ZIP_PATH"
+    echo "Packaging standalone release disk image..."
+    rm -rf "$STAGING_DIR"
+    mkdir -p "$STAGING_DIR"
+    ditto "$BINARY_PATH" "$STAGING_DIR/$APP_NAME"
+    SOURCE_SIZE_KB="$(du -sk "$STAGING_DIR" | awk '{print $1}')"
+    DMG_SIZE_KB="$((SOURCE_SIZE_KB + 65536))"
+    hdiutil create \
+        -volname "BugNarrator Local Transcription" \
+        -srcfolder "$STAGING_DIR" \
+        -size "${DMG_SIZE_KB}k" \
+        -ov \
+        -format UDZO \
+        "$VERSIONED_DMG_PATH" >/dev/null
+
+    if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
+        echo "Signing standalone server DMG with '$CODE_SIGN_IDENTITY'..."
+        codesign --force --timestamp --sign "$CODE_SIGN_IDENTITY" "$VERSIONED_DMG_PATH"
+        codesign --verify --strict --verbose=2 "$VERSIONED_DMG_PATH"
+    fi
 
     if [[ "$NOTARIZE" == "YES" ]]; then
-        echo "Submitting standalone server archive for notarization..."
-        xcrun notarytool submit "$VERSIONED_ZIP_PATH" \
+        echo "Submitting standalone server DMG for notarization..."
+        xcrun notarytool submit "$VERSIONED_DMG_PATH" \
             --keychain-profile "$NOTARY_PROFILE" \
             --wait
-        spctl --assess --type execute --verbose=2 "$BINARY_PATH"
+        xcrun stapler staple "$VERSIONED_DMG_PATH"
+        xcrun stapler validate "$VERSIONED_DMG_PATH"
     fi
+
+    cp "$VERSIONED_DMG_PATH" "$STABLE_DMG_PATH"
 
     (
         cd "$OUTPUT_DIR"
-        shasum -a 256 "$VERSIONED_ZIP_NAME" >"$VERSIONED_ZIP_NAME.sha256"
-        shasum -a 256 "$STABLE_ZIP_NAME" >"$STABLE_ZIP_NAME.sha256"
+        shasum -a 256 "$VERSIONED_DMG_NAME" >"$VERSIONED_DMG_NAME.sha256"
+        shasum -a 256 "$STABLE_DMG_NAME" >"$STABLE_DMG_NAME.sha256"
     )
 
-    PROVENANCE_PATH="$OUTPUT_DIR/$VERSIONED_ZIP_NAME.provenance.txt"
+    PROVENANCE_PATH="$OUTPUT_DIR/$VERSIONED_DMG_NAME.provenance.txt"
     {
-        echo "artifact: $VERSIONED_ZIP_NAME"
+        echo "artifact: $VERSIONED_DMG_NAME"
         echo "version: $VERSION"
         echo "commit: $RELEASE_COMMIT"
         echo "tag: ${RELEASE_TAG:-<none>}"
@@ -213,17 +233,19 @@ if [[ -f "$BINARY_PATH" ]]; then
         fi
         EXECUTABLE_MEMORY_ENTITLEMENT="$(
             codesign -d --entitlements :- "$BINARY_PATH" 2>/dev/null \
-                | plutil -extract com.apple.security.cs.allow-unsigned-executable-memory raw -
+                | python3 -c 'import plistlib, sys; print(str(plistlib.loads(sys.stdin.buffer.read()).get("com.apple.security.cs.allow-unsigned-executable-memory", False)).lower())'
         )"
         if [[ "$EXECUTABLE_MEMORY_ENTITLEMENT" != "true" ]]; then
             echo "error: public standalone artifact is missing its required executable-memory entitlement." >&2
             exit 1
         fi
+        codesign --verify --strict --verbose=2 "$VERSIONED_DMG_PATH"
+        xcrun stapler validate "$VERSIONED_DMG_PATH"
         echo "PUBLIC_RELEASE checks passed for the standalone transcription server."
     fi
 
-    echo "Versioned archive: $VERSIONED_ZIP_PATH"
-    echo "Stable archive: $STABLE_ZIP_PATH"
+    echo "Versioned DMG: $VERSIONED_DMG_PATH"
+    echo "Stable DMG: $STABLE_DMG_PATH"
     echo "Provenance: $PROVENANCE_PATH"
 else
     echo "error: build failed, binary not found at $BINARY_PATH" >&2

@@ -74,10 +74,11 @@ Important:
 The server ships as a signed, notarized download — no source checkout, no
 Python, no build step:
 
-1. Download `bugnarrator-transcription-macos-arm64.zip` from the
+1. Download `bugnarrator-transcription-macos-arm64.dmg` from the
    [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest),
    and verify it against the published `.sha256` if you want to.
-2. Unzip it and run it in Terminal:
+2. Open the disk image, copy `bugnarrator-transcription` to a local folder, and
+   run it in Terminal:
 
 ```bash
 ./bugnarrator-transcription --preload
