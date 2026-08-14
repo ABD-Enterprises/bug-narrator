@@ -140,7 +140,8 @@ if [[ -f "$BINARY_PATH" ]]; then
         codesign --force --options runtime --timestamp \
             --sign "$CODE_SIGN_IDENTITY" "$BINARY_PATH"
         codesign --verify --strict --verbose=2 "$BINARY_PATH"
-        SIGNING_AUTHORITY="$(codesign -dv --verbose=2 "$BINARY_PATH" 2>&1 | awk -F= '/^Authority=/{print $2; exit}')"
+        CODESIGN_DETAILS="$(codesign -dv --verbose=2 "$BINARY_PATH" 2>&1)"
+        SIGNING_AUTHORITY="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^Authority=/ && !found {print $2; found=1}')"
     else
         SIGNING_AUTHORITY="<unsigned>"
     fi

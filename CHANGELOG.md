@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-## 1.0.42 - 2026-08-14
+## 1.0.43 - 2026-08-14
+
+- [FIX] The standalone Parakeet release now completes smoke testing, packaging, and notarization after code signing. Its signing-authority probe previously exited its pipeline early under `pipefail`, aborting every public server release immediately after a valid signature was applied (#989).
+
+## 1.0.42 - 2026-08-14 (not published)
 
 - [FIX] Local Parakeet transcription now allows up to 15 minutes for each on-device request instead of timing out after 3 minutes. A timed-out local inference is no longer retried automatically because the server cannot cancel the original MLX job; retrying it only duplicated work and made the server less responsive (#987).
 - [FIX] The local server now processes every upload in bounded 120-second Parakeet chunks using the supported `chunk_duration` API. The previous `chunk_duration_sec` keyword failed every upload over 10 MB, while unbounded shorter uploads could produce repeated-word transcripts on long audio (#987).
