@@ -14,7 +14,8 @@ extension SettingsStore {
             model: preferredModelValue,
             languageHint: normalizedLanguageHint,
             prompt: normalizedPrompt,
-            apiBaseURL: openAIBaseURLValue
+            apiBaseURL: openAIBaseURLValue,
+            provider: aiProvider
         )
     }
 

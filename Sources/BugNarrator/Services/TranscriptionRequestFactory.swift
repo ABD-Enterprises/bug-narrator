@@ -26,6 +26,7 @@ struct TranscriptionRequestFactory {
             )
         )
         request.httpMethod = "POST"
+        request.timeoutInterval = transcriptionRequest.timeoutInterval
         applyAuthorization(apiKey, to: &request)
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = body

@@ -58,7 +58,7 @@ BugNarrator releases are signed with a `Developer ID Application` certificate (T
 
 BugNarrator does not ship with built-in AI access or credits. `OpenAI` is the hosted default provider and requires your own API key. You can also select `OpenAI-Compatible` for an enterprise gateway or hosted compatible provider, `Local-Compatible` for local or self-hosted OpenAI-compatible endpoints, or `Local (Parakeet)` for transcription on this Mac through `http://localhost:8422`.
 
-`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. Install it by downloading `bugnarrator-transcription-macos-arm64.zip` from the [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest), unzipping, and running `./bugnarrator-transcription --preload` in Terminal — it is signed and notarized, and needs no Python or source checkout. Settings > AI Engines has a direct download link. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
+`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. Install it by downloading `bugnarrator-transcription-macos-arm64.zip` from the [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest), verifying the published checksum, unzipping, and running `./bugnarrator-transcription --preload` in Terminal — it is signed and notarized, and needs no Python or source checkout. Settings > AI Engines has a direct download link. Leave that Terminal process running while you use Parakeet. Long recordings are processed in bounded local chunks and can take several minutes; BugNarrator waits for the active local inference instead of starting duplicate retries. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
 
 ## Core Workflow
 
@@ -270,7 +270,7 @@ BugNarrator keeps diagnostics local until you explicitly export or copy them for
 - confirm your AI provider configuration is valid in `Settings`
 - validate the key if needed
 - for hosted providers, confirm the Mac has network access
-- for `Local (Parakeet)`, confirm the local transcription server is running
+- for `Local (Parakeet)`, confirm the local transcription server is running and `Check Server` succeeds; long recordings can take several minutes to transcribe
 - retry with a short test recording to rule out an empty or corrupt audio file
 
 ### Microphone Permission Problems

@@ -7,6 +7,7 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 Use these commands as the current release-readiness baseline:
 
 - `./scripts/release_smoke_test.sh`
+- `local-transcription/build_standalone.sh` when the local server or its dependencies change
 - `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug CODE_SIGNING_ALLOWED=NO test`
 - `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Release CODE_SIGNING_ALLOWED=NO build`
 - `./scripts/build_dmg.sh`
@@ -30,7 +31,7 @@ For public-release validation, also run the signed and notarized DMG workflow do
 
 - live microphone permission prompts and denied-permission recovery
 - end-to-end transcription against the real OpenAI API
-- end-to-end local transcription against the `Local (Parakeet)` server
+- app-to-server Local Parakeet selection, progress, and preserved-session retry behavior; packaged server speech transcription is automated by `local-transcription/build_standalone.sh`
 - real screenshot capture behavior with macOS Screen Recording permission
 - signed-app menu bar smoke testing from `/Applications`: launch the installed app, click the menu bar item, confirm the popover opens, and confirm no fresh `~/Library/Logs/DiagnosticReports/BugNarrator*.ips` crash report appears
 - real GitHub export against a repository you control

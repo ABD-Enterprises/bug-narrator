@@ -21,12 +21,47 @@ fi
 echo "Checking version consistency (VERSION / project.yml / CHANGELOG)..."
 bash "$ROOT_DIR/scripts/check_version_consistency.sh"
 
+echo "Checking local transcription release inputs..."
+bash -n \
+    "$ROOT_DIR/local-transcription/build_standalone.sh" \
+    "$ROOT_DIR/local-transcription/smoke_test.sh"
+python3 - \
+    "$ROOT_DIR/local-transcription/requirements.txt" \
+    "$ROOT_DIR/local-transcription/requirements-standalone.lock" <<'PY'
+from pathlib import Path
+import sys
+
+requirements = [
+    line.strip()
+    for line in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+    if line.strip() and not line.lstrip().startswith("#")
+]
+if not requirements or any("==" not in requirement for requirement in requirements):
+    raise SystemExit("local transcription runtime dependencies must be exactly pinned")
+
+lock = Path(sys.argv[2]).read_text(encoding="utf-8")
+locked_packages = [
+    line
+    for line in lock.splitlines()
+    if line and not line.startswith(("#", " ", "--"))
+]
+if not locked_packages or any("==" not in package for package in locked_packages):
+    raise SystemExit("standalone transcription dependencies must be exactly locked")
+if lock.count("--hash=sha256:") < len(locked_packages):
+    raise SystemExit("standalone transcription dependencies must be hash locked")
+PY
+
+if [[ ! -x "$ROOT_DIR/local-transcription/smoke_test.sh" ]]; then
+    echo "error: local-transcription/smoke_test.sh must be executable" >&2
+    exit 1
+fi
+
 if [[ "$ROOT_DIR/project.yml" -nt "$PROJECT_PATH/project.pbxproj" ]]; then
     echo "Regenerating Xcode project with xcodegen..."
     (cd "$ROOT_DIR" && xcodegen generate)
 fi
 
-echo "Running debug tests..."
+echo "Running headless debug unit tests..."
 xcodebuild \
     -quiet \
     -project "$PROJECT_PATH" \
@@ -36,6 +71,7 @@ xcodebuild \
     CODE_SIGNING_ALLOWED=YES \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGN_IDENTITY=- \
+    -only-testing:BugNarratorTests \
     test
 
 echo "Running unsigned release build..."

@@ -87,7 +87,10 @@ Python, no build step:
    automatically and needs no API key.
 
 Leave that Terminal window running while you record. Apple Silicon only; the
-first `--preload` downloads the speech model.
+first `--preload` downloads the speech model. Long recordings are processed in
+bounded local chunks and can take several minutes; BugNarrator waits for the
+active local inference instead of starting duplicate retries.
+
 - transcription requires a provider endpoint compatible with `/v1/audio/transcriptions`
 - review summary and issue extraction require a provider endpoint compatible with `/v1/chat/completions`
 - unsupported provider/model combinations show clear setup guidance in Settings instead of starting a broken transcription

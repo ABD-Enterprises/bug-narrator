@@ -12,6 +12,8 @@ on:
     - cron: '0 4 * * 1'  # Weekly on Monday at 4 AM UTC
     - cron: '0 5 1 * *'  # Monthly on the 1st at 5 AM UTC — includes Swift
 
+permissions: {}
+
 jobs:
   # Swift is the main product language (230 files under Sources/) but analyzing
   # it needs a hosted macOS runner, which is metered. The weekly scan stays on

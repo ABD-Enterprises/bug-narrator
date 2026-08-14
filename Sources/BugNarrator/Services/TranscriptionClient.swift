@@ -25,8 +25,8 @@ actor TranscriptionClient: TranscriptionServing {
             self.session = session
         } else {
             let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = 180
-            configuration.timeoutIntervalForResource = 300
+            configuration.timeoutIntervalForRequest = TranscriptionRequest.remoteTimeout
+            configuration.timeoutIntervalForResource = TranscriptionRequest.localParakeetTimeout
             self.session = URLSession(configuration: configuration)
         }
     }
@@ -138,11 +138,13 @@ actor TranscriptionClient: TranscriptionServing {
     ) async throws -> TranscriptionResult {
         var lastError: Error?
 
-        for attempt in 0..<Self.maxRetryAttempts {
+        let maxAttempts = request.provider == .parakeetLocal ? 1 : Self.maxRetryAttempts
+
+        for attempt in 0..<maxAttempts {
             do {
                 return try await attemptTranscription(fileURL: fileURL, apiKey: apiKey, request: request, attempt: attempt)
             } catch let error as AppError {
-                let isLastAttempt = attempt >= Self.maxRetryAttempts - 1
+                let isLastAttempt = attempt >= maxAttempts - 1
                 if case .rateLimited(let retryAfter) = error, !isLastAttempt {
                     let delay = retryAfter ?? Self.exponentialBackoff(for: attempt)
                     let clampedDelay = min(delay, 60)
