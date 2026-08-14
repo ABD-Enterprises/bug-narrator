@@ -32,18 +32,18 @@ Current production artifacts:
 
 - `BugNarrator-macOS.dmg`
 - `BugNarrator-vX.Y.Z-macOS.dmg`
-- `bugnarrator-transcription-macos-arm64.zip`
-- `bugnarrator-transcription-vX.Y.Z-macos-arm64.zip`
+- `bugnarrator-transcription-macos-arm64.dmg`
+- `bugnarrator-transcription-vX.Y.Z-macos-arm64.dmg`
 - SHA-256 and provenance files for each published artifact family
 
-The DMGs are produced by `scripts/build_dmg.sh`; the server archives are produced by `local-transcription/build_standalone.sh`.
+The app DMGs are produced by `scripts/build_dmg.sh`; the server DMGs are produced by `local-transcription/build_standalone.sh`.
 
 ## Deployment Controls
 
 - do not publish an unsigned DMG as the production artifact
 - do not publish if microphone entitlement validation fails
 - do not publish if smoke validation or targeted regression checks fail
-- do not publish a local-server archive unless its packaged generated-speech transcription passes
+- do not publish a local-server DMG unless its packaged generated-speech transcription passes and its stapled ticket validates
 - do not publish if secrets or signing credentials are missing and the release is intended to be public
 
 ## GitHub Workflow Support

@@ -60,6 +60,8 @@ if '--codesign-identity "$CODE_SIGN_IDENTITY"' not in build_script:
     raise SystemExit("signed standalone builds must sign PyInstaller's embedded binaries")
 if '--entitlements "$ENTITLEMENTS_PATH"' not in build_script:
     raise SystemExit("the standalone executable must retain its MLX runtime entitlement")
+if "VERSIONED_DMG_PATH" not in build_script or 'xcrun stapler staple "$VERSIONED_DMG_PATH"' not in build_script:
+    raise SystemExit("the standalone public artifact must be a stapled disk image")
 PY
 
 if [[ ! -x "$ROOT_DIR/local-transcription/smoke_test.sh" ]]; then
