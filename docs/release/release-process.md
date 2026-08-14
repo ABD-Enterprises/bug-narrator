@@ -39,10 +39,10 @@ Notarizing and stapling an image is not the same as signing it.
 The separate Local Parakeet server uses the same fail-closed model through
 `local-transcription/build_standalone.sh`. With `PUBLIC_RELEASE=YES`, it requires
 a clean checkout at tag `v<VERSION>`, Developer ID signing, notarization, and the
-packaged transcription smoke test. It produces stable and versioned zip assets,
-SHA-256 files, and provenance under `dist/`. Apple does not support stapling a
-ticket to a bare Mach-O executable, so the notarized server is verified online
-by Gatekeeper rather than stapled. PyInstaller receives the Developer ID
+packaged transcription smoke test. It produces stable and versioned DMG assets,
+SHA-256 files, and provenance under `dist/`. The server is distributed in a
+signed, notarized DMG because Apple does not support stapling a ticket to a bare
+Mach-O executable. PyInstaller receives the Developer ID
 identity during assembly so its embedded Python framework and native libraries
 share the outer executable's Team ID; signing only the finished executable is
 not sufficient. The server also carries the narrow unsigned-executable-memory
@@ -97,7 +97,7 @@ Do not release unless all of these are true:
 9. Generate or review the internal release summary seed before publishing.
 10. Build the DMG with `./scripts/build_dmg.sh`.
 11. For public releases, sign and notarize both artifacts; staple the app and DMG. The bare server executable cannot be stapled.
-12. Publish the DMG, local-server zip, checksum, and provenance assets to GitHub Releases.
+12. Publish the app DMG, local-server DMG, checksum, and provenance assets to GitHub Releases.
 13. Validate the published downloads on a second Mac when practical.
 
 ## Versioning

@@ -75,7 +75,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Confirm no secrets, tokens, personal paths, or local-only files are tracked in git.
 - Review `.gitignore` for generated Xcode data and result bundles.
 - Upload `dist/BugNarrator-macOS.dmg` to the release and confirm the release asset name matches the README link strategy.
-- Upload the stable and versioned Parakeet server zip, checksum, and provenance files when the local server changed; confirm the executable is Developer ID signed and the archive notarization was accepted.
+- Upload the stable and versioned Parakeet server DMG, checksum, and provenance files when the local server changed; confirm the executable and DMG are Developer ID signed and the DMG's stapled notarization ticket validates.
 - If you built or tested BugNarrator from local `DerivedData`, run `./scripts/cleanup_local_build_apps.sh` after publishing so only the installed `/Applications` copy remains in normal tester paths.
 - Open the final DMG and confirm Finder shows the branded BugNarrator icon instead of the generic macOS app placeholder.
 - Confirm the DMG contains `BugNarrator.app` plus the `Applications` shortcut and supports the normal drag-to-Applications install flow.

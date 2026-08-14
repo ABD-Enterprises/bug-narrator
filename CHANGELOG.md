@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-## 1.0.44 - 2026-08-14
+## 1.0.45 - 2026-08-14
+
+- [FIX] The standalone Parakeet download now ships in a Developer ID-signed, notarized, stapled DMG instead of a ZIP. Apple accepted the ZIP and its exact executable hash, but a bare Mach-O cannot carry a stapled ticket and Gatekeeper continued to reject it; the DMG keeps the notarization ticket available online and offline (#993).
+
+## 1.0.44 - 2026-08-14 (not published)
 
 - [FIX] Signed standalone Parakeet builds now apply the Developer ID identity to PyInstaller's embedded Python framework and native libraries, not only the outer executable, and retain the executable-memory entitlement required by MLX's compiled kernels. macOS previously rejected the extracted runtime for a Team ID mismatch and then killed model loading under hardened runtime (#991).
 
@@ -19,7 +23,7 @@
 - [SECURITY] The standalone Parakeet dependency graph now pins MLX 0.29.4, resolving the published advisories affecting MLX 0.29.3 (#987).
 - [INTERNAL] Release hardening updates the docs-site dependency tree to patched Docusaurus, Babel, PostCSS, Joi, proxy middleware, and brace-expansion versions; the CodeQL workflow now defaults to no token permissions; and the headless release smoke gate explicitly excludes the separately gated UI-test target (#987).
 
-- [NEW] The local Parakeet transcription server is now a signed, notarized download published with each release (`bugnarrator-transcription-macos-arm64.zip`). Every in-app instruction previously named `local-transcription/venv/...` — a path only a source checkout has — so the free, no-upload transcription option was unreachable for anyone who installed from the DMG. Settings > AI Engines now links straight to it (#959).
+- [NEW] The local Parakeet transcription server is now a signed, notarized download published with each release (`bugnarrator-transcription-macos-arm64.dmg`). Every in-app instruction previously named `local-transcription/venv/...` — a path only a source checkout has — so the free, no-upload transcription option was unreachable for anyone who installed from the app DMG. Settings > AI Engines now links straight to it (#959).
 
 - [CHANGE] You can now record before configuring an AI provider. Recording was blocked until a provider was set up, walling the entire first run behind a paid API key — even though the record-now/transcribe-later path already existed and preserves the session for retry. The start button now says the session will be saved and kept ready to transcribe (#959).
 - [NEW] The menu bar offers the bundled sample session while your library is empty. The sample shipped with a button in the session library's empty state, but a new install opens the menu bar, not that window — so the one surface a first-time user sees had no route to it (#959).
