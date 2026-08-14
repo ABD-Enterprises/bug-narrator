@@ -7,10 +7,9 @@ private struct WindowSceneRegistrar: View {
     @ObservedObject var transcriptStore: TranscriptStore
     let windowCoordinator: WindowCoordinator
     /// True under an isolated test runtime. UI tests launch straight into a
-    /// specific window with an unconfigured store, which is exactly the state
-    /// that triggers the tour — auto-presenting it would drop a window on top
-    /// of the surface under test.
-    let suppressesAutomaticWelcome: Bool
+    /// specific window, so an automatic welcome or changelog window would cover
+    /// the surface under test.
+    let suppressesAutomaticLaunchWindows: Bool
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -60,6 +59,8 @@ private struct WindowSceneRegistrar: View {
     /// both the MenuBarExtra content and its label, so `onAppear` runs twice
     /// per launch and would otherwise reopen the tour the user just closed).
     private func presentLaunchWindowIfNeeded() {
+        guard !suppressesAutomaticLaunchWindows else { return }
+
         let presentation = OnboardingFlow.launchPresentation(
             shouldPresentWelcome: shouldPresentWelcome,
             shouldAutoShowChangelog: appState.shouldAutoShowChangelogOnLaunch()
@@ -77,8 +78,6 @@ private struct WindowSceneRegistrar: View {
     }
 
     private var shouldPresentWelcome: Bool {
-        guard !suppressesAutomaticWelcome else { return false }
-
         return OnboardingFlow.shouldPresentOnLaunch(
             hasCompletedFirstRunOnboarding: settingsStore.hasCompletedFirstRunOnboarding,
             hasExistingUserState: !transcriptStore.libraryEntries.isEmpty,
@@ -100,7 +99,7 @@ struct BugNarratorApp: App {
     @StateObject private var appState: AppState
 
     private let windowCoordinator: WindowCoordinator
-    private let suppressesAutomaticWelcome: Bool
+    private let suppressesAutomaticLaunchWindows: Bool
 
     init() {
         let runtimeEnvironment = AppRuntimeEnvironment()
@@ -174,7 +173,7 @@ struct BugNarratorApp: App {
         AppLifecycleDelegate.appState = appState
         AppLifecycleDelegate.launchContinuityMonitor = launchContinuityMonitor
         self.windowCoordinator = windowCoordinator
-        self.suppressesAutomaticWelcome = runtimeEnvironment.usesIsolatedRuntime
+        self.suppressesAutomaticLaunchWindows = runtimeEnvironment.usesIsolatedRuntime
 
         if let observation = launchContinuityMonitor.beginLaunch() {
             let timestampFormatter = BugNarratorDiagnostics.makeTimestampFormatter()
@@ -222,7 +221,7 @@ struct BugNarratorApp: App {
                     settingsStore: settingsStore,
                     transcriptStore: transcriptStore,
                     windowCoordinator: windowCoordinator,
-                    suppressesAutomaticWelcome: suppressesAutomaticWelcome
+                    suppressesAutomaticLaunchWindows: suppressesAutomaticLaunchWindows
                 )
             )
         } label: {
@@ -236,7 +235,7 @@ struct BugNarratorApp: App {
                     settingsStore: settingsStore,
                     transcriptStore: transcriptStore,
                     windowCoordinator: windowCoordinator,
-                    suppressesAutomaticWelcome: suppressesAutomaticWelcome
+                    suppressesAutomaticLaunchWindows: suppressesAutomaticLaunchWindows
                 )
             )
         }
