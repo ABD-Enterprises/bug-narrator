@@ -14,6 +14,7 @@ subsequent transcriptions.
 
 import argparse
 import asyncio
+import contextlib
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
@@ -53,6 +54,14 @@ _chunk_duration_seconds = 120
 _transcription_failure_message = (
     "Local transcription failed. Check the local transcription server logs for details."
 )
+
+
+class _SignalPreservingServer(uvicorn.Server):
+    """Keep process handlers installed while pinned Uvicorn 0.47 serves."""
+
+    @contextlib.contextmanager
+    def capture_signals(self):
+        yield
 
 
 def configure_default_model(model_name: str):
@@ -237,6 +246,16 @@ def _shutdown_handler(signum, frame):
     os.kill(os.getpid(), signum)
 
 
+def _serve(host: str, port: int):
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+    )
+    _SignalPreservingServer(config).run()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="BugNarrator Local Transcription Server"
@@ -274,12 +293,7 @@ def main():
     logger.info(
         f"Starting BugNarrator transcription server on {args.host}:{args.port}"
     )
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level="info",
-    )
+    _serve(args.host, args.port)
 
 
 if __name__ == "__main__":

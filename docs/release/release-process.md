@@ -54,6 +54,7 @@ The build is not tied to this machine beyond credentials. Another Mac needs:
 - a `notarytool` keychain profile named `BugNarratorNotary`
 - `python3` (the script bootstraps its own `dmgbuild` virtualenv)
 - Python 3.12 and `ffmpeg` when building the standalone Parakeet server
+- network access for an uncached Parakeet model; packaged smoke testing allows up to 10 minutes for the initial preload
 
 With those in place `PUBLIC_RELEASE=YES CODE_SIGNING_ALLOWED=YES NOTARIZE=YES
 ./scripts/build_dmg.sh` reproduces a publishable artifact. The remaining

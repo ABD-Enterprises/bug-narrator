@@ -9,6 +9,7 @@ HEALTH_PATH="$SMOKE_ROOT/health.json"
 RESPONSE_PATH="$SMOKE_ROOT/response.json"
 SERVER_LOG_PATH="$SMOKE_ROOT/server.log"
 SERVER_PID=""
+PRELOAD_TIMEOUT_SECONDS="${PRELOAD_TIMEOUT_SECONDS:-600}"
 
 cleanup() {
     if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -45,14 +46,14 @@ with socket.socket() as sock:
 PY
 )}"
 
-say -v Samantha -r 175 -o "$AUDIO_PATH" \
+say -r 175 -o "$AUDIO_PATH" \
     "Bug Narrator local transcription is ready."
 
 "$SERVER_BINARY" --host 127.0.0.1 --port "$PORT" --preload \
     >"$SERVER_LOG_PATH" 2>&1 &
 SERVER_PID="$!"
 
-for _ in $(seq 1 300); do
+for _ in $(seq 1 "$PRELOAD_TIMEOUT_SECONDS"); do
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
         cat "$SERVER_LOG_PATH" >&2
         echo "error: packaged transcription server exited before becoming healthy" >&2
@@ -90,7 +91,7 @@ raise SystemExit(0 if health.get("status") == "ok" and health.get("model_loaded"
 PY
 then
     cat "$SERVER_LOG_PATH" >&2
-    echo "error: packaged transcription server did not preload within 300 seconds" >&2
+    echo "error: packaged transcription server did not preload within $PRELOAD_TIMEOUT_SECONDS seconds" >&2
     exit 1
 fi
 

@@ -2,7 +2,12 @@ import asyncio
 import inspect
 import json
 from pathlib import Path
+import signal
+import socket
+import subprocess
+import sys
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -157,6 +162,75 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server.signal.SIG_DFL,
         )
         kill.assert_called_once_with(2468, server.signal.SIGTERM)
+
+    def test_uvicorn_does_not_replace_process_signal_handlers(self):
+        uvicorn_server = server._SignalPreservingServer(
+            server.uvicorn.Config(server.app)
+        )
+
+        with patch.object(server.signal, "signal") as install_signal:
+            with uvicorn_server.capture_signals():
+                pass
+
+        install_signal.assert_not_called()
+
+    def test_serve_uses_signal_preserving_uvicorn_server(self):
+        config = object()
+        with (
+            patch.object(server.uvicorn, "Config", return_value=config) as make_config,
+            patch.object(server, "_SignalPreservingServer") as server_type,
+        ):
+            server._serve("127.0.0.1", 8422)
+
+        make_config.assert_called_once_with(
+            server.app,
+            host="127.0.0.1",
+            port=8422,
+            log_level="info",
+        )
+        server_type.assert_called_once_with(config)
+        server_type.return_value.run.assert_called_once_with()
+
+    def test_sigterm_exits_while_inference_worker_is_active(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+
+        script = f"""
+import signal
+import time
+import server
+
+signal.signal(signal.SIGTERM, server._shutdown_handler)
+server._inference_executor.submit(time.sleep, 30)
+server._serve("127.0.0.1", {port})
+"""
+        process = subprocess.Popen(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).parent,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    self.fail("transcription server exited before accepting connections")
+                try:
+                    with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                        break
+                except OSError:
+                    time.sleep(0.05)
+            else:
+                self.fail("transcription server did not start within 10 seconds")
+
+            process.terminate()
+            process.wait(timeout=2)
+            self.assertEqual(process.returncode, -signal.SIGTERM)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
 
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
