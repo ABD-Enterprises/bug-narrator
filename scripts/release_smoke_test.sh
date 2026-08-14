@@ -56,6 +56,10 @@ if 'CODESIGN_DETAILS="$(codesign -dv' not in build_script:
     raise SystemExit("standalone signing must capture codesign output before parsing it")
 if "^Authority=/{print $2; exit}" in build_script:
     raise SystemExit("standalone signing authority parsing must not exit a pipe early under pipefail")
+if '--codesign-identity "$CODE_SIGN_IDENTITY"' not in build_script:
+    raise SystemExit("signed standalone builds must sign PyInstaller's embedded binaries")
+if '--entitlements "$ENTITLEMENTS_PATH"' not in build_script:
+    raise SystemExit("the standalone executable must retain its MLX runtime entitlement")
 PY
 
 if [[ ! -x "$ROOT_DIR/local-transcription/smoke_test.sh" ]]; then

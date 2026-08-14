@@ -12,6 +12,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PYTHON="${PYTHON:-}"
 BUILD_VENV_DIR="${BUILD_VENV_DIR:-$SCRIPT_DIR/build/standalone-venv}"
 REQUIREMENTS_LOCK="$SCRIPT_DIR/requirements-standalone.lock"
+ENTITLEMENTS_PATH="$SCRIPT_DIR/Standalone.entitlements"
 DIST_DIR="$SCRIPT_DIR/dist"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 APP_NAME="bugnarrator-transcription"
@@ -101,6 +102,13 @@ PYINSTALLER_VERSION="$(
     "$BUILD_VENV_DIR/bin/python" -c \
         'from importlib.metadata import version; print(version("pyinstaller"))'
 )"
+PYINSTALLER_SIGNING_ARGS=()
+if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
+    PYINSTALLER_SIGNING_ARGS=(
+        --codesign-identity "$CODE_SIGN_IDENTITY"
+        --osx-entitlements-file "$ENTITLEMENTS_PATH"
+    )
+fi
 
 echo "Building standalone binary..."
 "$BUILD_VENV_DIR/bin/python" -m PyInstaller \
@@ -123,6 +131,7 @@ echo "Building standalone binary..."
     --hidden-import uvicorn.protocols.websockets.auto \
     --hidden-import uvicorn.lifespan \
     --hidden-import uvicorn.lifespan.on \
+    "${PYINSTALLER_SIGNING_ARGS[@]}" \
     "$SCRIPT_DIR/server.py"
 
 BINARY_PATH="$DIST_DIR/$APP_NAME"
@@ -138,6 +147,7 @@ if [[ -f "$BINARY_PATH" ]]; then
         fi
         echo "Signing standalone server with '$CODE_SIGN_IDENTITY'..."
         codesign --force --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS_PATH" \
             --sign "$CODE_SIGN_IDENTITY" "$BINARY_PATH"
         codesign --verify --strict --verbose=2 "$BINARY_PATH"
         CODESIGN_DETAILS="$(codesign -dv --verbose=2 "$BINARY_PATH" 2>&1)"
@@ -199,6 +209,14 @@ if [[ -f "$BINARY_PATH" ]]; then
         codesign --verify --strict --verbose=2 "$BINARY_PATH"
         if [[ "$SIGNING_AUTHORITY" != Developer\ ID\ Application:* ]]; then
             echo "error: public standalone artifact is not Developer ID signed." >&2
+            exit 1
+        fi
+        EXECUTABLE_MEMORY_ENTITLEMENT="$(
+            codesign -d --entitlements :- "$BINARY_PATH" 2>/dev/null \
+                | plutil -extract com.apple.security.cs.allow-unsigned-executable-memory raw -
+        )"
+        if [[ "$EXECUTABLE_MEMORY_ENTITLEMENT" != "true" ]]; then
+            echo "error: public standalone artifact is missing its required executable-memory entitlement." >&2
             exit 1
         fi
         echo "PUBLIC_RELEASE checks passed for the standalone transcription server."
