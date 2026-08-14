@@ -1,0 +1,106 @@
+{
+  "schema": "orc.contract-archive.v1",
+  "ticket": "987",
+  "provenance": {
+    "pr": null,
+    "head_sha": null,
+    "done_when_total": 1,
+    "machine_backed": 0,
+    "checks": 4,
+    "satisfied": 0,
+    "class_counts": {
+      "machine_check": 0,
+      "human_evidence": 0,
+      "explicitly_self_attested": 1
+    },
+    "classified_ratio": 0,
+    "clauses": [
+      {
+        "index": 1,
+        "text": "Local Parakeet requests use a timeout appropriate for on-device inference and do not duplicate timed-out inference; server uses the supported bounded chunking API and remains health-responsive; standalone builds install pinned dependencies and must complete a real headless audio transcription smoke test; version, changelog, release docs, and release artifacts agree",
+        "backed": false,
+        "satisfied": null,
+        "evidence": null,
+        "class": "explicitly_self_attested"
+      }
+    ]
+  },
+  "contract": {
+    "scope": [
+      "EDIT Sources/BugNarrator/Services/TranscriptionClient.swift; EDIT Sources/BugNarrator/Services/TranscriptionModels.swift; EDIT Sources/BugNarrator/Services/SettingsStore+TranscriptionInput.swift; EDIT Tests/BugNarratorTests/TranscriptionClientTests.swift; EDIT local-transcription/server.py; EDIT local-transcription/requirements.txt; EDIT local-transcription/build_standalone.sh; EDIT local-transcription/test_server.py; EDIT scripts/release_smoke_test.sh; EDIT release docs/version/changelog as required"
+    ],
+    "depends_on": [],
+    "done_when": [
+      "Local Parakeet requests use a timeout appropriate for on-device inference and do not duplicate timed-out inference; server uses the supported bounded chunking API and remains health-responsive; standalone builds install pinned dependencies and must complete a real headless audio transcription smoke test; version, changelog, release docs, and release artifacts agree"
+    ],
+    "validation": {
+      "local": [
+        "./scripts/validate.sh origin/main|./scripts/release_smoke_test.sh|local-transcription/venv/bin/python -m unittest discover -s local-transcription -p 'test_*.py'|headless standalone Parakeet transcription smoke test|signed notarized public release verification"
+      ],
+      "review": []
+    },
+    "user_story": {
+      "user": "BugNarrator macOS user selecting Local Parakeet",
+      "problem": "Long local inference times out, retries duplicate work, a stale server API keyword fails large uploads, and release smoke tests do not exercise transcription.",
+      "desired_outcome": "Reliable local transcription with reproducible, behavior-tested release artifacts.",
+      "acceptance_examples": [],
+      "non_goals": [
+        "Changing OpenAI or compatible-provider semantics; broad UI redesign; deleting user recordings."
+      ],
+      "outcome_evidence": ""
+    },
+    "references": [],
+    "surfaces": [],
+    "artifact_expectations": [],
+    "review_points": [],
+    "requirements": [
+      "Preserve recordings and existing provider behavior",
+      "Do not use UI automation or take over the screen",
+      "Keep Parakeet audio on localhost"
+    ],
+    "acceptance_criteria": [
+      "A loopback Parakeet request can run longer than 180 seconds without client timeout",
+      "A transient local timeout is not automatically duplicated",
+      "The standalone server transcribes a generated speech fixture before publication",
+      "Public app and server artifacts are signed/notarized and checksummed"
+    ],
+    "architecture_fit": "Keep provider-specific policy in the transcription request/client boundary and server-specific behavior in local-transcription.",
+    "design_pass": {
+      "model": "gpt-5.5",
+      "reasoning": "high"
+    },
+    "open_questions": [
+      "coverage-probe (error-paths): What is the error / failure-path behavior?",
+      "coverage-probe (security): Any security / egress / secret-exposure impact?",
+      "coverage-probe (concurrency): Is the change concurrency-safe / idempotent / re-entrant?",
+      "coverage-probe (backward-compat): What is the backward-compat / consumer impact?",
+      "coverage-probe (rollback): Is there a rollback / undo path?"
+    ],
+    "checks": [
+      {
+        "type": "grep",
+        "path": "EDIT Sources/BugNarrator/Services/TranscriptionClient.swift; EDIT Sources/BugNarrator/Services/TranscriptionModels.swift; EDIT Sources/BugNarrator/Services/SettingsStore+TranscriptionInput.swift; EDIT Tests/BugNarratorTests/TranscriptionClientTests.swift; EDIT local-transcription/server.py; EDIT local-transcription/requirements.txt; EDIT local-transcription/build_standalone.sh; EDIT local-transcription/test_server.py; EDIT scripts/release_smoke_test.sh; EDIT release docs/version/changelog as required",
+        "pattern": "REFINE-1",
+        "for": "A loopback Parakeet request can run longer than 180 seconds without client timeout"
+      },
+      {
+        "type": "grep",
+        "path": "EDIT Sources/BugNarrator/Services/TranscriptionClient.swift; EDIT Sources/BugNarrator/Services/TranscriptionModels.swift; EDIT Sources/BugNarrator/Services/SettingsStore+TranscriptionInput.swift; EDIT Tests/BugNarratorTests/TranscriptionClientTests.swift; EDIT local-transcription/server.py; EDIT local-transcription/requirements.txt; EDIT local-transcription/build_standalone.sh; EDIT local-transcription/test_server.py; EDIT scripts/release_smoke_test.sh; EDIT release docs/version/changelog as required",
+        "pattern": "REFINE-2",
+        "for": "A transient local timeout is not automatically duplicated"
+      },
+      {
+        "type": "grep",
+        "path": "EDIT Sources/BugNarrator/Services/TranscriptionClient.swift; EDIT Sources/BugNarrator/Services/TranscriptionModels.swift; EDIT Sources/BugNarrator/Services/SettingsStore+TranscriptionInput.swift; EDIT Tests/BugNarratorTests/TranscriptionClientTests.swift; EDIT local-transcription/server.py; EDIT local-transcription/requirements.txt; EDIT local-transcription/build_standalone.sh; EDIT local-transcription/test_server.py; EDIT scripts/release_smoke_test.sh; EDIT release docs/version/changelog as required",
+        "pattern": "REFINE-3",
+        "for": "The standalone server transcribes a generated speech fixture before publication"
+      },
+      {
+        "type": "grep",
+        "path": "EDIT Sources/BugNarrator/Services/TranscriptionClient.swift; EDIT Sources/BugNarrator/Services/TranscriptionModels.swift; EDIT Sources/BugNarrator/Services/SettingsStore+TranscriptionInput.swift; EDIT Tests/BugNarratorTests/TranscriptionClientTests.swift; EDIT local-transcription/server.py; EDIT local-transcription/requirements.txt; EDIT local-transcription/build_standalone.sh; EDIT local-transcription/test_server.py; EDIT scripts/release_smoke_test.sh; EDIT release docs/version/changelog as required",
+        "pattern": "REFINE-4",
+        "for": "Public app and server artifacts are signed/notarized and checksummed"
+      }
+    ]
+  }
+}
