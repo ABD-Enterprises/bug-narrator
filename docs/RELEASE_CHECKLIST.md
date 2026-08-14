@@ -11,7 +11,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Review open Dependabot, CodeQL, and secret-scanning alerts. Fix patched findings and formally document any accepted exception with its exposure evidence before publishing.
 - Build the app in the intended configuration and confirm the build succeeds.
 - Run `./scripts/build_dmg.sh` and confirm the DMG packaging step succeeds.
-- If the local Parakeet server changed, run `local-transcription/build_standalone.sh` and confirm its packaged generated-speech transcription succeeds.
+- If the local Parakeet server changed, run `local-transcription/build_standalone.sh`; confirm its packaged generated-speech transcription succeeds and the command reaches `PUBLIC_RELEASE checks passed` before treating the artifact as publishable.
 - If shipping a signed build, verify the Apple signing team, bundle identifier, and entitlements are correct.
 - For a public download, use `Developer ID Application` signing rather than `Apple Development`.
 - If publishing broadly, notarize the DMG and staple the ticket before release.

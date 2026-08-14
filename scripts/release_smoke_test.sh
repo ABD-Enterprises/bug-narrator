@@ -27,7 +27,8 @@ bash -n \
     "$ROOT_DIR/local-transcription/smoke_test.sh"
 python3 - \
     "$ROOT_DIR/local-transcription/requirements.txt" \
-    "$ROOT_DIR/local-transcription/requirements-standalone.lock" <<'PY'
+    "$ROOT_DIR/local-transcription/requirements-standalone.lock" \
+    "$ROOT_DIR/local-transcription/build_standalone.sh" <<'PY'
 from pathlib import Path
 import sys
 
@@ -49,6 +50,12 @@ if not locked_packages or any("==" not in package for package in locked_packages
     raise SystemExit("standalone transcription dependencies must be exactly locked")
 if lock.count("--hash=sha256:") < len(locked_packages):
     raise SystemExit("standalone transcription dependencies must be hash locked")
+
+build_script = Path(sys.argv[3]).read_text(encoding="utf-8")
+if 'CODESIGN_DETAILS="$(codesign -dv' not in build_script:
+    raise SystemExit("standalone signing must capture codesign output before parsing it")
+if "^Authority=/{print $2; exit}" in build_script:
+    raise SystemExit("standalone signing authority parsing must not exit a pipe early under pipefail")
 PY
 
 if [[ ! -x "$ROOT_DIR/local-transcription/smoke_test.sh" ]]; then
