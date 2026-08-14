@@ -7,9 +7,11 @@ Use this checklist before cutting a public test build or release candidate.
 ## Build And Signing
 
 - Regenerate the project with `xcodegen generate` if `project.yml` changed.
-- Run `./scripts/release_smoke_test.sh` and confirm it passes before packaging a candidate build.
+- Run `./scripts/release_smoke_test.sh` and confirm its headless unit-test and Release-build checks pass before packaging a candidate build. Run the separately gated UI-test target only from a usable interactive window-server session or CI.
+- Review open Dependabot, CodeQL, and secret-scanning alerts. Fix patched findings and formally document any accepted exception with its exposure evidence before publishing.
 - Build the app in the intended configuration and confirm the build succeeds.
 - Run `./scripts/build_dmg.sh` and confirm the DMG packaging step succeeds.
+- If the local Parakeet server changed, run `local-transcription/build_standalone.sh` and confirm its packaged generated-speech transcription succeeds.
 - If shipping a signed build, verify the Apple signing team, bundle identifier, and entitlements are correct.
 - For a public download, use `Developer ID Application` signing rather than `Apple Development`.
 - If publishing broadly, notarize the DMG and staple the ticket before release.
@@ -73,6 +75,7 @@ Use this checklist before cutting a public test build or release candidate.
 - Confirm no secrets, tokens, personal paths, or local-only files are tracked in git.
 - Review `.gitignore` for generated Xcode data and result bundles.
 - Upload `dist/BugNarrator-macOS.dmg` to the release and confirm the release asset name matches the README link strategy.
+- Upload the stable and versioned Parakeet server zip, checksum, and provenance files when the local server changed; confirm the executable is Developer ID signed and the archive notarization was accepted.
 - If you built or tested BugNarrator from local `DerivedData`, run `./scripts/cleanup_local_build_apps.sh` after publishing so only the installed `/Applications` copy remains in normal tester paths.
 - Open the final DMG and confirm Finder shows the branded BugNarrator icon instead of the generic macOS app placeholder.
 - Confirm the DMG contains `BugNarrator.app` plus the `Applications` shortcut and supports the normal drag-to-Applications install flow.

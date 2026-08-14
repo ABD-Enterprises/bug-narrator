@@ -48,8 +48,8 @@ check_literal \
   '.accessibilityLabel("Recording controls dialog")' \
   'recording controls dialog label'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
-  '.accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])' \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/SessionListSidebar.swift" \
+  '.accessibilityAddTraits(viewModel.selectedFilter == filter ? .isSelected : [])' \
   'session-library filter selected-state announcement'
 check_literal \
   "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/ReviewWorkspaceShell.swift" \
@@ -100,11 +100,11 @@ check_literal \
   'Jira export status:' \
   'settings Jira export status row label'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/MenuBarView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/MenuBarView+Controls.swift" \
   '.accessibilityHint("Opens the recording controls window.")' \
   'menu bar recording controls hint'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/MenuBarView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/MenuBarView+RecoverySections.swift" \
   '.accessibilityLabel("Open Microphone privacy settings")' \
   'menu bar microphone recovery label'
 check_literal \

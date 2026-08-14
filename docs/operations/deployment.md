@@ -2,7 +2,7 @@
 
 BugNarrator is currently distributed as a signed macOS desktop application through GitHub Releases.
 
-There is no hosted backend deployment at this time. Deployment therefore means packaging, signing, notarizing, validating, and publishing the app and DMG artifacts.
+There is no hosted backend deployment at this time. Deployment therefore means packaging, signing, notarizing, validating, and publishing the app DMG and the optional Local Parakeet server artifacts.
 
 ## Current Environments
 
@@ -18,10 +18,13 @@ There is no hosted backend deployment at this time. Deployment therefore means p
 1. Validate the current workspace with:
    - `./scripts/release_smoke_test.sh`
    - any focused manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md)
-2. Build the DMG with `./scripts/build_dmg.sh`
-3. For public distribution, sign with `Developer ID Application`, notarize, and staple
-4. Publish the DMG artifacts to GitHub Releases
-5. Validate the public download on a second Mac when practical
+2. Confirm the separately gated UI tests pass in CI or a usable interactive window-server session; the release smoke script remains headless
+3. Review Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding
+4. If the local transcription server changed, build and behavior-test it with `local-transcription/build_standalone.sh`
+5. Build the DMG with `./scripts/build_dmg.sh`
+6. For public distribution, Developer ID sign and notarize both artifact families; staple the app and DMG
+7. Publish the app and local-server artifacts, checksums, and provenance to GitHub Releases
+8. Validate the public downloads on a second Mac when practical
 
 ## Production Artifact Targets
 
@@ -29,14 +32,18 @@ Current production artifacts:
 
 - `BugNarrator-macOS.dmg`
 - `BugNarrator-vX.Y.Z-macOS.dmg`
+- `bugnarrator-transcription-macos-arm64.zip`
+- `bugnarrator-transcription-vX.Y.Z-macos-arm64.zip`
+- SHA-256 and provenance files for each published artifact family
 
-These are produced by `scripts/build_dmg.sh`.
+The DMGs are produced by `scripts/build_dmg.sh`; the server archives are produced by `local-transcription/build_standalone.sh`.
 
 ## Deployment Controls
 
 - do not publish an unsigned DMG as the production artifact
 - do not publish if microphone entitlement validation fails
 - do not publish if smoke validation or targeted regression checks fail
+- do not publish a local-server archive unless its packaged generated-speech transcription passes
 - do not publish if secrets or signing credentials are missing and the release is intended to be public
 
 ## GitHub Workflow Support

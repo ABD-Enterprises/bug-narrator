@@ -13,11 +13,13 @@ subsequent transcriptions.
 """
 
 import argparse
+import asyncio
+import contextlib
+from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
 import os
 import signal
-import sys
 import tempfile
 import time
 from pathlib import Path
@@ -44,9 +46,22 @@ _model_aliases = {
     "whisper-1",
 }
 _default_model_name = _canonical_model_name
+_inference_executor = ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="bugnarrator-parakeet",
+)
+_chunk_duration_seconds = 120
 _transcription_failure_message = (
     "Local transcription failed. Check the local transcription server logs for details."
 )
+
+
+class _SignalPreservingServer(uvicorn.Server):
+    """Keep process handlers installed while pinned Uvicorn 0.47 serves."""
+
+    @contextlib.contextmanager
+    def capture_signals(self):
+        yield
 
 
 def configure_default_model(model_name: str):
@@ -128,28 +143,21 @@ async def transcribe(
         tmp.flush()
         tmp.close()
 
-        model_id = _resolve_model_id(model)
-        parakeet = get_model(model_id)
-
         file_size_mb = len(contents) / (1024 * 1024)
+        model_id = _resolve_model_id(model)
+
         logger.info(
             f"Transcribing {file.filename} ({file_size_mb:.1f} MB) "
-            f"with model {model_id}"
+            f"with model {model_id} in {_chunk_duration_seconds}s chunks"
         )
         start = time.time()
+        result = await asyncio.get_running_loop().run_in_executor(
+            _inference_executor,
+            _run_inference,
+            model_id,
+            tmp.name,
+        )
 
-        # Parakeet-mlx has built-in chunking via chunk_duration_sec.
-        # For files over 10MB (~15 min of AAC audio), enable chunking
-        # to avoid Metal buffer allocation failures on long recordings.
-        transcribe_kwargs = {}
-        if file_size_mb > 10:
-            transcribe_kwargs["chunk_duration_sec"] = 120
-            logger.info(
-                f"Large file detected ({file_size_mb:.1f} MB), "
-                f"chunking at 120s intervals"
-            )
-
-        result = parakeet.transcribe(tmp.name, **transcribe_kwargs)
         elapsed = time.time() - start
         logger.info(f"Transcription completed in {elapsed:.1f}s")
 
@@ -205,6 +213,19 @@ def _resolve_model_id(model: Optional[str]) -> str:
     return value
 
 
+def _transcribe_audio(parakeet, audio_path: str):
+    """Bound inference so long recordings do not degrade or exhaust Metal buffers."""
+    return parakeet.transcribe(
+        audio_path,
+        chunk_duration=_chunk_duration_seconds,
+    )
+
+
+def _run_inference(model_id: str, audio_path: str):
+    """Load and use MLX on the dedicated inference thread."""
+    return _transcribe_audio(get_model(model_id), audio_path)
+
+
 def _transcription_failure_response() -> JSONResponse:
     return JSONResponse(
         status_code=500,
@@ -218,8 +239,21 @@ def _transcription_failure_response() -> JSONResponse:
 
 
 def _shutdown_handler(signum, frame):
-    logger.info("Shutting down gracefully...")
-    sys.exit(0)
+    logger.info("Stopping transcription server...")
+    # MLX inference cannot be cancelled safely from another Python thread. Restore
+    # the default handler and re-send the signal so the entire process exits.
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+def _serve(host: str, port: int):
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+    )
+    _SignalPreservingServer(config).run()
 
 
 def main():
@@ -254,17 +288,12 @@ def main():
     signal.signal(signal.SIGINT, _shutdown_handler)
 
     if args.preload:
-        get_model(args.model)
+        _inference_executor.submit(get_model, args.model).result()
 
     logger.info(
         f"Starting BugNarrator transcription server on {args.host}:{args.port}"
     )
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level="info",
-    )
+    _serve(args.host, args.port)
 
 
 if __name__ == "__main__":

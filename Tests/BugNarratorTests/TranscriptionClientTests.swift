@@ -28,6 +28,7 @@ final class TranscriptionClientTests: XCTestCase {
 
         XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/audio/transcriptions")
         XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.timeoutInterval, TranscriptionRequest.remoteTimeout)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-openai-key")
         XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
         XCTAssertTrue(bodyString.contains("name=\"model\""))
@@ -36,6 +37,27 @@ final class TranscriptionClientTests: XCTestCase {
         XCTAssertTrue(bodyString.contains("name=\"prompt\""))
         XCTAssertTrue(bodyString.contains("filename=\"\(fileURL.lastPathComponent)\""))
         XCTAssertTrue(bodyString.contains("audio-data"))
+    }
+
+    func testMakeURLRequestUsesExtendedTimeoutForLocalParakeet() async throws {
+        let fileURL = try makeAudioFile(named: "parakeet-timeout", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+        let request = try await client.makeURLRequest(
+            fileURL: fileURL,
+            apiKey: "",
+            request: TranscriptionRequest(
+                model: "parakeet-tdt-0.6b-v3",
+                languageHint: "en",
+                prompt: nil,
+                apiBaseURL: URL(string: "http://localhost:8422")!,
+                provider: .parakeetLocal
+            )
+        )
+
+        XCTAssertEqual(request.timeoutInterval, TranscriptionRequest.localParakeetTimeout)
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
     }
 
     func testMultipartFormDataBuilderBuildsFieldFileAndClosingBoundary() throws {
@@ -381,6 +403,41 @@ final class TranscriptionClientTests: XCTestCase {
                 return
             }
         }
+    }
+
+    func testParakeetTimeoutIsNotRetried() async throws {
+        let fileURL = try makeAudioFile(named: "parakeet-no-timeout-retry", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            throw URLError(.timedOut)
+        }
+
+        let client = TranscriptionClient(session: makeMockURLSession())
+
+        do {
+            _ = try await client.transcribe(
+                fileURL: fileURL,
+                apiKey: "",
+                request: TranscriptionRequest(
+                    model: "parakeet-tdt-0.6b-v3",
+                    languageHint: nil,
+                    prompt: nil,
+                    apiBaseURL: URL(string: "http://localhost:8422")!,
+                    provider: .parakeetLocal
+                )
+            )
+            XCTFail("Expected a timeout error.")
+        } catch let error as AppError {
+            guard case .networkTimeout = error else {
+                XCTFail("Unexpected app error: \(error)")
+                return
+            }
+        }
+
+        XCTAssertEqual(requestCount, 1)
     }
 
     func testTranscribeRejectsEmptyTranscriptPayload() async throws {
