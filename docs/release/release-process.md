@@ -36,6 +36,14 @@ non-public build says so in its summary line.
 `codesign -dv` on the shipped 1.0.41 DMG reported "not signed at all".
 Notarizing and stapling an image is not the same as signing it.
 
+The separate Local Parakeet server uses the same fail-closed model through
+`local-transcription/build_standalone.sh`. With `PUBLIC_RELEASE=YES`, it requires
+a clean checkout at tag `v<VERSION>`, Developer ID signing, notarization, and the
+packaged transcription smoke test. It produces stable and versioned zip assets,
+SHA-256 files, and provenance under `dist/`. Apple does not support stapling a
+ticket to a bare Mach-O executable, so the notarized server is verified online
+by Gatekeeper rather than stapled.
+
 ### Recovering this process on another Mac
 
 The build is not tied to this machine beyond credentials. Another Mac needs:
@@ -45,6 +53,7 @@ The build is not tied to this machine beyond credentials. Another Mac needs:
   imported into the login keychain
 - a `notarytool` keychain profile named `BugNarratorNotary`
 - `python3` (the script bootstraps its own `dmgbuild` virtualenv)
+- Python 3.11 or 3.12 and `ffmpeg` when building the standalone Parakeet server
 
 With those in place `PUBLIC_RELEASE=YES CODE_SIGNING_ALLOWED=YES NOTARIZE=YES
 ./scripts/build_dmg.sh` reproduces a publishable artifact. The remaining
@@ -74,14 +83,16 @@ Do not release unless all of these are true:
 1. Review [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues) for unresolved risks and active release blockers.
 2. Review [Product Spec](../architecture/product-spec.md) for the intended product behavior, terminology, and artifact contract.
 3. Update `CHANGELOG.md`.
-4. Run `./scripts/release_smoke_test.sh`.
+4. Run `./scripts/release_smoke_test.sh`; this is the headless unit-test and Release-build gate. Confirm the separately gated UI-test target passes in CI or a usable interactive window-server session.
 5. Run `./scripts/accessibility_regression_check.sh`.
-6. Run any targeted manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md).
-7. Generate or review the internal release summary seed before publishing.
-8. Build the DMG with `./scripts/build_dmg.sh`.
-9. For public releases, sign with `Developer ID Application`, notarize, and staple.
-10. Publish the DMG assets to GitHub Releases.
-11. Validate the published download on a second Mac when practical.
+6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing.
+7. If the local server changed, run `local-transcription/build_standalone.sh`; its packaged speech transcription must pass.
+8. Run any targeted manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md).
+9. Generate or review the internal release summary seed before publishing.
+10. Build the DMG with `./scripts/build_dmg.sh`.
+11. For public releases, sign and notarize both artifacts; staple the app and DMG. The bare server executable cannot be stapled.
+12. Publish the DMG, local-server zip, checksum, and provenance assets to GitHub Releases.
+13. Validate the published downloads on a second Mac when practical.
 
 ## Versioning
 

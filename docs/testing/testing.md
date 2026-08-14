@@ -22,12 +22,13 @@ Current macOS release-readiness baseline:
 
 ```bash
 ./scripts/release_smoke_test.sh
+local-transcription/build_standalone.sh
 ./scripts/accessibility_regression_check.sh
 xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination 'platform=macOS' -only-testing:BugNarratorTests CODE_SIGNING_ALLOWED=NO test
 xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Release CODE_SIGNING_ALLOWED=NO build
 ```
 
-The CI macOS job intentionally runs `BugNarratorTests` only; UI tests require a usable window server and remain a targeted local/manual validation path.
+`build_standalone.sh` creates a clean pinned environment and sends generated speech through the packaged Parakeet executable. The CI macOS job intentionally runs `BugNarratorTests` only; UI tests require a usable window server and remain a targeted local/manual validation path.
 
 Current Windows workspace validation baseline on Windows:
 
@@ -60,6 +61,7 @@ Manual validation remains necessary for:
 - live microphone permission prompts
 - live Screen Recording prompts
 - real AI provider transcription and issue extraction
+- app-to-server Local Parakeet selection, progress, and preserved-session retry behavior (the packaged server transcription itself is automated)
 - representative Windows system-audio output device capture
 - retrying a preserved session after restoring a rejected AI provider credential in Settings
 - real GitHub and Jira export

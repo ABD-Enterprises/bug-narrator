@@ -1,6 +1,10 @@
 import asyncio
+import inspect
 import json
+from pathlib import Path
+import threading
 import unittest
+from unittest.mock import patch
 
 import server
 
@@ -91,6 +95,63 @@ class ServerModelConfigurationTests(unittest.TestCase):
         )
         self.assertNotIn("Traceback", body["error"]["message"])
         self.assertNotIn("Exception", body["error"]["message"])
+
+    def test_transcription_uses_supported_bounded_chunking_argument(self):
+        class RecordingModel:
+            def __init__(self):
+                self.calls = []
+
+            def transcribe(self, path, **kwargs):
+                self.calls.append((path, kwargs))
+                return "result"
+
+        model = RecordingModel()
+
+        result = server._transcribe_audio(model, "/tmp/fixture.m4a")
+
+        self.assertEqual(result, "result")
+        self.assertEqual(
+            model.calls,
+            [("/tmp/fixture.m4a", {"chunk_duration": 120})],
+        )
+
+    def test_transcription_route_keeps_http_event_loop_async(self):
+        self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
+
+    def test_model_load_and_transcription_share_the_inference_thread(self):
+        class RecordingModel:
+            def transcribe(self, path, **kwargs):
+                return (threading.get_ident(), path, kwargs)
+
+        model = RecordingModel()
+
+        def load_model(_model_id):
+            return model
+
+        with patch.object(server, "get_model", side_effect=load_model):
+            first = server._inference_executor.submit(
+                server._run_inference,
+                "model",
+                "/tmp/first.m4a",
+            ).result()
+            second = server._inference_executor.submit(
+                server._run_inference,
+                "model",
+                "/tmp/second.m4a",
+            ).result()
+
+        self.assertEqual(first[0], second[0])
+        self.assertEqual(first[2], {"chunk_duration": 120})
+        self.assertEqual(second[2], {"chunk_duration": 120})
+
+    def test_runtime_dependencies_are_exactly_pinned(self):
+        requirements = (
+            Path(__file__).with_name("requirements.txt").read_text().splitlines()
+        )
+        packages = [line for line in requirements if line and not line.startswith("#")]
+
+        self.assertTrue(packages)
+        self.assertTrue(all("==" in package for package in packages))
 
 
 if __name__ == "__main__":

@@ -67,6 +67,13 @@ Recommended release-readiness baseline:
 ./scripts/release_smoke_test.sh
 ```
 
+When the Local Parakeet server changes, build it from a clean pinned environment
+and run its packaged speech-transcription gate:
+
+```bash
+local-transcription/build_standalone.sh
+```
+
 Unsigned DMG packaging:
 
 ```bash

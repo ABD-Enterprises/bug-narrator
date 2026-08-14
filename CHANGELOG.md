@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.42 - 2026-08-14
+
+- [FIX] Local Parakeet transcription now allows up to 15 minutes for each on-device request instead of timing out after 3 minutes. A timed-out local inference is no longer retried automatically because the server cannot cancel the original MLX job; retrying it only duplicated work and made the server less responsive (#987).
+- [FIX] The local server now processes every upload in bounded 120-second Parakeet chunks using the supported `chunk_duration` API. The previous `chunk_duration_sec` keyword failed every upload over 10 MB, while unbounded shorter uploads could produce repeated-word transcripts on long audio (#987).
+- [INTERNAL] Parakeet release builds now use exact dependency versions, build in a clean Python 3.11/3.12 environment, transcribe generated speech through the packaged executable, and fail closed unless public zip assets are Developer ID signed, notarized, checksummed, and tied to a clean tagged commit (#987).
+- [INTERNAL] Release hardening updates the docs-site dependency tree to patched Docusaurus, Babel, PostCSS, Joi, proxy middleware, and brace-expansion versions; the CodeQL workflow now defaults to no token permissions; and the headless release smoke gate explicitly excludes the separately gated UI-test target (#987).
+
 - [NEW] The local Parakeet transcription server is now a signed, notarized download published with each release (`bugnarrator-transcription-macos-arm64.zip`). Every in-app instruction previously named `local-transcription/venv/...` — a path only a source checkout has — so the free, no-upload transcription option was unreachable for anyone who installed from the DMG. Settings > AI Engines now links straight to it (#959).
 
 - [CHANGE] You can now record before configuring an AI provider. Recording was blocked until a provider was set up, walling the entire first run behind a paid API key — even though the record-now/transcribe-later path already existed and preserves the session for retry. The start button now says the session will be saved and kept ready to transcribe (#959).
