@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-## 1.0.43 - 2026-08-14
+## 1.0.44 - 2026-08-14
+
+- [FIX] Signed standalone Parakeet builds now apply the Developer ID identity to PyInstaller's embedded Python framework and native libraries, not only the outer executable, and retain the executable-memory entitlement required by MLX's compiled kernels. macOS previously rejected the extracted runtime for a Team ID mismatch and then killed model loading under hardened runtime (#991).
+
+## 1.0.43 - 2026-08-14 (not published)
 
 - [FIX] The standalone Parakeet release now completes smoke testing, packaging, and notarization after code signing. Its signing-authority probe previously exited its pipeline early under `pipefail`, aborting every public server release immediately after a valid signature was applied (#989).
 
