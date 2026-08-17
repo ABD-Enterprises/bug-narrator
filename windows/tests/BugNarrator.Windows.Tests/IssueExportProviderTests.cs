@@ -143,6 +143,120 @@ public sealed class IssueExportProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task GitHubBuildRequest_RendersReproductionStepsLikeMac()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            ReproductionSteps =
+            [
+                new IssueReproductionStep(
+                    Guid.NewGuid(), "Open checkout", "Button visible", "Right edge cut off", 30, screenshot.ScreenshotId),
+                new IssueReproductionStep(Guid.NewGuid(), "Resize window", null, null, null, null),
+            ],
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.Contains("## Reproduction Steps", body);
+        Assert.Contains("1. Open checkout", body);
+        Assert.Contains("   - Expected: Button visible", body);
+        Assert.Contains("   - Actual: Right edge cut off", body);
+        // Assert the whole Reference line so the screenshot name is proven to come from the step,
+        // not from the separate "Related Screenshots" section.
+        Assert.Contains(
+            $"   - Reference: Transcript `00:30`  •  Screenshot `{Path.GetFileName(screenshot.RelativePath)}` (`00:08`)",
+            body);
+        // A step with no optional fields renders as a bare numbered line.
+        Assert.Contains("2. Resize window", body);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_CapsReproductionStepsAtTheTrackerBudget()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            ReproductionSteps = Enumerable.Range(1, 12)
+                .Select(i => new IssueReproductionStep(Guid.NewGuid(), $"Step {i}", null, null, null, null))
+                .ToArray(),
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.Contains("10. Step 10", body);
+        Assert.DoesNotContain("11. Step 11", body);
+        // macOS drops steps past the cap silently — no omission notice for reproduction steps.
+        Assert.DoesNotContain("Additional items were omitted", body);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_OmitsReproductionSectionWhenThereAreNoSteps()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            session.IssueExtraction!.Issues[0],
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.DoesNotContain("## Reproduction Steps", body);
+    }
+
+    [Fact]
+    public async Task JiraBuildRequest_RendersReproductionStepsInTheMacTextShape()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            ReproductionSteps =
+            [
+                new IssueReproductionStep(
+                    Guid.NewGuid(), "Open checkout", "Button visible", "Cut off", 30, screenshot.ScreenshotId),
+            ],
+        };
+        var provider = new JiraExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new JiraExportConfiguration(
+                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
+        var body = await request.Content!.ReadAsStringAsync();
+
+        Assert.Contains("Reproduction steps", body);
+
+        // Assert the WHOLE entry, so the macOS separators (" | ", "Reference: ", " • ") are pinned.
+        // Loose per-fragment assertions pass no matter how the parts are joined.
+        var expected = "1. Open checkout | Expected: Button visible | Actual: Cut off | "
+            + $"Reference: Transcript 00:30 • Screenshot {Path.GetFileName(screenshot.RelativePath)} (00:08)";
+        Assert.Contains(JsonEncodedText.Encode(expected).ToString(), body);
+    }
+
+    [Fact]
     public async Task GitHubExportAsync_ReportsPartialSuccessWhenLaterIssueFails()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(
