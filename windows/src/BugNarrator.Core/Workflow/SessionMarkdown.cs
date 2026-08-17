@@ -1,9 +1,10 @@
 namespace BugNarrator.Core.Workflow;
 
 /// <summary>
-/// Shared line joining for session markdown output. macOS joins its markdown lines with <c>\n</c>,
-/// so Windows emits LF as well: the exported documents are a cross-platform contract and must not
-/// vary with the host's newline convention.
+/// Shared line joining for session markdown output. macOS joins its markdown lines with <c>\n</c>
+/// and adds no trailing newline, so Windows does the same: these documents are a cross-platform
+/// contract, byte-compared against <c>contract-fixtures/</c>, and must not vary with the host's
+/// newline convention or gain an extra terminator.
 /// </summary>
 internal static class SessionMarkdown
 {
@@ -11,6 +12,6 @@ internal static class SessionMarkdown
 
     internal static string Join(IEnumerable<string> lines)
     {
-        return string.Join(LineSeparator, lines).TrimEnd() + LineSeparator;
+        return string.Join(LineSeparator, lines).TrimEnd();
     }
 }
