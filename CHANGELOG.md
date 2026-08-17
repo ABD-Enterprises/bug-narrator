@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- [INTERNAL] macOS and Windows now share committed contract fixtures for `transcript.md`, so a parity break fails a build instead of surviving as two green suites. Each side previously asserted against its own retyped literal — which is how the Windows test came to pin a macOS output macOS produces nowhere outside UTC (#1000).
+- [INTERNAL] Session timestamp rendering in exports is now injectable. The default is unchanged (the user's locale and timezone); fixtures pin `en_US_POSIX`/UTC with ASCII spaces, because Apple's formatter uses U+202F before AM/PM while .NET uses ASCII — two byte-different strings that look identical (#1000).
+
 ## 1.0.45 - 2026-08-14
 
 - [FIX] The standalone Parakeet download now ships in a Developer ID-signed, notarized, stapled DMG instead of a ZIP. Apple accepted the ZIP and its exact executable hash, but a bare Mach-O cannot carry a stapled ticket and Gatekeeper continued to reject it; the DMG keeps the notarization ticket available online and offline (#993).
