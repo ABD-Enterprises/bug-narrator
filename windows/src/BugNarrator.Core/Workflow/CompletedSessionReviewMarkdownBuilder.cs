@@ -95,6 +95,36 @@ public static class CompletedSessionReviewMarkdownBuilder
             lines.Add(string.Empty);
             lines.Add($"> {issue.EvidenceExcerpt}");
 
+            if (issue.ReproductionSteps.Count > 0)
+            {
+                lines.Add(string.Empty);
+                lines.Add("Reproduction steps:");
+                lines.Add(string.Empty);
+
+                var stepNumber = 1;
+                foreach (var step in issue.ReproductionSteps)
+                {
+                    lines.Add($"{stepNumber}. {step.Instruction}");
+
+                    if (!string.IsNullOrWhiteSpace(step.ExpectedResult))
+                    {
+                        lines.Add($"   - Expected: {step.ExpectedResult}");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(step.ActualResult))
+                    {
+                        lines.Add($"   - Actual: {step.ActualResult}");
+                    }
+
+                    if (step.TimestampLabel is not null)
+                    {
+                        lines.Add($"   - Transcript: `{step.TimestampLabel}`");
+                    }
+
+                    stepNumber++;
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(issue.Note))
             {
                 lines.Add(string.Empty);

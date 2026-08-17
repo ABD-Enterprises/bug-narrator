@@ -108,6 +108,8 @@ public sealed class CompletedSessionFormattingTests
         Assert.Null(issue.DeduplicationHint);
         // Old sessions still get a usable identity for duplicate detection.
         Assert.StartsWith("issue-", issue.EffectiveDeduplicationHint);
+        // Reproduction steps did not exist when this shape was written.
+        Assert.Empty(issue.ReproductionSteps);
     }
 
     [Fact]
