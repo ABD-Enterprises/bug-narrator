@@ -78,6 +78,39 @@ public sealed class CompletedSessionFormattingTests
     }
 
     [Fact]
+    public void ExtractedIssue_DeserializesSessionJsonSavedBeforeTheParityFieldsExisted()
+    {
+        // Shape of an issue persisted by an earlier build: no Severity/Component/DeduplicationHint.
+        // Property casing and the numeric enum mirror FileCompletedSessionStore's serializer options.
+        var json =
+            """
+            {
+              "IssueId": "55555555-5555-5555-5555-555555555555",
+              "Title": "Save button clips",
+              "Category": 0,
+              "Summary": "The save button is clipped.",
+              "EvidenceExcerpt": "clipped",
+              "TimestampSeconds": 12,
+              "RelatedScreenshotIds": [],
+              "Confidence": 0.8,
+              "RequiresReview": true,
+              "IsSelectedForExport": true,
+              "SectionTitle": null,
+              "Note": null
+            }
+            """;
+
+        var issue = System.Text.Json.JsonSerializer.Deserialize<ExtractedIssue>(json);
+
+        Assert.NotNull(issue);
+        Assert.Equal(ExtractedIssueSeverity.Medium, issue!.Severity);
+        Assert.Null(issue.Component);
+        Assert.Null(issue.DeduplicationHint);
+        // Old sessions still get a usable identity for duplicate detection.
+        Assert.StartsWith("issue-", issue.EffectiveDeduplicationHint);
+    }
+
+    [Fact]
     public void SessionTimeFormatter_FormatsHoursWithoutLeadingZeroLikeMac()
     {
         Assert.Equal("1:05:09", SessionTimeFormatter.FormatDuration(TimeSpan.FromSeconds(3909)));

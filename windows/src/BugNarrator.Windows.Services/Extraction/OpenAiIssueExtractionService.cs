@@ -60,8 +60,11 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
                     You convert narrated software review sessions into structured, reviewable draft issues.
                     Use only information explicitly present in the transcript, screenshots, and timeline context.
                     Return strict JSON with keys summary, guidanceNote, issues.
-                    Each issue must contain title, category, summary, evidenceExcerpt, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview.
+                    Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview.
                     Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
+                    Valid severities are exactly: Critical, High, Medium, Low. Use Medium when the transcript does not justify a stronger or weaker rating.
+                    component is the area of the product the issue affects, or null when the transcript does not identify one.
+                    deduplicationHint is a short stable phrase naming the underlying problem, so repeat reports of the same issue can be recognized.
                     Prefer conservative output. If evidence is weak, set requiresReview to true and use a lower confidence.
                     """
                 ),
