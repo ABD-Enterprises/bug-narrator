@@ -1,5 +1,60 @@
 import Foundation
 
+/// How a session timestamp is rendered in exported text (#1000).
+///
+/// macOS rendered these with a bare `.formatted(date:time:)`, i.e. the running
+/// machine's locale and timezone, with no way to pin it. Windows renders the
+/// same line through `SessionTimeFormatter.InvariantTimestampOptions`
+/// (invariant culture, UTC) and its parity test asserts that output as "the
+/// macOS contract" — an output macOS does not produce anywhere outside UTC.
+///
+/// Making it injectable is what lets one golden fixture bind both platforms.
+/// `.current` preserves shipped behavior exactly, so nothing a user sees in an
+/// export changes; only fixtures ask for `.invariant`.
+struct SessionTimestampOptions: Equatable {
+    let locale: Locale
+    let timeZone: TimeZone
+    /// Fold Unicode spaces to ASCII. See `invariant` — this is not cosmetic.
+    let normalizesSpaces: Bool
+
+    static let current = SessionTimestampOptions(
+        locale: .current,
+        timeZone: .current,
+        normalizesSpaces: false
+    )
+
+    /// The pinned rendering both implementations can agree on.
+    ///
+    /// `normalizesSpaces` is the subtle half. Apple's formatter separates the
+    /// time from AM/PM with U+202F (narrow no-break space); .NET's invariant
+    /// `ToString` uses ASCII 0x20. Pinning locale and timezone alone still
+    /// leaves two byte-different strings that render identically on screen —
+    /// which is precisely the class of drift a retyped literal can never catch
+    /// and a byte-compared fixture catches instantly (#1000).
+    ///
+    /// The contract is ASCII, because Windows already emits ASCII and because
+    /// a fixture full of invisible characters is a trap for whoever edits it
+    /// next. macOS's own user-facing export is untouched — only this pinned
+    /// rendering normalizes.
+    static let invariant = SessionTimestampOptions(
+        locale: Locale(identifier: "en_US_POSIX"),
+        timeZone: TimeZone(identifier: "UTC") ?? .current,
+        normalizesSpaces: true
+    )
+
+    func string(from date: Date) -> String {
+        var style = Date.FormatStyle(date: .abbreviated, time: .standard)
+        style.locale = locale
+        style.timeZone = timeZone
+        let rendered = date.formatted(style)
+
+        guard normalizesSpaces else { return rendered }
+        return rendered
+            .replacingOccurrences(of: "\u{202F}", with: " ")
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+    }
+}
+
 struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     let id: UUID
     let createdAt: Date
@@ -341,10 +396,16 @@ struct TranscriptSession: SessionLibraryItem, Codable, Equatable {
     }
 
     var markdownContent: String {
+        markdownContent(timestampOptions: .current)
+    }
+
+    /// The exported `transcript.md`. `timestampOptions` exists so a fixture can
+    /// pin the rendering; product callers use the default (#1000).
+    func markdownContent(timestampOptions: SessionTimestampOptions) -> String {
         var lines = [
             "# BugNarrator Transcript",
             "",
-            "- Recorded: \(createdAt.formatted(date: .abbreviated, time: .standard))",
+            "- Recorded: \(timestampOptions.string(from: createdAt))",
             "- Duration: \(ElapsedTimeFormatter.string(from: duration))",
             "- Model: \(model)"
         ]
