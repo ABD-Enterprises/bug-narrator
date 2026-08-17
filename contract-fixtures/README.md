@@ -77,8 +77,28 @@ to match. That failure is the feature.
 
 ## Consuming from Windows
 
-Load `transcript.golden.md` from the repository root rather than retyping it,
-build the canonical session from the table above, render with
-`SessionTimeFormatter.InvariantTimestampOptions`, and compare the full string.
-Wiring that up is tracked separately so it does not collide with in-flight
-Windows work.
+Wired up in #1003. `windows/tests/BugNarrator.Core.Tests/TranscriptContractFixtureTests.cs` builds
+the canonical session from the table above, renders it with
+`SessionTimeFormatter.InvariantTimestampOptions`, and byte-compares against this golden. It locates
+the file from the test's `[CallerFilePath]`, mirroring how the macOS test uses `#filePath`, and it
+fails loudly if the fixture is missing rather than skipping.
+
+Both platforms now compare against this one file, so a renderer change on either side that the
+fixture does not expect fails a build.
+
+### Line endings
+
+`contract-fixtures/**` is pinned to `text eol=lf` in `.gitattributes`. Without it, `core.autocrlf=true`
+checks the golden out as CRLF on Windows while the committed bytes are LF, and the byte comparison
+fails on one machine while passing on another. The Windows test also asserts the loaded fixture
+contains no `\r` and says so explicitly, because that failure otherwise looks impossible — the text
+is identical on screen.
+
+### What wiring this up found
+
+Two real divergences in the Windows renderer, both fixed in the renderer rather than by editing the
+fixture:
+
+- marker notes were not rendered at all — `SessionTimelineMoment` had no note field, so the
+  `— Right edge is cut off at 1280 wide.` in the golden could not be produced
+- Windows appended a trailing newline that macOS does not emit

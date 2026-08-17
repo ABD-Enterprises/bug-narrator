@@ -62,7 +62,14 @@ public static class CompletedSessionMarkdownBuilder
 
             foreach (var moment in session.TimelineMoments.OrderBy(moment => moment.ElapsedSeconds))
             {
-                lines.Add($"- **{moment.Label}** at `{SessionTimeFormatter.FormatElapsedSeconds(moment.ElapsedSeconds)}`");
+                var markerLine = $"- **{moment.Label}** at `{SessionTimeFormatter.FormatElapsedSeconds(moment.ElapsedSeconds)}`";
+                if (!string.IsNullOrWhiteSpace(moment.Note))
+                {
+                    // macOS appends the marker note after an em dash.
+                    markerLine += $" — {moment.Note}";
+                }
+
+                lines.Add(markerLine);
             }
 
             lines.Add(string.Empty);

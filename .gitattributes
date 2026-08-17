@@ -1,0 +1,4 @@
+# The contract fixtures are byte-compared by both platforms. Without this, core.autocrlf=true
+# checks them out as CRLF on Windows while the committed bytes (and the macOS renderer) are LF,
+# so a byte-for-byte comparison would fail on one machine and pass on another.
+contract-fixtures/** text eol=lf
