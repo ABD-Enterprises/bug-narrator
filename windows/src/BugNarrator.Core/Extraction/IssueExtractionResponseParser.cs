@@ -120,8 +120,37 @@ public static class IssueExtractionResponseParser
             RequiresReview: GetFirstBool(issueElement, "requiresReview", "requires_review", "needsReview") ?? true,
             IsSelectedForExport: true,
             SectionTitle: GetFirstString(issueElement, "sectionTitle", "section", "sectionName")?.Trim(),
-            Note: GetFirstString(issueElement, "note", "comment")?.Trim());
+            Note: GetFirstString(issueElement, "note", "comment")?.Trim())
+        {
+            // Alias lists mirror the macOS parser (Sources/BugNarrator/Services/IssueExtractionResponseParser.swift)
+            // so the same model output is understood identically on both platforms.
+            Severity = ParseSeverity(GetFirstString(issueElement, "severity", "priority", "impact")),
+            Component = NullIfBlank(GetFirstString(
+                issueElement, "component", "area", "affectedComponent", "affected_component", "surface", "scope")),
+            DeduplicationHint = NullIfBlank(GetFirstString(
+                issueElement, "deduplicationHint", "dedupHint", "dedup_hint", "duplicateHint", "duplicate_hint")),
+        };
         return true;
+    }
+
+    /// <summary>
+    /// Severity comes from model output, so an unknown or missing value falls back to the same
+    /// <see cref="ExtractedIssueSeverity.Medium"/> default macOS uses rather than failing the parse.
+    /// </summary>
+    private static ExtractedIssueSeverity ParseSeverity(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "critical" or "blocker" or "sev1" => ExtractedIssueSeverity.Critical,
+            "high" or "major" or "sev2" => ExtractedIssueSeverity.High,
+            "low" or "minor" or "trivial" or "sev4" => ExtractedIssueSeverity.Low,
+            _ => ExtractedIssueSeverity.Medium,
+        };
+    }
+
+    private static string? NullIfBlank(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static ExtractedIssueCategory ParseCategory(string rawValue)

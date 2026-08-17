@@ -65,6 +65,12 @@ public static class CompletedSessionReviewMarkdownBuilder
             lines.Add($"### {issue.Title}");
             lines.Add(string.Empty);
             lines.Add($"- Category: {ToDisplayText(issue.Category)}");
+            lines.Add($"- Severity: {issue.Severity}");
+
+            if (!string.IsNullOrWhiteSpace(issue.Component))
+            {
+                lines.Add($"- Component: {issue.Component}");
+            }
 
             if (issue.TimestampSeconds is not null)
             {
@@ -81,6 +87,7 @@ public static class CompletedSessionReviewMarkdownBuilder
                 lines.Add($"- Confidence: {issue.ConfidenceLabel}");
             }
 
+            lines.Add($"- Dedup Hint: {issue.EffectiveDeduplicationHint}");
             lines.Add($"- Requires Review: {(issue.RequiresReview ? "Yes" : "No")}");
             lines.Add($"- Selected For Export: {(issue.IsSelectedForExport ? "Yes" : "No")}");
             lines.Add(string.Empty);

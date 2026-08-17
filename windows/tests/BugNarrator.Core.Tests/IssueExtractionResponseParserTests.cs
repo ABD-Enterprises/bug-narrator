@@ -7,6 +7,110 @@ namespace BugNarrator.Core.Tests;
 public sealed class IssueExtractionResponseParserTests
 {
     [Fact]
+    public void Parse_ReadsSeverityComponentAndDeduplicationHint()
+    {
+        var content =
+            """
+            {
+              "summary": "One issue.",
+              "issues": [
+                {
+                  "title": "Save button clips",
+                  "category": "Bug",
+                  "severity": "High",
+                  "component": "Save flow",
+                  "summary": "The save button is clipped.",
+                  "evidenceExcerpt": "clipped",
+                  "deduplicationHint": "save-button-clipping"
+                }
+              ]
+            }
+            """;
+
+        var issue = Assert.Single(
+            IssueExtractionResponseParser.Parse(content, new Dictionary<string, Guid>()).Issues);
+
+        Assert.Equal(ExtractedIssueSeverity.High, issue.Severity);
+        Assert.Equal("Save flow", issue.Component);
+        Assert.Equal("save-button-clipping", issue.DeduplicationHint);
+        Assert.Equal("save-button-clipping", issue.EffectiveDeduplicationHint);
+    }
+
+    [Fact]
+    public void Parse_UsesMacAliasKeysForTheNewFields()
+    {
+        var content =
+            """
+            {
+              "issues": [
+                {
+                  "title": "Slow export",
+                  "category": "Bug",
+                  "priority": "Critical",
+                  "affected_component": "Export",
+                  "summary": "Export takes minutes.",
+                  "evidenceExcerpt": "took two minutes",
+                  "dedup_hint": "slow-export"
+                }
+              ]
+            }
+            """;
+
+        var issue = Assert.Single(
+            IssueExtractionResponseParser.Parse(content, new Dictionary<string, Guid>()).Issues);
+
+        Assert.Equal(ExtractedIssueSeverity.Critical, issue.Severity);
+        Assert.Equal("Export", issue.Component);
+        Assert.Equal("slow-export", issue.DeduplicationHint);
+    }
+
+    [Fact]
+    public void Parse_FallsBackSafelyWhenNewFieldsAreMissingOrInvalid()
+    {
+        var content =
+            """
+            {
+              "issues": [
+                {
+                  "title": "Missing fields",
+                  "category": "Bug",
+                  "severity": "catastrophic",
+                  "component": "   ",
+                  "summary": "No severity given.",
+                  "evidenceExcerpt": "evidence"
+                }
+              ]
+            }
+            """;
+
+        var issue = Assert.Single(
+            IssueExtractionResponseParser.Parse(content, new Dictionary<string, Guid>()).Issues);
+
+        // An unusable value must never drop an otherwise valid issue.
+        Assert.Equal(ExtractedIssueSeverity.Medium, issue.Severity);
+        Assert.Null(issue.Component);
+        Assert.Null(issue.DeduplicationHint);
+        Assert.StartsWith("issue-", issue.EffectiveDeduplicationHint);
+    }
+
+    [Fact]
+    public void IssueDeduplication_MatchesTheMacHashContract()
+    {
+        // Same normalization + FNV-1a 64 as macOS makeDeduplicationHint, so the same issue yields
+        // the same hint on both platforms.
+        var hint = IssueDeduplication.MakeHint("Save button clips", "It is clipped.", "clipped");
+
+        Assert.Matches("^issue-[0-9a-f]{16}$", hint);
+
+        // Case, diacritics, and whitespace runs must not change the identity.
+        Assert.Equal(
+            hint,
+            IssueDeduplication.MakeHint("SAVE   button  clips", "It is clipped.", "clipped"));
+        Assert.Equal("issue-0000000000000000", IssueDeduplication.MakeHint("", "", ""));
+        Assert.NotEqual(hint, IssueDeduplication.MakeHint("Different", "It is clipped.", "clipped"));
+    }
+
+    [Fact]
     public void Parse_HandlesMarkdownFenceAliasKeysAndScreenshotMapping()
     {
         var screenshotId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
