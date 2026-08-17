@@ -3,123 +3,91 @@ using BugNarrator.Core.Models;
 
 namespace BugNarrator.Core.Workflow;
 
+/// <summary>
+/// Renders the session <c>transcript.md</c>. This follows the macOS
+/// <c>TranscriptSession.markdownContent</c> contract, which the parity matrix declares must remain
+/// identical across platforms. Review summary and extracted issues deliberately live in
+/// <see cref="CompletedSessionReviewMarkdownBuilder"/> instead, mirroring the macOS split.
+/// </summary>
 public static class CompletedSessionMarkdownBuilder
 {
     public static string Build(CompletedSession session)
     {
-        var builder = new StringBuilder();
+        return Build(session, SessionTimeFormatter.DefaultTimestampOptions);
+    }
 
-        builder.AppendLine("# BugNarrator Transcript");
-        builder.AppendLine();
-        builder.AppendLine($"- Recorded: {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}");
-        builder.AppendLine($"- Duration: {SessionTimeFormatter.FormatDuration(session.Duration)}");
-        builder.AppendLine($"- Transcription Status: {ToDisplayText(session.TranscriptionStatus)}");
+    public static string Build(CompletedSession session, SessionTimestampOptions timestampOptions)
+    {
+        var lines = new List<string>
+        {
+            "# BugNarrator Transcript",
+            string.Empty,
+            $"- Recorded: {SessionTimeFormatter.FormatTimestamp(session.CreatedAt, timestampOptions)}",
+            $"- Duration: {SessionTimeFormatter.FormatDuration(session.Duration)}",
+        };
 
         if (!string.IsNullOrWhiteSpace(session.TranscriptionModel))
         {
-            builder.AppendLine($"- Model: {session.TranscriptionModel}");
+            lines.Add($"- Model: {session.TranscriptionModel}");
         }
 
         if (!string.IsNullOrWhiteSpace(session.LanguageHint))
         {
-            builder.AppendLine($"- Language Hint: {session.LanguageHint}");
+            lines.Add($"- Language Hint: {session.LanguageHint}");
         }
 
         if (!string.IsNullOrWhiteSpace(session.Prompt))
         {
-            builder.AppendLine($"- Prompt: {session.Prompt}");
+            lines.Add($"- Prompt: {session.Prompt}");
         }
 
-        if (!string.IsNullOrWhiteSpace(session.TranscriptionFailureMessage))
+        // macOS only surfaces a status line for the pending-retry case. Windows has no retry state,
+        // so the equivalent signal is a non-completed transcription status.
+        if (session.TranscriptionStatus != SessionTranscriptionStatus.Completed)
         {
-            builder.AppendLine($"- Transcription Note: {session.TranscriptionFailureMessage}");
-        }
+            lines.Add($"- Transcription Status: {ToDisplayText(session.TranscriptionStatus)}");
 
-        builder.AppendLine();
-        builder.AppendLine("## Review Summary");
-        builder.AppendLine();
-        builder.AppendLine(session.ReviewSummary);
-        builder.AppendLine();
-
-        if (session.IssueExtraction is not null)
-        {
-            builder.AppendLine("## Extracted Issues");
-            builder.AppendLine();
-            builder.AppendLine($"> {session.IssueExtraction.GuidanceNote}");
-            builder.AppendLine();
-
-            foreach (var issue in session.IssueExtraction.Issues)
+            if (!string.IsNullOrWhiteSpace(session.TranscriptionFailureMessage))
             {
-                builder.AppendLine($"### {issue.Title}");
-                builder.AppendLine();
-                builder.AppendLine($"- Category: {ToDisplayText(issue.Category)}");
-
-                if (issue.TimestampSeconds is not null)
-                {
-                    builder.AppendLine($"- Transcript Time: {SessionTimeFormatter.FormatElapsedSeconds(issue.TimestampSeconds.Value)}");
-                }
-
-                if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
-                {
-                    builder.AppendLine($"- Section: {issue.SectionTitle}");
-                }
-
-                if (issue.ConfidenceLabel is not null)
-                {
-                    builder.AppendLine($"- Confidence: {issue.ConfidenceLabel}");
-                }
-
-                builder.AppendLine($"- Requires Review: {(issue.RequiresReview ? "Yes" : "No")}");
-                builder.AppendLine($"- Selected For Export: {(issue.IsSelectedForExport ? "Yes" : "No")}");
-                builder.AppendLine();
-                builder.AppendLine(issue.Summary);
-                builder.AppendLine();
-                builder.AppendLine($"> {issue.EvidenceExcerpt}");
-
-                if (!string.IsNullOrWhiteSpace(issue.Note))
-                {
-                    builder.AppendLine();
-                    builder.AppendLine($"Note: {issue.Note}");
-                }
-
-                builder.AppendLine();
+                lines.Add($"- Transcription Note: {session.TranscriptionFailureMessage}");
             }
+        }
+
+        lines.Add(string.Empty);
+
+        if (session.TimelineMoments.Count > 0)
+        {
+            lines.Add("## Markers");
+            lines.Add(string.Empty);
+
+            foreach (var moment in session.TimelineMoments.OrderBy(moment => moment.ElapsedSeconds))
+            {
+                lines.Add($"- **{moment.Label}** at `{SessionTimeFormatter.FormatElapsedSeconds(moment.ElapsedSeconds)}`");
+            }
+
+            lines.Add(string.Empty);
         }
 
         if (session.Screenshots.Count > 0)
         {
-            builder.AppendLine("## Screenshots");
-            builder.AppendLine();
+            lines.Add("## Screenshots");
+            lines.Add(string.Empty);
 
             foreach (var screenshot in session.Screenshots)
             {
-                builder.AppendLine(
-                    $"- **{Path.GetFileName(screenshot.RelativePath)}** at `{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}` ({screenshot.Width}x{screenshot.Height})");
+                lines.Add($"- **{Path.GetFileName(screenshot.RelativePath)}** at `{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`");
             }
 
-            builder.AppendLine();
+            lines.Add(string.Empty);
         }
 
-        if (session.TimelineMoments.Count > 0)
-        {
-            builder.AppendLine("## Timeline Moments");
-            builder.AppendLine();
-
-            foreach (var moment in session.TimelineMoments.OrderBy(moment => moment.ElapsedSeconds))
-            {
-                builder.AppendLine($"- **{moment.Label}** at `{SessionTimeFormatter.FormatElapsedSeconds(moment.ElapsedSeconds)}`");
-            }
-
-            builder.AppendLine();
-        }
-
-        builder.AppendLine("## Transcript");
-        builder.AppendLine();
-        builder.AppendLine(string.IsNullOrWhiteSpace(session.TranscriptText)
-            ? "_Transcript unavailable for this session._"
+        lines.Add("## Raw Transcript");
+        lines.Add(string.Empty);
+        lines.Add(string.IsNullOrWhiteSpace(session.TranscriptText)
+            ? "Transcript not available yet."
             : session.TranscriptText.Trim());
 
-        return builder.ToString().TrimEnd() + Environment.NewLine;
+        return SessionMarkdown.Join(lines);
     }
 
     private static string ToDisplayText(SessionTranscriptionStatus status)
@@ -130,18 +98,6 @@ public static class CompletedSessionMarkdownBuilder
             SessionTranscriptionStatus.NotConfigured => "AI Provider Not Configured",
             SessionTranscriptionStatus.Failed => "Failed",
             _ => status.ToString(),
-        };
-    }
-
-    private static string ToDisplayText(ExtractedIssueCategory category)
-    {
-        return category switch
-        {
-            ExtractedIssueCategory.Bug => "Bug",
-            ExtractedIssueCategory.UxIssue => "UX Issue",
-            ExtractedIssueCategory.Enhancement => "Enhancement",
-            ExtractedIssueCategory.FollowUp => "Question / Follow-up",
-            _ => category.ToString(),
         };
     }
 }

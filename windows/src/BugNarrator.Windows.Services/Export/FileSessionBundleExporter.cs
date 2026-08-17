@@ -29,15 +29,18 @@ public sealed class FileSessionBundleExporter : ISessionBundleExporter
         var bundleDirectory = CreateUniqueBundleDirectory(session);
         Directory.CreateDirectory(bundleDirectory);
 
+        // Always regenerate rather than copying the session's stored transcript.md: a file written by
+        // an earlier build still carries the pre-parity contract, so copying it would silently export
+        // the old shape.
         var transcriptPath = Path.Combine(bundleDirectory, "transcript.md");
-        if (File.Exists(normalizedSession.TranscriptMarkdownFilePath))
+        var markdown = CompletedSessionMarkdownBuilder.Build(normalizedSession);
+        await AtomicFileOperations.WriteAllTextAsync(transcriptPath, markdown, cancellationToken);
+
+        if (CompletedSessionReviewMarkdownBuilder.HasReviewOutput(normalizedSession))
         {
-            File.Copy(normalizedSession.TranscriptMarkdownFilePath, transcriptPath, overwrite: true);
-        }
-        else
-        {
-            var markdown = CompletedSessionMarkdownBuilder.Build(normalizedSession);
-            await AtomicFileOperations.WriteAllTextAsync(transcriptPath, markdown, cancellationToken);
+            var summaryPath = Path.Combine(bundleDirectory, "summary.md");
+            var summaryMarkdown = CompletedSessionReviewMarkdownBuilder.Build(normalizedSession);
+            await AtomicFileOperations.WriteAllTextAsync(summaryPath, summaryMarkdown, cancellationToken);
         }
 
         var screenshotsDirectory = Path.Combine(bundleDirectory, "screenshots");

@@ -79,6 +79,15 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
             normalizedSession.TranscriptMarkdownFilePath,
             markdown,
             cancellationToken);
+
+        // transcript.md now holds only the shared transcript contract, so the review output is
+        // written alongside it to keep it visible when browsing the session folder.
+        if (CompletedSessionReviewMarkdownBuilder.HasReviewOutput(normalizedSession))
+        {
+            var summaryPath = Path.Combine(normalizedSession.SessionDirectory, "summary.md");
+            var summaryMarkdown = CompletedSessionReviewMarkdownBuilder.Build(normalizedSession);
+            await AtomicFileOperations.WriteAllTextAsync(summaryPath, summaryMarkdown, cancellationToken);
+        }
     }
 
     public Task DeleteAsync(CompletedSession session, CancellationToken cancellationToken = default)
