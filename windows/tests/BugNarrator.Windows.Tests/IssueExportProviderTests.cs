@@ -57,6 +57,92 @@ public sealed class IssueExportProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task GitHubBuildRequest_IncludesSeverityComponentAndDeduplicationHint()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            Severity = ExtractedIssueSeverity.High,
+            Component = "Save flow",
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.Contains("- Severity: High", body);
+        Assert.Contains("- Component: Save flow", body);
+        Assert.Contains("- Deduplication hint: `issue-", body);
+
+        // macOS orders these after the transcript time and before the transcript section.
+        Assert.True(body.IndexOf("- Transcript time", StringComparison.Ordinal)
+            < body.IndexOf("- Severity:", StringComparison.Ordinal));
+        Assert.True(body.IndexOf("- Severity:", StringComparison.Ordinal)
+            < body.IndexOf("- Component:", StringComparison.Ordinal));
+        Assert.True(body.IndexOf("- Component:", StringComparison.Ordinal)
+            < body.IndexOf("- Deduplication hint:", StringComparison.Ordinal));
+        Assert.True(body.IndexOf("- Deduplication hint:", StringComparison.Ordinal)
+            < body.IndexOf("- Transcript section:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_OmitsComponentLineWhenComponentIsMissing()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with { Component = null };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.DoesNotContain("- Component:", body);
+        // Severity and the dedup hint are unconditional, so they must still be present.
+        Assert.Contains("- Severity:", body);
+        Assert.Contains("- Deduplication hint:", body);
+    }
+
+    [Fact]
+    public async Task JiraBuildRequest_IncludesSeverityComponentAndDeduplicationHint()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            Severity = ExtractedIssueSeverity.Critical,
+            Component = "Export",
+        };
+        var provider = new JiraExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new JiraExportConfiguration(
+                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
+
+        var body = await request.Content!.ReadAsStringAsync();
+
+        Assert.Contains("Severity: Critical", body);
+        Assert.Contains("Component: Export", body);
+        // Jira metadata lines are plain text, not backticked like the GitHub body.
+        Assert.Contains("Deduplication hint: issue-", body);
+    }
+
+    [Fact]
     public async Task GitHubExportAsync_ReportsPartialSuccessWhenLaterIssueFails()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(

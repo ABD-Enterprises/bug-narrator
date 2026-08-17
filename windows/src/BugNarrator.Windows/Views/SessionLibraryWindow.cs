@@ -882,6 +882,19 @@ public sealed class SessionLibraryWindow : Window
             },
             SelectedItem = issue.Category,
         };
+        var severityComboBox = new ComboBox
+        {
+            Margin = new Thickness(0, 0, 0, 12),
+            ItemsSource = new[]
+            {
+                ExtractedIssueSeverity.Critical,
+                ExtractedIssueSeverity.High,
+                ExtractedIssueSeverity.Medium,
+                ExtractedIssueSeverity.Low,
+            },
+            SelectedItem = issue.Severity,
+        };
+        var componentTextBox = BuildIssueTextBox(issue.Component ?? string.Empty);
         var sectionTitleTextBox = BuildIssueTextBox(issue.SectionTitle ?? string.Empty);
         var summaryTextBox = BuildIssueTextBox(issue.Summary, acceptsReturn: true, height: 84);
         var evidenceTextBox = BuildIssueTextBox(issue.EvidenceExcerpt, acceptsReturn: true, height: 84);
@@ -919,6 +932,10 @@ public sealed class SessionLibraryWindow : Window
                     titleTextBox,
                     BuildLabel("Category"),
                     categoryComboBox,
+                    BuildLabel("Severity"),
+                    severityComboBox,
+                    BuildLabel("Component"),
+                    componentTextBox,
                     BuildLabel("Section"),
                     sectionTitleTextBox,
                     BuildLabel("Summary"),
@@ -937,7 +954,9 @@ public sealed class SessionLibraryWindow : Window
             exportCheckBox,
             requiresReviewCheckBox,
             categoryComboBox,
+            severityComboBox,
             titleTextBox,
+            componentTextBox,
             sectionTitleTextBox,
             summaryTextBox,
             evidenceTextBox,
@@ -1213,6 +1232,10 @@ public sealed class SessionLibraryWindow : Window
             parts.Add($"{issue.RelatedScreenshotIds.Count} linked screenshot(s)");
         }
 
+        // Read-only on purpose: the hint is a generated identity used to recognize duplicate
+        // reports, so letting it be edited would corrupt duplicate detection.
+        parts.Add($"Dedup hint: {issue.EffectiveDeduplicationHint}");
+
         return string.Join("  |  ", parts);
     }
 
@@ -1232,6 +1255,8 @@ public sealed class SessionLibraryWindow : Window
     private sealed class IssueEditorRow
     {
         private readonly ComboBox categoryComboBox;
+        private readonly ComboBox severityComboBox;
+        private readonly TextBox componentTextBox;
         private readonly TextBox evidenceTextBox;
         private readonly CheckBox exportCheckBox;
         private readonly TextBox noteTextBox;
@@ -1247,7 +1272,9 @@ public sealed class SessionLibraryWindow : Window
             CheckBox exportCheckBox,
             CheckBox requiresReviewCheckBox,
             ComboBox categoryComboBox,
+            ComboBox severityComboBox,
             TextBox titleTextBox,
+            TextBox componentTextBox,
             TextBox sectionTitleTextBox,
             TextBox summaryTextBox,
             TextBox evidenceTextBox,
@@ -1258,7 +1285,9 @@ public sealed class SessionLibraryWindow : Window
             this.exportCheckBox = exportCheckBox;
             this.requiresReviewCheckBox = requiresReviewCheckBox;
             this.categoryComboBox = categoryComboBox;
+            this.severityComboBox = severityComboBox;
             this.titleTextBox = titleTextBox;
+            this.componentTextBox = componentTextBox;
             this.sectionTitleTextBox = sectionTitleTextBox;
             this.summaryTextBox = summaryTextBox;
             this.evidenceTextBox = evidenceTextBox;
@@ -1277,6 +1306,10 @@ public sealed class SessionLibraryWindow : Window
                 Category = categoryComboBox.SelectedItem is ExtractedIssueCategory category
                     ? category
                     : sourceIssue.Category,
+                Severity = severityComboBox.SelectedItem is ExtractedIssueSeverity severity
+                    ? severity
+                    : sourceIssue.Severity,
+                Component = NullIfWhiteSpace(componentTextBox.Text),
                 Summary = NormalizeText(summaryTextBox.Text, sourceIssue.Summary),
                 EvidenceExcerpt = NormalizeText(evidenceTextBox.Text, sourceIssue.EvidenceExcerpt),
                 RequiresReview = requiresReviewCheckBox.IsChecked != false,

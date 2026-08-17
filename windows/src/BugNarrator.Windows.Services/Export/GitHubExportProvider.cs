@@ -126,6 +126,17 @@ public sealed class GitHubExportProvider
             lines.Add($"- Transcript time: `{issue.TimestampLabel}`");
         }
 
+        lines.Add($"- Severity: {issue.Severity}");
+
+        if (!string.IsNullOrWhiteSpace(issue.Component))
+        {
+            // Component is free text from model output, so it gets the same neutralizing the other
+            // untrusted fields in this body already get.
+            lines.Add($"- Component: {UntrustedMarkdown.Neutralize(issue.Component)}");
+        }
+
+        lines.Add($"- Deduplication hint: `{issue.EffectiveDeduplicationHint}`");
+
         if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
         {
             lines.Add($"- Transcript section: {UntrustedMarkdown.Neutralize(issue.SectionTitle)}");

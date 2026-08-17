@@ -126,6 +126,15 @@ public sealed class JiraExportProvider
             metadataLines.Add($"Transcript time: {issue.TimestampLabel}");
         }
 
+        metadataLines.Add($"Severity: {issue.Severity}");
+
+        if (!string.IsNullOrWhiteSpace(issue.Component))
+        {
+            metadataLines.Add($"Component: {issue.Component}");
+        }
+
+        metadataLines.Add($"Deduplication hint: {issue.EffectiveDeduplicationHint}");
+
         if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
         {
             metadataLines.Add($"Transcript section: {issue.SectionTitle}");
