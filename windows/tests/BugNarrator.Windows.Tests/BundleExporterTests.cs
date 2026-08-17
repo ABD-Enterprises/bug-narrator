@@ -46,6 +46,59 @@ public sealed class BundleExporterTests : IDisposable
     }
 
     [Fact]
+    public async Task FileSessionBundleExporter_RegeneratesTranscriptInsteadOfCopyingStaleFile()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        // A transcript.md written by an earlier build still carries the pre-parity contract.
+        await File.WriteAllTextAsync(
+            session.TranscriptMarkdownFilePath,
+            "# Stale Transcript\n\n## Review Summary\n\nStale superset content.");
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        var transcript = await File.ReadAllTextAsync(Path.Combine(bundlePath, "transcript.md"));
+
+        Assert.DoesNotContain("Stale superset content.", transcript);
+        Assert.DoesNotContain("## Review Summary", transcript);
+        Assert.Contains("# BugNarrator Transcript", transcript);
+        Assert.Contains("## Raw Transcript", transcript);
+    }
+
+    [Fact]
+    public async Task FileSessionBundleExporter_WritesSummaryWhenReviewOutputExists()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        var summaryPath = Path.Combine(bundlePath, "summary.md");
+        Assert.True(File.Exists(summaryPath));
+
+        var summary = await File.ReadAllTextAsync(summaryPath);
+        Assert.Contains("# BugNarrator Review Output", summary);
+        Assert.Contains("## Extracted Issues", summary);
+    }
+
+    [Fact]
+    public async Task FileSessionBundleExporter_OmitsSummaryWhenThereIsNoReviewOutput()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            ReviewSummary = string.Empty,
+            IssueExtraction = null,
+        };
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        Assert.False(File.Exists(Path.Combine(bundlePath, "summary.md")));
+    }
+
+    [Fact]
     public async Task FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(

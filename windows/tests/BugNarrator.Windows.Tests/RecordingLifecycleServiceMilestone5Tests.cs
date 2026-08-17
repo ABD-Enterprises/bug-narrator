@@ -36,7 +36,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.True(File.Exists(session.TranscriptMarkdownFilePath));
 
         var transcriptMarkdown = await File.ReadAllTextAsync(session.TranscriptMarkdownFilePath);
-        Assert.Contains("## Transcript", transcriptMarkdown);
+        Assert.Contains("## Raw Transcript", transcriptMarkdown);
         Assert.Contains("Tester opens Settings and validates the OpenAI API key.", transcriptMarkdown);
     }
 
