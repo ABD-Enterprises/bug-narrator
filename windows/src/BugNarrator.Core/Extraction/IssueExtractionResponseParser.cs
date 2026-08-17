@@ -129,8 +129,91 @@ public static class IssueExtractionResponseParser
                 issueElement, "component", "area", "affectedComponent", "affected_component", "surface", "scope")),
             DeduplicationHint = NullIfBlank(GetFirstString(
                 issueElement, "deduplicationHint", "dedupHint", "dedup_hint", "duplicateHint", "duplicate_hint")),
+            ReproductionSteps = ParseReproductionSteps(issueElement, screenshotIndex),
         };
         return true;
+    }
+
+    /// <summary>
+    /// Reproduction steps arrive as a model-generated array, so every failure mode is tolerated: a
+    /// missing or non-array value yields no steps, and an entry without a usable instruction is
+    /// skipped rather than dropping the whole issue. Alias keys mirror the macOS parser.
+    /// </summary>
+    private static IReadOnlyList<IssueReproductionStep> ParseReproductionSteps(
+        JsonElement issueElement,
+        IReadOnlyDictionary<string, Guid> screenshotIndex)
+    {
+        var array = GetFirstArray(
+            issueElement,
+            "reproductionSteps",
+            "stepsToReproduce",
+            "steps_to_reproduce",
+            "reproSteps",
+            "steps");
+
+        if (array is null)
+        {
+            return Array.Empty<IssueReproductionStep>();
+        }
+
+        var steps = new List<IssueReproductionStep>();
+        foreach (var element in array.Value.EnumerateArray())
+        {
+            // The model sometimes emits a plain string per step instead of an object.
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                var text = NullIfBlank(element.GetString());
+                if (text is not null)
+                {
+                    steps.Add(new IssueReproductionStep(
+                        Guid.NewGuid(), text, null, null, null, null));
+                }
+
+                continue;
+            }
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var instruction = NullIfBlank(GetFirstString(
+                element, "instruction", "step", "action", "text", "description"));
+            if (instruction is null)
+            {
+                continue;
+            }
+
+            steps.Add(new IssueReproductionStep(
+                StepId: Guid.NewGuid(),
+                Instruction: instruction,
+                ExpectedResult: NullIfBlank(GetFirstString(
+                    element, "expectedResult", "expected_result", "expected")),
+                ActualResult: NullIfBlank(GetFirstString(
+                    element, "actualResult", "actual_result", "actual")),
+                TimestampSeconds: ParseTimestamp(GetFirstValue(element, "timestamp", "time", "timecode")),
+                ScreenshotId: ResolveScreenshotId(element, screenshotIndex)));
+        }
+
+        return steps;
+    }
+
+    /// <summary>
+    /// Resolves a model-supplied screenshot file name to a known screenshot id using the same index
+    /// the issue-level <c>relatedScreenshotFileNames</c> mapping uses. An unknown name resolves to
+    /// null rather than inventing a reference.
+    /// </summary>
+    private static Guid? ResolveScreenshotId(
+        JsonElement element,
+        IReadOnlyDictionary<string, Guid> screenshotIndex)
+    {
+        var fileName = GetFirstString(element, "screenshotFileName", "screenshot_file_name", "screenshot");
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        return screenshotIndex.TryGetValue(fileName.Trim().ToLowerInvariant(), out var id) ? id : null;
     }
 
     /// <summary>

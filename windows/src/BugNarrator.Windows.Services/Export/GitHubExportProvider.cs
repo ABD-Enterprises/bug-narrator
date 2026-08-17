@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BugNarrator.Core.Export;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
@@ -157,6 +158,38 @@ public sealed class GitHubExportProvider
             lines.Add($"- Note: {UntrustedMarkdown.Neutralize(issue.Note)}");
         }
 
+        if (issue.ReproductionSteps.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("## Reproduction Steps");
+
+            var stepNumber = 1;
+            foreach (var step in issue.ReproductionSteps.Take(TrackerExportPayloadBudget.ReproductionStepLimit))
+            {
+                lines.Add($"{stepNumber}. {NeutralizedStepText(step.Instruction)}");
+
+                if (!string.IsNullOrWhiteSpace(step.ExpectedResult))
+                {
+                    lines.Add($"   - Expected: {NeutralizedStepText(step.ExpectedResult)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(step.ActualResult))
+                {
+                    lines.Add($"   - Actual: {NeutralizedStepText(step.ActualResult)}");
+                }
+
+                if (ReproductionStepReference(step, session) is { } reference)
+                {
+                    lines.Add($"   - Reference: {reference}");
+                }
+
+                stepNumber++;
+            }
+
+            // macOS iterates prefix(reproductionStepLimit) and emits no omission notice here, so
+            // neither does Windows: steps past the cap are dropped silently on both platforms.
+        }
+
         var screenshots = session.Screenshots
             .Where(screenshot => issue.RelatedScreenshotIds.Contains(screenshot.ScreenshotId))
             .OrderBy(screenshot => screenshot.ElapsedSeconds)
@@ -180,6 +213,39 @@ public sealed class GitHubExportProvider
         lines.Add("Review against the raw transcript before triage.");
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>Step text is model output: truncate to the tracker budget, then neutralize.</summary>
+    private static string NeutralizedStepText(string value)
+    {
+        return UntrustedMarkdown.Neutralize(
+            TrackerExportPayloadBudget.Truncated(value, TrackerExportPayloadBudget.ListEntryLimit));
+    }
+
+    /// <summary>
+    /// Mirrors the macOS `reproductionStepReference`: transcript time and/or the referenced
+    /// screenshot, joined with a bullet separator. Null when the step references neither.
+    /// </summary>
+    private static string? ReproductionStepReference(IssueReproductionStep step, CompletedSession session)
+    {
+        var parts = new List<string>();
+
+        if (step.TimestampLabel is not null)
+        {
+            parts.Add($"Transcript `{step.TimestampLabel}`");
+        }
+
+        if (step.ScreenshotId is { } screenshotId)
+        {
+            var screenshot = session.Screenshots.FirstOrDefault(item => item.ScreenshotId == screenshotId);
+            if (screenshot is not null)
+            {
+                parts.Add(
+                    $"Screenshot `{Path.GetFileName(screenshot.RelativePath)}` (`{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`)");
+            }
+        }
+
+        return parts.Count == 0 ? null : string.Join("  •  ", parts);
     }
 
     private static string BuildFailureMessage(

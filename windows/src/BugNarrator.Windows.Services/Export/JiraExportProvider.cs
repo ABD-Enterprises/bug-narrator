@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BugNarrator.Core.Export;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
@@ -160,6 +161,22 @@ public sealed class JiraExportProvider
             blocks.Add(JiraBlock.BulletList(metadataLines));
         }
 
+        if (issue.ReproductionSteps.Count > 0)
+        {
+            // macOS caps with prefix(...) BEFORE calling limitedList, so limitedList never sees an
+            // over-cap list and the omission notice never fires for reproduction steps. Mirror that.
+            var stepLines = issue.ReproductionSteps
+                .Take(TrackerExportPayloadBudget.ReproductionStepLimit)
+                .Select((step, index) => FormatReproductionStep(step, index, session))
+                .ToArray();
+
+            blocks.Add(JiraBlock.Paragraph("Reproduction steps"));
+            blocks.Add(JiraBlock.BulletList(TrackerExportPayloadBudget.LimitedList(
+                stepLines,
+                TrackerExportPayloadBudget.ReproductionStepLimit,
+                TrackerExportPayloadBudget.ListEntryLimit)));
+        }
+
         var screenshots = session.Screenshots
             .Where(screenshot => issue.RelatedScreenshotIds.Contains(screenshot.ScreenshotId))
             .OrderBy(screenshot => screenshot.ElapsedSeconds)
@@ -177,6 +194,56 @@ public sealed class JiraExportProvider
             $"Exported from BugNarrator session \"{session.Title}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}. Review against the raw transcript before triage."));
 
         return new JiraDocument(blocks);
+    }
+
+    /// <summary>
+    /// Mirrors the macOS `formattedReproductionStep`: the numbered instruction plus any
+    /// expected/actual results and references, joined into one bullet entry. Jira emits structured
+    /// ADF rather than markdown, so nothing is neutralized here — matching both the neighbouring
+    /// Windows metadata lines and the macOS Jira provider.
+    /// </summary>
+    private static string FormatReproductionStep(
+        IssueReproductionStep step,
+        int index,
+        CompletedSession session)
+    {
+        var parts = new List<string>
+        {
+            $"{index + 1}. {TrackerExportPayloadBudget.Truncated(step.Instruction, TrackerExportPayloadBudget.ListEntryLimit)}",
+        };
+
+        if (!string.IsNullOrWhiteSpace(step.ExpectedResult))
+        {
+            parts.Add($"Expected: {TrackerExportPayloadBudget.Truncated(step.ExpectedResult, TrackerExportPayloadBudget.ListEntryLimit)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(step.ActualResult))
+        {
+            parts.Add($"Actual: {TrackerExportPayloadBudget.Truncated(step.ActualResult, TrackerExportPayloadBudget.ListEntryLimit)}");
+        }
+
+        var references = new List<string>();
+        if (step.TimestampLabel is not null)
+        {
+            references.Add($"Transcript {step.TimestampLabel}");
+        }
+
+        if (step.ScreenshotId is { } screenshotId)
+        {
+            var screenshot = session.Screenshots.FirstOrDefault(item => item.ScreenshotId == screenshotId);
+            if (screenshot is not null)
+            {
+                references.Add(
+                    $"Screenshot {Path.GetFileName(screenshot.RelativePath)} ({SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)})");
+            }
+        }
+
+        if (references.Count > 0)
+        {
+            parts.Add($"Reference: {string.Join(" • ", references)}");
+        }
+
+        return string.Join(" | ", parts);
     }
 
     private static string BuildFailureMessage(

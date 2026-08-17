@@ -33,6 +33,13 @@ public sealed record ExtractedIssue(
     public string? DeduplicationHint { get; init; }
 
     /// <summary>
+    /// Ordered steps to reproduce the issue. Init-only with an empty default so sessions saved
+    /// before this field existed still deserialize.
+    /// </summary>
+    public IReadOnlyList<IssueReproductionStep> ReproductionSteps { get; init; } =
+        Array.Empty<IssueReproductionStep>();
+
+    /// <summary>
     /// The deduplication hint that actually identifies this issue. macOS treats this as
     /// non-optional and falls back to a derived hash, so Windows does the same.
     /// </summary>
