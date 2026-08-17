@@ -21,7 +21,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 | Screenshot evidence during recording | Shipped | In Progress | Native capture implementation allowed | Windows has overlay/capture plumbing, but DPI, multi-monitor, and real desktop capture validation remain in #44. |
 | Session Library archive | Shipped | In Progress | Must remain identical | Implemented by Windows Milestone 5; #50 is closed as completed, with remaining validation tracked in #44. |
 | Review Workspace tabs | Shipped | In Progress | Must remain identical | Implemented by Windows Milestones 5 and 6; #51 is closed as completed, with remaining validation tracked in #44. |
-| Session Bundle export | Shipped | In Progress | Must remain identical | Implemented by Windows Milestone 6; validation remains in #44 and release hardening remains in #75. |
+| Session Bundle export | Shipped | In Progress | `transcript.md` must remain identical; bundle contents may differ | Windows `transcript.md` was realigned to the macOS `markdownContent` contract in `WIN-011` / #995 (same section names, ordering, date/duration formats, fallback text, LF endings). The Windows bundle additionally contains `summary.md` (review summary + extracted issues). macOS has no counterpart file: its `TranscriptSession.summaryMarkdownContent` is defined but never exported, so Windows keeps the information rather than dropping it. Validation remains in #44. |
 | Debug Bundle support export | Shipped | In Progress | Must remain aligned | Implemented on Windows with redaction/hardening coverage; real support-bundle validation remains in #44. |
 | Missing or invalid AI provider recovery | Shipped | In Progress | Must remain identical | Windows preserves completed sessions on missing, incompatible, or failed AI provider setup; real-provider validation remains in #44. |
 | Configurable AI provider setup | Shipped | In Progress | Must remain aligned | Windows supports OpenAI, OpenAI-compatible hosted endpoints, and local-compatible endpoints; real-provider validation remains in #44. |
@@ -35,6 +35,8 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 - macOS is the only production platform today.
 - Windows implements the core `record -> review -> refine -> export` path, including session library, review workspace, extraction, export, hotkeys, and hardening coverage, but it still needs real Windows runtime validation in `RR-002` / #44.
 - macOS currently has mixed microphone plus system audio capture beyond Windows; Windows surfaces the limitation explicitly while system-audio loopback support is available.
+- The Windows session bundle contains a `summary.md` that macOS does not write. This is deliberate: `transcript.md` now matches the macOS contract exactly, and the review summary / extracted issues that previously lived inside it moved to `summary.md` instead of being lost. macOS defines the same review output (`summaryMarkdownContent`) but never exports it.
+- Windows still has no transcript-section data source, so the macOS `## Transcript Sections` block and screenshot-to-marker linkage remain unimplemented rather than faked. Tracked in #996.
 - Windows public tester distribution is blocked on external code-signing certificate provisioning, not missing repo scripts. The release entrypoint and manual GitHub Actions workflow are in place for the signed tester zip path.
 
 ## Update Rules

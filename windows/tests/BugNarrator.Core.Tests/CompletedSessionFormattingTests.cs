@@ -7,6 +7,130 @@ namespace BugNarrator.Core.Tests;
 public sealed class CompletedSessionFormattingTests
 {
     [Fact]
+    public void CompletedSessionMarkdownBuilder_MatchesMacTranscriptContract()
+    {
+        var session = CreateReviewSession();
+
+        var markdown = CompletedSessionMarkdownBuilder.Build(
+            session,
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        var expected = string.Join("\n",
+        [
+            "# BugNarrator Transcript",
+            "",
+            "- Recorded: Mar 17, 2026 at 3:00:00 PM",
+            "- Duration: 02:00",
+            "- Model: whisper-1",
+            "- Language Hint: en",
+            "- Prompt: Focus on testing narration.",
+            "",
+            "## Markers",
+            "",
+            "- **Screenshot 001** at `00:12`",
+            "",
+            "## Screenshots",
+            "",
+            "- **screenshot-001.png** at `00:12`",
+            "",
+            "## Raw Transcript",
+            "",
+            "Tester opens Settings and validates the API key.",
+        ]) + "\n";
+
+        Assert.Equal(expected, markdown);
+    }
+
+    [Fact]
+    public void CompletedSessionMarkdownBuilder_OmitsReviewOutputFromTranscript()
+    {
+        var markdown = CompletedSessionMarkdownBuilder.Build(
+            CreateReviewSession(),
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        Assert.DoesNotContain("## Review Summary", markdown);
+        Assert.DoesNotContain("## Extracted Issues", markdown);
+    }
+
+    [Fact]
+    public void CompletedSessionReviewMarkdownBuilder_PreservesReviewSummary()
+    {
+        var review = CompletedSessionReviewMarkdownBuilder.Build(
+            CreateReviewSession(),
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        var expected = string.Join("\n",
+        [
+            "# BugNarrator Review Output",
+            "",
+            "- Recorded: Mar 17, 2026 at 3:00:00 PM",
+            "- Duration: 02:00",
+            "- Transcript Model: whisper-1",
+            "",
+            "## Summary",
+            "",
+            "Tester validates the OpenAI API key before starting a new review pass.",
+            "",
+            "Issue extraction has not been run for this session yet.",
+        ]) + "\n";
+
+        Assert.Equal(expected, review);
+    }
+
+    [Fact]
+    public void SessionTimeFormatter_FormatsHoursWithoutLeadingZeroLikeMac()
+    {
+        Assert.Equal("1:05:09", SessionTimeFormatter.FormatDuration(TimeSpan.FromSeconds(3909)));
+        Assert.Equal("02:00", SessionTimeFormatter.FormatDuration(TimeSpan.FromSeconds(120)));
+    }
+
+    private static CompletedSession CreateReviewSession()
+    {
+        var createdAt = new DateTimeOffset(2026, 3, 17, 15, 0, 0, TimeSpan.Zero);
+
+        return new CompletedSession(
+            SessionId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Title: "Tester opens Settings",
+            CreatedAt: createdAt,
+            RecordingStartedAt: createdAt,
+            RecordingStoppedAt: createdAt.AddMinutes(2),
+            SessionDirectory: @"C:\BugNarrator\Sessions\example",
+            AudioFilePath: @"C:\BugNarrator\Sessions\example\session.wav",
+            MetadataFilePath: @"C:\BugNarrator\Sessions\example\session.json",
+            TranscriptMarkdownFilePath: @"C:\BugNarrator\Sessions\example\transcript.md",
+            TranscriptText: "Tester opens Settings and validates the API key.",
+            ReviewSummary: "Tester validates the OpenAI API key before starting a new review pass.",
+            TranscriptionStatus: SessionTranscriptionStatus.Completed,
+            TranscriptionModel: "whisper-1",
+            LanguageHint: "en",
+            Prompt: "Focus on testing narration.",
+            TranscriptionFailureMessage: null,
+            IssueExtraction: null,
+            Screenshots:
+            [
+                new ScreenshotArtifact(
+                    Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                    "screenshots/screenshot-001.png",
+                    @"C:\BugNarrator\Sessions\example\screenshots\screenshot-001.png",
+                    createdAt.AddSeconds(12),
+                    ElapsedSeconds: 12,
+                    Width: 320,
+                    Height: 180,
+                    TimelineLabel: "Screenshot 001"),
+            ],
+            TimelineMoments:
+            [
+                new SessionTimelineMoment(
+                    Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                    Kind: "screenshot",
+                    CreatedAt: createdAt.AddSeconds(12),
+                    ElapsedSeconds: 12,
+                    Label: "Screenshot 001",
+                    RelatedScreenshotId: Guid.Parse("33333333-3333-3333-3333-333333333333")),
+            ]);
+    }
+
+    [Fact]
     public void CompletedSessionMarkdownBuilder_IncludesSummaryTranscriptAndScreenshots()
     {
         var createdAt = new DateTimeOffset(2026, 3, 17, 15, 0, 0, TimeSpan.Zero);
@@ -54,10 +178,9 @@ public sealed class CompletedSessionFormattingTests
         var markdown = CompletedSessionMarkdownBuilder.Build(session);
 
         Assert.Contains("# BugNarrator Transcript", markdown);
-        Assert.Contains("## Review Summary", markdown);
-        Assert.Contains("Tester validates the OpenAI API key", markdown);
         Assert.Contains("screenshots/screenshot-001.png".Split('/')[1], markdown);
-        Assert.Contains("## Transcript", markdown);
+        Assert.Contains("## Raw Transcript", markdown);
+        Assert.Contains("Tester opens Settings and validates the API key.", markdown);
     }
 
     [Fact]
