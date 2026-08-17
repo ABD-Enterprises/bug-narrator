@@ -6,13 +6,16 @@ namespace BugNarrator.Core.Tests;
 
 public sealed class CompletedSessionFormattingTests
 {
-    [Fact]
-    public void CompletedSessionMarkdownBuilder_MatchesMacTranscriptContract()
-    {
-        var session = CreateReviewSession();
 
+    [Fact]
+    public void CompletedSessionMarkdownBuilder_RendersPromptAndScreenshotsExactly()
+    {
+        // Supplementary Windows coverage, NOT a macOS contract assertion — the shared fixture in
+        // TranscriptContractFixtureTests owns that. The canonical fixture session has no prompt and
+        // no screenshots, so without this the exact rendering of those two blocks is untested and a
+        // regression (dropping "- Prompt:", omitting "## Screenshots", reordering) could pass.
         var markdown = CompletedSessionMarkdownBuilder.Build(
-            session,
+            CreateReviewSession(),
             SessionTimeFormatter.InvariantTimestampOptions);
 
         var expected = string.Join("\n",
@@ -36,7 +39,7 @@ public sealed class CompletedSessionFormattingTests
             "## Raw Transcript",
             "",
             "Tester opens Settings and validates the API key.",
-        ]) + "\n";
+        ]);
 
         Assert.Equal(expected, markdown);
     }
@@ -72,9 +75,33 @@ public sealed class CompletedSessionFormattingTests
             "Tester validates the OpenAI API key before starting a new review pass.",
             "",
             "Issue extraction has not been run for this session yet.",
-        ]) + "\n";
+        ]);
 
         Assert.Equal(expected, review);
+    }
+
+    [Fact]
+    public void SessionTimelineMoment_DeserializesSessionJsonSavedBeforeTheNoteFieldExisted()
+    {
+        // Shape persisted by an earlier build: no Note. Property casing mirrors
+        // FileCompletedSessionStore's serializer options (defaults: PascalCase, numeric enums).
+        var json =
+            """
+            {
+              "MomentId": "44444444-4444-4444-4444-444444444444",
+              "Kind": "screenshot",
+              "CreatedAt": "2026-03-17T15:00:12+00:00",
+              "ElapsedSeconds": 12,
+              "Label": "Screenshot 001",
+              "RelatedScreenshotId": null
+            }
+            """;
+
+        var moment = System.Text.Json.JsonSerializer.Deserialize<SessionTimelineMoment>(json);
+
+        Assert.NotNull(moment);
+        Assert.Equal("Screenshot 001", moment!.Label);
+        Assert.Null(moment.Note);
     }
 
     [Fact]
