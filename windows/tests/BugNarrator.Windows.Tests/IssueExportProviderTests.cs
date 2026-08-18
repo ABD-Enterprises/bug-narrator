@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using BugNarrator.Core.Models;
+using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Storage;
@@ -254,6 +255,134 @@ public sealed class IssueExportProviderTests : IDisposable
         var expected = "1. Open checkout | Expected: Button visible | Actual: Cut off | "
             + $"Reference: Transcript 00:30 • Screenshot {Path.GetFileName(screenshot.RelativePath)} (00:08)";
         Assert.Contains(JsonEncodedText.Encode(expected).ToString(), body);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_RendersAnnotatedScreenshotsLikeMac()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            // macOS only exports annotations for screenshots the issue relates to.
+            RelatedScreenshotIds = [screenshot.ScreenshotId],
+            ScreenshotAnnotations =
+            [
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), screenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4, 0.85),
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), screenshot.ScreenshotId, null, 0.5, 0.5, 0.2, 0.2),
+            ],
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.Contains("## Annotated Screenshots", body);
+        // One line per screenshot, annotations joined with "; ", in the macOS no-rendered-asset shape.
+        Assert.Contains(
+            $"- {Path.GetFileName(screenshot.RelativePath)} (`00:08`) — "
+            + "Save button • x 10% • y 20% • w 30% • h 40% • confidence 85%; "
+            + "UI highlight • x 50% • y 50% • w 20% • h 20%",
+            body);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_CapsAnnotatedScreenshotsAndSaysSoWhenTruncated()
+    {
+        // 12 screenshots, each with one annotation -> 12 lines, over the 10-line cap.
+        var screenshots = Enumerable.Range(1, 12)
+            .Select(i => ReviewSessionTestData.CreateScreenshot(
+                rootDirectory, fileName: $"shot-{i:00}.png", elapsedSeconds: i))
+            .ToArray();
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: screenshots,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            RelatedScreenshotIds = screenshots.Select(s => s.ScreenshotId).ToArray(),
+            ScreenshotAnnotations = screenshots
+                .Select(s => new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), s.ScreenshotId, "Target", 0.1, 0.1, 0.2, 0.2))
+                .ToArray(),
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        // Scope the assertions to the annotation section: the screenshots are also listed in
+        // "## Related Screenshots", so a whole-body check would not prove the cap.
+        var annotationSection = body[body.IndexOf("## Annotated Screenshots", StringComparison.Ordinal)..];
+        annotationSection = annotationSection[..annotationSection.IndexOf("## Related Screenshots", StringComparison.Ordinal)];
+
+        Assert.Contains("shot-10.png", annotationSection);
+        Assert.DoesNotContain("shot-11.png", annotationSection);
+        // Unlike reproduction steps (which macOS pre-caps before limitedList), macOS passes the full
+        // annotation list to limitedList, so the omission notice IS expected here.
+        Assert.Contains("Additional items were omitted by BugNarrator to fit tracker limits.", annotationSection);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_OmitsAnnotationSectionWhenThereAreNone()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            session.IssueExtraction!.Issues[0],
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.DoesNotContain("## Annotated Screenshots", body);
+    }
+
+    [Fact]
+    public async Task JiraBuildRequest_RendersAnnotatedScreenshots()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            RelatedScreenshotIds = [screenshot.ScreenshotId],
+            ScreenshotAnnotations =
+            [
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), screenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
+            ],
+        };
+        var provider = new JiraExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new JiraExportConfiguration(
+                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
+        var body = await request.Content!.ReadAsStringAsync();
+
+        Assert.Contains("Annotated screenshots", body);
+        Assert.Contains(
+            JsonEncodedText.Encode(
+                $"{Path.GetFileName(screenshot.RelativePath)} (00:08) - Save button • x 10% • y 20% • w 30% • h 40%").ToString(),
+            body);
     }
 
     [Fact]

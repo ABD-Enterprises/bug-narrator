@@ -14,6 +14,7 @@ public static class TrackerExportPayloadBudget
 {
     public const int ReproductionStepLimit = 10;
     public const int ListEntryLimit = 500;
+    public const int ScreenshotListLimit = 10;
 
     private const string TruncationMarker = " …[truncated by BugNarrator for tracker limits]";
     private const string OmissionNotice = "Additional items were omitted by BugNarrator to fit tracker limits.";

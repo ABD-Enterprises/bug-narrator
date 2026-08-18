@@ -60,8 +60,9 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
                     You convert narrated software review sessions into structured, reviewable draft issues.
                     Use only information explicitly present in the transcript, screenshots, and timeline context.
                     Return strict JSON with keys summary, guidanceNote, issues.
-                    Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps.
+                    Each issue must contain title, category, severity, component, summary, evidenceExcerpt, deduplicationHint, timestamp, sectionTitle, relatedScreenshotFileNames, confidence, requiresReview, reproductionSteps, screenshotAnnotations.
                     reproductionSteps is an ordered array of objects, each with instruction plus optional expectedResult, actualResult, timestamp, and screenshotFileName. Use an empty array when the transcript does not describe how to reproduce the issue; do not invent steps.
+                    screenshotAnnotations is an array of highlight regions using normalized 0-1 coordinates with a top-left origin, each with x, y, width, height plus optional label, confidence, and screenshotFileName. Only include one when the narration clearly points at a specific UI element; otherwise return an empty array.
                     Valid categories are exactly: Bug, UX Issue, Enhancement, Question / Follow-up.
                     Valid severities are exactly: Critical, High, Medium, Low. Use Medium when the transcript does not justify a stronger or weaker rating.
                     component is the area of the product the issue affects, or null when the transcript does not identify one.

@@ -40,6 +40,13 @@ public sealed record ExtractedIssue(
         Array.Empty<IssueReproductionStep>();
 
     /// <summary>
+    /// Normalized highlight regions on session screenshots. Init-only with an empty default so
+    /// sessions saved before this field existed still deserialize.
+    /// </summary>
+    public IReadOnlyList<IssueScreenshotAnnotation> ScreenshotAnnotations { get; init; } =
+        Array.Empty<IssueScreenshotAnnotation>();
+
+    /// <summary>
     /// The deduplication hint that actually identifies this issue. macOS treats this as
     /// non-optional and falls back to a derived hash, so Windows does the same.
     /// </summary>

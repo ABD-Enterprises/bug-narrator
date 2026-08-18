@@ -177,6 +177,39 @@ public sealed class JiraExportProvider
                 TrackerExportPayloadBudget.ListEntryLimit)));
         }
 
+        var annotationLines = new List<string>();
+        // macOS narrows to session.screenshots(for: issue) first, so annotations are only exported
+        // for screenshots the issue actually relates to.
+        foreach (var screenshot in session.Screenshots
+            .Where(item => issue.RelatedScreenshotIds.Contains(item.ScreenshotId))
+            .OrderBy(item => item.ElapsedSeconds))
+        {
+            var descriptions = issue.ScreenshotAnnotations
+                .Where(annotation => annotation.ScreenshotId == screenshot.ScreenshotId)
+                .Select(annotation => annotation.ExportDescription)
+                .ToArray();
+
+            if (descriptions.Length == 0)
+            {
+                continue;
+            }
+
+            // Jira emits structured ADF text, so nothing is neutralized here — same rule the
+            // surrounding Jira metadata already follows on both platforms.
+            annotationLines.Add(
+                $"{Path.GetFileName(screenshot.RelativePath)} ({SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}) - "
+                + string.Join("; ", descriptions));
+        }
+
+        if (annotationLines.Count > 0)
+        {
+            blocks.Add(JiraBlock.Paragraph("Annotated screenshots"));
+            blocks.Add(JiraBlock.BulletList(TrackerExportPayloadBudget.LimitedList(
+                annotationLines,
+                TrackerExportPayloadBudget.ScreenshotListLimit,
+                TrackerExportPayloadBudget.ListEntryLimit)));
+        }
+
         var screenshots = session.Screenshots
             .Where(screenshot => issue.RelatedScreenshotIds.Contains(screenshot.ScreenshotId))
             .OrderBy(screenshot => screenshot.ElapsedSeconds)
