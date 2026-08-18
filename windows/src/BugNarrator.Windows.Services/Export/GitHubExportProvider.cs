@@ -190,6 +190,19 @@ public sealed class GitHubExportProvider
             // neither does Windows: steps past the cap are dropped silently on both platforms.
         }
 
+        var annotationLines = BuildAnnotatedScreenshotLines(issue, session);
+        if (annotationLines.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("## Annotated Screenshots");
+            // macOS passes the full list to limitedList here (unlike reproduction steps, which it
+            // pre-caps), so the omission notice does appear once there are more than the limit.
+            lines.AddRange(TrackerExportPayloadBudget.LimitedList(
+                annotationLines,
+                TrackerExportPayloadBudget.ScreenshotListLimit,
+                TrackerExportPayloadBudget.ListEntryLimit));
+        }
+
         var screenshots = session.Screenshots
             .Where(screenshot => issue.RelatedScreenshotIds.Contains(screenshot.ScreenshotId))
             .OrderBy(screenshot => screenshot.ElapsedSeconds)
@@ -213,6 +226,41 @@ public sealed class GitHubExportProvider
         lines.Add("Review against the raw transcript before triage.");
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// One line per annotated screenshot, in the macOS shape for the no-rendered-asset case:
+    /// "- name (`time`) — description; description". Windows does not render annotated PNGs, which
+    /// is the branch macOS itself takes when it has no rendered asset.
+    /// </summary>
+    private static List<string> BuildAnnotatedScreenshotLines(ExtractedIssue issue, CompletedSession session)
+    {
+        var lines = new List<string>();
+
+        // macOS narrows to session.screenshots(for: issue) first, so annotations are only exported
+        // for screenshots the issue actually relates to.
+        foreach (var screenshot in session.Screenshots
+            .Where(item => issue.RelatedScreenshotIds.Contains(item.ScreenshotId))
+            .OrderBy(item => item.ElapsedSeconds))
+        {
+            var descriptions = issue.ScreenshotAnnotations
+                .Where(annotation => annotation.ScreenshotId == screenshot.ScreenshotId)
+                .Select(annotation => annotation.ExportDescription)
+                .ToArray();
+
+            if (descriptions.Length == 0)
+            {
+                continue;
+            }
+
+            // The label inside each description is model output, so it is neutralized here exactly
+            // as the other untrusted GitHub markdown fields are.
+            lines.Add(
+                $"- {Path.GetFileName(screenshot.RelativePath)} (`{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`) — "
+                + UntrustedMarkdown.Neutralize(string.Join("; ", descriptions)));
+        }
+
+        return lines;
     }
 
     /// <summary>Step text is model output: truncate to the tracker budget, then neutralize.</summary>
