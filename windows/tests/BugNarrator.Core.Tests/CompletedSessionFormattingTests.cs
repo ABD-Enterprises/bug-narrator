@@ -56,8 +56,11 @@ public sealed class CompletedSessionFormattingTests
     }
 
     [Fact]
-    public void CompletedSessionReviewMarkdownBuilder_PreservesReviewSummary()
+    public void CompletedSessionReviewMarkdownBuilder_WithoutExtraction_SaysExtractionHasNotRun()
     {
+        // session.ReviewSummary is the stop-time status text, not this document's subject: macOS
+        // renders the extraction's own summary here, so a session without extraction gets no
+        // "## Summary" section at all.
         var review = CompletedSessionReviewMarkdownBuilder.Build(
             CreateReviewSession(),
             SessionTimeFormatter.InvariantTimestampOptions);
@@ -70,14 +73,74 @@ public sealed class CompletedSessionFormattingTests
             "- Duration: 02:00",
             "- Transcript Model: whisper-1",
             "",
-            "## Summary",
-            "",
-            "Tester validates the OpenAI API key before starting a new review pass.",
-            "",
             "Issue extraction has not been run for this session yet.",
         ]);
 
         Assert.Equal(expected, review);
+        Assert.DoesNotContain("Tester validates the OpenAI API key", review);
+    }
+
+    [Fact]
+    public void CompletedSessionReviewMarkdownBuilder_RendersTheExtractionSummaryNotTheReviewSummary()
+    {
+        var session = CreateReviewSession() with
+        {
+            ReviewSummary = "Stop-time status text that must not appear.",
+            IssueExtraction = new IssueExtractionResult(
+                GeneratedAt: new DateTimeOffset(2026, 3, 17, 15, 5, 0, TimeSpan.Zero),
+                Summary: "One draft issue was extracted.",
+                GuidanceNote: "Review before export.",
+                Issues: []),
+        };
+
+        var review = CompletedSessionReviewMarkdownBuilder.Build(
+            session,
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        Assert.Contains("## Summary", review);
+        Assert.Contains("One draft issue was extracted.", review);
+        Assert.DoesNotContain("Stop-time status text", review);
+    }
+
+    [Fact]
+    public void CompletedSessionReviewMarkdownBuilder_FallsBackWhenTheExtractionSummaryIsEmpty()
+    {
+        var session = CreateReviewSession() with
+        {
+            IssueExtraction = new IssueExtractionResult(
+                GeneratedAt: new DateTimeOffset(2026, 3, 17, 15, 5, 0, TimeSpan.Zero),
+                Summary: "   ",
+                GuidanceNote: "Review before export.",
+                Issues: []),
+        };
+
+        var review = CompletedSessionReviewMarkdownBuilder.Build(
+            session,
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        // macOS checks isEmpty where this checks IsNullOrWhiteSpace, but both parsers trim the
+        // summary on ingest, so a whitespace-only value cannot reach either renderer through the
+        // real pipeline. This constructs it directly; the check is defensive, not a parity gap.
+        // macOS renders "No summary generated." rather than an empty section.
+        Assert.Contains("No summary generated.", review);
+    }
+
+    [Fact]
+    public void CompletedSessionReviewMarkdownBuilder_EmitsAFileOnlyWhenExtractionRan()
+    {
+        var withoutExtraction = CreateReviewSession();
+        var withExtraction = withoutExtraction with
+        {
+            IssueExtraction = new IssueExtractionResult(
+                GeneratedAt: new DateTimeOffset(2026, 3, 17, 15, 5, 0, TimeSpan.Zero),
+                Summary: "s",
+                GuidanceNote: "g",
+                Issues: []),
+        };
+
+        // Matches the macOS exporter: a bare review summary does not earn a summary.md.
+        Assert.False(CompletedSessionReviewMarkdownBuilder.HasReviewOutput(withoutExtraction));
+        Assert.True(CompletedSessionReviewMarkdownBuilder.HasReviewOutput(withExtraction));
     }
 
     [Fact]
