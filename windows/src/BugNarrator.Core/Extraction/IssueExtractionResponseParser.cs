@@ -130,11 +130,101 @@ public static class IssueExtractionResponseParser
             DeduplicationHint = NullIfBlank(GetFirstString(
                 issueElement, "deduplicationHint", "dedupHint", "dedup_hint", "duplicateHint", "duplicate_hint")),
             ReproductionSteps = ParseReproductionSteps(issueElement, screenshotIndex),
+            ScreenshotAnnotations = ParseScreenshotAnnotations(issueElement, screenshotIndex, relatedScreenshotIds),
         };
         return true;
     }
 
     /// <summary>
+    /// <summary>
+    /// Annotations are model output, so every failure mode is tolerated: a missing or non-array
+    /// value yields none, and an entry that is not an object or is missing any of x/y/width/height
+    /// is skipped individually. macOS requires all four coordinates too — an annotation without a
+    /// rectangle has nothing to point at. Alias keys mirror the macOS payload.
+    /// </summary>
+    private static IReadOnlyList<IssueScreenshotAnnotation> ParseScreenshotAnnotations(
+        JsonElement issueElement,
+        IReadOnlyDictionary<string, Guid> screenshotIndex,
+        IReadOnlyList<Guid> relatedScreenshotIds)
+    {
+        var array = GetFirstArray(
+            issueElement,
+            "screenshotAnnotations",
+            "annotations",
+            "screenshot_annotations",
+            "uiAnnotations");
+
+        if (array is null)
+        {
+            return Array.Empty<IssueScreenshotAnnotation>();
+        }
+
+        var annotations = new List<IssueScreenshotAnnotation>();
+        foreach (var element in array.Value.EnumerateArray())
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var x = GetFirstDouble(element, "x", "left", "originX", "origin_x", "minX");
+            var y = GetFirstDouble(element, "y", "top", "originY", "origin_y", "minY");
+            var width = GetFirstDouble(element, "width", "w");
+            var height = GetFirstDouble(element, "height", "h");
+
+            if (x is null || y is null || width is null || height is null)
+            {
+                continue;
+            }
+
+            // macOS falls back to the issue's first related screenshot when the annotation does not
+            // name one; an explicitly named but unknown screenshot resolves to nothing rather than
+            // inventing a reference.
+            var screenshotId = ResolveAnnotationScreenshotId(element, screenshotIndex, relatedScreenshotIds);
+            if (screenshotId is null)
+            {
+                continue;
+            }
+
+            annotations.Add(new IssueScreenshotAnnotation(
+                annotationId: Guid.NewGuid(),
+                screenshotId: screenshotId.Value,
+                label: GetFirstString(element, "label", "title", "target", "description"),
+                x: x.Value,
+                y: y.Value,
+                width: width.Value,
+                height: height.Value,
+                confidence: GetFirstDouble(element, "confidence", "score")));
+        }
+
+        return annotations;
+    }
+
+    private static Guid? ResolveAnnotationScreenshotId(
+        JsonElement element,
+        IReadOnlyDictionary<string, Guid> screenshotIndex,
+        IReadOnlyList<Guid> relatedScreenshotIds)
+    {
+        var fileName = GetFirstString(
+            element,
+            "relatedScreenshotFileName",
+            "screenshot",
+            "screenshotFileName",
+            "fileName",
+            "related_screenshot_file_name");
+
+        // macOS: relatedScreenshotFileName.flatMap { lookup } ?? fallbackScreenshotID — an unknown
+        // name falls through to the issue's first related screenshot rather than dropping the
+        // annotation. Only a name that resolves to nothing AND no related screenshot yields null.
+        if (!string.IsNullOrWhiteSpace(fileName)
+            && screenshotIndex.TryGetValue(fileName.Trim().ToLowerInvariant(), out var id))
+        {
+            return id;
+        }
+
+        return relatedScreenshotIds.Count > 0 ? relatedScreenshotIds[0] : null;
+    }
+
     /// Reproduction steps arrive as a model-generated array, so every failure mode is tolerated: a
     /// missing or non-array value yields no steps, and an entry without a usable instruction is
     /// skipped rather than dropping the whole issue. Alias keys mirror the macOS parser.
