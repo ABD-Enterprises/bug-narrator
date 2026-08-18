@@ -99,6 +99,26 @@ public sealed class BundleExporterTests : IDisposable
     }
 
     [Fact]
+    public async Task FileSessionBundleExporter_OmitsSummaryForAReviewSummaryOnlySession()
+    {
+        // Behavior change: a session with a review summary but no extraction used to get a
+        // summary.md on Windows. macOS writes one only when extraction ran, and Windows now matches.
+        // The review summary itself is unaffected — it stays in session.json and the session library.
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            ReviewSummary = "Tester reviews the save flow.",
+            IssueExtraction = null,
+        };
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        Assert.False(File.Exists(Path.Combine(bundlePath, "summary.md")));
+        // The transcript is still exported.
+        Assert.True(File.Exists(Path.Combine(bundlePath, "transcript.md")));
+    }
+
+    [Fact]
     public async Task FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(

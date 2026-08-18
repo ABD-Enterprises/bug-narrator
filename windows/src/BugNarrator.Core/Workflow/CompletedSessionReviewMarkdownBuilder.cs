@@ -3,19 +3,24 @@ using BugNarrator.Core.Models;
 namespace BugNarrator.Core.Workflow;
 
 /// <summary>
-/// Renders the review output (<c>summary.md</c>) for a completed session: the review summary and the
-/// extracted issues that used to be appended to <c>transcript.md</c>.
+/// Renders the review output (<c>summary.md</c>) for a completed session.
 ///
-/// This file is Windows-only. macOS defines an equivalent <c>summaryMarkdownContent</c> but never
-/// exports it, so its session bundle contains no counterpart. Windows keeps the information rather
-/// than dropping it when <c>transcript.md</c> moved onto the shared macOS contract.
+/// macOS exports a <c>summary.md</c> too (TranscriptExporter.swift, added in #924), and writes it
+/// only when issue extraction has run. Windows matches that emit condition. The two documents do NOT
+/// yet share a byte-for-byte contract: macOS groups issues by category, while Windows renders the
+/// richer per-issue detail it collects (reproduction steps, note, export selection). Converging them
+/// needs a macOS renderer change and is tracked separately — see #1006.
 /// </summary>
 public static class CompletedSessionReviewMarkdownBuilder
 {
+    /// <summary>
+    /// macOS writes <c>summary.md</c> only when extraction produced output; a bare review summary
+    /// does not earn a file on either platform. The summary text itself is still kept in
+    /// <c>session.json</c> and shown in the session library.
+    /// </summary>
     public static bool HasReviewOutput(CompletedSession session)
     {
-        return session.IssueExtraction is not null
-            || !string.IsNullOrWhiteSpace(session.ReviewSummary);
+        return session.IssueExtraction is not null;
     }
 
     public static string Build(CompletedSession session)
@@ -38,21 +43,24 @@ public static class CompletedSessionReviewMarkdownBuilder
             lines.Add($"- Transcript Model: {session.TranscriptionModel}");
         }
 
-        if (!string.IsNullOrWhiteSpace(session.ReviewSummary))
-        {
-            lines.Add(string.Empty);
-            lines.Add("## Summary");
-            lines.Add(string.Empty);
-            lines.Add(session.ReviewSummary.Trim());
-        }
-
         if (session.IssueExtraction is null)
         {
+            // Kept for callers that render a session without extraction; the exporter no longer
+            // writes a file in that case (see HasReviewOutput).
             lines.Add(string.Empty);
             lines.Add("Issue extraction has not been run for this session yet.");
 
             return SessionMarkdown.Join(lines);
         }
+
+        // The summary body is the extraction's own summary, matching macOS. session.ReviewSummary is
+        // a different value (the stop-time status text) and is not this document's subject.
+        lines.Add(string.Empty);
+        lines.Add("## Summary");
+        lines.Add(string.Empty);
+        lines.Add(string.IsNullOrWhiteSpace(session.IssueExtraction.Summary)
+            ? "No summary generated."
+            : session.IssueExtraction.Summary.Trim());
 
         lines.Add(string.Empty);
         lines.Add("## Extracted Issues");
