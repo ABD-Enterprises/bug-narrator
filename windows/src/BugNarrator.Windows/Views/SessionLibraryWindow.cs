@@ -899,6 +899,9 @@ public sealed class SessionLibraryWindow : Window
         var summaryTextBox = BuildIssueTextBox(issue.Summary, acceptsReturn: true, height: 84);
         var evidenceTextBox = BuildIssueTextBox(issue.EvidenceExcerpt, acceptsReturn: true, height: 84);
         var noteTextBox = BuildIssueTextBox(issue.Note ?? string.Empty, acceptsReturn: true, height: 70);
+        var reproductionStepEditors = issue.ReproductionSteps
+            .Select(BuildReproductionStepEditor)
+            .ToArray();
 
         var metadataTextBlock = new TextBlock
         {
@@ -942,6 +945,7 @@ public sealed class SessionLibraryWindow : Window
                     summaryTextBox,
                     BuildLabel("Evidence"),
                     evidenceTextBox,
+                    BuildReproductionStepsSection(reproductionStepEditors),
                     BuildLabel("Note"),
                     noteTextBox,
                 },
@@ -960,7 +964,95 @@ public sealed class SessionLibraryWindow : Window
             sectionTitleTextBox,
             summaryTextBox,
             evidenceTextBox,
-            noteTextBox);
+            noteTextBox,
+            reproductionStepEditors);
+    }
+
+    private static ReproductionStepEditorRow BuildReproductionStepEditor(
+        IssueReproductionStep step,
+        int index)
+    {
+        var instructionTextBox = BuildIssueTextBox(step.Instruction, acceptsReturn: true, height: 56);
+        var expectedTextBox = BuildIssueTextBox(step.ExpectedResult ?? string.Empty, acceptsReturn: true, height: 50);
+        var actualTextBox = BuildIssueTextBox(step.ActualResult ?? string.Empty, acceptsReturn: true, height: 50);
+        var metadataTextBlock = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Brushes.DimGray,
+            Text = BuildReproductionStepMetadata(step, index),
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+        var container = new Border
+        {
+            Margin = new Thickness(0, 0, 0, 12),
+            Padding = new Thickness(10),
+            BorderBrush = Brushes.Gainsboro,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    metadataTextBlock,
+                    BuildLabel("Instruction"),
+                    instructionTextBox,
+                    BuildLabel("Expected"),
+                    expectedTextBox,
+                    BuildLabel("Actual"),
+                    actualTextBox,
+                },
+            },
+        };
+
+        return new ReproductionStepEditorRow(
+            step,
+            container,
+            instructionTextBox,
+            expectedTextBox,
+            actualTextBox);
+    }
+
+    private static UIElement BuildReproductionStepsSection(
+        IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors)
+    {
+        if (reproductionStepEditors.Count == 0)
+        {
+            return new Border();
+        }
+
+        var panel = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 0, 2),
+        };
+        panel.Children.Add(BuildLabel("Reproduction Steps"));
+
+        foreach (var editor in reproductionStepEditors)
+        {
+            panel.Children.Add(editor.Container);
+        }
+
+        return panel;
+    }
+
+    private static string BuildReproductionStepMetadata(IssueReproductionStep step, int index)
+    {
+        var parts = new List<string>
+        {
+            $"Step {index + 1}",
+        };
+
+        if (step.TimestampLabel is not null)
+        {
+            parts.Add($"Transcript {step.TimestampLabel}");
+        }
+
+        if (step.ScreenshotId is not null)
+        {
+            parts.Add("Screenshot linked");
+        }
+
+        return string.Join(" | ", parts);
     }
 
     private void OnScreenshotSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1261,6 +1353,7 @@ public sealed class SessionLibraryWindow : Window
         private readonly CheckBox exportCheckBox;
         private readonly TextBox noteTextBox;
         private readonly CheckBox requiresReviewCheckBox;
+        private readonly IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors;
         private readonly TextBox sectionTitleTextBox;
         private readonly ExtractedIssue sourceIssue;
         private readonly TextBox summaryTextBox;
@@ -1278,7 +1371,8 @@ public sealed class SessionLibraryWindow : Window
             TextBox sectionTitleTextBox,
             TextBox summaryTextBox,
             TextBox evidenceTextBox,
-            TextBox noteTextBox)
+            TextBox noteTextBox,
+            IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors)
         {
             this.sourceIssue = sourceIssue;
             Container = container;
@@ -1292,6 +1386,7 @@ public sealed class SessionLibraryWindow : Window
             this.summaryTextBox = summaryTextBox;
             this.evidenceTextBox = evidenceTextBox;
             this.noteTextBox = noteTextBox;
+            this.reproductionStepEditors = reproductionStepEditors;
         }
 
         public Border Container { get; }
@@ -1316,6 +1411,55 @@ public sealed class SessionLibraryWindow : Window
                 IsSelectedForExport = exportCheckBox.IsChecked == true,
                 SectionTitle = NullIfWhiteSpace(sectionTitleTextBox.Text),
                 Note = NullIfWhiteSpace(noteTextBox.Text),
+                ReproductionSteps = reproductionStepEditors
+                    .Select(editor => editor.BuildStep())
+                    .ToArray(),
+            };
+        }
+
+        private static string NormalizeText(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? fallback
+                : value.Trim();
+        }
+
+        private static string? NullIfWhiteSpace(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+    }
+
+    private sealed class ReproductionStepEditorRow
+    {
+        private readonly TextBox actualTextBox;
+        private readonly TextBox expectedTextBox;
+        private readonly TextBox instructionTextBox;
+        private readonly IssueReproductionStep sourceStep;
+
+        public ReproductionStepEditorRow(
+            IssueReproductionStep sourceStep,
+            Border container,
+            TextBox instructionTextBox,
+            TextBox expectedTextBox,
+            TextBox actualTextBox)
+        {
+            this.sourceStep = sourceStep;
+            Container = container;
+            this.instructionTextBox = instructionTextBox;
+            this.expectedTextBox = expectedTextBox;
+            this.actualTextBox = actualTextBox;
+        }
+
+        public Border Container { get; }
+
+        public IssueReproductionStep BuildStep()
+        {
+            return sourceStep with
+            {
+                Instruction = NormalizeText(instructionTextBox.Text, sourceStep.Instruction),
+                ExpectedResult = NullIfWhiteSpace(expectedTextBox.Text),
+                ActualResult = NullIfWhiteSpace(actualTextBox.Text),
             };
         }
 

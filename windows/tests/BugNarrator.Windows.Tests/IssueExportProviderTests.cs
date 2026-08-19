@@ -2,7 +2,6 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using BugNarrator.Core.Models;
-using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Storage;
@@ -294,6 +293,70 @@ public sealed class IssueExportProviderTests : IDisposable
     }
 
     [Fact]
+    public void IssueScreenshotAnnotationRenderer_WritesRenderedPngForLoadableSource()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
+        File.WriteAllBytes(screenshot.AbsolutePath, TinyPngBytes());
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var sessionScreenshot = session.Screenshots.Single();
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            RelatedScreenshotIds = [sessionScreenshot.ScreenshotId],
+            ScreenshotAnnotations =
+            [
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), sessionScreenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
+            ],
+        };
+        var renderer = new IssueScreenshotAnnotationRenderer();
+
+        var exports = renderer.AnnotatedScreenshotExports(issue, session);
+
+        var export = Assert.Single(exports);
+        Assert.NotNull(export.RenderedFileName);
+        Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", export.RenderedFileName)));
+        Assert.Equal(Path.GetFileName(sessionScreenshot.RelativePath), export.ScreenshotFileName);
+        Assert.Equal("00:08", export.TimeLabel);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_ReferencesRenderedAnnotatedScreenshotWhenImageLoads()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
+        File.WriteAllBytes(screenshot.AbsolutePath, TinyPngBytes());
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var sessionScreenshot = session.Screenshots.Single();
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            RelatedScreenshotIds = [sessionScreenshot.ScreenshotId],
+            ScreenshotAnnotations =
+            [
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), sessionScreenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
+            ],
+        };
+        var expectedRenderedName =
+            $"review-shot-annotated-{issue.IssueId.ToString("D").Split('-')[0]}.png";
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        Assert.Contains(
+            $"- {expectedRenderedName} from `review-shot.png` (`00:08`) \u2014 Save button",
+            body);
+        Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", expectedRenderedName)));
+    }
+
+    [Fact]
     public async Task GitHubBuildRequest_CapsAnnotatedScreenshotsAndSaysSoWhenTruncated()
     {
         // 12 screenshots, each with one annotation -> 12 lines, over the 10-line cap.
@@ -383,6 +446,43 @@ public sealed class IssueExportProviderTests : IDisposable
             JsonEncodedText.Encode(
                 $"{Path.GetFileName(screenshot.RelativePath)} (00:08) - Save button • x 10% • y 20% • w 30% • h 40%").ToString(),
             body);
+    }
+
+    [Fact]
+    public async Task JiraBuildRequest_ReferencesRenderedAnnotatedScreenshotWhenImageLoads()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
+        File.WriteAllBytes(screenshot.AbsolutePath, TinyPngBytes());
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            screenshots: [screenshot],
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var sessionScreenshot = session.Screenshots.Single();
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            RelatedScreenshotIds = [sessionScreenshot.ScreenshotId],
+            ScreenshotAnnotations =
+            [
+                new IssueScreenshotAnnotation(
+                    Guid.NewGuid(), sessionScreenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
+            ],
+        };
+        var expectedRenderedName =
+            $"review-shot-annotated-{issue.IssueId.ToString("D").Split('-')[0]}.png";
+        var provider = new JiraExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new JiraExportConfiguration(
+                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
+        var body = await request.Content!.ReadAsStringAsync();
+
+        Assert.Contains(
+            JsonEncodedText.Encode(
+                $"{expectedRenderedName} from review-shot.png (00:08) - Save button").ToString(),
+            body);
+        Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", expectedRenderedName)));
     }
 
     [Fact]
@@ -494,6 +594,12 @@ public sealed class IssueExportProviderTests : IDisposable
                     IssueType: "Task")));
 
         Assert.Contains("Issue type is invalid", exception.Message);
+    }
+
+    private static byte[] TinyPngBytes()
+    {
+        return Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
     }
 
     public void Dispose()
