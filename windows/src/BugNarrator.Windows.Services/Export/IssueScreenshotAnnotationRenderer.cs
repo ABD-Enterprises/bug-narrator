@@ -62,8 +62,9 @@ public sealed class IssueScreenshotAnnotationRenderer
         try
         {
             Directory.CreateDirectory(annotationDirectory);
-            var destinationFileName = UniqueRenderedFileName(issue, screenshot, annotationDirectory);
+            var destinationFileName = RenderedFileName(issue, screenshot);
             var destinationPath = Path.Combine(annotationDirectory, destinationFileName);
+            RemovePriorRenderedFiles(destinationPath);
             WriteAnnotatedScreenshot(screenshot.AbsolutePath, destinationPath, annotations);
             return destinationFileName;
         }
@@ -102,37 +103,32 @@ public sealed class IssueScreenshotAnnotationRenderer
             graphics.DrawRectangle(stroke, rect.X, rect.Y, rect.Width, rect.Height);
 
             var arrowLength = MathF.Max(18, MathF.Min(source.Width, source.Height) * 0.05f);
-            var anchor = new PointF(rect.Left, rect.Bottom);
+            var anchor = new PointF(rect.Left, rect.Top);
             graphics.DrawLines(
                 stroke,
                 [
-                    new PointF(anchor.X - arrowLength, anchor.Y + arrowLength),
+                    new PointF(anchor.X - arrowLength, anchor.Y - arrowLength),
                     anchor,
-                    new PointF(anchor.X + arrowLength * 0.45f, anchor.Y + arrowLength),
+                    new PointF(anchor.X + arrowLength * 0.45f, anchor.Y - arrowLength),
                 ]);
         }
 
         output.Save(destinationPath, ImageFormat.Png);
     }
 
-    private static string UniqueRenderedFileName(
-        ExtractedIssue issue,
-        ScreenshotArtifact screenshot,
-        string annotationDirectory)
+    private static string RenderedFileName(ExtractedIssue issue, ScreenshotArtifact screenshot)
     {
         var sourceName = Path.GetFileNameWithoutExtension(screenshot.RelativePath);
         var issuePrefix = issue.IssueId.ToString("D").Split('-')[0];
-        var baseName = $"{sourceName}-annotated-{issuePrefix}";
-        var candidate = $"{baseName}.png";
-        var index = 2;
+        return $"{sourceName}-annotated-{issuePrefix}.png";
+    }
 
-        while (File.Exists(Path.Combine(annotationDirectory, candidate)))
+    private static void RemovePriorRenderedFiles(string destinationPath)
+    {
+        if (File.Exists(destinationPath))
         {
-            candidate = $"{baseName}-{index}.png";
-            index++;
+            File.Delete(destinationPath);
         }
-
-        return candidate;
     }
 }
 

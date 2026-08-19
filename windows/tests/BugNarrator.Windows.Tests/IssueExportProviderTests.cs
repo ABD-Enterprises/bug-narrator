@@ -324,6 +324,9 @@ public sealed class IssueExportProviderTests : IDisposable
             $"- {expectedRenderedName} from `review-shot.png` (`00:08`) \u2014 Save button",
             body);
         Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", expectedRenderedName)));
+        using var retryRequest = provider.BuildRequest(
+            issue, session, new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        Assert.Single(Directory.EnumerateFiles(Path.Combine(session.SessionDirectory, "annotated-exports"), "*.png"));
     }
 
     [Fact]
