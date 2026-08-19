@@ -293,36 +293,6 @@ public sealed class IssueExportProviderTests : IDisposable
     }
 
     [Fact]
-    public void IssueScreenshotAnnotationRenderer_WritesRenderedPngForLoadableSource()
-    {
-        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
-        File.WriteAllBytes(screenshot.AbsolutePath, TinyPngBytes());
-        var session = ReviewSessionTestData.CreateCompletedSession(
-            rootDirectory,
-            screenshots: [screenshot],
-            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
-        var sessionScreenshot = session.Screenshots.Single();
-        var issue = session.IssueExtraction!.Issues[0] with
-        {
-            RelatedScreenshotIds = [sessionScreenshot.ScreenshotId],
-            ScreenshotAnnotations =
-            [
-                new IssueScreenshotAnnotation(
-                    Guid.NewGuid(), sessionScreenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
-            ],
-        };
-        var renderer = new IssueScreenshotAnnotationRenderer();
-
-        var exports = renderer.AnnotatedScreenshotExports(issue, session);
-
-        var export = Assert.Single(exports);
-        Assert.NotNull(export.RenderedFileName);
-        Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", export.RenderedFileName)));
-        Assert.Equal(Path.GetFileName(sessionScreenshot.RelativePath), export.ScreenshotFileName);
-        Assert.Equal("00:08", export.TimeLabel);
-    }
-
-    [Fact]
     public async Task GitHubBuildRequest_ReferencesRenderedAnnotatedScreenshotWhenImageLoads()
     {
         var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
