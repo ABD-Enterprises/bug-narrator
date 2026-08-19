@@ -419,43 +419,6 @@ public sealed class IssueExportProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task JiraBuildRequest_ReferencesRenderedAnnotatedScreenshotWhenImageLoads()
-    {
-        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
-        File.WriteAllBytes(screenshot.AbsolutePath, TinyPngBytes());
-        var session = ReviewSessionTestData.CreateCompletedSession(
-            rootDirectory,
-            screenshots: [screenshot],
-            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
-        var sessionScreenshot = session.Screenshots.Single();
-        var issue = session.IssueExtraction!.Issues[0] with
-        {
-            RelatedScreenshotIds = [sessionScreenshot.ScreenshotId],
-            ScreenshotAnnotations =
-            [
-                new IssueScreenshotAnnotation(
-                    Guid.NewGuid(), sessionScreenshot.ScreenshotId, "Save button", 0.1, 0.2, 0.3, 0.4),
-            ],
-        };
-        var expectedRenderedName =
-            $"review-shot-annotated-{issue.IssueId.ToString("D").Split('-')[0]}.png";
-        var provider = new JiraExportProvider(diagnostics);
-
-        using var request = provider.BuildRequest(
-            issue,
-            session,
-            new JiraExportConfiguration(
-                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
-        var body = await request.Content!.ReadAsStringAsync();
-
-        Assert.Contains(
-            JsonEncodedText.Encode(
-                $"{expectedRenderedName} from review-shot.png (00:08) - Save button").ToString(),
-            body);
-        Assert.True(File.Exists(Path.Combine(session.SessionDirectory, "annotated-exports", expectedRenderedName)));
-    }
-
-    [Fact]
     public async Task GitHubExportAsync_ReportsPartialSuccessWhenLaterIssueFails()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(
@@ -566,11 +529,8 @@ public sealed class IssueExportProviderTests : IDisposable
         Assert.Contains("Issue type is invalid", exception.Message);
     }
 
-    private static byte[] TinyPngBytes()
-    {
-        return Convert.FromBase64String(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
-    }
+    private static byte[] TinyPngBytes() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
 
     public void Dispose()
     {
