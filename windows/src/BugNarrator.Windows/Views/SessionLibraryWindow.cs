@@ -902,6 +902,15 @@ public sealed class SessionLibraryWindow : Window
         var reproductionStepEditors = issue.ReproductionSteps
             .Select(BuildReproductionStepEditor)
             .ToArray();
+        var reproductionStepsPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
+        if (reproductionStepEditors.Length > 0)
+        {
+            reproductionStepsPanel.Children.Add(BuildLabel("Reproduction Steps"));
+            foreach (var editor in reproductionStepEditors)
+            {
+                reproductionStepsPanel.Children.Add(editor.Container);
+            }
+        }
 
         var metadataTextBlock = new TextBlock
         {
@@ -945,7 +954,7 @@ public sealed class SessionLibraryWindow : Window
                     summaryTextBox,
                     BuildLabel("Evidence"),
                     evidenceTextBox,
-                    BuildReproductionStepsSection(reproductionStepEditors),
+                    reproductionStepsPanel,
                     BuildLabel("Note"),
                     noteTextBox,
                 },
@@ -979,7 +988,9 @@ public sealed class SessionLibraryWindow : Window
         {
             Margin = new Thickness(0, 0, 0, 8),
             Foreground = Brushes.DimGray,
-            Text = BuildReproductionStepMetadata(step, index),
+            Text = $"Step {index + 1}"
+                + (step.TimestampLabel is null ? string.Empty : $" | Transcript {step.TimestampLabel}")
+                + (step.ScreenshotId is null ? string.Empty : " | Screenshot linked"),
             TextWrapping = TextWrapping.Wrap,
         };
 
@@ -1011,48 +1022,6 @@ public sealed class SessionLibraryWindow : Window
             instructionTextBox,
             expectedTextBox,
             actualTextBox);
-    }
-
-    private static UIElement BuildReproductionStepsSection(
-        IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors)
-    {
-        if (reproductionStepEditors.Count == 0)
-        {
-            return new Border();
-        }
-
-        var panel = new StackPanel
-        {
-            Margin = new Thickness(0, 0, 0, 2),
-        };
-        panel.Children.Add(BuildLabel("Reproduction Steps"));
-
-        foreach (var editor in reproductionStepEditors)
-        {
-            panel.Children.Add(editor.Container);
-        }
-
-        return panel;
-    }
-
-    private static string BuildReproductionStepMetadata(IssueReproductionStep step, int index)
-    {
-        var parts = new List<string>
-        {
-            $"Step {index + 1}",
-        };
-
-        if (step.TimestampLabel is not null)
-        {
-            parts.Add($"Transcript {step.TimestampLabel}");
-        }
-
-        if (step.ScreenshotId is not null)
-        {
-            parts.Add("Screenshot linked");
-        }
-
-        return string.Join(" | ", parts);
     }
 
     private void OnScreenshotSelectionChanged(object? sender, SelectionChangedEventArgs e)
