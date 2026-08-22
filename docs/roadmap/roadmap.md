@@ -107,7 +107,10 @@ Completed on `2026-03-23`
 Scope completed:
 
 - added `./scripts/accessibility_regression_check.sh` as a lightweight accessibility regression tripwire
-- wired the new script into CI and release workflow scaffolding
+- wired the new script into CI and release workflow scaffolding — **regressed:
+  commit `1b8f3e2` ("keep mac builds local and harden session recovery") removed
+  that wiring in May 2026. `scripts/accessibility_regression_check.sh` still
+  exists but was referenced by no workflow until it was re-wired (see #966)
 - documented the boundary between the new automation seed and the remaining live assistive-technology validation work
 
 ### OPS-005 Spec-Driven Parity Matrix
@@ -138,7 +141,10 @@ Completed on `2026-03-23`
 Scope completed:
 
 - added `scripts/generate_release_summary.py`
-- wired the generated summary into the release workflow as a run summary and artifact
+- wired the generated summary into the release workflow as a run summary and
+  artifact — **regressed:** removed by the same `1b8f3e2` change.
+  `scripts/generate_release_summary.py` exists on disk and is currently
+  referenced by no workflow. Tracked in #966; not yet re-wired
 - documented the summary as a maintainer aid rather than a public release-note replacement
 
 ### OPS-012 Dependency Alert Remediation
