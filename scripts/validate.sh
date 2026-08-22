@@ -17,6 +17,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'FAIL: python3 is required to check the product-spec contract\n' >&2
+  exit 1
+fi
+python3 "$ROOT/scripts/sync_product_spec_contract.py" --check
+
 BASE_REF="${AI_VALIDATOR_BASE_REF:-${1:-}}"
 if [[ -z "$BASE_REF" && -n "${GITHUB_BASE_REF:-}" ]]; then
   BASE_REF="origin/${GITHUB_BASE_REF}"
