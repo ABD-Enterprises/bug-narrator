@@ -1,0 +1,11 @@
+{
+  "source": "docs/architecture/product-spec.md#session-bundle",
+  "always": [
+    "manifest.json",
+    "screenshots/",
+    "transcript.md"
+  ],
+  "whenIssueExtractionHasRun": [
+    "summary.md"
+  ]
+}

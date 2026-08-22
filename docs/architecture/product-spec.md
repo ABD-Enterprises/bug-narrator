@@ -186,6 +186,28 @@ BugNarrator includes product-information surfaces for:
 - support development
 - release-page updates
 
+### First-Run Surfaces
+
+A new install is not left to discover the setup contract on its own.
+
+- A one-time welcome sheet walks provider, microphone, and capture hotkeys. It
+  is skippable at every step, reopenable from Help, and never shown to someone
+  who already has recorded sessions. Skipping is durable and does not fabricate
+  readiness — the finish-setup banner still reflects real state.
+- A bundled sample session is reachable from the menu bar while the library is
+  empty, and from the session library's empty state. It is a text-only fixture
+  and is labelled `Sample` wherever it appears, so it can never be mistaken for
+  a real capture.
+- Recording does not require a configured AI provider. A session recorded
+  without one is preserved as a retryable pending transcription; the provider
+  gates transcription, not capture.
+
+### Issue Extraction Offer
+
+Automatic issue extraction is offered once, from the session library, and only
+when the active provider can actually perform it. Local transcription-only
+providers are not offered a capability they cannot deliver.
+
 ## Session Lifecycle And Recovery Rules
 
 ### Recording
@@ -286,10 +308,28 @@ Deleting a session:
 
 ### Session Bundle
 
-The canonical session bundle export contains:
+The canonical session bundle export always contains:
 
+<!-- BEGIN SESSION-BUNDLE-LAYOUT always -->
 - `transcript.md`
+- `manifest.json`
 - `screenshots/`
+<!-- END SESSION-BUNDLE-LAYOUT always -->
+
+The exact rendering of `transcript.md` is bound by
+`contract-fixtures/transcript.golden.md` and byte-compared by both platforms.
+`manifest.json` records what the bundle contains, including any screenshot the
+export could not copy.
+
+When issue extraction has run, the bundle also contains:
+
+<!-- BEGIN SESSION-BUNDLE-LAYOUT whenIssueExtractionHasRun -->
+- `summary.md` — the review summary and extracted issues
+<!-- END SESSION-BUNDLE-LAYOUT whenIssueExtractionHasRun -->
+
+A screenshot whose file has been moved or deleted degrades the export rather
+than failing it: the bundle is written with the screenshots that remain and the
+missing ones are named in `manifest.json`.
 
 ### Issue Export
 

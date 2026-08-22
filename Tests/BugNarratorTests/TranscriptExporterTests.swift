@@ -3,6 +3,19 @@ import XCTest
 
 @MainActor
 final class TranscriptExporterTests: XCTestCase {
+    private struct SessionBundleLayoutContract: Decodable {
+        let always: [String]
+        let whenIssueExtractionHasRun: [String]
+    }
+
+    private var sessionBundleLayoutFixtureURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // BugNarratorTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("contract-fixtures/session-bundle-layout.json")
+    }
+
     func testWriteBundleCreatesExpectedFilesAndCopiesScreenshots() throws {
         let fileManager = FileManager.default
         let rootDirectoryURL = fileManager.temporaryDirectory
@@ -221,5 +234,86 @@ final class TranscriptExporterTests: XCTestCase {
         let screenshotContents = try fileManager.contentsOfDirectory(atPath: screenshotsDirectoryURL.path).sorted()
 
         XCTAssertEqual(screenshotContents, ["capture-2.png", "capture.png"])
+    }
+
+    func testSessionBundleLayoutMatchesProductSpecContract() throws {
+        let fileManager = FileManager.default
+        let rootDirectoryURL = fileManager.temporaryDirectory
+            .appendingPathComponent("TranscriptExporterContractTests-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: rootDirectoryURL) }
+
+        let fixtureData = try Data(contentsOf: sessionBundleLayoutFixtureURL)
+        let contract = try JSONDecoder().decode(SessionBundleLayoutContract.self, from: fixtureData)
+        let exporter = TranscriptExporter(fileManager: fileManager)
+
+        let sessionWithoutIssueExtraction = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_400),
+            transcript: "A session without issue extraction.",
+            duration: 10,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil
+        )
+        let bundleWithoutIssueExtraction = try exporter.writeBundle(
+            session: sessionWithoutIssueExtraction,
+            to: rootDirectoryURL
+        )
+        let actualWithoutIssueExtraction = try immediateEntries(
+            in: bundleWithoutIssueExtraction,
+            fileManager: fileManager
+        )
+        let expectedWithoutIssueExtraction = Array(Set(contract.always)).sorted()
+
+        XCTAssertEqual(
+            actualWithoutIssueExtraction,
+            expectedWithoutIssueExtraction,
+            """
+            FAIL: session bundle without issue extraction does not match the product-spec contract
+            expected: \(expectedWithoutIssueExtraction)
+            actual: \(actualWithoutIssueExtraction)
+            """
+        )
+
+        let sessionWithIssueExtraction = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_500),
+            transcript: "A session with issue extraction.",
+            duration: 11,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "One issue.", issues: [])
+        )
+        let bundleWithIssueExtraction = try exporter.writeBundle(
+            session: sessionWithIssueExtraction,
+            to: rootDirectoryURL
+        )
+        let actualWithIssueExtraction = try immediateEntries(
+            in: bundleWithIssueExtraction,
+            fileManager: fileManager
+        )
+        let expectedWithIssueExtraction = Array(
+            Set(contract.always).union(contract.whenIssueExtractionHasRun)
+        ).sorted()
+
+        XCTAssertEqual(
+            actualWithIssueExtraction,
+            expectedWithIssueExtraction,
+            """
+            FAIL: session bundle with issue extraction does not match the product-spec contract
+            expected: \(expectedWithIssueExtraction)
+            actual: \(actualWithIssueExtraction)
+            """
+        )
+    }
+
+    private func immediateEntries(in directoryURL: URL, fileManager: FileManager) throws -> [String] {
+        try fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ).map { entryURL in
+            let values = try entryURL.resourceValues(forKeys: [.isDirectoryKey])
+            return entryURL.lastPathComponent + (values.isDirectory == true ? "/" : "")
+        }.sorted()
     }
 }
