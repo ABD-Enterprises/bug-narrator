@@ -3,7 +3,7 @@
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'BugNarrator Docs',
-  tagline: 'User, release, and roadmap documentation for BugNarrator',
+  tagline: 'Narrate a testing session anywhere on your Mac. Get back filed issues and a searchable archive.',
   favicon: 'img/favicon.png',
   url: 'https://abd-enterprises.github.io',
   baseUrl: '/bug-narrator/',

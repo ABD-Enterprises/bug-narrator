@@ -3,7 +3,11 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black)](https://www.apple.com/macos/)
 
-BugNarrator is a macOS menu bar tool for narrated software testing sessions that automatically captures transcripts, screenshot-based timeline markers, screenshots, and extracted issues.
+**Narrate a whole testing session, anywhere on your Mac, and get back many filed issues and a transcript you can search months later.**
+
+BugNarrator is a macOS menu bar tool for narrated software testing sessions. It captures transcripts, screenshot-backed timeline markers, screenshots, and extracted issues.
+
+Three things together, which is the part that is hard to copy: a long exploratory **session** rather than one clip per ticket; **desktop-wide** capture rather than browser-bound; and **local-first** storage, with a local transcription option so audio need never leave the machine.
 
 BugNarrator intentionally runs as a single-instance menu bar app. If you launch it again while it is already running, the existing instance is reactivated and the second copy exits so you do not end up with duplicate menu bar items or competing session state.
 
