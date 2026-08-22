@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [DOCS] The site, its tagline, and the README now lead with what actually distinguishes BugNarrator — a whole exploratory session rather than one clip per ticket, desktop-wide rather than browser-bound, and local-first with an option where audio never leaves the Mac — instead of a feature list that reads like every other capture tool (#967).
+
 - [INTERNAL] macOS and Windows now share committed contract fixtures for `transcript.md`, so a parity break fails a build instead of surviving as two green suites. Each side previously asserted against its own retyped literal — which is how the Windows test came to pin a macOS output macOS produces nowhere outside UTC (#1000).
 - [INTERNAL] Session timestamp rendering in exports is now injectable. The default is unchanged (the user's locale and timezone); fixtures pin `en_US_POSIX`/UTC with ASCII spaces, because Apple's formatter uses U+202F before AM/PM while .NET uses ASCII — two byte-different strings that look identical (#1000).
 
