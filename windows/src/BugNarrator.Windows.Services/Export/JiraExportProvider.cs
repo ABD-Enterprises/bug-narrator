@@ -20,16 +20,19 @@ public sealed class JiraExportProvider
 
     private readonly WindowsDiagnostics diagnostics;
     private readonly HttpClient httpClient;
+    private readonly IssueScreenshotAnnotationRenderer annotationRenderer;
 
     public JiraExportProvider(
         WindowsDiagnostics diagnostics,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        IssueScreenshotAnnotationRenderer? annotationRenderer = null)
     {
         this.diagnostics = diagnostics;
         this.httpClient = httpClient ?? new HttpClient
         {
             Timeout = TimeSpan.FromMinutes(2),
         };
+        this.annotationRenderer = annotationRenderer ?? new IssueScreenshotAnnotationRenderer();
     }
 
     public async Task<IReadOnlyList<IssueExportResult>> ExportAsync(
@@ -113,7 +116,7 @@ public sealed class JiraExportProvider
         return request;
     }
 
-    private static JiraDocument BuildDescription(ExtractedIssue issue, CompletedSession session)
+    private JiraDocument BuildDescription(ExtractedIssue issue, CompletedSession session)
     {
         var blocks = new List<JiraBlock>
         {
@@ -178,27 +181,13 @@ public sealed class JiraExportProvider
         }
 
         var annotationLines = new List<string>();
-        // macOS narrows to session.screenshots(for: issue) first, so annotations are only exported
-        // for screenshots the issue actually relates to.
-        foreach (var screenshot in session.Screenshots
-            .Where(item => issue.RelatedScreenshotIds.Contains(item.ScreenshotId))
-            .OrderBy(item => item.ElapsedSeconds))
+        foreach (var export in annotationRenderer.AnnotatedScreenshotExports(issue, session))
         {
-            var descriptions = issue.ScreenshotAnnotations
-                .Where(annotation => annotation.ScreenshotId == screenshot.ScreenshotId)
-                .Select(annotation => annotation.ExportDescription)
-                .ToArray();
-
-            if (descriptions.Length == 0)
-            {
-                continue;
-            }
-
-            // Jira emits structured ADF text, so nothing is neutralized here — same rule the
-            // surrounding Jira metadata already follows on both platforms.
-            annotationLines.Add(
-                $"{Path.GetFileName(screenshot.RelativePath)} ({SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}) - "
-                + string.Join("; ", descriptions));
+            // Jira emits structured ADF text, so nothing is neutralized here, matching the
+            // surrounding Jira metadata lines and the macOS Jira provider.
+            annotationLines.Add(export.RenderedFileName is null
+                ? $"{export.ScreenshotFileName} ({export.TimeLabel}) - {export.Summaries}"
+                : $"{export.RenderedFileName} from {export.ScreenshotFileName} ({export.TimeLabel}) - {export.Summaries}");
         }
 
         if (annotationLines.Count > 0)

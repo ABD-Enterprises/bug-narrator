@@ -20,16 +20,19 @@ public sealed class GitHubExportProvider
 
     private readonly WindowsDiagnostics diagnostics;
     private readonly HttpClient httpClient;
+    private readonly IssueScreenshotAnnotationRenderer annotationRenderer;
 
     public GitHubExportProvider(
         WindowsDiagnostics diagnostics,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        IssueScreenshotAnnotationRenderer? annotationRenderer = null)
     {
         this.diagnostics = diagnostics;
         this.httpClient = httpClient ?? new HttpClient
         {
             Timeout = TimeSpan.FromMinutes(2),
         };
+        this.annotationRenderer = annotationRenderer ?? new IssueScreenshotAnnotationRenderer();
     }
 
     public async Task<IReadOnlyList<IssueExportResult>> ExportAsync(
@@ -110,7 +113,7 @@ public sealed class GitHubExportProvider
         return request;
     }
 
-    private static string BuildIssueBody(ExtractedIssue issue, CompletedSession session)
+    private string BuildIssueBody(ExtractedIssue issue, CompletedSession session)
     {
         var lines = new List<string>
         {
@@ -228,36 +231,18 @@ public sealed class GitHubExportProvider
         return string.Join(Environment.NewLine, lines);
     }
 
-    /// <summary>
-    /// One line per annotated screenshot, in the macOS shape for the no-rendered-asset case:
-    /// "- name (`time`) — description; description". Windows does not render annotated PNGs, which
-    /// is the branch macOS itself takes when it has no rendered asset.
-    /// </summary>
-    private static List<string> BuildAnnotatedScreenshotLines(ExtractedIssue issue, CompletedSession session)
+    private List<string> BuildAnnotatedScreenshotLines(ExtractedIssue issue, CompletedSession session)
     {
         var lines = new List<string>();
 
-        // macOS narrows to session.screenshots(for: issue) first, so annotations are only exported
-        // for screenshots the issue actually relates to.
-        foreach (var screenshot in session.Screenshots
-            .Where(item => issue.RelatedScreenshotIds.Contains(item.ScreenshotId))
-            .OrderBy(item => item.ElapsedSeconds))
+        foreach (var export in annotationRenderer.AnnotatedScreenshotExports(issue, session))
         {
-            var descriptions = issue.ScreenshotAnnotations
-                .Where(annotation => annotation.ScreenshotId == screenshot.ScreenshotId)
-                .Select(annotation => annotation.ExportDescription)
-                .ToArray();
-
-            if (descriptions.Length == 0)
-            {
-                continue;
-            }
-
             // The label inside each description is model output, so it is neutralized here exactly
             // as the other untrusted GitHub markdown fields are.
-            lines.Add(
-                $"- {Path.GetFileName(screenshot.RelativePath)} (`{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`) — "
-                + UntrustedMarkdown.Neutralize(string.Join("; ", descriptions)));
+            var summaries = UntrustedMarkdown.Neutralize(export.Summaries);
+            lines.Add(export.RenderedFileName is null
+                ? $"- {export.ScreenshotFileName} (`{export.TimeLabel}`) \u2014 {summaries}"
+                : $"- {export.RenderedFileName} from `{export.ScreenshotFileName}` (`{export.TimeLabel}`) \u2014 {summaries}");
         }
 
         return lines;
