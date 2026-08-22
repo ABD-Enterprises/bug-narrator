@@ -46,6 +46,20 @@ public sealed class BundleExporterTests : IDisposable
     }
 
     [Fact]
+    public async Task FileSessionBundleExporter_CopiesAnnotatedExports()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        var annotatedExportsDirectory = Path.Combine(session.SessionDirectory, "annotated-exports");
+        Directory.CreateDirectory(annotatedExportsDirectory);
+        await File.WriteAllBytesAsync(Path.Combine(annotatedExportsDirectory, "review-shot-annotated-12345678.png"), [1, 2, 3]);
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        Assert.True(File.Exists(Path.Combine(bundlePath, "annotated-exports", "review-shot-annotated-12345678.png")));
+    }
+
+    [Fact]
     public async Task FileSessionBundleExporter_RegeneratesTranscriptInsteadOfCopyingStaleFile()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
