@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- [INTERNAL] The semgrep scan's outcome now appears in CI output. It was written only to `.validation-artifacts/semgrep-status.txt`, which CI neither prints nor uploads — so a scan that reported "NOT RUN: neither docker nor a local semgrep on PATH is available" looked exactly like a clean scan in every log (#1012).
+- [INTERNAL] The accessibility regression check runs in the blocking validation path again. It was written for OPS-004, wired into CI, then orphaned when `1b8f3e2` removed that wiring in May — leaving a working, hermetic gate referenced by nothing. Verified it fails the build when broken (#1012).
+- [INTERNAL] Removed dead code: the unreferenced `clickWhenHittable` UI-test helper, orphaned when #949 dropped the typing assertions, and the `generate_app_icon.sh` / `render_app_icon.swift` scripts, which no workflow, script, or doc referenced (#1012).
+- [INTERNAL] Dropped a no-op `@preconcurrency` on `AudioRecorder`'s `AVAudioRecorderDelegate` conformance, which the compiler reported as having no effect (#1012).
+
 - [DOCS] The site, its tagline, and the README now lead with what actually distinguishes BugNarrator — a whole exploratory session rather than one clip per ticket, desktop-wide rather than browser-bound, and local-first with an option where audio never leaves the Mac — instead of a feature list that reads like every other capture tool (#967).
 - [INTERNAL] The product spec is now enforced by a machine check instead of prose. The session-bundle layout is generated from the spec into `contract-fixtures/session-bundle-layout.json`, verified by `scripts/validate.sh`, and bound to the real exporter by a test that runs `TranscriptExporter.writeBundle` and compares the bundle's actual contents. A spec claim that stops being true now fails a build (#966).
 - [DOCS] The spec covers what shipped: the first-run welcome tour, the bundled sample session, the issue-extraction offer, recording without a configured provider, and the `summary.md` / `manifest.json` bundle contract. Two roadmap entries that reported CI wiring as complete are corrected — commit `1b8f3e2` removed it in May and `scripts/accessibility_regression_check.sh` and `scripts/generate_release_summary.py` were left referenced by no workflow (#966).

@@ -101,7 +101,7 @@ run_semgrep_local() {
 }
 
 if [[ ${#SEMGREP_TARGETS[@]} -eq 0 && -n "$BASE_REF" ]]; then
-  printf 'PASS: no scannable changed files for semgrep\n' >"$SEMGREP_STATUS_FILE"
+  printf 'PASS: no scannable changed files for semgrep\n' | tee "$SEMGREP_STATUS_FILE"
 else
   if [[ ${#SEMGREP_TARGETS[@]} -eq 0 ]]; then
     SEMGREP_TARGETS=(.)
@@ -144,6 +144,10 @@ else
       esac
       ;;
   esac
+  # The status file alone is invisible: CI neither prints nor uploads
+  # .validation-artifacts, so a "NOT RUN" scan looked identical to a clean one
+  # in every log. Echo it like the other checks do (#1012).
+  cat "$SEMGREP_STATUS_FILE"
   : "$semgrep_outcome"
 fi
 
@@ -186,6 +190,16 @@ fi
 
 if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   if ! "$ROOT/scripts/check-agent-rules-sync.sh"; then
+    exit 1
+  fi
+fi
+
+# Hermetic (zero network/docker calls) and fast, so it belongs in the blocking
+# path. It was written for OPS-004, wired into CI, then orphaned when 1b8f3e2
+# removed that wiring in May — leaving a working gate referenced by nothing
+# (#1012).
+if [[ -x "$ROOT/scripts/accessibility_regression_check.sh" ]]; then
+  if ! "$ROOT/scripts/accessibility_regression_check.sh"; then
     exit 1
   fi
 fi
