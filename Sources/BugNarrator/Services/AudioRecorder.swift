@@ -2,7 +2,7 @@ import AVFAudio
 import AVFoundation
 import Foundation
 @MainActor
-final class AudioRecorder: NSObject, @preconcurrency AVAudioRecorderDelegate, AudioRecording {
+final class AudioRecorder: NSObject, AVAudioRecorderDelegate, AudioRecording {
     private let recordingLogger = DiagnosticsLogger(category: .recording)
     private let permissionAccess: any MicrophonePermissionAccessing
     private let recoveryDirectoryURL: URL

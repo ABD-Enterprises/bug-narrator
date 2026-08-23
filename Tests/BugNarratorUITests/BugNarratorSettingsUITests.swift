@@ -445,27 +445,6 @@ final class BugNarratorSettingsUITests: XCTestCase {
         return false
     }
 
-    @MainActor
-    private func clickWhenHittable(
-        _ element: XCUIElement,
-        in settingsWindow: XCUIElement,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let labeledScrollView = settingsWindow.scrollViews["Settings scroll area"].firstMatch
-        let scrollView = labeledScrollView.exists ? labeledScrollView : settingsWindow.scrollViews.firstMatch
-        for deltaY in [-700, 700] {
-            for _ in 0..<8 where !element.isHittable {
-                scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(deltaY))
-                waitForSettingsLayout(interval: 0.15)
-            }
-        }
-
-        // Poll for readiness after scrolling rather than asserting hittability
-        // once — the single-shot assert raced layout settling.
-        XCTAssertTrue(waitForReady(element), "Element never became ready to click", file: file, line: line)
-        element.click()
-    }
 
     @MainActor
     private func waitForElement(_ element: XCUIElement, in window: XCUIElement) -> Bool {
