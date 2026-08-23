@@ -589,6 +589,56 @@ private struct TranscriptStoreIndex: Codable {
     let entries: [SessionLibraryEntry]
     let sessionIDs: [UUID]
 
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case entries
+        case sessionIDs
+    }
+
+    /// Lenient on purpose (#1017).
+    ///
+    /// A v1 index wrote only `sessionIDs`. With `entries` decoded strictly, that
+    /// file threw `keyNotFound` and `loadPartitionedState` returned nil for both
+    /// the primary and backup index — which made the `sessionIDs` recovery path
+    /// directly below it unreachable for the exact file it was written to
+    /// recover. The library then read as empty while every session JSON sat
+    /// intact on disk, and `load()` fell through to a legacy path that deletes
+    /// unreferenced sessions and (since #960) their artifacts.
+    ///
+    /// A missing key here is a format we can still recover from; refusing to
+    /// parse it is what turns an old file into a lost library.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        let decodedEntries = try container.decodeIfPresent([SessionLibraryEntry].self, forKey: .entries)
+        let decodedSessionIDs = try container.decodeIfPresent([UUID].self, forKey: .sessionIDs)
+
+        // Lenient about a MISSING key, not about a file that names no sessions
+        // at all. `{}` must still throw.
+        //
+        // Both reviewers caught this in the first cut of the fix: defaulting
+        // both to [] made an empty or unrecognized object parse as a valid
+        // EMPTY library. `loadPartitionedState` then passed its `0 == 0` guard,
+        // called `persistIndex([])` — which overwrites the good BACKUP index
+        // too — and returned success, so neither the backup nor the legacy
+        // fallback could run. The next save would then treat every intact
+        // session file as unreferenced and delete it with its artifacts.
+        //
+        // Throwing here keeps that path exactly as loud as it was before.
+        guard decodedEntries != nil || decodedSessionIDs != nil else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.entries,
+                DecodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription: "session index names neither entries nor sessionIDs; treating as corrupt so backup recovery still runs"
+                )
+            )
+        }
+
+        entries = decodedEntries ?? []
+        sessionIDs = decodedSessionIDs ?? []
+    }
+
     init(version: Int = 2, entries: [SessionLibraryEntry], sessionIDs: [UUID]? = nil) {
         self.version = version
         self.entries = entries
