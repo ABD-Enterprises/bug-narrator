@@ -126,6 +126,41 @@ final class TranscriptionRecoveryController: ObservableObject {
         return PendingTranscriptionFailureReason(appError: appError)
     }
 
+    /// The reason to preserve a session by when a FIRST stop fails (#1015).
+    ///
+    /// Wider than `recoverablePendingTranscriptionReason`, and only here. A
+    /// generic `.transcriptionFailure` — an unparseable provider body,
+    /// exhausted retries, an audio export error — mapped to nothing, and
+    /// `handleStopSessionFailure` then deleted the recording and its
+    /// screenshots. A dropped network preserved the session; a malformed
+    /// response destroyed it.
+    ///
+    /// The retry path deliberately does NOT use this. There a
+    /// `.transcriptionFailure` is terminal for that attempt: the session keeps
+    /// its original reason and the retry finishes rather than looping.
+    /// Widening the shared mapper instead would have overwritten that stored
+    /// reason — `PendingTranscriptionRetryFailureHandlerTests` exists to catch
+    /// exactly that, and did.
+    static func preservableStopFailureReason(for error: Error) -> PendingTranscriptionFailureReason? {
+        guard let appError = error as? AppError else {
+            return nil
+        }
+
+        if let reason = PendingTranscriptionFailureReason(appError: appError) {
+            return reason
+        }
+
+        guard case .transcriptionFailure = appError else {
+            return nil
+        }
+
+        return .transcriptionFailure
+    }
+
+    func preservableStopFailureReason(for error: Error) -> PendingTranscriptionFailureReason? {
+        Self.preservableStopFailureReason(for: error)
+    }
+
     func recordRetryableFailure(
         _ error: Error,
         context: PendingTranscriptionRetryContext,

@@ -996,7 +996,7 @@ final class AppState: ObservableObject {
         recordingSession: RecordingSessionDraft,
         request: TranscriptionRequest
     ) {
-        if let failureReason = transcriptionRecovery.recoverablePendingTranscriptionReason(for: error),
+        if let failureReason = transcriptionRecovery.preservableStopFailureReason(for: error),
            let recordedAudio = recordingSessionController.pendingRecordedAudioSnapshot {
             preserveRetryableSession(
                 from: recordingSession,

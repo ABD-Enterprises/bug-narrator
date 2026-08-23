@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] **A failed transcription no longer deletes your recording.** If transcription failed for the most common reason — an unparseable provider response, exhausted retries, an audio export error — the session's audio and screenshots were deleted instead of being kept for retry. A dropped network connection preserved the session; a malformed response destroyed it. Local-model users were most exposed. The recording is now preserved and retryable in every case where the audio still exists (#1015).
+
 - [INTERNAL] The semgrep scan's outcome now appears in CI output. It was written only to `.validation-artifacts/semgrep-status.txt`, which CI neither prints nor uploads — so a scan that reported "NOT RUN: neither docker nor a local semgrep on PATH is available" looked exactly like a clean scan in every log (#1012).
 - [INTERNAL] The accessibility regression check runs in the blocking validation path again. It was written for OPS-004, wired into CI, then orphaned when `1b8f3e2` removed that wiring in May — leaving a working, hermetic gate referenced by nothing. Verified it fails the build when broken (#1012).
 - [INTERNAL] Removed dead code: the unreferenced `clickWhenHittable` UI-test helper, orphaned when #949 dropped the typing assertions, and the `generate_app_icon.sh` / `render_app_icon.swift` scripts, which no workflow, script, or doc referenced (#1012).
