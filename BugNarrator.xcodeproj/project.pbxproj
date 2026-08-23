@@ -287,6 +287,8 @@
 		C4DEF637FA4D2980FA55A9C9 /* APIKeyValidationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 084D11633172FCB62C674D40 /* APIKeyValidationState.swift */; };
 		C739EC09645E2A0D6E7B52CA /* RecordingStatusMessageBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C800B9028E34058B3B1544 /* RecordingStatusMessageBuilderTests.swift */; };
 		C789D35AE3191C6183D2A154 /* SampleSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA28674A157DEC83F1CAB4FC /* SampleSessionTests.swift */; };
+		A9B8C7D60001000100010001 /* LegacyIndexMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B8C7D60002000200020002 /* LegacyIndexMigrationTests.swift */; };
+		B4C5D6E70001000100010001 /* StopFailurePreservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E70002000200020002 /* StopFailurePreservationTests.swift */; };
 		F1C0A7E10001000100010001 /* TranscriptContractFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1C0A7E10002000200020002 /* TranscriptContractFixtureTests.swift */; };
 		E7A1B2C50001000100010001 /* FirstRunFunnelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A1B2C50002000200020002 /* FirstRunFunnelTests.swift */; };
 		C78BD5EF85ED92EADB317E96 /* OperationalTelemetryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6AE9B0A2681924431362E5 /* OperationalTelemetryRecorder.swift */; };
@@ -647,6 +649,8 @@
 		B7954D0569085C2B6D0F13A1 /* MenuBarView+Footer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarView+Footer.swift"; sourceTree = "<group>"; };
 		E7A1B2C30002000200020002 /* MenuBarView+SampleOffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarView+SampleOffer.swift"; sourceTree = "<group>"; };
 		BA28674A157DEC83F1CAB4FC /* SampleSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleSessionTests.swift; sourceTree = "<group>"; };
+		A9B8C7D60002000200020002 /* LegacyIndexMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyIndexMigrationTests.swift; sourceTree = "<group>"; };
+		B4C5D6E70002000200020002 /* StopFailurePreservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopFailurePreservationTests.swift; sourceTree = "<group>"; };
 		F1C0A7E10002000200020002 /* TranscriptContractFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptContractFixtureTests.swift; sourceTree = "<group>"; };
 		E7A1B2C50002000200020002 /* FirstRunFunnelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunFunnelTests.swift; sourceTree = "<group>"; };
 		BA49B2B79731E3A62B083174 /* IssueExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExportController.swift; sourceTree = "<group>"; };
@@ -833,6 +837,8 @@
 				34F0EA33B709CD1A77190E70 /* ReviewWorkspaceTests.swift */,
 				4FD6EC791976A8AD3A45D1E3 /* RoutingAudioRecorderTests.swift */,
 				BA28674A157DEC83F1CAB4FC /* SampleSessionTests.swift */,
+				A9B8C7D60002000200020002 /* LegacyIndexMigrationTests.swift */,
+				B4C5D6E70002000200020002 /* StopFailurePreservationTests.swift */,
 				F1C0A7E10002000200020002 /* TranscriptContractFixtureTests.swift */,
 				E7A1B2C50002000200020002 /* FirstRunFunnelTests.swift */,
 				84F3D36DA7C2B60A61D7CB47 /* ScreenCapturePermissionServiceTests.swift */,
@@ -1395,6 +1401,8 @@
 				634C2CA46D17B6AA571D0771 /* ReviewWorkspaceTests.swift in Sources */,
 				79EE80974F21923B656A5F87 /* RoutingAudioRecorderTests.swift in Sources */,
 				C789D35AE3191C6183D2A154 /* SampleSessionTests.swift in Sources */,
+				A9B8C7D60001000100010001 /* LegacyIndexMigrationTests.swift in Sources */,
+				B4C5D6E70001000100010001 /* StopFailurePreservationTests.swift in Sources */,
 				F1C0A7E10001000100010001 /* TranscriptContractFixtureTests.swift in Sources */,
 				E7A1B2C50001000100010001 /* FirstRunFunnelTests.swift in Sources */,
 				9DD9E28AE4387EAEB9C43E92 /* ScreenCapturePermissionServiceTests.swift in Sources */,
