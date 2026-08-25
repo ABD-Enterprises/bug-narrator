@@ -92,6 +92,7 @@ jobs:
             windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-signature.json
             windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-validation.json
             windows/artifacts/validation/BugNarrator-windows-${{ inputs.runtime }}-release-notes.md
+          retention-days: 14
 
       - name: Publish GitHub Release
         shell: pwsh
