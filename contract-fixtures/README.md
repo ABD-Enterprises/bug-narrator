@@ -27,6 +27,7 @@ Windows test was green against an output macOS produced nowhere outside UTC.
 | File | What it is |
 |---|---|
 | `transcript.golden.md` | The exact `transcript.md` the canonical session must export |
+| `summary.golden.md` | The shared `summary.md` subset both platforms emit identically today |
 
 ## The canonical session
 
@@ -42,6 +43,24 @@ Fixed values so both platforms can build the same input:
 | `languageHint` | `en` |
 | `prompt` | none |
 | marker | id `11111111-1111-4111-8111-111111111111`, index `1`, elapsed `30`, title `Checkout button clipped`, note `Right edge is cut off at 1280 wide.`, no screenshot |
+
+### Additional values for `summary.golden.md`
+
+| field | value |
+|---|---|
+| extraction summary | `The checkout button is clipped on the right at 1280 wide.` |
+| guidance note | `Review before export.` |
+| issue id | `22222222-2222-4222-8222-222222222222` |
+| issue title | `Checkout button clipped` |
+| issue category | `Bug` |
+| issue severity | `High` |
+| issue component | `Checkout` |
+| issue section | `Opening Notes` |
+| issue transcript time | `00:30` |
+| issue confidence | `72%` |
+| issue dedup hint | `checkout-button-clipped` |
+| issue evidence | `The checkout button is clipped on the right at 1280 wide.` |
+| Windows-only extra fields still present in the live renderer | `Selected For Export = No`, one reproduction step, `Note = Investigate responsive width handling.` |
 
 ## Timestamp rendering — read this before debugging a mismatch
 
@@ -75,6 +94,11 @@ TEST_RUNNER_BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1 \
 A regenerated fixture means the Windows suite should fail until it is updated
 to match. That failure is the feature.
 
+For `summary.golden.md`, the macOS test regenerates the **shared subset** rather than the full
+renderer output. That is deliberate: on 2026-08-25 the operator chose to pin only the fields both
+platforms emit today, while leaving the richer Windows-only fields and the macOS-only section
+grouping documented as intentional divergence instead of forcing either renderer to change here.
+
 ## Consuming from Windows
 
 Wired up in #1003. `windows/tests/BugNarrator.Core.Tests/TranscriptContractFixtureTests.cs` builds
@@ -85,6 +109,11 @@ fails loudly if the fixture is missing rather than skipping.
 
 Both platforms now compare against this one file, so a renderer change on either side that the
 fixture does not expect fails a build.
+
+For `summary.golden.md`, both suites render the real `summary.md`, extract the shared fields, and
+byte-compare that reduced document against the committed golden. The reducer is intentionally
+strict: if a pinned field disappears, changes label, or moves into an unparseable shape, the test
+fails rather than silently re-typing the new output.
 
 ### Line endings
 
@@ -102,3 +131,28 @@ fixture:
 - marker notes were not rendered at all — `SessionTimelineMoment` had no note field, so the
   `— Right edge is cut off at 1280 wide.` in the golden could not be produced
 - Windows appended a trailing newline that macOS does not emit
+
+### Why `summary.golden.md` is a subset, not the whole file
+
+As of 2026-08-25, the shared fixture pins:
+
+- header title
+- duration
+- transcript model
+- extraction summary
+- guidance note
+- shared per-issue fields: title, category, severity, component, section, transcript time,
+  confidence, requires-review flag, summary, evidence, and dedup hint
+
+It intentionally does **not** pin:
+
+- `- Recorded:` because macOS `summaryMarkdownContent` still renders that line through
+  machine-local `Date.formatted(...)` with no invariant injection point in this ticket's approved
+  scope; the reducer still asserts that the line exists
+- Windows-only `Selected For Export`, reproduction steps, and `Note`
+- macOS-only category section grouping (`## Bug`, `## UX Issue`, etc.), including empty
+  `None identified.` categories
+- macOS-only related screenshot filename lines
+
+Those unpinned fields are also called out in `docs/architecture/parity-matrix.md`, so the fixture
+is narrowing the contract consciously rather than pretending the rest of the file matches.
