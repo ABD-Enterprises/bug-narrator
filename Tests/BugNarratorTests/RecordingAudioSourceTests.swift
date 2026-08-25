@@ -52,9 +52,11 @@ final class RecordingAudioSourceTests: XCTestCase {
             deliveredLevel.fulfill()
         }
 
-        DispatchQueue(label: "RealtimeMessenger.mServiceQueue").async {
+        let realtimeThread = Thread {
             tap(buffer, AVAudioTime(sampleTime: 0, atRate: 44_100))
         }
+        realtimeThread.name = "RealtimeMessenger.mServiceQueue"
+        realtimeThread.start()
 
         wait(for: [deliveredLevel], timeout: 1)
     }
