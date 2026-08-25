@@ -292,6 +292,17 @@ public sealed class TranscriptContractFixtureTests
             bool? requiresReview = null;
 
             index++;
+
+            // The builder emits a blank line between "### <title>" and the field
+            // block. Without skipping it the field loop never runs: every field
+            // stays null, the summary read then consumes "- Category: ...", and the
+            // evidence assert fails on "- Severity: ..." — reported as a missing
+            // evidence line that is in fact present and correct.
+            while (index < lines.Length && lines[index] == string.Empty)
+            {
+                index++;
+            }
+
             while (index < lines.Length && lines[index].StartsWith("- ", StringComparison.Ordinal))
             {
                 var line = lines[index];
