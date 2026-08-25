@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.46 - 2026-08-25
+
 - [FIX] A session library stored in the oldest index format no longer opens empty. That index named its sessions only by id, which the current code refused to parse — so the library appeared empty while every session file sat intact on disk, and the recovery path written for exactly that format could never run. Worse, the empty read could then let a later save delete the very files that would have restored it (#1017).
 
 - [FIX] **A failed transcription no longer deletes your recording.** If transcription failed for the most common reason — an unparseable provider response, exhausted retries, an audio export error — the session's audio and screenshots were deleted instead of being kept for retry. A dropped network connection preserved the session; a malformed response destroyed it. Local-model users were most exposed. The recording is now preserved and retryable in every case where the audio still exists (#1015).
