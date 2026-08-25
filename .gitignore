@@ -3,6 +3,7 @@
 build/
 DerivedData/
 dist/
+.tmp/
 
 *.xcuserstate
 *.moved-aside
