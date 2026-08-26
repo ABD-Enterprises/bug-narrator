@@ -134,9 +134,12 @@ final class TranscriptContractFixtureTests: XCTestCase {
             return
         }
 
+        // xcodebuild does not forward arbitrary shell env vars into the XCTest
+        // runner process, so the remediation text must name the TEST_RUNNER_
+        // form that the harness translates into the bare env this test reads.
         guard let golden = try? String(contentsOf: goldenURL, encoding: .utf8) else {
             return XCTFail(
-                "Missing \(goldenURL.path). Regenerate with BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1."
+                "Missing \(goldenURL.path). Regenerate with TEST_RUNNER_BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1."
             )
         }
 
@@ -144,7 +147,7 @@ final class TranscriptContractFixtureTests: XCTestCase {
             produced,
             golden,
             "transcript.md drifted from the committed contract. If the change is intended, "
-                + "regenerate with BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1 and expect the Windows suite to fail until it is updated too."
+                + "regenerate with TEST_RUNNER_BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1 and expect the Windows suite to fail until it is updated too."
         )
     }
 
@@ -200,7 +203,7 @@ final class TranscriptContractFixtureTests: XCTestCase {
 
         let goldenData = try XCTUnwrap(
             try? Data(contentsOf: goldenURL),
-            "Missing \(goldenURL.path). Regenerate with BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1."
+            "Missing \(goldenURL.path). Regenerate with TEST_RUNNER_BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1."
         )
 
         XCTAssertFalse(
@@ -216,7 +219,7 @@ final class TranscriptContractFixtureTests: XCTestCase {
             goldenData,
             Data(produced.utf8),
             "summary.md shared-subset drifted from the committed contract. If the change is intended, "
-                + "regenerate with BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1 and expect the Windows suite to fail until it is updated too."
+                + "regenerate with TEST_RUNNER_BUGNARRATOR_UPDATE_CONTRACT_FIXTURES=1 and expect the Windows suite to fail until it is updated too."
         )
     }
 
