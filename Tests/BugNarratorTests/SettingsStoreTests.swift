@@ -112,8 +112,13 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in false }
+        )
 
+        XCTAssertEqual(store.aiProvider, .parakeetLocal)
         XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.screenshotHotkeyShortcut, .disabled)
@@ -479,6 +484,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .openAI
 
         XCTAssertEqual(
             store.transcriptionModelChoices.map(\.id),
@@ -588,7 +594,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in true }
+        )
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = ""
 
@@ -599,6 +609,26 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
     }
 
+    func testParakeetProviderReportsUnreachableServerBeforeRecordingStarts() {
+        let suiteName = "BugNarrator-SettingsParakeetUnreachable-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in false }
+        )
+        store.aiProvider = .parakeetLocal
+
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
+        XCTAssertEqual(
+            store.aiProviderCompatibilityIssue,
+            "BugNarrator could not reach the local transcription server at http://localhost:8422. Download bugnarrator-transcription from the BugNarrator releases page, then run ./bugnarrator-transcription --preload in Terminal."
+        )
+    }
+
     func testOpenAIProviderConfigurationRequiresUsableCredential() {
         let suiteName = "BugNarrator-SettingsOpenAIReadiness-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -606,6 +636,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        store.aiProvider = .openAI
 
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
 
@@ -622,10 +653,12 @@ final class SettingsStoreTests: XCTestCase {
 
         let keychain = MockKeychainService()
         let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        firstStore.aiProvider = .openAI
         firstStore.apiKey = "sk-fixture"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
         let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        secondStore.aiProvider = .openAI
 
         XCTAssertEqual(secondStore.apiKey, "")
         XCTAssertEqual(secondStore.apiKeyPersistenceState, .keychain)
@@ -797,7 +830,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in false }
+        )
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = "http://localhost:8422"
         store.autoExtractIssues = true
@@ -816,7 +853,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in true }
+        )
         store.aiProvider = .openAI
         store.autoExtractIssues = true
 
@@ -838,7 +879,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
         defaults.set(true, forKey: "settings.autoExtractIssues")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in true }
+        )
 
         XCTAssertFalse(store.autoExtractIssues)
         XCTAssertFalse(store.supportsIssueExtraction)

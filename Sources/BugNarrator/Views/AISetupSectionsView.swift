@@ -80,16 +80,33 @@ struct AISetupSectionsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                // One click to the signed, notarized server build (#959). The
-                // old guidance named a repo path a DMG user does not have.
                 if settingsStore.aiProvider == .parakeetLocal {
-                    Button("Download the local transcription server") {
-                        appState.openLocalTranscriptionDownload()
+                    VStack(alignment: .leading, spacing: 6) {
+                        if settingsStore.localProviderReachability == .unreachable {
+                            Label("Local transcription server not reachable", systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.orange)
+
+                            Text(settingsStore.localProviderSetupDetail)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Text("Run in Terminal: \(settingsStore.localProviderSetupCommand)")
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+
+                        // One click to the signed, notarized server build (#959).
+                        Button("Download the local transcription server") {
+                            appState.openLocalTranscriptionDownload()
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .help("Opens the BugNarrator releases page, where bugnarrator-transcription is published.")
+                        .accessibilityLabel("Download the local transcription server")
                     }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .help("Opens the BugNarrator releases page, where bugnarrator-transcription is published.")
-                    .accessibilityLabel("Download the local transcription server")
                 }
 
                 if let warning = settingsStore.aiBaseURLPlaintextWarning {
@@ -150,6 +167,7 @@ struct AISetupSectionsView: View {
                     Text(compatibilityIssue)
                         .font(.footnote)
                         .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(settingsStore.selectedAIProviderCredentialStorageDescription)

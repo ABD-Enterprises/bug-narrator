@@ -7,6 +7,12 @@ struct AIModelChoice: Identifiable, Equatable {
     let detail: String
 }
 
+enum LocalProviderReachability: Equatable {
+    case unknown
+    case reachable
+    case unreachable
+}
+
 final class SettingsStore: ObservableObject {
     static let defaultLegacyDefaultsDomains = [
         "com.abdenterprises.sessionmic"
@@ -15,6 +21,7 @@ final class SettingsStore: ObservableObject {
     static let openAITranscriptionModel = "whisper-1"
     private static let defaultLanguageHint = "en"
     static let openAIIssueExtractionModel = "gpt-4.1-mini"
+    static let localTranscriptionRunCommand = "./bugnarrator-transcription --preload"
 
     private let logger = DiagnosticsLogger(category: .settings)
 
@@ -30,21 +37,24 @@ final class SettingsStore: ObservableObject {
     }
 
     @Published private(set) var jiraEmailPersistenceState: APIKeyPersistenceState = .empty
+    @Published private(set) var localProviderReachability: LocalProviderReachability = .unknown
 
     @Published var openAIBaseURL: String = "" {
         didSet {
             guard hasLoaded else { return }
             defaults.set(openAIBaseURL, forKey: Keys.openAIBaseURL)
+            refreshLocalProviderReachabilityIfNeeded()
         }
     }
 
-    @Published var aiProvider: AIProvider = .openAI {
+    @Published var aiProvider: AIProvider = .parakeetLocal {
         didSet {
             guard hasLoaded else { return }
             defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
             normalizeTranscriptionModelForCurrentProvider(persist: true)
             normalizeIssueExtractionModelForCurrentProvider(persist: true)
             normalizeIssueExtractionAvailabilityForCurrentProvider(persist: true)
+            refreshLocalProviderReachabilityIfNeeded()
         }
     }
 
@@ -527,6 +537,38 @@ final class SettingsStore: ObservableObject {
         return components.url ?? fallback
     }
 
+    static func probeLocalProviderReachability(at url: URL) -> Bool {
+        guard let host = url.host, !host.isEmpty else {
+            return false
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 0.35
+        configuration.timeoutIntervalForResource = 0.35
+        let session = URLSession(configuration: configuration)
+        let semaphore = DispatchSemaphore(value: 0)
+        var isReachable = false
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        let task = session.dataTask(with: request) { _, response, _ in
+            if response != nil {
+                isReachable = true
+            }
+            semaphore.signal()
+        }
+
+        task.resume()
+        let completed = semaphore.wait(timeout: .now() + 0.4) == .success
+        if !completed {
+            task.cancel()
+        }
+        session.invalidateAndCancel()
+        return completed && isReachable
+    }
+
     /// Whether `host` denotes a loopback / private / link-local / `.local`
     /// endpoint. Plaintext HTTP to such a host is acceptable because the traffic
     /// stays on the machine or the trusted local network; plaintext HTTP to any
@@ -601,6 +643,22 @@ final class SettingsStore: ObservableObject {
         return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
             + "Your email and API token would be sent unencrypted. Use https:// "
             + "unless this is a trusted local server."
+    }
+
+    var localProviderSetupCommand: String {
+        Self.localTranscriptionRunCommand
+    }
+
+    var localProviderSetupDownloadURL: URL {
+        BugNarratorLinks.localTranscriptionDownload
+    }
+
+    var localProviderSetupDetail: String {
+        "Download bugnarrator-transcription from the BugNarrator releases page, then run \(localProviderSetupCommand) in Terminal."
+    }
+
+    var localProviderUnreachableMessage: String {
+        "BugNarrator could not reach the local transcription server at \(openAIBaseURLValue.absoluteString). \(localProviderSetupDetail)"
     }
 
 
@@ -719,6 +777,31 @@ final class SettingsStore: ObservableObject {
         return components.url
     }
 
+    private func refreshLocalProviderReachabilityIfNeeded() {
+        guard aiProvider == .parakeetLocal else {
+            localProviderReachability = .unknown
+            lastLocalProviderReachabilityURL = nil
+            return
+        }
+
+        let url = openAIBaseURLValue
+        lastLocalProviderReachabilityURL = url
+        localProviderReachability = localProviderReachabilityProbe(url) ? .reachable : .unreachable
+    }
+
+    fileprivate func currentLocalProviderReachability() -> LocalProviderReachability {
+        guard aiProvider == .parakeetLocal else {
+            return .reachable
+        }
+
+        let url = openAIBaseURLValue
+        if lastLocalProviderReachabilityURL != url || localProviderReachability == .unknown {
+            refreshLocalProviderReachabilityIfNeeded()
+        }
+
+        return localProviderReachability
+    }
+
     var jiraExportConfiguration: JiraExportConfiguration? {
         guard let connection = jiraConnectionConfiguration else {
             return nil
@@ -749,9 +832,11 @@ final class SettingsStore: ObservableObject {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let legacyDefaultsDomains: [String]
+    private let localProviderReachabilityProbe: (URL) -> Bool
     private var hasLoaded = false
     private var isSynchronizingHotkeys = false
     private var isSynchronizingLaunchAtLogin = false
+    private var lastLocalProviderReachabilityURL: URL?
     private var sessionOnlySecrets: [SecretSlot: String] = [:]
     private var committedSecrets: [SecretSlot: String] = [:]
     private var committedSecretStates: [SecretSlot: APIKeyPersistenceState] = [:]
@@ -760,13 +845,15 @@ final class SettingsStore: ObservableObject {
         defaults: UserDefaults = .standard,
         keychainService: KeychainServicing = KeychainService(),
         launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
-        legacyDefaultsDomains: [String]? = nil
+        legacyDefaultsDomains: [String]? = nil,
+        localProviderReachabilityProbe: @escaping (URL) -> Bool = SettingsStore.probeLocalProviderReachability
     ) {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
         self.trackerExportSettings = TrackerExportSettingsStore(defaults: defaults)
         self.secretStore = KeychainSecretStore(keychainService: keychainService)
         self.launchAtLoginService = launchAtLoginService
+        self.localProviderReachabilityProbe = localProviderReachabilityProbe
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
         } else if defaults === UserDefaults.standard {
@@ -875,7 +962,7 @@ final class SettingsStore: ObservableObject {
         )
 
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
-        aiProvider = AIProvider(rawValue: stringValue(forKey: Keys.aiProvider) ?? "") ?? .openAI
+        aiProvider = AIProvider(rawValue: stringValue(forKey: Keys.aiProvider) ?? "") ?? .parakeetLocal
         openAIBaseURL = stringValue(forKey: Keys.openAIBaseURL) ?? ""
         languageHint = stringValue(forKey: Keys.languageHint) ?? Self.defaultLanguageHint
         transcriptionPrompt = stringValue(forKey: Keys.transcriptionPrompt) ?? ""
@@ -886,6 +973,7 @@ final class SettingsStore: ObservableObject {
             ?? Self.openAIIssueExtractionModel
         normalizeTranscriptionModelForCurrentProvider(persist: true)
         normalizeIssueExtractionModelForCurrentProvider(persist: true)
+        refreshLocalProviderReachabilityIfNeeded()
 
         autoCopyTranscript = boolValue(forKey: Keys.autoCopyTranscript) ?? false
         uploadScreenshotsForExtraction = boolValue(forKey: Keys.uploadScreenshotsForExtraction) ?? false
