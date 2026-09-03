@@ -191,11 +191,7 @@ private final class PostTranscriptionPipelineControllerHarness {
         defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
-        settingsStore = SettingsStore(
-            defaults: defaults,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+        settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
         settingsStore.apiKey = "api-key"
         settingsStore.autoCopyTranscript = true
         settingsStore.autoExtractIssues = autoExtractIssues
@@ -253,6 +249,14 @@ private final class PostTranscriptionPipelineControllerHarness {
             recordingSessionController: recordingSessionController,
             statusPresenter: statusPresenter,
             telemetryRecorder: telemetryRecorder
+        )
+    }
+
+    private static func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
         )
     }
 
