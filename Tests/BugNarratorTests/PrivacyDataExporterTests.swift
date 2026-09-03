@@ -312,7 +312,10 @@ final class PrivacyDataExporterTests: XCTestCase {
         let suiteName = "\(suiteNamePrefix)-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        // Capture only the suite NAME here: addTeardownBlock takes a @Sendable
+        // closure and UserDefaults is not Sendable, so capturing `defaults`
+        // is a data-race error under strict concurrency.
+        addTeardownBlock { UserDefaults().removePersistentDomain(forName: suiteName) }
         return SettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),

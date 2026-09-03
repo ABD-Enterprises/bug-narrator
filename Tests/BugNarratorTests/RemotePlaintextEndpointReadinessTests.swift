@@ -18,7 +18,10 @@ final class RemotePlaintextEndpointReadinessTests: XCTestCase {
         let suiteName = "\(suiteNamePrefix)-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        // Capture only the suite NAME here: addTeardownBlock takes a @Sendable
+        // closure and UserDefaults is not Sendable, so capturing `defaults`
+        // is a data-race error under strict concurrency.
+        addTeardownBlock { UserDefaults().removePersistentDomain(forName: suiteName) }
 
         return SettingsStore(
             defaults: defaults,
@@ -45,9 +48,19 @@ final class RemotePlaintextEndpointReadinessTests: XCTestCase {
 
         for (relativePath, expectedCount) in expectedSettingsStoreInitCounts {
             let source = try String(contentsOf: rootURL.appendingPathComponent(relativePath), encoding: .utf8)
-            let settingsStoreInitCount = source.components(separatedBy: "SettingsStore(").count - 1
-            let quotedSettingsStoreInitCount = source.components(separatedBy: "\"SettingsStore(\"").count - 1
-            let actualCount = settingsStoreInitCount - quotedSettingsStoreInitCount
+            // Substring counting is wrong twice over here. "SettingsStore(" is a
+            // substring of `makeHermeticSettingsStore(` and `makeSettingsStore(`,
+            // so every HELPER CALL counted as a construction — RoutingAudioRecorder
+            // Tests reported 13 for its single real one. It also matched this
+            // file's own string literals, so the check counted itself.
+            // A preceding-character guard excludes both: an identifier character
+            // before the name means it is part of a longer identifier, and a quote
+            // means it is a literal.
+            let pattern = try NSRegularExpression(pattern: "(?<![A-Za-z0-9_\"])SettingsStore\\(")
+            let actualCount = pattern.numberOfMatches(
+                in: source,
+                range: NSRange(source.startIndex..., in: source)
+            )
 
             XCTAssertEqual(
                 actualCount,
