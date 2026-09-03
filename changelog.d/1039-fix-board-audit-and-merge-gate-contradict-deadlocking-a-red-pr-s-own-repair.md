@@ -1,0 +1,1 @@
+- [FIX] Narrow the effort-leak board audit so a merge-gate `ai/blocked` label does not deadlock an issue already in `ai/in-pr-review` with an open PR. (#1039)
