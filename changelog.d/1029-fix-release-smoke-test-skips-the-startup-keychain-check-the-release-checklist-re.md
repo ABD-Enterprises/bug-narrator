@@ -1,0 +1,1 @@
+- [FIX] Release smoke tests now run the startup keychain probe by default instead of silently skipping the release-checklist gate. (#1029)
