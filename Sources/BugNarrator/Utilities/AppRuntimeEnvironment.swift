@@ -79,6 +79,19 @@ struct AppRuntimeEnvironment: Equatable {
     /// Lets a UI test pin the provider, the way BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS
     /// pins launch-at-login. Only consulted on the isolated-runtime path in
     /// AppBootstrap, so it cannot influence a production launch (#1026).
+    /// Under a deterministic UI-test runtime the local-server reachability probe
+    /// must NOT open a real socket: the suite would then pass on a machine running
+    /// Parakeet and fail in CI, which is exactly the false green that #1026 already
+    /// produced once in the unit suite. Defaults to reachable so the ordinary UI
+    /// path is exercisable; a test that is ABOUT the unreachable state sets "0".
+    var testLocalServerIsReachable: Bool? {
+        guard usesIsolatedRuntime else { return nil }
+        if let raw = environment["BUGNARRATOR_TEST_LOCAL_SERVER_REACHABLE"] {
+            return raw == "1"
+        }
+        return shouldUseDeterministicUITestServices ? true : nil
+    }
+
     var testAIProvider: AIProvider? {
         // Self-guarding on purpose. AppBootstrap only reads this inside the
         // isolated-runtime branch today, but that safety is a property of the
