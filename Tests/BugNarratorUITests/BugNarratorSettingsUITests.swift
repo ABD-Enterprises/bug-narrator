@@ -37,7 +37,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
     @MainActor
     func testSavedOpenAIKeyKeepsSettingsCredentialActionsEnabled() throws {
-        let app = launchSettingsApp(scope: "saved-openai-key-actions", seedCredentials: true)
+        let app = launchSettingsApp(scope: "saved-openai-key-actions", seedCredentials: true, aiProvider: "openAI")
         defer { app.terminate() }
 
         let settingsWindow = app.windows["BugNarrator Settings"]
@@ -121,7 +121,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         // that this test used to establish by typing. Removing the keystrokes
         // without this left those fields empty, which correctly disabled
         // "Load GitHub Repos" — a failure I caused, not one I found.
-        let app = launchSettingsApp(scope: "settings-dialog-full-coverage", seedCredentials: true)
+        let app = launchSettingsApp(scope: "settings-dialog-full-coverage", seedCredentials: true, aiProvider: "openAI")
         defer { app.terminate() }
 
         let settingsWindow = app.windows["BugNarrator Settings"]
@@ -362,13 +362,15 @@ final class BugNarratorSettingsUITests: XCTestCase {
     private func launchSettingsApp(
         scope: String,
         launchAtLoginStatus: String = "disabled",
-        seedCredentials: Bool = false
+        seedCredentials: Bool = false,
+        aiProvider: String? = nil
     ) -> XCUIApplication {
         launchApp(
             scope: scope,
             openSettings: true,
             seedSessionLibrary: seedCredentials,
-            launchAtLoginStatus: launchAtLoginStatus
+            launchAtLoginStatus: launchAtLoginStatus,
+            aiProvider: aiProvider
         )
     }
 
@@ -389,7 +391,11 @@ final class BugNarratorSettingsUITests: XCTestCase {
         openSessionLibrary: Bool = false,
         openRecordingControls: Bool = false,
         seedSessionLibrary: Bool = false,
-        launchAtLoginStatus: String = "disabled"
+        launchAtLoginStatus: String = "disabled",
+        // nil means "use whatever the app's real default is", so UI tests keep
+        // exercising the shipped default unless they explicitly need another
+        // provider. Only tests that assert OpenAI-specific UI pin this (#1026).
+        aiProvider: String? = nil
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["BUGNARRATOR_SETTINGS_UI_SMOKE_TEST"] = "1"
@@ -401,6 +407,9 @@ final class BugNarratorSettingsUITests: XCTestCase {
         app.launchEnvironment["BUGNARRATOR_SEED_SESSION_LIBRARY_UI_TEST_DATA"] = seedSessionLibrary ? "1" : "0"
         app.launchEnvironment["BUGNARRATOR_SETTINGS_UI_SMOKE_SCOPE"] = scope
         app.launchEnvironment["BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS"] = launchAtLoginStatus
+        if let aiProvider {
+            app.launchEnvironment["BUGNARRATOR_TEST_AI_PROVIDER"] = aiProvider
+        }
         app.launch()
         return app
     }

@@ -41,7 +41,13 @@ extension SettingsStore {
     }
 
     var aiProviderConfigurationIsReady: Bool {
-        aiProviderCompatibilityIssue == nil && hasUsableAIProviderCredential
+        switch aiProvider {
+        case .parakeetLocal:
+            return aiProviderCompatibilityIssue == nil &&
+                currentLocalProviderReachability() == .reachable
+        default:
+            return aiProviderCompatibilityIssue == nil && hasUsableAIProviderCredential
+        }
     }
 
     var aiProviderCompatibilityIssue: String? {
@@ -74,6 +80,9 @@ extension SettingsStore {
         case .parakeetLocal:
             if autoExtractIssues {
                 return "Turn off automatic issue extraction or choose a provider with a chat completion model."
+            }
+            guard currentLocalProviderReachability() == .reachable else {
+                return localProviderUnreachableMessage
             }
             return nil
         }

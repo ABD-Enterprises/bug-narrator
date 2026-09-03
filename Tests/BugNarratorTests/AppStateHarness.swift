@@ -32,6 +32,12 @@ struct AppStateHarness {
         autoSaveTranscript: Bool = true,
         autoExtractIssues: Bool = false,
         launchAtLoginStatus: LaunchAtLoginStatus = .disabled,
+        // The default provider is now the LOCAL server, whose readiness depends on
+        // a real socket probe. Without injecting this, the suite's result depends
+        // on whether the machine running it happens to have Parakeet listening on
+        // 8422 — green on a developer box, red in CI (#1026). Tests that are ABOUT
+        // unreachability pass `false` explicitly.
+        localProviderIsReachable: Bool = true,
         screenshotCaptureService: MockScreenshotCaptureService = MockScreenshotCaptureService(),
         screenshotSelectionService: MockScreenshotSelectionService = MockScreenshotSelectionService(),
         debugBundleExporter: MockDebugBundleExporter = MockDebugBundleExporter(),
@@ -54,7 +60,8 @@ struct AppStateHarness {
         let settingsStore = SettingsStore(
             defaults: defaults,
             keychainService: keychainService,
-            launchAtLoginService: launchAtLoginService
+            launchAtLoginService: launchAtLoginService,
+            localProviderReachabilityProbe: { _ in localProviderIsReachable }
         )
         settingsStore.apiKey = apiKey
         settingsStore.debugMode = debugMode

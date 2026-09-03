@@ -14,6 +14,10 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         await harness.appState.validateAPIKey()
 
         XCTAssertEqual(harness.appState.apiKeyValidationState, .success("OpenAI accepted this key."))
@@ -22,6 +26,10 @@ final class AppStateProviderValidationTests: XCTestCase {
     func testValidateAPIKeyWithoutConfiguredKeyShowsFailure() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
+
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
 
         await harness.appState.validateAPIKey()
 
