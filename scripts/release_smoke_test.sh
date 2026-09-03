@@ -8,7 +8,7 @@ DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
 HOST_ARCH="$(uname -m)"
 MACOS_DESTINATION="${MACOS_DESTINATION:-platform=macOS,arch=$HOST_ARCH}"
 CLEAN_LOCAL_BUILD_APPS="${CLEAN_LOCAL_BUILD_APPS:-NO}"
-RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-NO}"
+RUN_STARTUP_KEYCHAIN_SMOKE="${RUN_STARTUP_KEYCHAIN_SMOKE:-YES}"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/BugNarrator.app"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 ENTITLEMENTS_PLIST="$ROOT_DIR/Resources/BugNarrator.entitlements"
@@ -135,7 +135,7 @@ if [[ "$RUN_STARTUP_KEYCHAIN_SMOKE" == "YES" ]]; then
     echo "Running startup keychain smoke test..."
     APP_PATH="$APP_PATH" "$ROOT_DIR/scripts/keychain_startup_smoke_test.sh"
 else
-    echo "Startup keychain smoke test NOT RUN (set RUN_STARTUP_KEYCHAIN_SMOKE=YES to enable)."
+    echo "WARNING: skipping RELEASE_CHECKLIST item 'Confirm first launch does not trigger an unexpected Keychain prompt before the user opens Settings or starts a credential-dependent workflow.' (RUN_STARTUP_KEYCHAIN_SMOKE=$RUN_STARTUP_KEYCHAIN_SMOKE)"
 fi
 
 echo "Release smoke test passed."
