@@ -55,6 +55,11 @@ jq -r -e -n \
   --slurpfile prs "$prs_json" '
     def labels: [.labels[].name];
     def has_label($name): labels | index($name) != null;
+    def has_open_pr($prs; $issue_number):
+      any(
+        $prs[];
+        (.closingIssuesReferences // []) | any(.number == $issue_number)
+      );
     def active_ai:
       has_label("ai/ready-for-work") or
       has_label("ai/in-development") or
@@ -67,7 +72,14 @@ jq -r -e -n \
     (
       [
         $issues_list[]
-        | select(has_label("ai/blocked") and active_ai)
+        | select(
+            has_label("ai/blocked") and
+            active_ai and
+            (
+              (has_label("ai/in-pr-review") and has_open_pr($prs_list; .number))
+              | not
+            )
+          )
         | "Issue #\(.number) is blocked but also carries an active AI workflow label: \([.labels[].name] | join(", "))"
       ] +
       [
