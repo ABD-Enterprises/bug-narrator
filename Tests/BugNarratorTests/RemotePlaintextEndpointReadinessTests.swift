@@ -8,15 +8,57 @@ import XCTest
 @MainActor
 final class RemotePlaintextEndpointReadinessTests: XCTestCase {
     private func makeStore(provider: AIProvider, baseURL: String) -> SettingsStore {
-        let suiteName = "BugNarrator-PlaintextReadiness-\(UUID().uuidString)"
+        let store = makeHermeticSettingsStore(suiteNamePrefix: "BugNarrator-PlaintextReadiness")
+        store.aiProvider = provider
+        store.openAIBaseURL = baseURL
+        return store
+    }
+
+    private func makeHermeticSettingsStore(suiteNamePrefix: String) -> SettingsStore {
+        let suiteName = "\(suiteNamePrefix)-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
-        store.aiProvider = provider
-        store.openAIBaseURL = baseURL
-        return store
+        return SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
+    }
+
+    func testScopedSettingsStoreConstructionsStayCentralized() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let expectedSettingsStoreInitCounts = [
+            "Tests/BugNarratorTests/PrivacyDataExporterTests.swift": 1,
+            "Tests/BugNarratorTests/OnboardingFlowTests.swift": 1,
+            "Tests/BugNarratorTests/IssueExportControllerTests.swift": 1,
+            "Tests/BugNarratorTests/LocalDataDeletionControllerTests.swift": 1,
+            "Tests/BugNarratorTests/PostTranscriptionPipelineControllerTests.swift": 1,
+            "Tests/BugNarratorTests/RoutingAudioRecorderTests.swift": 1,
+            "Tests/BugNarratorTests/DebugBundleExporterTests.swift": 1,
+            "Tests/BugNarratorTests/RemotePlaintextEndpointReadinessTests.swift": 1
+        ]
+
+        for (relativePath, expectedCount) in expectedSettingsStoreInitCounts {
+            let source = try String(contentsOf: rootURL.appendingPathComponent(relativePath), encoding: .utf8)
+            let settingsStoreInitCount = source.components(separatedBy: "SettingsStore(").count - 1
+            let quotedSettingsStoreInitCount = source.components(separatedBy: "\"SettingsStore(\"").count - 1
+            let actualCount = settingsStoreInitCount - quotedSettingsStoreInitCount
+
+            XCTAssertEqual(
+                actualCount,
+                expectedCount,
+                "\(relativePath) must keep SettingsStore construction centralized in one hermetic helper."
+            )
+            XCTAssertTrue(
+                source.contains("makeHermeticSettingsStore"),
+                "\(relativePath) must construct SettingsStore through makeHermeticSettingsStore."
+            )
+        }
     }
 
     // MARK: - Blocked
