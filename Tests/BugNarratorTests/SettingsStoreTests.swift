@@ -430,6 +430,10 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // Pinned: asserts OpenAI-shaped defaults, so it must name the provider
+        // rather than inherit whatever the global default is (#1026).
+        store.aiProvider = .openAI
         store.preferredModel = "  gpt-4o-transcribe  "
         store.languageHint = "  en  "
         store.transcriptionPrompt = "  Focus on tester narration.  "
@@ -549,6 +553,13 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // This test verifies that Local-Compatible REJECTS remote model ids. It
+        // used to inherit whisper-1/gpt-4.1-mini from the global default; with a
+        // local-first default those ids are no longer what a fresh store holds,
+        // so the test now names the values it is actually about (#1026).
+        store.preferredModel = "whisper-1"
+        store.issueExtractionModel = "gpt-4.1-mini"
         store.aiProvider = .localCompatible
 
         XCTAssertEqual(
@@ -627,6 +638,32 @@ final class SettingsStoreTests: XCTestCase {
             store.aiProviderCompatibilityIssue,
             "BugNarrator could not reach the local transcription server at http://localhost:8422. Download bugnarrator-transcription from the BugNarrator releases page, then run ./bugnarrator-transcription --preload in Terminal."
         )
+    }
+
+    /// The point of the local-first default (#1026): a fresh install with NO API
+    /// key is a fully ready configuration. Both reviewers on the D3 decision
+    /// asked for this explicitly — the unreachable case was covered, the SUCCESS
+    /// path was not, so nothing proved the feature's actual claim.
+    func testFreshInstallWithNoAPIKeyIsReadyWhenTheLocalServerIsReachable() {
+        let suiteName = "BugNarrator-SettingsParakeetReady-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            localProviderReachabilityProbe: { _ in true }
+        )
+
+        // Nothing is configured: no provider chosen, no key entered.
+        XCTAssertEqual(store.aiProvider, .parakeetLocal)
+        XCTAssertFalse(store.hasAPIKey)
+
+        // ...and that is a ready configuration, with no credential demanded.
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+        XCTAssertNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
     func testOpenAIProviderConfigurationRequiresUsableCredential() {
@@ -953,6 +990,10 @@ final class SettingsStoreTests: XCTestCase {
             keychainService: MockKeychainService(),
             legacyDefaultsDomains: [legacyDomainName]
         )
+
+        // Pinned: asserts OpenAI-shaped defaults, so it must name the provider
+        // rather than inherit whatever the global default is (#1026).
+        store.aiProvider = .openAI
 
         XCTAssertEqual(store.preferredModel, "whisper-1")
         XCTAssertFalse(store.autoSaveTranscript)

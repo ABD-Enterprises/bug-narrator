@@ -17,6 +17,10 @@ final class DebugBundleExporterTests: XCTestCase {
 
         let keychainService = MockKeychainService()
         let settingsStore = SettingsStore(defaults: defaults, keychainService: keychainService)
+
+        // Pinned: asserts OpenAI-shaped defaults, so it must name the provider
+        // rather than inherit whatever the global default is (#1026).
+        settingsStore.aiProvider = .openAI
         settingsStore.apiKey = "fixture-openai-key"
         settingsStore.preferredModel = "whisper-1"
         settingsStore.issueExtractionModel = "gpt-4.1-mini"

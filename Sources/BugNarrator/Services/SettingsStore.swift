@@ -789,7 +789,7 @@ final class SettingsStore: ObservableObject {
         localProviderReachability = localProviderReachabilityProbe(url) ? .reachable : .unreachable
     }
 
-    fileprivate func currentLocalProviderReachability() -> LocalProviderReachability {
+    func currentLocalProviderReachability() -> LocalProviderReachability {
         guard aiProvider == .parakeetLocal else {
             return .reachable
         }
