@@ -1,0 +1,1 @@
+- [FIX] Make `scripts/validate.sh` report Docker-invisible repo mounts distinctly and fall back to local `semgrep` when available. (#1031)

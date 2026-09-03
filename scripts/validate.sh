@@ -89,6 +89,11 @@ run_semgrep_docker() {
   return 1
 }
 
+semgrep_docker_root_unavailable() {
+  [[ -f "$SEMGREP_OUTPUT_FILE" ]] || return 1
+  grep -Fq 'Invalid scanning root:' "$SEMGREP_OUTPUT_FILE"
+}
+
 run_semgrep_local() {
   if ! command -v semgrep >/dev/null 2>&1; then
     return 2
@@ -119,8 +124,33 @@ else
       semgrep_outcome="pass"
       ;;
     1)
-      cat "$SEMGREP_OUTPUT_FILE" >&2
-      exit 1
+      if semgrep_docker_root_unavailable; then
+        printf 'WARN: docker semgrep could not see repo path %s; trying local semgrep on PATH\n' "$ROOT" >&2
+        set +e
+        run_semgrep_local "${SEMGREP_TARGETS[@]}"
+        local_status=$?
+        set -e
+
+        case "$local_status" in
+          0)
+            printf 'PASS: docker semgrep could not see repo path %s; local semgrep on PATH completed successfully\n' "$ROOT" \
+              >"$SEMGREP_STATUS_FILE"
+            semgrep_outcome="pass"
+            ;;
+          1)
+            cat "$SEMGREP_OUTPUT_FILE" >&2
+            exit 1
+            ;;
+          *)
+            printf 'NOT RUN: docker semgrep could not see repo path %s, and no local semgrep on PATH is available\n' "$ROOT" \
+              >"$SEMGREP_STATUS_FILE"
+            semgrep_outcome="skipped"
+            ;;
+        esac
+      else
+        cat "$SEMGREP_OUTPUT_FILE" >&2
+        exit 1
+      fi
       ;;
     *)
       set +e
