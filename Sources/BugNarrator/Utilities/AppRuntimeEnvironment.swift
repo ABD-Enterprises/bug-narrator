@@ -76,6 +76,20 @@ struct AppRuntimeEnvironment: Equatable {
         )
     }
 
+    /// Lets a UI test pin the provider, the way BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS
+    /// pins launch-at-login. Only consulted on the isolated-runtime path in
+    /// AppBootstrap, so it cannot influence a production launch (#1026).
+    var testAIProvider: AIProvider? {
+        // Self-guarding on purpose. AppBootstrap only reads this inside the
+        // isolated-runtime branch today, but that safety is a property of the
+        // CALL SITE, not of this value — move the read and the guard disappears.
+        // Unknown values return nil via the enum, so a typo is ignored rather
+        // than silently selecting some other provider.
+        guard usesIsolatedRuntime else { return nil }
+        guard let raw = environment["BUGNARRATOR_TEST_AI_PROVIDER"] else { return nil }
+        return AIProvider(rawValue: raw)
+    }
+
     var testLaunchAtLoginStatus: LaunchAtLoginStatus {
         switch environment["BUGNARRATOR_TEST_LAUNCH_AT_LOGIN_STATUS"] {
         case "enabled":

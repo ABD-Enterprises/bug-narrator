@@ -37,6 +37,9 @@ struct AppBootstrap {
                 launchAtLoginService: launchAtLoginService,
                 legacyDefaultsDomains: []
             )
+            if let testProvider = runtimeEnvironment.testAIProvider {
+                self.settingsStore.aiProvider = testProvider
+            }
             self.transcriptStore = TranscriptStore(
                 fileManager: fileManager,
                 storageURL: storageRootURL.appendingPathComponent("sessions.json"),
