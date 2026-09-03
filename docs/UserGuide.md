@@ -381,6 +381,26 @@ BugNarrator does not continuously stream live audio to any AI provider while you
 
 ## More Documentation
 
+## Running The Windows Suite From macOS
+
+If you are running the Windows test suite locally from a macOS worktree, the
+normal `dotnet restore` step can fail to reach `https://api.nuget.org/v3/index.json`
+on this host even when `curl` against the same URL returns HTTP 200. This does
+not affect CI; it is a local-developer workaround only.
+
+From a fresh worktree, restore from the already-populated local NuGet cache,
+then build without restoring again before invoking the PowerShell test harness:
+
+```sh
+dotnet restore windows/BugNarrator.Windows.sln --source "$HOME/.nuget/packages"
+dotnet build windows/BugNarrator.Windows.sln -c Debug --no-restore
+pwsh -File windows/scripts/test-windows.ps1 -Configuration Debug -NoBuild
+```
+
+If you need a release build, switch both commands to `Release` and keep
+`-NoBuild` on the PowerShell step so it reuses the offline-restored build
+output.
+
 - [Quickstart](../QUICKSTART.md)
 - [Distribution and DMG packaging](Distribution.md)
 - [Security Notes](../SECURITY.md)
