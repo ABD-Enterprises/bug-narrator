@@ -66,6 +66,41 @@ public sealed class TranscriptContractFixtureTests
     }
 
     [Fact]
+    public void TranscriptMarkdown_RendersScreenshotLinksByInvertingTimelineMomentRelatedScreenshotId()
+    {
+        var produced = CompletedSessionMarkdownBuilder.Build(
+            ScreenshotLinkageSession(),
+            SessionTimeFormatter.InvariantTimestampOptions);
+
+        // Mirrors macOS TranscriptSession.markdownContent: a resolved associated marker appends
+        // ` linked to **<marker title>**`; an unresolved screenshot line is left unchanged.
+        var expected = string.Join('\n',
+        [
+            "# BugNarrator Transcript",
+            string.Empty,
+            "- Recorded: Mar 17, 2026 at 3:00:00 PM",
+            "- Duration: 02:00",
+            "- Model: whisper-1",
+            "- Language Hint: en",
+            string.Empty,
+            "## Markers",
+            string.Empty,
+            "- **Screenshot 001** at `00:12`",
+            string.Empty,
+            "## Screenshots",
+            string.Empty,
+            "- **screenshot-001.png** at `00:12` linked to **Screenshot 001**",
+            "- **screenshot-002.png** at `00:45`",
+            string.Empty,
+            "## Raw Transcript",
+            string.Empty,
+            "Tester opens Settings and captures screenshots.",
+        ]);
+
+        Assert.Equal(expected, produced);
+    }
+
+    [Fact]
     public void SummaryMarkdownSharedSubset_MatchesTheCommittedGolden()
     {
         var goldenPath = Path.Combine(RepositoryRoot(), "contract-fixtures", "summary.golden.md");
@@ -130,6 +165,63 @@ public sealed class TranscriptContractFixtureTests
                 {
                     Note = "Right edge is cut off at 1280 wide.",
                 },
+            ]);
+    }
+
+    private static CompletedSession ScreenshotLinkageSession()
+    {
+        var createdAt = DateTimeOffset.FromUnixTimeSeconds(1_773_759_600); // 2026-03-17T15:00:00Z
+        var linkedScreenshotId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        var unlinkedScreenshotId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+
+        return new CompletedSession(
+            SessionId: Guid.Parse("00000000-0000-4000-8000-000000000002"),
+            Title: "Settings screenshots",
+            CreatedAt: createdAt,
+            RecordingStartedAt: createdAt,
+            RecordingStoppedAt: createdAt.AddSeconds(120),
+            SessionDirectory: string.Empty,
+            AudioFilePath: string.Empty,
+            MetadataFilePath: string.Empty,
+            TranscriptMarkdownFilePath: string.Empty,
+            TranscriptText: "Tester opens Settings and captures screenshots.",
+            ReviewSummary: string.Empty,
+            TranscriptionStatus: SessionTranscriptionStatus.Completed,
+            TranscriptionModel: "whisper-1",
+            LanguageHint: "en",
+            Prompt: null,
+            TranscriptionFailureMessage: null,
+            IssueExtraction: null,
+            Screenshots:
+            [
+                new ScreenshotArtifact(
+                    linkedScreenshotId,
+                    "screenshots/screenshot-001.png",
+                    string.Empty,
+                    createdAt.AddSeconds(12),
+                    ElapsedSeconds: 12,
+                    Width: 320,
+                    Height: 180,
+                    TimelineLabel: "Screenshot 001"),
+                new ScreenshotArtifact(
+                    unlinkedScreenshotId,
+                    "screenshots/screenshot-002.png",
+                    string.Empty,
+                    createdAt.AddSeconds(45),
+                    ElapsedSeconds: 45,
+                    Width: 320,
+                    Height: 180,
+                    TimelineLabel: "Screenshot 002"),
+            ],
+            TimelineMoments:
+            [
+                new SessionTimelineMoment(
+                    MomentId: Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+                    Kind: "screenshot",
+                    CreatedAt: createdAt.AddSeconds(12),
+                    ElapsedSeconds: 12,
+                    Label: "Screenshot 001",
+                    RelatedScreenshotId: linkedScreenshotId),
             ]);
     }
 
