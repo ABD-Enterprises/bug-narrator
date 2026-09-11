@@ -57,7 +57,7 @@ struct AppStateHarness {
 
         let keychainService = MockKeychainService()
         let launchAtLoginService = MockLaunchAtLoginService(status: launchAtLoginStatus)
-        let settingsStore = SettingsStore(
+        let settingsStore = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychainService,
             launchAtLoginService: launchAtLoginService,
