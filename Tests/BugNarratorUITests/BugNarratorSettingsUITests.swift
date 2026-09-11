@@ -61,6 +61,62 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(waitUntil(removeKeyButton, isEnabled: true), "Remove Key never became enabled")
     }
 
+    @MainActor
+    func testFirstRunAIPaneDefaultsToLocalParakeetAndCanSwitchToOpenAI() throws {
+        let app = launchSettingsApp(scope: "first-run-local-parakeet-default")
+        defer { app.terminate() }
+
+        let settingsWindow = app.windows["BugNarrator Settings"]
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+        waitForSettingsLayout()
+        selectSettingsTab("AI Engines", in: app)
+
+        let providerPicker = app.popUpButtons["AI provider"].firstMatch
+        XCTAssertTrue(waitForSettingsElement(providerPicker, in: settingsWindow))
+        XCTAssertEqual(providerPicker.value as? String, "Local (Parakeet)")
+
+        XCTAssertTrue(app.staticTexts["Local transcription is selected."].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Start the local transcription server before recording."]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.staticTexts["Download bugnarrator-transcription from the releases page, then run in Terminal: ./bugnarrator-transcription --preload"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["No AI provider credential required"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No key required"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Check Server"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Download the local transcription server"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["Issue extraction model not available for Local Parakeet"].waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(app.textFields["OpenAI API Key"].exists)
+
+        selectAIProvider("OpenAI", in: app, settingsWindow: settingsWindow)
+
+        XCTAssertTrue(
+            app.staticTexts["BugNarrator requires your own AI provider configuration."].waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.staticTexts["BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction."]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.staticTexts["Transcription and issue extraction use the selected provider and may incur charges on that provider account."]
+                .waitForExistence(timeout: 5)
+        )
+
+        let openAIKeyField = app.textFields["OpenAI API Key"]
+        XCTAssertTrue(waitForSettingsElement(openAIKeyField, in: settingsWindow))
+        XCTAssertTrue(button(matchingAnyOf: ["Save & Validate Key", "Validate Key"], in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No key saved"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code."]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
     // testSettingsCredentialFieldsAcceptTypingWithoutLockingWindow was deleted
     // here (#949, operator decision 2026-08-10).
     //
@@ -627,6 +683,29 @@ final class BugNarratorSettingsUITests: XCTestCase {
         }
         XCTAssertEqual(tab.value as? Int, 1, "Settings section '\(section)' did not become selected")
         waitForSettingsLayout(interval: 0.3)
+    }
+
+    @MainActor
+    private func selectAIProvider(_ provider: String, in app: XCUIApplication, settingsWindow: XCUIElement) {
+        let picker = app.popUpButtons["AI provider"].firstMatch
+        XCTAssertTrue(waitForSettingsElement(picker, in: settingsWindow), "AI provider picker not found")
+
+        let deadline = Date().addingTimeInterval(10)
+        while (picker.value as? String) != provider, Date() < deadline {
+            app.activate()
+            if picker.isHittable {
+                picker.click()
+            } else {
+                picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            }
+
+            let menuItem = app.menuItems[provider].firstMatch
+            XCTAssertTrue(menuItem.waitForExistence(timeout: 2), "AI provider option '\(provider)' not found")
+            menuItem.click()
+            waitForSettingsLayout(interval: 0.3)
+        }
+
+        XCTAssertEqual(picker.value as? String, provider, "AI provider '\(provider)' was not selected")
     }
 
     /// Lists the buttons actually present, so a missing-control failure says what
