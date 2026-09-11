@@ -139,6 +139,13 @@ final class TranscriptStoreTests: XCTestCase {
         let session = makeSampleTranscriptSession(index: 1)
         try TranscriptStore(storageURL: storage).add(session)
         try JSONEncoder().encode([session]).write(to: storage)
+        // Older indexes used preview-only search metadata; it is not body identity.
+        let indexURL = root.appendingPathComponent("sessions.index.json")
+        var index = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: indexURL)) as? [String: Any])
+        var entries = try XCTUnwrap(index["entries"] as? [[String: Any]])
+        entries[0]["searchIndexText"] = "old preview-only search text"
+        index["entries"] = entries
+        try JSONSerialization.data(withJSONObject: index).write(to: indexURL)
         try Data("corrupt".utf8).write(to: root.appendingPathComponent("sessions.index.backup.json"))
         let reloaded = TranscriptStore(storageURL: storage)
         XCTAssertEqual(reloaded.session(with: session.id), session)

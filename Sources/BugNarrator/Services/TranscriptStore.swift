@@ -380,7 +380,7 @@ final class TranscriptStore: ObservableObject {
             throw AppError.storageFailure("The migrated session index could not be verified.")
         }
         for entry in entries {
-            guard let session = loadSessionFile(with: entry.id), SessionLibraryEntry(session: session) == entry else {
+            guard let session = loadSessionFile(with: entry.id), session.id == entry.id else {
                 throw AppError.storageFailure("A migrated session body could not be verified.")
             }
         }
