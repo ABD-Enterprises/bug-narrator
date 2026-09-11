@@ -5,7 +5,6 @@ import Foundation
 
 @MainActor
 final class LocalTranscriptionManager: ObservableObject {
-    static let shared = LocalTranscriptionManager()
     static let assetName = "bugnarrator-transcription-macos-arm64.dmg"
     nonisolated static let publisherRequirement = "=anchor apple generic and certificate leaf[subject.OU] = \"2R4WAH4R53\""
 
@@ -61,6 +60,12 @@ final class LocalTranscriptionManager: ObservableObject {
             .sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.stop() }
             }
+    }
+
+    static func isolated(directory: URL) -> LocalTranscriptionManager {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [IsolatedLocalServerURLProtocol.self]
+        return LocalTranscriptionManager(directory: directory, session: URLSession(configuration: configuration), dependencies: .isolated)
     }
 
     static func selectPackage(from releases: [Release]) -> Package? {
@@ -313,6 +318,12 @@ final class LocalTranscriptionManager: ObservableObject {
         var verify: @Sendable (URL) async throws -> Void
         var launch: @MainActor @Sendable (URL, URL, @escaping @MainActor @Sendable (Int32, String) -> Void) throws -> any LocalServerProcess
 
+        static let isolated = Dependencies(
+            install: { _, _, _, _ in throw Failure("Server installation is disabled in the isolated runtime.") },
+            verify: { _ in throw Failure("Server launch is disabled in the isolated runtime.") },
+            launch: { _, _, _ in throw Failure("Server launch is disabled in the isolated runtime.") }
+        )
+
         static let live = Dependencies(
             install: { image, checksum, size, directory in
                 try await background { try installImage(image, checksum: checksum, expectedSize: size, directory: directory) }
@@ -425,4 +436,14 @@ private final class ManagedLocalServerProcess: LocalServerProcess {
             if process.isRunning { kill(process.processIdentifier, SIGKILL) }
         }
     }
+}
+
+/// An instance-scoped transport barrier: test controls never open a real connection.
+private final class IsolatedLocalServerURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+    override func stopLoading() {}
 }

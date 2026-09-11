@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
 
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
+    let localTranscriptionManager: LocalTranscriptionManager
     let trackerIntegration: TrackerIntegrationController
     let aiProviderSettings: AIProviderSettingsController
     let recordingTimer: RecordingTimerViewModel
@@ -77,13 +78,15 @@ final class AppState: ObservableObject {
     convenience init(
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
-        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(),
+        localTranscriptionManager: LocalTranscriptionManager? = nil
     ) {
         self.init(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
             services: .production(settingsStore: settingsStore),
-            runtimeEnvironment: runtimeEnvironment
+            runtimeEnvironment: runtimeEnvironment,
+            localTranscriptionManager: localTranscriptionManager
         )
     }
 
@@ -91,7 +94,8 @@ final class AppState: ObservableObject {
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
         services: AppServiceContainer,
-        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(),
+        localTranscriptionManager: LocalTranscriptionManager? = nil
     ) {
         self.init(
             settingsStore: settingsStore,
@@ -113,7 +117,8 @@ final class AppState: ObservableObject {
             telemetryRecorder: services.telemetryRecorder,
             localPrivacyDataManager: services.localPrivacyDataManager,
             recordingTimer: services.recordingTimer,
-            runtimeEnvironment: runtimeEnvironment
+            runtimeEnvironment: runtimeEnvironment,
+            localTranscriptionManager: localTranscriptionManager
         )
     }
 
@@ -137,10 +142,14 @@ final class AppState: ObservableObject {
         telemetryRecorder: any OperationalTelemetryRecording,
         localPrivacyDataManager: any LocalPrivacyDataManaging,
         recordingTimer: RecordingTimerViewModel,
-        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment()
+        runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(),
+        localTranscriptionManager: LocalTranscriptionManager? = nil
     ) {
         self.settingsStore = settingsStore
         self.transcriptStore = transcriptStore
+        self.localTranscriptionManager = localTranscriptionManager ?? (runtimeEnvironment.usesIsolatedRuntime
+            ? .isolated(directory: FileManager.default.temporaryDirectory.appendingPathComponent("BugNarrator-LocalServer-\(UUID())", isDirectory: true))
+            : LocalTranscriptionManager())
         self.recordingTimer = recordingTimer
         let presentationState = AppPresentationState()
         self.presentationState = presentationState

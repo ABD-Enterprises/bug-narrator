@@ -9,7 +9,7 @@ final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private lazy var termination = AppTerminationCoordinator(
         shouldTerminate: { Self.appState?.applicationShouldTerminate() ?? .terminateNow },
-        shutdown: { await LocalTranscriptionManager.shared.shutdown() },
+        shutdown: { await Self.appState?.localTranscriptionManager.shutdown() },
         setTerminationPending: { Self.appState?.setTerminationPending($0) }
     )
 
