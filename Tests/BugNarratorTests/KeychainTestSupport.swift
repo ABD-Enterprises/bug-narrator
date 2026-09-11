@@ -68,13 +68,15 @@ func makeIsolatedSettingsStore(
     keychainService: KeychainServicing = MockKeychainService(),
     launchAtLoginService: any LaunchAtLoginControlling = MockLaunchAtLoginService(),
     legacyDefaultsDomains: [String]? = nil,
-    localProviderReachabilityProbe: ((URL) -> Bool)? = { _ in false }
+    localProviderReachabilityProbe: ((URL) -> Bool)? = { _ in false },
+    localProviderSession: URLSession = .shared
 ) -> SettingsStore {
     SettingsStore(
         defaults: defaults,
         keychainService: keychainService,
         launchAtLoginService: launchAtLoginService,
         legacyDefaultsDomains: legacyDefaultsDomains,
-        localProviderReachabilityProbe: localProviderReachabilityProbe ?? { _ in false }
+        localProviderReachabilityProbe: localProviderReachabilityProbe ?? { _ in false },
+        localProviderSession: localProviderSession
     )
 }

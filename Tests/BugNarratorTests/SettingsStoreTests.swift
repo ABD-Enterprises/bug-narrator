@@ -4,22 +4,29 @@ import XCTest
 @testable import BugNarrator
 
 final class SettingsStoreTests: XCTestCase {
-    func testIsolatedSettingsFactoryNeverStartsHealthRequests() async {
+    func testIsolatedSettingsFactoryNeverStartsHealthRequests() async throws {
         let name = "BugNarrator-IsolatedFactory-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
-        let request = expectation(description: "No real health requests")
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            MockURLProtocol.requestHandler = nil
+        }
+        let session = makeMockURLSession()
+        defer { session.invalidateAndCancel() }
+        // Positive control: this session intercepts requests without changing the
+        // app host's shared session or observing unrelated background traffic.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("intercepted".utf8))
+        }
+        let (control, _) = try await session.data(from: URL(string: "http://127.0.0.1:9999/health")!)
+        XCTAssertEqual(String(decoding: control, as: UTF8.self), "intercepted")
+        let request = expectation(description: "No health requests from isolated store")
         request.isInverted = true
         MockURLProtocol.requestHandler = { _ in
             request.fulfill()
             throw URLError(.notConnectedToInternet)
         }
-        URLProtocol.registerClass(MockURLProtocol.self)
-        defer {
-            URLProtocol.unregisterClass(MockURLProtocol.self)
-            MockURLProtocol.requestHandler = nil
-        }
-        let store = makeIsolatedSettingsStore(defaults: defaults)
+        let store = makeIsolatedSettingsStore(defaults: defaults, localProviderSession: session)
         XCTAssertEqual(store.aiProvider, .parakeetLocal)
         XCTAssertEqual(store.currentLocalProviderReachability(), .unreachable)
         store.openAIBaseURL = "http://127.0.0.1:9999"
