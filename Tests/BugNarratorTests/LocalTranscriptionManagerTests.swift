@@ -5,6 +5,75 @@ import XCTest
 
 final class LocalTranscriptionManagerTests: XCTestCase {
     @MainActor
+    func testPendingQuitBlocksActualRecordingStartAndReleasesOnRejection() async {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+        let gate = ShutdownTestGate()
+        var allowed = true
+        let replied = expectation(description: "Rejected quit releases admission")
+        let coordinator = AppTerminationCoordinator(
+            shouldTerminate: { allowed ? harness.appState.applicationShouldTerminate() : .terminateCancel },
+            shutdown: { await gate.wait() },
+            setTerminationPending: { harness.appState.setTerminationPending($0) }
+        )
+        XCTAssertEqual(coordinator.request { result in
+            XCTAssertFalse(result)
+            replied.fulfill()
+        }, .terminateLater)
+        // This attempt occurs before the cleanup Task even gets a turn.
+        await harness.appState.startSession()
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
+        XCTAssertTrue(harness.appState.localServerControlsDisabled)
+        allowed = false
+        await gate.release()
+        await fulfillment(of: [replied], timeout: 2)
+        XCTAssertFalse(harness.appState.localServerControlsDisabled)
+        await harness.appState.startSession()
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
+    }
+
+    @MainActor
+    func testRecordingStartupAndTranscriptionGuardServerActionsAndQuit() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        try Data("fixture".utf8).write(to: fixture.destination.appendingPathComponent("bugnarrator-transcription"))
+        let process = FakeLocalServerProcess()
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.verify = { _ in }
+        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
+        manager.start()
+        await waitUntil { manager.running }
+        XCTAssertTrue(manager.running)
+        harness.audioRecorder.suspendStart = true
+        let start = Task { await harness.appState.startSession() }
+        await waitUntil { harness.audioRecorder.startCallCount == 1 }
+        XCTAssertNil(harness.appState.activeRecordingSession)
+        XCTAssertEqual(harness.appState.status.phase, .idle)
+        XCTAssertEqual(harness.appState.applicationShouldTerminate(), .terminateCancel)
+        harness.appState.stopLocalServer(manager)
+        XCTAssertFalse(process.terminated)
+        // Remove is guarded even if a process exits naturally during startup.
+        process.onExit?(0, "")
+        harness.appState.removeLocalServer(manager)
+        XCTAssertTrue(manager.installed)
+        harness.audioRecorder.resumeStart()
+        await start.value
+        XCTAssertEqual(harness.appState.applicationShouldTerminate(), .terminateCancel)
+        harness.appState.presentationState.setStatus(.transcribing(), error: nil)
+        XCTAssertTrue(harness.appState.localServerControlsDisabled)
+        XCTAssertEqual(harness.appState.applicationShouldTerminate(), .terminateCancel)
+        harness.appState.removeLocalServer(manager)
+        XCTAssertTrue(manager.installed)
+        harness.appState.presentationState.setStatus(.idle(), error: nil)
+        harness.appState.removeLocalServer(manager)
+        XCTAssertFalse(manager.installed)
+    }
+
+    @MainActor
     func testTerminationVetoDoesNotStartCleanup() {
         let coordinator = AppTerminationCoordinator(shouldTerminate: { .terminateCancel }, shutdown: {
             XCTFail("Recording/transcription veto must precede cleanup")

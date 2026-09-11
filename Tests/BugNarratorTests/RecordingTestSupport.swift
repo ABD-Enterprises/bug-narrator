@@ -17,6 +17,8 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     var cancelPreserveArguments: [Bool] = []
     var startError: Error?
     var stopResults: [Result<RecordedAudio, Error>] = []
+    var suspendStart = false
+    private var startContinuation: CheckedContinuation<Void, Never>?
     var suspendStop = false
     var permissionState: MicrophonePermissionState = .authorized
     var requestedPermissionStates: [MicrophonePermissionState] = []
@@ -71,10 +73,17 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 
     func startRecording() async throws {
         startCallCount += 1
+        if suspendStart { await withCheckedContinuation { startContinuation = $0 } }
 
         if let startError {
             throw startError
         }
+    }
+
+    func resumeStart() {
+        suspendStart = false
+        startContinuation?.resume()
+        startContinuation = nil
     }
 
     func stopRecording() async throws -> RecordedAudio {

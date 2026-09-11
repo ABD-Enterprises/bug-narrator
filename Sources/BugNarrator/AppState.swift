@@ -421,6 +421,7 @@ final class AppState: ObservableObject {
             transcriptionClient: transcriptionClient
         )
         let applicationTerminationController = ApplicationTerminationController(
+            isRecordingInProgress: { recordingSessionController.hasInFlightRecordingWork(statusPhase: presentationState.status.phase) },
             statusPhase: { presentationState.status.phase },
             activeRecordingSession: { recordingSessionController.activeRecordingSession },
             isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
@@ -574,7 +575,26 @@ final class AppState: ObservableObject {
     var activeRecordingSession: RecordingSessionDraft? {
         recordingSessionController.activeRecordingSession
     }
+    var localServerControlsDisabled: Bool {
+        recordingSessionController.terminationPending || recordingSessionController.hasInFlightRecordingWork(statusPhase: status.phase)
+    }
+
+    func stopLocalServer(_ manager: LocalTranscriptionManager) {
+        guard !localServerControlsDisabled else { return }
+        manager.stop()
+    }
+
+    func removeLocalServer(_ manager: LocalTranscriptionManager) {
+        guard !localServerControlsDisabled else { return }
+        manager.remove()
+    }
+
+    func setTerminationPending(_ pending: Bool) {
+        recordingSessionController.setTerminationPending(pending)
+    }
+
     func startSession() async {
+        guard !recordingSessionController.terminationPending else { return }
         recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
         if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
@@ -791,6 +811,7 @@ final class AppState: ObservableObject {
     }
 
     func retryPendingTranscription(for sessionID: UUID) async {
+        guard !localServerControlsDisabled else { return }
         let retryContext: PendingTranscriptionRetryContext
         switch transcriptionRecovery.retryContext(
             for: sessionID,
