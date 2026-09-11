@@ -537,36 +537,19 @@ final class SettingsStore: ObservableObject {
         return components.url ?? fallback
     }
 
-    static func probeLocalProviderReachability(at url: URL) -> Bool {
-        guard let host = url.host, !host.isEmpty else {
+    static func isHealthyLocalProvider(data: Data?, response: URLResponse?) -> Bool {
+        guard let response = response as? HTTPURLResponse,
+              response.statusCode == 200,
+              let data,
+              let health = try? JSONDecoder().decode(LocalProviderHealth.self, from: data) else {
             return false
         }
+        return health.status == "ok"
+    }
 
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 0.35
-        configuration.timeoutIntervalForResource = 0.35
-        let session = URLSession(configuration: configuration)
-        let semaphore = DispatchSemaphore(value: 0)
-        var isReachable = false
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let task = session.dataTask(with: request) { _, response, _ in
-            if response != nil {
-                isReachable = true
-            }
-            semaphore.signal()
-        }
-
-        task.resume()
-        let completed = semaphore.wait(timeout: .now() + 0.4) == .success
-        if !completed {
-            task.cancel()
-        }
-        session.invalidateAndCancel()
-        return completed && isReachable
+    private struct LocalProviderHealth: Decodable {
+        let status: String
+        let model_loaded: Bool
     }
 
     /// Whether `host` denotes a loopback / private / link-local / `.local`
@@ -778,6 +761,10 @@ final class SettingsStore: ObservableObject {
     }
 
     private func refreshLocalProviderReachabilityIfNeeded() {
+        localProviderRefresh?.cancel()
+        localProviderTask?.cancel()
+        let requestID = UUID()
+        localProviderRequestID = requestID
         guard aiProvider == .parakeetLocal else {
             localProviderReachability = .unknown
             lastLocalProviderReachabilityURL = nil
@@ -786,20 +773,49 @@ final class SettingsStore: ObservableObject {
 
         let url = openAIBaseURLValue
         lastLocalProviderReachabilityURL = url
-        localProviderReachability = localProviderReachabilityProbe(url) ? .reachable : .unreachable
+        if let localProviderReachabilityProbe {
+            // Injected probes keep isolated tests synchronous and network-free.
+            localProviderReachability = localProviderReachabilityProbe(url) ? .reachable : .unreachable
+            return
+        }
+
+        var request = URLRequest(url: url.appendingPathComponent("health"))
+        request.timeoutInterval = 2
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        localProviderTask = localProviderSession.dataTaskPublisher(for: request)
+            .map { Self.isHealthyLocalProvider(data: $0.data, response: $0.response) }
+            .replaceError(with: false)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] reachable in
+                guard let self, self.localProviderRequestID == requestID,
+                      self.aiProvider == .parakeetLocal else { return }
+                self.localProviderTask = nil
+                let result: LocalProviderReachability = reachable ? .reachable : .unreachable
+                if self.localProviderReachability != result {
+                    self.localProviderReachability = result
+                }
+                let refresh = DispatchWorkItem { [weak self] in
+                    self?.refreshLocalProviderReachabilityIfNeeded()
+                }
+                self.localProviderRefresh = refresh
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: refresh)
+            }
     }
 
     func currentLocalProviderReachability() -> LocalProviderReachability {
-        guard aiProvider == .parakeetLocal else {
-            return .reachable
+        guard aiProvider == .parakeetLocal else { return .reachable }
+        if let localProviderReachabilityProbe {
+            return localProviderReachabilityProbe(openAIBaseURLValue) ? .reachable : .unreachable
         }
-
-        let url = openAIBaseURLValue
-        if lastLocalProviderReachabilityURL != url || localProviderReachability == .unknown {
+        if lastLocalProviderReachabilityURL != openAIBaseURLValue {
             refreshLocalProviderReachabilityIfNeeded()
         }
-
         return localProviderReachability
+    }
+
+    deinit {
+        localProviderTask?.cancel()
+        localProviderRefresh?.cancel()
     }
 
     var jiraExportConfiguration: JiraExportConfiguration? {
@@ -832,7 +848,11 @@ final class SettingsStore: ObservableObject {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let legacyDefaultsDomains: [String]
-    private let localProviderReachabilityProbe: (URL) -> Bool
+    private let localProviderReachabilityProbe: ((URL) -> Bool)?
+    private var localProviderTask: AnyCancellable?
+    private let localProviderSession: URLSession
+    private var localProviderRefresh: DispatchWorkItem?
+    private var localProviderRequestID = UUID()
     private var hasLoaded = false
     private var isSynchronizingHotkeys = false
     private var isSynchronizingLaunchAtLogin = false
@@ -846,7 +866,8 @@ final class SettingsStore: ObservableObject {
         keychainService: KeychainServicing = KeychainService(),
         launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
         legacyDefaultsDomains: [String]? = nil,
-        localProviderReachabilityProbe: @escaping (URL) -> Bool = SettingsStore.probeLocalProviderReachability
+        localProviderReachabilityProbe: ((URL) -> Bool)? = nil,
+        localProviderSession: URLSession = .shared
     ) {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
@@ -854,6 +875,7 @@ final class SettingsStore: ObservableObject {
         self.secretStore = KeychainSecretStore(keychainService: keychainService)
         self.launchAtLoginService = launchAtLoginService
         self.localProviderReachabilityProbe = localProviderReachabilityProbe
+        self.localProviderSession = localProviderSession
         if let legacyDefaultsDomains {
             self.legacyDefaultsDomains = legacyDefaultsDomains
         } else if defaults === UserDefaults.standard {
