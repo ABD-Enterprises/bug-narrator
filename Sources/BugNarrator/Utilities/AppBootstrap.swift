@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 
+@MainActor
 struct AppBootstrap {
     enum StorageMode: Equatable {
         case production
@@ -10,6 +11,7 @@ struct AppBootstrap {
     let storageMode: StorageMode
     let settingsStore: SettingsStore
     let transcriptStore: TranscriptStore
+    let localTranscriptionManager: LocalTranscriptionManager
     let isolatedDefaultsSuiteName: String?
     let isolatedStorageRootURL: URL?
 
@@ -55,6 +57,7 @@ struct AppBootstrap {
                 storageURL: storageRootURL.appendingPathComponent("sessions.json"),
                 artifactsRemover: Self.makeArtifactsRemover()
             )
+            self.localTranscriptionManager = .isolated(directory: storageRootURL.appendingPathComponent("LocalTranscription", isDirectory: true))
             self.isolatedDefaultsSuiteName = defaultsSuiteName
             self.isolatedStorageRootURL = storageRootURL
             return
@@ -64,6 +67,7 @@ struct AppBootstrap {
         self.storageMode = .production
         self.settingsStore = SettingsStore(launchAtLoginService: launchAtLoginService)
         self.transcriptStore = TranscriptStore(artifactsRemover: Self.makeArtifactsRemover())
+        self.localTranscriptionManager = LocalTranscriptionManager()
         self.isolatedDefaultsSuiteName = nil
         self.isolatedStorageRootURL = nil
     }
@@ -107,7 +111,8 @@ enum UITestRuntimeSupport {
         settingsStore: SettingsStore,
         transcriptStore: TranscriptStore,
         runtimeEnvironment: AppRuntimeEnvironment,
-        storageRootURL: URL?
+        storageRootURL: URL?,
+        localTranscriptionManager: LocalTranscriptionManager? = nil
     ) -> AppState {
         let rootURL = storageRootURL ?? FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-UITestRuntime", isDirectory: true)
@@ -133,7 +138,8 @@ enum UITestRuntimeSupport {
             telemetryRecorder: OperationalTelemetryRecorder(),
             localPrivacyDataManager: LocalPrivacyDataManager(),
             recordingTimer: RecordingTimerViewModel(),
-            runtimeEnvironment: runtimeEnvironment
+            runtimeEnvironment: runtimeEnvironment,
+            localTranscriptionManager: localTranscriptionManager
         )
     }
 
