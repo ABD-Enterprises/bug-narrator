@@ -16,7 +16,7 @@ final class DebugBundleExporterTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         let keychainService = MockKeychainService()
-        let settingsStore = SettingsStore(defaults: defaults, keychainService: keychainService)
+        let settingsStore = makeHermeticSettingsStore(defaults: defaults, keychainService: keychainService)
         settingsStore.apiKey = "fixture-openai-key"
         settingsStore.preferredModel = "whisper-1"
         settingsStore.issueExtractionModel = "gpt-4.1-mini"
@@ -80,5 +80,16 @@ final class DebugBundleExporterTests: XCTestCase {
         let recentLog = try String(contentsOf: bundleURL.appendingPathComponent("recent-log.txt"))
         XCTAssertTrue(recentLog.contains("debug bundle"))
         XCTAssertFalse(recentLog.contains("fixture-openai-key"))
+    }
+
+    private func makeHermeticSettingsStore(
+        defaults: UserDefaults,
+        keychainService: MockKeychainService
+    ) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: keychainService,
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
     }
 }

@@ -363,11 +363,7 @@ private final class IssueExportControllerHarness {
         defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
-        settingsStore = SettingsStore(
-            defaults: defaults,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+        settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
         settingsStore.apiKey = "test-api-key"
 
         transcriptStore = TranscriptStore(
@@ -451,6 +447,14 @@ private final class IssueExportControllerHarness {
             XCTFail("Expected export preflight success, got \(failure.error)", file: file, line: line)
             throw failure.error
         }
+    }
+
+    private static func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
     }
 
     func cleanup() {

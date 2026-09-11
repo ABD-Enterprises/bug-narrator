@@ -211,7 +211,7 @@ final class OnboardingFlowTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeHermeticSettingsStore(defaults: defaults)
         store.markChangelogShown(version: "1.0.41")
 
         let changelog = store.shouldAutoShowChangelog(currentVersion: "1.0.42", hasExistingUserState: false)
@@ -269,6 +269,14 @@ final class OnboardingFlowTests: XCTestCase {
             .appendingPathComponent("BugNarrator-OnboardingFlowTests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         return directoryURL
+    }
+
+    private func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
     }
 
 }

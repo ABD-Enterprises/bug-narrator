@@ -220,7 +220,15 @@ final class RoutingAudioRecorderTests: XCTestCase {
         let suiteName = "BugNarrator-RoutingAudioRecorderTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeHermeticSettingsStore(defaults: defaults)
         return (store, defaults, suiteName)
+    }
+
+    private func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
     }
 }

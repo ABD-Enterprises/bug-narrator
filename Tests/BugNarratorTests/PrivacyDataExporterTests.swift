@@ -11,11 +11,7 @@ final class PrivacyDataExporterTests: XCTestCase {
 
         let exporter = PrivacyDataExporter()
         let session = makeSampleTranscriptSession(index: 1)
-        let settingsStore = SettingsStore(
-            defaults: UserDefaults(suiteName: "BugNarrator-PrivacyDataExporterTests-\(UUID().uuidString)") ?? .standard,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+        let settingsStore = makeHermeticSettingsStore(suiteNamePrefix: "BugNarrator-PrivacyDataExporterTests")
         settingsStore.githubToken = "github_pat_secret"
         settingsStore.jiraAPIToken = "jira-secret"
         settingsStore.jiraEmail = "person@example.com"
@@ -88,8 +84,8 @@ final class PrivacyDataExporterTests: XCTestCase {
                     count: sessions.count,
                     forEach: { body in try sessions.forEach(body) }
                 ),
-                settings: Self.makeFixtureSettings(),
-                diagnostics: Self.makeFixtureDiagnostics(),
+                settings: makeFixtureSettings(),
+                diagnostics: makeFixtureDiagnostics(),
                 to: rootDirectoryURL
             )
             let streamedData = try Data(contentsOf: exportURL.appendingPathComponent("sessions.json"))
@@ -133,8 +129,8 @@ final class PrivacyDataExporterTests: XCTestCase {
 
         let exportURL = try PrivacyDataExporter().writeBundle(
             sessions: stream,
-            settings: Self.makeFixtureSettings(),
-            diagnostics: Self.makeFixtureDiagnostics(),
+            settings: makeFixtureSettings(),
+            diagnostics: makeFixtureDiagnostics(),
             to: rootDirectoryURL
         )
 
@@ -169,8 +165,8 @@ final class PrivacyDataExporterTests: XCTestCase {
 
         let exportURL = try PrivacyDataExporter().writeBundle(
             sessions: stream,
-            settings: Self.makeFixtureSettings(),
-            diagnostics: Self.makeFixtureDiagnostics(),
+            settings: makeFixtureSettings(),
+            diagnostics: makeFixtureDiagnostics(),
             to: rootDirectoryURL
         )
 
@@ -188,16 +184,12 @@ final class PrivacyDataExporterTests: XCTestCase {
         XCTAssertEqual(manifest?["sessionCount"] as? Int, writable.count)
     }
 
-    private static func makeFixtureSettings() -> PrivacyDataExportSettingsSnapshot {
-        let settingsStore = SettingsStore(
-            defaults: UserDefaults(suiteName: "BugNarrator-PrivacyFixture-\(UUID().uuidString)") ?? .standard,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+    private func makeFixtureSettings() -> PrivacyDataExportSettingsSnapshot {
+        let settingsStore = makeHermeticSettingsStore(suiteNamePrefix: "BugNarrator-PrivacyFixture")
         return PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore)
     }
 
-    private static func makeFixtureDiagnostics() -> PrivacyDataExportDiagnosticsSnapshot {
+    private func makeFixtureDiagnostics() -> PrivacyDataExportDiagnosticsSnapshot {
         PrivacyDataExportDiagnosticsSnapshot(
             appName: "BugNarrator",
             versionDescription: "1.0.0 (1)",
@@ -301,15 +293,11 @@ final class PrivacyDataExporterTests: XCTestCase {
             "Precondition: the stored body is encrypted, which is what makes migration lossy."
         )
 
-        let settingsStore = SettingsStore(
-            defaults: UserDefaults(suiteName: "BugNarrator-ExportEscapeHatch-\(UUID().uuidString)") ?? .standard,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+        let settingsStore = makeHermeticSettingsStore(suiteNamePrefix: "BugNarrator-ExportEscapeHatch")
         let bundleURL = try PrivacyDataExporter().writeBundle(
             sessions: store.privacyExportSessionStream(),
             settings: PrivacyDataExportSettingsSnapshot(settingsStore: settingsStore),
-            diagnostics: Self.makeFixtureDiagnostics(),
+            diagnostics: makeFixtureDiagnostics(),
             to: rootDirectoryURL
         )
 
@@ -317,6 +305,21 @@ final class PrivacyDataExporterTests: XCTestCase {
         XCTAssertNotNil(
             exported.range(of: Data(secret.utf8)),
             "The export must be readable without the device-only key, or it is not an escape hatch."
+        )
+    }
+
+    private func makeHermeticSettingsStore(suiteNamePrefix: String) -> SettingsStore {
+        let suiteName = "\(suiteNamePrefix)-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        // Capture only the suite NAME here: addTeardownBlock takes a @Sendable
+        // closure and UserDefaults is not Sendable, so capturing `defaults`
+        // is a data-race error under strict concurrency.
+        addTeardownBlock { UserDefaults().removePersistentDomain(forName: suiteName) }
+        return SettingsStore(
+            defaults: defaults,
+            keychainService: MockKeychainService(),
+            launchAtLoginService: MockLaunchAtLoginService()
         )
     }
 
