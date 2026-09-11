@@ -6,7 +6,7 @@ struct AISetupSectionsView: View {
     let secureControlsDisabled: Bool
 
     @State private var revealCredential = false
-    @StateObject private var localServer = LocalTranscriptionManager.shared
+    @ObservedObject var localServer: LocalTranscriptionManager
 
     var body: some View {
         GroupBox("AI Provider Setup") {
@@ -446,7 +446,7 @@ struct AISetupSectionsView: View {
             Button("Use OpenAI instead") { settingsStore.aiProvider = .openAI }
         }
         .task {
-            if !AppRuntimeEnvironment().usesIsolatedRuntime { await localServer.discover() }
+            await localServer.discover()
         }
     }
 

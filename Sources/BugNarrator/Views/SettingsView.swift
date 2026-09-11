@@ -166,7 +166,8 @@ struct SettingsView: View {
             AISetupSectionsView(
                 appState: appState,
                 settingsStore: settingsStore,
-                secureControlsDisabled: secureControlsDisabled
+                secureControlsDisabled: secureControlsDisabled,
+                localServer: appState.localTranscriptionManager
             )
         }
     }

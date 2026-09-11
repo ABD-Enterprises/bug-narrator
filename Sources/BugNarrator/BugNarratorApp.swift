@@ -135,20 +135,23 @@ struct BugNarratorApp: App {
                 settingsStore: settingsStore,
                 transcriptStore: transcriptStore,
                 runtimeEnvironment: runtimeEnvironment,
-                storageRootURL: bootstrap.isolatedStorageRootURL
+                storageRootURL: bootstrap.isolatedStorageRootURL,
+                localTranscriptionManager: bootstrap.localTranscriptionManager
             )
         } else {
             appState = AppState(
                 settingsStore: settingsStore,
                 transcriptStore: transcriptStore,
-                runtimeEnvironment: runtimeEnvironment
+                runtimeEnvironment: runtimeEnvironment,
+                localTranscriptionManager: bootstrap.localTranscriptionManager
             )
         }
         #else
         appState = AppState(
             settingsStore: settingsStore,
             transcriptStore: transcriptStore,
-            runtimeEnvironment: runtimeEnvironment
+            runtimeEnvironment: runtimeEnvironment,
+            localTranscriptionManager: bootstrap.localTranscriptionManager
         )
         #endif
         let windowCoordinator = WindowCoordinator(
