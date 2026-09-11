@@ -620,6 +620,64 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
     }
 
+    func testAutomaticParakeetProbeRecoversWithoutChangingProvider() {
+        let suiteName = "BugNarrator-AutomaticReadiness-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            MockURLProtocol.requestHandler = nil
+        }
+        var requests = 0
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/health")
+            requests += 1
+            let code = requests == 1 ? 503 : 200
+            return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!,
+                    Data(#"{"status":"ok","model_loaded":false}"#.utf8))
+        }
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession())
+        XCTAssertEqual(store.localProviderReachability, .unknown)
+        let unavailable = expectation(description: "Server initially unavailable")
+        let recovered = expectation(description: "Server becomes ready without another user action")
+        let observation = store.$localProviderReachability.dropFirst().sink { state in
+            if state == .unreachable { unavailable.fulfill() }
+            if state == .reachable { recovered.fulfill() }
+        }
+        wait(for: [unavailable, recovered], timeout: 6, enforceOrder: true)
+        observation.cancel()
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+        store.aiProvider = .openAI
+    }
+
+    func testParakeetReadinessRecoversAtTheSameURL() {
+        let suiteName = "BugNarrator-ReadinessRecovery-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var reachable = false
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderReachabilityProbe: { _ in reachable })
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
+        reachable = true
+        XCTAssertTrue(store.aiProviderConfigurationIsReady)
+        reachable = false
+        XCTAssertFalse(store.aiProviderConfigurationIsReady)
+    }
+
+    func testParakeetHealthRequiresSuccessfulStructuredResponse() {
+        let url = URL(string: "http://localhost:8422/health")!
+        let healthy = Data(#"{"status":"ok","model_loaded":false}"#.utf8)
+        for status in [404, 500] {
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
+        }
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
+        for body in ["OK", #"{"status":"ok"}"#, #"{"status":"error","model_loaded":true}"#] {
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response))
+        }
+    }
+
     func testParakeetProviderReportsUnreachableServerBeforeRecordingStarts() {
         let suiteName = "BugNarrator-SettingsParakeetUnreachable-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
