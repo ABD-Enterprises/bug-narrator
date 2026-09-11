@@ -9,7 +9,8 @@ final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private lazy var termination = AppTerminationCoordinator(
         shouldTerminate: { Self.appState?.applicationShouldTerminate() ?? .terminateNow },
-        shutdown: { await LocalTranscriptionManager.shared.shutdown() }
+        shutdown: { await LocalTranscriptionManager.shared.shutdown() },
+        setTerminationPending: { Self.appState?.setTerminationPending($0) }
     )
 
     @MainActor
@@ -27,23 +28,28 @@ final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
 final class AppTerminationCoordinator {
     private let shouldTerminate: () -> NSApplication.TerminateReply
     private let shutdown: () async -> Void
+    private let setTerminationPending: (Bool) -> Void
     private var pending: Task<Void, Never>?
 
     init(shouldTerminate: @escaping () -> NSApplication.TerminateReply,
-         shutdown: @escaping () async -> Void) {
+         shutdown: @escaping () async -> Void,
+         setTerminationPending: @escaping (Bool) -> Void = { _ in }) {
         self.shouldTerminate = shouldTerminate
         self.shutdown = shutdown
+        self.setTerminationPending = setTerminationPending
     }
 
     func request(reply: @escaping (Bool) -> Void) -> NSApplication.TerminateReply {
         guard pending == nil else { return .terminateLater }
         let decision = shouldTerminate()
         guard decision == .terminateNow else { return decision }
+        setTerminationPending(true)
         pending = Task {
             await shutdown()
-            // A recording action may have arrived while server cleanup was pending.
+            // Recheck other eligibility changes while holding recording admission closed.
             let allowed = shouldTerminate() == .terminateNow
             pending = nil
+            if !allowed { setTerminationPending(false) }
             reply(allowed)
         }
         return .terminateLater

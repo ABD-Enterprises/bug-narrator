@@ -3,6 +3,7 @@ import Foundation
 
 @MainActor
 final class ApplicationTerminationController {
+    private let isRecordingInProgress: () -> Bool
     private let statusPhase: () -> AppStatus.Phase
     private let activeRecordingSession: () -> RecordingSessionDraft?
     private let isExtractingIssues: () -> Bool
@@ -19,6 +20,7 @@ final class ApplicationTerminationController {
     private let settingsLogger: DiagnosticsLogger
 
     init(
+        isRecordingInProgress: @escaping () -> Bool,
         statusPhase: @escaping () -> AppStatus.Phase,
         activeRecordingSession: @escaping () -> RecordingSessionDraft?,
         isExtractingIssues: @escaping () -> Bool,
@@ -34,6 +36,7 @@ final class ApplicationTerminationController {
         recordingLogger: DiagnosticsLogger = DiagnosticsLogger(category: .recording),
         settingsLogger: DiagnosticsLogger = DiagnosticsLogger(category: .settings)
     ) {
+        self.isRecordingInProgress = isRecordingInProgress
         self.statusPhase = statusPhase
         self.activeRecordingSession = activeRecordingSession
         self.isExtractingIssues = isExtractingIssues
@@ -60,8 +63,7 @@ final class ApplicationTerminationController {
 
     func applicationShouldTerminate() -> NSApplication.TerminateReply {
         let phase = statusPhase()
-        guard let activeRecordingSession = activeRecordingSession(),
-              phase == .recording || phase == .transcribing else {
+        guard isRecordingInProgress() else {
             return .terminateNow
         }
 
@@ -71,7 +73,7 @@ final class ApplicationTerminationController {
             isTranscribing
                 ? "BugNarrator blocked an app termination request while a stopped recording was still being transcribed."
                 : "BugNarrator blocked an app termination request while a recording session was still active.",
-            metadata: ["session_id": activeRecordingSession.sessionID.uuidString]
+            metadata: ["session_id": activeRecordingSession()?.sessionID.uuidString ?? "starting"]
         )
         cancelPendingScreenshotSelection(
             isTranscribing
