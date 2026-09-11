@@ -77,12 +77,24 @@ public static class CompletedSessionMarkdownBuilder
 
         if (session.Screenshots.Count > 0)
         {
+            var timelineMomentsByScreenshotId = session.TimelineMoments
+                .Where(moment => moment.RelatedScreenshotId.HasValue)
+                .OrderBy(moment => moment.ElapsedSeconds)
+                .GroupBy(moment => moment.RelatedScreenshotId!.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+
             lines.Add("## Screenshots");
             lines.Add(string.Empty);
 
             foreach (var screenshot in session.Screenshots)
             {
-                lines.Add($"- **{Path.GetFileName(screenshot.RelativePath)}** at `{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`");
+                var screenshotLine = $"- **{Path.GetFileName(screenshot.RelativePath)}** at `{SessionTimeFormatter.FormatElapsedSeconds(screenshot.ElapsedSeconds)}`";
+                if (timelineMomentsByScreenshotId.TryGetValue(screenshot.ScreenshotId, out var moment))
+                {
+                    screenshotLine += $" linked to **{moment.Label}**";
+                }
+
+                lines.Add(screenshotLine);
             }
 
             lines.Add(string.Empty);
