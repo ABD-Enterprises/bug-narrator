@@ -27,6 +27,31 @@ final class SettingsStoreTests: XCTestCase {
         await fulfillment(of: [request], timeout: 0.1)
     }
 
+    func testUntaggedCredentialCannotBeClaimedByCompatibleProvider() {
+        for locked in [false, true] {
+            let name = "BugNarrator-CredentialOwnership-\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: name)!
+            defer { defaults.removePersistentDomain(forName: name) }
+            defaults.set(AIProvider.openAICompatible.rawValue, forKey: "settings.aiProvider")
+            let keychain = MockKeychainService()
+            let key = "BugNarrator.OpenAI::openai-api-key"
+            keychain.values[key] = "legacy-openai-key"
+            if locked { keychain.interactionRequiredKeys = [key] }
+            let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain,
+                                      localProviderReachabilityProbe: { _ in false })
+
+            XCTAssertFalse(store.aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: false))
+            XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+            XCTAssertNil(defaults.string(forKey: "settings.aiProviderCredentialProvider"))
+            XCTAssertFalse(keychain.readRequests.contains { $0.allowInteraction })
+
+            store.aiProvider = .openAI
+            XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "legacy-openai-key")
+            store.aiProvider = .openAICompatible
+            XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+        }
+    }
+
     func testLegacyProfileWithoutProviderPreservesOpenAIAndExtraction() {
         let name = "BugNarrator-LegacyProvider-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
