@@ -39,6 +39,7 @@ final class AppState: ObservableObject {
     let permissionRecoveryStatusPresenter: PermissionRecoveryStatusPresenter
     let appUtilityActions: AppUtilityActionController
     let appUtilityActionPresenter: AppUtilityActionResultPresenter
+    private let recordingWorkInProgress: () -> Bool
     let applicationTerminationController: ApplicationTerminationController
     let supportDataController: SupportDataController
     let supportDataActionPresenter: SupportDataActionPresenter
@@ -354,10 +355,11 @@ final class AppState: ObservableObject {
             supportDataController: self.supportDataController,
             exportHistoryController: self.exportHistoryController
         )
-        self.transcriptionRecovery = TranscriptionRecoveryController(
+        let transcriptionRecovery = TranscriptionRecoveryController(
             sessionLibrary: sessionLibrary,
             artifactsService: artifactsService
         )
+        self.transcriptionRecovery = transcriptionRecovery
         self.retryTranscriptionStatusPresenter = RetryTranscriptionStatusPresenter(
             errorPresenter: self.errorPresenter,
             showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
@@ -420,8 +422,12 @@ final class AppState: ObservableObject {
             settingsStore: settingsStore,
             transcriptionClient: transcriptionClient
         )
+        let recordingWorkInProgress = {
+            transcriptionRecovery.retryingSessionID != nil || recordingSessionController.hasInFlightRecordingWork(statusPhase: presentationState.status.phase)
+        }
+        self.recordingWorkInProgress = recordingWorkInProgress
         let applicationTerminationController = ApplicationTerminationController(
-            isRecordingInProgress: { recordingSessionController.hasInFlightRecordingWork(statusPhase: presentationState.status.phase) },
+            isRecordingInProgress: recordingWorkInProgress,
             statusPhase: { presentationState.status.phase },
             activeRecordingSession: { recordingSessionController.activeRecordingSession },
             isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
@@ -576,7 +582,7 @@ final class AppState: ObservableObject {
         recordingSessionController.activeRecordingSession
     }
     var localServerControlsDisabled: Bool {
-        recordingSessionController.terminationPending || recordingSessionController.hasInFlightRecordingWork(statusPhase: status.phase)
+        recordingSessionController.terminationPending || recordingWorkInProgress()
     }
 
     func stopLocalServer(_ manager: LocalTranscriptionManager) {
@@ -594,7 +600,7 @@ final class AppState: ObservableObject {
     }
 
     func startSession() async {
-        guard !recordingSessionController.terminationPending else { return }
+        guard !recordingSessionController.terminationPending, transcriptionRecovery.retryingSessionID == nil else { return }
         recordingLogger.info(.sessionStartRequested, "A feedback session start was requested.")
 
         if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {

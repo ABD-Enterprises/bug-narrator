@@ -74,6 +74,48 @@ final class LocalTranscriptionManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testRetryRemainsProtectedAfterScreenshotChangesPresentationStatus() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+        harness.settingsStore.aiProvider = .openAI
+        harness.audioRecorder.stopResults = [.success(try harness.makeRecordedAudio(fileName: "retry-admission"))]
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+        let session = try XCTUnwrap(harness.transcriptStore.sessions.first)
+        harness.settingsStore.apiKey = "restored-key"
+        await harness.transcriptionClient.enqueue(.success(TranscriptionResult(text: "Recovered transcript", segments: [])))
+        await harness.transcriptionClient.holdTranscription()
+        let retry = Task { await harness.appState.retryPendingTranscription(for: session.id) }
+        await waitUntil { harness.appState.retryingSessionID != nil }
+        await harness.appState.captureScreenshot()
+        XCTAssertEqual(harness.appState.status.phase, .error)
+        XCTAssertTrue(harness.appState.localServerControlsDisabled)
+        XCTAssertEqual(harness.appState.applicationShouldTerminate(), .terminateCancel)
+        await harness.appState.startSession()
+        XCTAssertEqual(harness.audioRecorder.startCallCount, 1)
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        try Data("fixture".utf8).write(to: fixture.destination.appendingPathComponent("bugnarrator-transcription"))
+        let process = FakeLocalServerProcess()
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.verify = { _ in }
+        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
+        manager.start()
+        await waitUntil { manager.running }
+        harness.appState.stopLocalServer(manager)
+        XCTAssertFalse(process.terminated)
+        process.onExit?(0, "")
+        harness.appState.removeLocalServer(manager)
+        XCTAssertTrue(manager.installed)
+        await harness.transcriptionClient.resumeTranscription()
+        await retry.value
+        XCTAssertFalse(harness.appState.localServerControlsDisabled)
+    }
+
+    @MainActor
     func testTerminationVetoDoesNotStartCleanup() {
         let coordinator = AppTerminationCoordinator(shouldTerminate: { .terminateCancel }, shutdown: {
             XCTFail("Recording/transcription veto must precede cleanup")

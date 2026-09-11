@@ -121,6 +121,16 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 }
 
 actor MockTranscriptionClient: TranscriptionServing {
+    private var suspendTranscription = false
+    private var transcriptionContinuation: CheckedContinuation<Void, Never>?
+
+    func holdTranscription() { suspendTranscription = true }
+    func resumeTranscription() {
+        suspendTranscription = false
+        transcriptionContinuation?.resume()
+        transcriptionContinuation = nil
+    }
+
     private var queuedResults: [Result<TranscriptionResult, Error>] = []
     private var validationResults: [Result<Void, Error>] = []
     private(set) var callCount = 0
@@ -142,6 +152,7 @@ actor MockTranscriptionClient: TranscriptionServing {
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
         callCount += 1
+        if suspendTranscription { await withCheckedContinuation { transcriptionContinuation = $0 } }
         requestedFileURLs.append(fileURL)
         requestedAPIKeys.append(apiKey)
         requestedModels.append(request.model)
