@@ -53,6 +53,51 @@ final class LocalTranscriptionManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testShutdownWaitsForCanceledInstallerCleanup() async throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove(); MockURLProtocol.requestHandler = nil }
+        let assetName = LocalTranscriptionManager.assetName
+        let manifest = fixture.manifest
+        MockURLProtocol.requestHandler = { @Sendable request in
+            let data: Data
+            if request.url!.path.contains("releases/download") {
+                data = request.url!.path.hasSuffix("checksum") ? manifest : Data("image".utf8)
+            } else {
+                data = try JSONSerialization.data(withJSONObject: [["draft": false, "prerelease": false, "assets": [
+                    ["name": assetName, "size": 5, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/image"],
+                    ["name": assetName + ".sha256", "size": 64, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/checksum"]
+                ]]])
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let gate = ShutdownTestGate()
+        let installing = expectation(description: "Installer entered")
+        let shutdownEntered = expectation(description: "Shutdown entered")
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.install = { _, _, _, _ in
+            installing.fulfill()
+            await gate.wait()
+            try Task.checkCancellation()
+        }
+        dependencies.launch = { _, _, _ in XCTFail("Canceled install must not launch"); return FakeLocalServerProcess() }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, session: makeMockURLSession(), dependencies: dependencies)
+        try XCTSkipUnless(manager.supported, "Server packages require Apple Silicon")
+        await manager.discover()
+        manager.installAndStart()
+        await fulfillment(of: [installing], timeout: 2)
+        var finished = false
+        let shutdown = Task { shutdownEntered.fulfill(); await manager.shutdown(); finished = true }
+        await fulfillment(of: [shutdownEntered], timeout: 2)
+        XCTAssertFalse(finished)
+        await gate.release()
+        await shutdown.value
+        XCTAssertTrue(finished)
+        XCTAssertFalse(manager.installed)
+        XCTAssertFalse(manager.running)
+        XCTAssertFalse(manager.busy)
+    }
+
+    @MainActor
     func testShutdownWaitsForCanceledStartAndPreventsLaunch() async throws {
         let fixture = try InstallerFixture()
         defer { fixture.remove() }
