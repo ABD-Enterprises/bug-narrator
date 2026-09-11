@@ -97,6 +97,7 @@ private final class ApplicationTerminationControllerHarness {
     var terminateCount = 0
 
     lazy var controller = ApplicationTerminationController(
+        isRecordingInProgress: { [weak self] in self?.statusPhase == .recording || self?.statusPhase == .transcribing },
         statusPhase: { [weak self] in self?.statusPhase ?? .idle },
         activeRecordingSession: { [weak self] in self?.activeRecordingSession },
         isExtractingIssues: { [weak self] in self?.isExtractingIssues ?? false },

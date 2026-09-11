@@ -414,23 +414,24 @@ struct AISetupSectionsView: View {
                 if localServer.installed {
                     HStack {
                         Button(localServer.running ? "Stop local server" : "Start local server") {
-                            if localServer.running { localServer.stop() } else { localServer.start() }
+                            if localServer.running { appState.stopLocalServer(localServer) } else { localServer.start() }
                         }
-                        .disabled(localServer.busy)
-                        Button("Remove local server and models", role: .destructive) { localServer.remove() }
-                            .disabled(localServer.busy || localServer.running)
+                        .disabled(localServer.busy || appState.localServerControlsDisabled)
+                        Button("Remove local server and models", role: .destructive) { appState.removeLocalServer(localServer) }
+                            .disabled(localServer.busy || localServer.running || appState.localServerControlsDisabled)
                     }
                 } else {
                     Button("Download the local transcription server") { localServer.installAndStart() }
                         .disabled(localServer.busy || localServer.package == nil)
                     if localServer.package == nil {
                         Button("Check server download") { Task { await localServer.discover() } }
-                            .disabled(localServer.busy)
+                            .disabled(localServer.busy || appState.localServerControlsDisabled)
                     }
                 }
                 if let progress = localServer.progress {
                     ProgressView(value: progress)
-                    Button("Cancel installation") { localServer.stop() }
+                    Button("Cancel installation") { appState.stopLocalServer(localServer) }
+                        .disabled(appState.localServerControlsDisabled)
                 }
                 Text("Install location: \(localServer.directory.path)")
                     .font(.caption)

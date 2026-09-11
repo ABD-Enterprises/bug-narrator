@@ -13,7 +13,17 @@ final class RecordingSessionController: ObservableObject {
 
     private var processActivity: NSObjectProtocol?
     private var pendingRecordedAudio: RecordedAudio?
-    private var transition: RecordingTransition = .idle
+    @Published private var transition: RecordingTransition = .idle
+
+    @Published private(set) var terminationPending = false
+
+    func setTerminationPending(_ pending: Bool) {
+        terminationPending = pending
+    }
+
+    func hasInFlightRecordingWork(statusPhase: AppStatus.Phase) -> Bool {
+        transition != .idle || statusPhase == .recording || statusPhase == .transcribing
+    }
 
     init(
         audioRecorder: any AudioRecording,
@@ -47,7 +57,7 @@ final class RecordingSessionController: ObservableObject {
         statusPhase: AppStatus.Phase,
         activityReason: String
     ) async -> RecordingSessionStartOutcome {
-        guard transition == .idle else {
+        guard !terminationPending, transition == .idle else {
             return .transitionInProgress
         }
 

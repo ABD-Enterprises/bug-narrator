@@ -17,6 +17,8 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
     var cancelPreserveArguments: [Bool] = []
     var startError: Error?
     var stopResults: [Result<RecordedAudio, Error>] = []
+    var suspendStart = false
+    private var startContinuation: CheckedContinuation<Void, Never>?
     var suspendStop = false
     var permissionState: MicrophonePermissionState = .authorized
     var requestedPermissionStates: [MicrophonePermissionState] = []
@@ -71,10 +73,17 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 
     func startRecording() async throws {
         startCallCount += 1
+        if suspendStart { await withCheckedContinuation { startContinuation = $0 } }
 
         if let startError {
             throw startError
         }
+    }
+
+    func resumeStart() {
+        suspendStart = false
+        startContinuation?.resume()
+        startContinuation = nil
     }
 
     func stopRecording() async throws -> RecordedAudio {
@@ -112,6 +121,16 @@ final class MockAudioRecorder: AudioRecording, MicrophonePermissionAccessing {
 }
 
 actor MockTranscriptionClient: TranscriptionServing {
+    private var suspendTranscription = false
+    private var transcriptionContinuation: CheckedContinuation<Void, Never>?
+
+    func holdTranscription() { suspendTranscription = true }
+    func resumeTranscription() {
+        suspendTranscription = false
+        transcriptionContinuation?.resume()
+        transcriptionContinuation = nil
+    }
+
     private var queuedResults: [Result<TranscriptionResult, Error>] = []
     private var validationResults: [Result<Void, Error>] = []
     private(set) var callCount = 0
@@ -133,6 +152,7 @@ actor MockTranscriptionClient: TranscriptionServing {
 
     func transcribe(fileURL: URL, apiKey: String, request: TranscriptionRequest) async throws -> TranscriptionResult {
         callCount += 1
+        if suspendTranscription { await withCheckedContinuation { transcriptionContinuation = $0 } }
         requestedFileURLs.append(fileURL)
         requestedAPIKeys.append(apiKey)
         requestedModels.append(request.model)
