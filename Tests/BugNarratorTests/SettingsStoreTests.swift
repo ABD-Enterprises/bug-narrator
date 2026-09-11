@@ -4,6 +4,36 @@ import XCTest
 @testable import BugNarrator
 
 final class SettingsStoreTests: XCTestCase {
+    func testIsolatedSettingsFactoryNeverStartsHealthRequests() async throws {
+        let name = "BugNarrator-IsolatedFactory-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            MockURLProtocol.requestHandler = nil
+        }
+        let session = makeMockURLSession()
+        defer { session.invalidateAndCancel() }
+        // Positive control: this session intercepts requests without changing the
+        // app host's shared session or observing unrelated background traffic.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("intercepted".utf8))
+        }
+        let (control, _) = try await session.data(from: URL(string: "http://127.0.0.1:9999/health")!)
+        XCTAssertEqual(String(decoding: control, as: UTF8.self), "intercepted")
+        let request = expectation(description: "No health requests from isolated store")
+        request.isInverted = true
+        MockURLProtocol.requestHandler = { _ in
+            request.fulfill()
+            throw URLError(.notConnectedToInternet)
+        }
+        let store = makeIsolatedSettingsStore(defaults: defaults, localProviderSession: session)
+        XCTAssertEqual(store.aiProvider, .parakeetLocal)
+        XCTAssertEqual(store.currentLocalProviderReachability(), .unreachable)
+        store.openAIBaseURL = "http://127.0.0.1:9999"
+        XCTAssertEqual(store.currentLocalProviderReachability(), .unreachable)
+        await fulfillment(of: [request], timeout: 0.1)
+    }
+
     func testUntaggedCredentialCannotBeClaimedByCompatibleProvider() {
         for locked in [false, true] {
             let name = "BugNarrator-CredentialOwnership-\(UUID().uuidString)"
@@ -14,7 +44,7 @@ final class SettingsStoreTests: XCTestCase {
             let key = "BugNarrator.OpenAI::openai-api-key"
             keychain.values[key] = "legacy-openai-key"
             if locked { keychain.interactionRequiredKeys = [key] }
-            let store = SettingsStore(defaults: defaults, keychainService: keychain,
+            let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain,
                                       localProviderReachabilityProbe: { _ in false })
 
             XCTAssertFalse(store.aiProviderCredentialIsAvailableForCurrentProvider(allowsLegacyOpenAICredential: false))
@@ -35,7 +65,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: name) }
         defaults.set(true, forKey: "settings.didMigrateLegacyBuiltInHotkeys")
         defaults.set(true, forKey: "settings.autoExtractIssues")
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
                                   localProviderReachabilityProbe: { _ in false })
         XCTAssertEqual(store.aiProvider, .openAI)
         XCTAssertEqual(store.preferredModel, "whisper-1")
@@ -47,10 +77,10 @@ final class SettingsStoreTests: XCTestCase {
         let name = "BugNarrator-FreshProvider-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
-        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+        let first = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
                                   localProviderReachabilityProbe: { _ in false })
         XCTAssertEqual(first.aiProvider, .parakeetLocal)
-        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+        let second = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
                                    localProviderReachabilityProbe: { _ in false })
         XCTAssertEqual(second.aiProvider, .parakeetLocal)
     }
@@ -68,7 +98,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         // Brand-new install: no recorded version, no existing user state -> defer to onboarding.
         XCTAssertFalse(store.shouldAutoShowChangelog(currentVersion: "1.0.40", hasExistingUserState: false))
@@ -82,7 +112,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         store.markChangelogShown(version: "1.0.40")
         // Same version after shown -> no re-show.
@@ -101,11 +131,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let first = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(first.autoShowChangelogOnUpdate)
         first.autoShowChangelogOnUpdate = false
 
-        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let second = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertFalse(second.autoShowChangelogOnUpdate)
     }
 
@@ -115,7 +145,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         // On a fresh install every row is empty, so each action offers its suggestion.
         let startSuggestion = store.suggestedShortcutIfAvailable(for: .startRecording)
@@ -140,7 +170,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         // Microphone-only never shows the explainer.
         XCTAssertFalse(store.shouldShowSystemAudioExplainer(for: .microphone, acknowledged: false))
@@ -153,7 +183,7 @@ final class SettingsStoreTests: XCTestCase {
         store.suppressSystemAudioExplainer = true
         XCTAssertFalse(store.shouldShowSystemAudioExplainer(for: .systemAudio, acknowledged: false))
 
-        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let reloaded = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(reloaded.suppressSystemAudioExplainer)
     }
 
@@ -163,7 +193,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in false }
@@ -187,11 +217,11 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let firstStore = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertEqual(firstStore.languageHint, "en")
         firstStore.languageHint = ""
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(secondStore.languageHint, "")
         XCTAssertNil(secondStore.transcriptionRequest.languageHint)
@@ -205,7 +235,7 @@ final class SettingsStoreTests: XCTestCase {
 
         let keychain = MockKeychainService()
         let launchAtLoginService = MockLaunchAtLoginService()
-        let firstStore = SettingsStore(
+        let firstStore = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychain,
             launchAtLoginService: launchAtLoginService
@@ -252,7 +282,7 @@ final class SettingsStoreTests: XCTestCase {
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
         firstStore.refreshExportSecretsForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(
+        let secondStore = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychain,
             launchAtLoginService: launchAtLoginService
@@ -310,7 +340,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.apiKey = "saved-in-keychain"
 
         XCTAssertFalse(defaults.dictionaryRepresentation().keys.contains { $0.localizedCaseInsensitiveContains("apikey") })
@@ -329,7 +359,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.apiKey = "saved-in-keychain"
         store.refreshOpenAISecretForUserInitiatedAccess()
         XCTAssertEqual(store.apiKeyPersistenceState, .keychain)
@@ -351,7 +381,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.jiraEmail = "secure@example.com"
 
         XCTAssertNil(defaults.string(forKey: "settings.jiraEmail"))
@@ -376,11 +406,11 @@ final class SettingsStoreTests: XCTestCase {
         let keychain = MockKeychainService()
         keychain.setError = AppError.storageFailure("Keychain unavailable")
 
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.apiKey = "fallback-key"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(firstStore.apiKeyPersistenceState, .sessionOnly)
         XCTAssertEqual(secondStore.apiKey, "")
@@ -392,7 +422,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.apiKey = "fixture-openai-key-1234"
 
         XCTAssertEqual(store.maskedAPIKey, "••••••••1234")
@@ -447,7 +477,7 @@ final class SettingsStoreTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         for allowed in [
             "https://acme.atlassian.net",   // remote HTTPS
@@ -480,7 +510,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         // Pinned: asserts OpenAI-shaped defaults, so it must name the provider
         // rather than inherit whatever the global default is (#1026).
@@ -507,7 +537,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(AIProvider.openAI.rawValue, forKey: "settings.aiProvider")
         defaults.set("parakeet-tdt-0.6b-v3", forKey: "settings.preferredModel")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(store.preferredModel, "whisper-1")
         XCTAssertEqual(store.transcriptionRequest.model, "whisper-1")
@@ -524,7 +554,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set("whisper-1", forKey: "settings.preferredModel")
         defaults.set("https://api.openai.com", forKey: "settings.openAIBaseURL")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
         XCTAssertEqual(store.transcriptionRequest.model, "parakeet-tdt-0.6b-v3")
@@ -538,7 +568,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .openAI
 
         XCTAssertEqual(
@@ -565,7 +595,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(AIProvider.openAI.rawValue, forKey: "settings.aiProvider")
         defaults.set("not-a-chat-model", forKey: "settings.issueExtractionModel")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(
             store.issueExtractionModelChoices.map(\.id),
@@ -585,7 +615,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .parakeetLocal
 
         XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
@@ -603,7 +633,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         // This test verifies that Local-Compatible REJECTS remote model ids. It
         // used to inherit whisper-1/gpt-4.1-mini from the global default; with a
@@ -636,7 +666,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .openAICompatible
         store.apiKey = "enterprise-token"
 
@@ -656,7 +686,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in true }
@@ -706,7 +736,7 @@ final class SettingsStoreTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var reachable = false
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
                                   localProviderReachabilityProbe: { _ in reachable })
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         reachable = true
@@ -735,7 +765,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in false }
@@ -759,7 +789,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in true }
@@ -781,7 +811,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .openAI
 
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
@@ -798,12 +828,12 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .openAI
         firstStore.apiKey = "sk-fixture"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         secondStore.aiProvider = .openAI
 
         XCTAssertEqual(secondStore.apiKey, "")
@@ -818,7 +848,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .localCompatible
 
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
@@ -839,7 +869,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .localCompatible
         firstStore.preferredModel = "whisper-large-v3"
         firstStore.issueExtractionModel = "llama3.1:8b"
@@ -850,7 +880,7 @@ final class SettingsStoreTests: XCTestCase {
             "local-provider-token"
         )
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(secondStore.aiProvider, .localCompatible)
         XCTAssertEqual(
@@ -866,14 +896,14 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .localCompatible
         firstStore.preferredModel = "whisper-large-v3"
         firstStore.issueExtractionModel = "llama3.1:8b"
         firstStore.apiKey = "local-provider-token"
         _ = firstStore.aiProviderCredentialForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         secondStore.aiProvider = .openAI
 
         XCTAssertFalse(secondStore.hasUsableAIProviderCredential)
@@ -893,12 +923,12 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .openAI
         firstStore.apiKey = "sk-openai-token"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         secondStore.aiProvider = .openAICompatible
         secondStore.openAIBaseURL = "https://gateway.example.com/openai"
 
@@ -913,12 +943,12 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .openAI
         firstStore.apiKey = "sk-openai-token"
         firstStore.refreshOpenAISecretForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         secondStore.aiProvider = .openAICompatible
 
         XCTAssertTrue(secondStore.hasAPIKey)
@@ -938,12 +968,12 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let firstStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let firstStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         firstStore.aiProvider = .localCompatible
         firstStore.apiKey = "local-provider-token"
         _ = firstStore.aiProviderCredentialForUserInitiatedAccess()
 
-        let secondStore = SettingsStore(defaults: defaults, keychainService: keychain)
+        let secondStore = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         secondStore.aiProvider = .localCompatible
 
         XCTAssertTrue(secondStore.hasSelectedAIProviderCredential)
@@ -957,7 +987,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.apiKey = "sk-draft-openai-key"
         store.aiProvider = .parakeetLocal
 
@@ -976,7 +1006,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in false }
@@ -999,7 +1029,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in true }
@@ -1025,7 +1055,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
         defaults.set(true, forKey: "settings.autoExtractIssues")
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             localProviderReachabilityProbe: { _ in true }
@@ -1044,7 +1074,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.aiProvider = .openAI
         store.apiKey = "sk-saved-openai-key"
         XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "sk-saved-openai-key")
@@ -1094,7 +1124,7 @@ final class SettingsStoreTests: XCTestCase {
             forName: legacyDomainName
         )
 
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             legacyDefaultsDomains: [legacyDomainName]
@@ -1123,7 +1153,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set("legacy@example.com", forKey: "settings.jiraEmail")
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.jiraEmail, "legacy@example.com")
         XCTAssertEqual(store.jiraEmailPersistenceState, .keychain)
@@ -1141,7 +1171,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.apiKey = "draft-openai-key"
         store.jiraAPIToken = "draft-jira-token"
 
@@ -1167,7 +1197,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(true, forKey: "settings.systemAudioCaptureEnabled")
         defaults.set("not-a-source", forKey: "settings.recordingAudioSource")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(store.recordingAudioSource, .microphone)
     }
@@ -1181,7 +1211,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(false, forKey: "settings.systemAudioCaptureEnabled")
         defaults.set(RecordingAudioSource.systemAudio.rawValue, forKey: "settings.recordingAudioSource")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(store.recordingAudioSource, .microphone)
         XCTAssertEqual(defaults.string(forKey: "settings.recordingAudioSource"), RecordingAudioSource.microphone.rawValue)
@@ -1193,7 +1223,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertFalse(store.gitHubRepositoryDiscoveryIsReady)
         XCTAssertFalse(store.gitHubConfigurationValidationIsReady)
@@ -1224,7 +1254,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.githubToken = "fixture-github-token"
         store.githubRepositoryOwner = "acme"
         store.githubRepositoryName = "bugnarrator"
@@ -1255,7 +1285,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         var observedStates: [APIKeyPersistenceState] = []
         let cancellable = store.$jiraTokenPersistenceState.sink { observedStates.append($0) }
         defer { cancellable.cancel() }
@@ -1273,7 +1303,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         let duplicateShortcut = HotkeyShortcut(
             keyCode: 7,
             modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue
@@ -1305,7 +1335,7 @@ final class SettingsStoreTests: XCTestCase {
             encoder.encode(try XCTUnwrap(HotkeyAction.stopRecording.legacyBuiltInShortcut)),
             forKey: "settings.stopRecordingHotkeyShortcut"
         )
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertEqual(store.startRecordingHotkeyShortcut, .disabled)
         XCTAssertEqual(store.stopRecordingHotkeyShortcut, .disabled)
@@ -1328,7 +1358,7 @@ final class SettingsStoreTests: XCTestCase {
             forKey: "settings.markerHotkeyShortcut"
         )
 
-        _ = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        _ = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertNil(defaults.object(forKey: "settings.markerHotkeyShortcut"))
     }
@@ -1342,7 +1372,7 @@ final class SettingsStoreTests: XCTestCase {
         let keychain = MockKeychainService()
         keychain.values["SessionMic.OpenAI::openai-api-key"] = "legacy-api-key"
 
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.apiKey, "")
         XCTAssertEqual(store.openAIAPIKeyForUserInitiatedAccess(), "legacy-api-key")
@@ -1363,7 +1393,7 @@ final class SettingsStoreTests: XCTestCase {
         keychain.values["BugNarrator.OpenAI::openai-api-key"] = "locked-api-key"
         keychain.interactionRequiredKeys = ["BugNarrator.OpenAI::openai-api-key"]
 
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.apiKey, "")
         XCTAssertEqual(store.apiKeyPersistenceState, .keychainLocked)
@@ -1390,7 +1420,7 @@ final class SettingsStoreTests: XCTestCase {
         keychain.values[legacyKey] = "legacy-api-key"
         keychain.interactionRequiredKeys = [legacyKey]
 
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.apiKey, "")
         XCTAssertEqual(store.apiKeyPersistenceState, .keychainLocked)
@@ -1429,7 +1459,7 @@ final class SettingsStoreTests: XCTestCase {
         keychain.values[legacyJiraKey] = "legacy-fixture-jira-token"
         keychain.interactionRequiredKeys = [legacyGitHubKey, legacyJiraKey]
 
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
 
         XCTAssertEqual(store.githubToken, "")
         XCTAssertEqual(store.jiraAPIToken, "")
@@ -1476,7 +1506,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.githubToken = "fixture-github-token-9876"
         store.jiraAPIToken = "fixture-jira-token-4321"
 
@@ -1491,7 +1521,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.apiKey = "to-be-removed"
 
         store.removeAPIKey()
@@ -1508,7 +1538,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let keychain = MockKeychainService()
-        let store = SettingsStore(defaults: defaults, keychainService: keychain)
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
         store.githubToken = "github-remove"
         store.jiraAPIToken = "jira-remove"
 
@@ -1528,7 +1558,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let launchAtLoginService = MockLaunchAtLoginService(status: .requiresApproval)
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: launchAtLoginService
@@ -1549,7 +1579,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let launchAtLoginService = MockLaunchAtLoginService(status: .notFound)
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: launchAtLoginService
@@ -1572,7 +1602,7 @@ final class SettingsStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let launchAtLoginService = MockLaunchAtLoginService(status: .unavailable)
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: launchAtLoginService
@@ -1600,7 +1630,7 @@ final class SettingsStoreTests: XCTestCase {
             code: 1,
             userInfo: [NSLocalizedDescriptionKey: "The login item could not be registered."]
         )
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: launchAtLoginService
@@ -1628,7 +1658,7 @@ final class SettingsStoreTests: XCTestCase {
             code: 2,
             userInfo: [NSLocalizedDescriptionKey: "The login item could not be updated."]
         )
-        let store = SettingsStore(
+        let store = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: launchAtLoginService
@@ -1672,7 +1702,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.systemAudioCaptureEnabled = true
         store.recordingAudioSource = .microphoneAndSystemAudio
         XCTAssertEqual(store.recordingAudioSource, .microphoneAndSystemAudio)
@@ -1699,7 +1729,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set(true, forKey: "settings.hasAcceptedSystemAudioRecordingConsent")
         defaults.set(true, forKey: "settings.suppressSystemAudioExplainer")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(store.systemAudioCaptureEnabled)
         XCTAssertEqual(store.recordingAudioSource, .microphoneAndSystemAudio)
         XCTAssertTrue(store.hasAcceptedSystemAudioRecordingConsent)
@@ -1711,7 +1741,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(defaults.bool(forKey: "settings.hasAcceptedSystemAudioRecordingConsent"))
         XCTAssertFalse(defaults.bool(forKey: "settings.suppressSystemAudioExplainer"))
 
-        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let reloaded = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(reloaded.systemAudioCaptureEnabled)
         XCTAssertEqual(reloaded.recordingAudioSource, .microphoneAndSystemAudio)
         XCTAssertFalse(reloaded.hasAcceptedSystemAudioRecordingConsent)
@@ -1732,7 +1762,7 @@ final class SettingsStoreTests: XCTestCase {
         // Fresh install: nothing stored, so the source defaults to microphone and
         // needs no normalization. load() must NOT write the key back (mirrors the
         // old code, which only persisted inside the normalization branch).
-        _ = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        _ = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertNil(defaults.object(forKey: "settings.recordingAudioSource"))
     }
@@ -1769,7 +1799,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.githubRepositoryOwner = "acme"
         store.githubRepositoryName = "bugnarrator"
         store.githubRepositoryID = "repo-123"
@@ -1798,7 +1828,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         store.jiraProjectKey = "UCAP"
         store.jiraProjectID = "10001"
         // A normalized-equal project-key change (case/whitespace) keeps the id.
@@ -1837,7 +1867,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.set("Task", forKey: "settings.jiraIssueType")
         defaults.set("10100", forKey: "settings.jiraIssueTypeID")
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertEqual(store.githubRepositoryOwner, "acme")
         XCTAssertEqual(store.githubRepositoryName, "bugnarrator")
         XCTAssertEqual(store.githubRepositoryID, "repo-1")
@@ -1851,7 +1881,7 @@ final class SettingsStoreTests: XCTestCase {
         // Mutations write back to the identical keys and survive a reload.
         store.githubDefaultLabels = "bug"
         store.jiraBaseURL = "https://other.atlassian.net"
-        let reloaded = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let reloaded = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertEqual(reloaded.githubDefaultLabels, "bug")
         XCTAssertEqual(reloaded.jiraBaseURL, "https://other.atlassian.net")
         XCTAssertEqual(reloaded.githubRepositoryOwner, "acme")
@@ -1904,7 +1934,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let first = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertFalse(
             first.hasCompletedFirstRunOnboarding,
             "A fresh install has not been through the tour."
@@ -1913,7 +1943,7 @@ final class SettingsStoreTests: XCTestCase {
         first.markFirstRunOnboardingCompleted()
         XCTAssertTrue(first.hasCompletedFirstRunOnboarding)
 
-        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let second = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(
             second.hasCompletedFirstRunOnboarding,
             "Skipping has to survive a relaunch, or an unconfigured user is re-prompted every launch."
@@ -1928,7 +1958,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertFalse(
             store.hasAnyCaptureHotkeyAssigned,
             "Capture hotkeys ship unbound by the 1.0.11 decision."
@@ -1960,7 +1990,7 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
 
         XCTAssertFalse(
             store.autoCopyTranscript,
@@ -1976,10 +2006,10 @@ final class SettingsStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let first = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         first.autoCopyTranscript = true
 
-        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let second = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
         XCTAssertTrue(
             second.autoCopyTranscript,
             "An explicit opt-in must outlive the default change."

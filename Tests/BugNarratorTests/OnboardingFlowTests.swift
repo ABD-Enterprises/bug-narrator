@@ -272,7 +272,7 @@ final class OnboardingFlowTests: XCTestCase {
     }
 
     private func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
-        SettingsStore(
+        makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: MockLaunchAtLoginService()

@@ -316,7 +316,7 @@ final class PrivacyDataExporterTests: XCTestCase {
         // closure and UserDefaults is not Sendable, so capturing `defaults`
         // is a data-race error under strict concurrency.
         addTeardownBlock { UserDefaults().removePersistentDomain(forName: suiteName) }
-        return SettingsStore(
+        return makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: MockLaunchAtLoginService()
