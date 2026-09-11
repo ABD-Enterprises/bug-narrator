@@ -23,7 +23,6 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.aiProvider, .parakeetLocal)
         XCTAssertEqual(store.currentLocalProviderReachability(), .unreachable)
         store.openAIBaseURL = "http://127.0.0.1:9999"
-        store.refreshLocalProviderReachabilityIfNeeded()
         XCTAssertEqual(store.currentLocalProviderReachability(), .unreachable)
         await fulfillment(of: [request], timeout: 0.1)
     }
