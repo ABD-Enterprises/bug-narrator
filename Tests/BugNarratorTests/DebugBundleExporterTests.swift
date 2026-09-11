@@ -16,10 +16,7 @@ final class DebugBundleExporterTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         let keychainService = MockKeychainService()
-        let settingsStore = SettingsStore(defaults: defaults, keychainService: keychainService)
-
-        // Pinned: asserts OpenAI-shaped defaults, so it must name the provider
-        // rather than inherit whatever the global default is (#1026).
+        let settingsStore = makeHermeticSettingsStore(defaults: defaults, keychainService: keychainService)
         settingsStore.aiProvider = .openAI
         settingsStore.apiKey = "fixture-openai-key"
         settingsStore.preferredModel = "whisper-1"
@@ -84,5 +81,16 @@ final class DebugBundleExporterTests: XCTestCase {
         let recentLog = try String(contentsOf: bundleURL.appendingPathComponent("recent-log.txt"))
         XCTAssertTrue(recentLog.contains("debug bundle"))
         XCTAssertFalse(recentLog.contains("fixture-openai-key"))
+    }
+
+    private func makeHermeticSettingsStore(
+        defaults: UserDefaults,
+        keychainService: MockKeychainService
+    ) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: keychainService,
+            launchAtLoginService: MockLaunchAtLoginService()
+        )
     }
 }

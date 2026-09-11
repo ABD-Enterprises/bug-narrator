@@ -116,11 +116,7 @@ private final class LocalDataDeletionControllerHarness {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
         let keychainService = MockKeychainService()
-        let settingsStore = SettingsStore(
-            defaults: defaults,
-            keychainService: keychainService,
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
+        let settingsStore = Self.makeHermeticSettingsStore(defaults: defaults, keychainService: keychainService)
         let transcriptStore = TranscriptStore(
             fileManager: fileManager,
             storageURL: rootDirectoryURL.appendingPathComponent("sessions.json")
@@ -159,6 +155,17 @@ private final class LocalDataDeletionControllerHarness {
             sessionLibrary: sessionLibrary,
             supportDataController: supportDataController,
             exportHistoryController: exportHistoryController
+        )
+    }
+
+    private static func makeHermeticSettingsStore(
+        defaults: UserDefaults,
+        keychainService: MockKeychainService
+    ) -> SettingsStore {
+        SettingsStore(
+            defaults: defaults,
+            keychainService: keychainService,
+            launchAtLoginService: MockLaunchAtLoginService()
         )
     }
 
