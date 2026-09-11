@@ -34,6 +34,7 @@ final class LocalTranscriptionManager: ObservableObject {
     private var server: (any LocalServerProcess)?
     private var operation: Task<Void, Never>?
     private var startOperation: Task<Void, Never>?
+    private var shuttingDown = false
     private var terminationObserver: AnyCancellable?
     private let session: URLSession
     private let dependencies: Dependencies
@@ -81,7 +82,7 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func discover() async {
-        guard package == nil, !busy, supported else { return }
+        guard package == nil, !busy, supported, !shuttingDown else { return }
         busy = true
         defer { busy = false }
         do {
@@ -108,7 +109,7 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func installAndStart() {
-        guard let package, supported, !busy, !installed else { return }
+        guard let package, supported, !busy, !installed, !shuttingDown else { return }
         busy = true
         progress = 0
         message = "Downloading the local server…"
@@ -139,7 +140,7 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func start() {
-        guard installed, server == nil, startOperation == nil else { return }
+        guard installed, server == nil, startOperation == nil, !shuttingDown else { return }
         busy = true
         let binary = executable
         startOperation = Task {
@@ -172,6 +173,20 @@ final class LocalTranscriptionManager: ObservableObject {
         operation?.cancel()
         startOperation?.cancel()
         server?.terminate()
+    }
+
+    func shutdown() async {
+        shuttingDown = true
+        defer { shuttingDown = false }
+        let installing = operation
+        let starting = startOperation
+        let process = server
+        stop()
+        // Cancellation requests alone are insufficient: await detach/staging cleanup
+        // and the bounded SIGTERM/SIGKILL process shutdown before the OS exits.
+        await installing?.value
+        await starting?.value
+        await process?.waitForExit()
     }
 
     func remove() {
@@ -326,6 +341,7 @@ private final class LocalServerDownloadProgress: NSObject, URLSessionDownloadDel
 
 @MainActor
 protocol LocalServerProcess: AnyObject {
+    func waitForExit() async
     func terminate()
 }
 
@@ -394,6 +410,12 @@ private final class ManagedLocalServerProcess: LocalServerProcess {
         }
         catch { errors.fileHandleForReading.readabilityHandler = nil; throw error }
     }
+    func waitForExit() async {
+        while process.isRunning {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
     func terminate() {
         guard process.isRunning else { return }
         process.terminate()
