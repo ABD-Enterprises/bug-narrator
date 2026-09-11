@@ -34,7 +34,7 @@ public sealed class CompletedSessionFormattingTests
             "",
             "## Screenshots",
             "",
-            "- **screenshot-001.png** at `00:12`",
+            "- **screenshot-001.png** at `00:12` linked to **Screenshot 001**",
             "",
             "## Raw Transcript",
             "",
