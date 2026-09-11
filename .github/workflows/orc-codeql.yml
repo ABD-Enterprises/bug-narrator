@@ -1,0 +1,88 @@
+name: ORC CodeQL Alert Drain
+
+on:
+  workflow_run:
+    workflows: [CodeQL]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+
+concurrency:
+  group: orc-codeql-alert-drain
+  cancel-in-progress: false
+
+jobs:
+  security-drain:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ fromJSON(vars.ORC_RUNNER_LABELS || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    env:
+      BASH_ENV: ""
+      GH_TOKEN: ${{ github.token }}
+      ORC_ENGINE_REPO: ABD-Enterprises/sure-forge
+      ORC_ENGINE_SHA: c67304bd414e722f8d7a3371ced58bfb16333c3c
+      ORC_ENGINE_TOKEN: ${{ secrets.ORC_ENGINE_TOKEN }}
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "20"
+
+      - name: Fetch pinned SureForge engine
+        run: |
+          set -euo pipefail
+          if [ -z "${ORC_ENGINE_TOKEN:-}" ]; then
+            echo "::error::ORC_ENGINE_TOKEN is missing. Configure a fine-grained token with Contents: read on $ORC_ENGINE_REPO."
+            exit 1
+          fi
+          echo "::add-mask::$ORC_ENGINE_TOKEN"
+          engine="$RUNNER_TEMP/sureforge-engine"
+          askpass="$RUNNER_TEMP/sureforge-askpass"
+          fetch_log="$RUNNER_TEMP/sureforge-fetch.err"
+          mkdir -p "$engine"
+          cat > "$askpass" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "$ORC_ENGINE_TOKEN" ;;
+            *) printf '\n' ;;
+          esac
+          EOF
+          chmod 700 "$askpass"
+          export GIT_ASKPASS="$askpass"
+          export GIT_TERMINAL_PROMPT=0
+          git init -q "$engine"
+          git -C "$engine" remote add origin "https://github.com/$ORC_ENGINE_REPO.git"
+          if ! git -C "$engine" -c credential.helper= fetch --no-tags --depth=1 origin "$ORC_ENGINE_SHA" 2>"$fetch_log"; then
+            sed 's/x-access-token:[^@]*@/x-access-token:***@/g' "$fetch_log" >&2 || true
+            echo "::error::Could not fetch the pinned SureForge engine. Verify ORC_ENGINE_TOKEN has Contents: read access."
+            exit 1
+          fi
+          git -C "$engine" -c advice.detachedHead=false checkout --detach FETCH_HEAD
+          got="$(git -C "$engine" rev-parse HEAD)"
+          if [ "$got" != "$ORC_ENGINE_SHA" ]; then
+            echo "::error::SureForge resolved to $got, expected $ORC_ENGINE_SHA"
+            exit 1
+          fi
+          printf 'ORC_ENGINE_DIR=%s\n' "$engine" >> "$GITHUB_ENV"
+
+      - name: Configure repository threat model
+        run: |
+          set -euo pipefail
+          mkdir -p .ai
+          printf '%s\n' '{"schema_version":1,"board":{"type":"github","project":"ABD-Enterprises/bug-narrator","auth_env":"GH_TOKEN"},"security":{"threat_model_profile":"local-cli"}}' > .ai/config.json
+
+      - name: Drain CodeQL alerts
+        run: node "$ORC_ENGINE_DIR/tools/orc/cli.mjs" security drain --repo "$GITHUB_REPOSITORY"
