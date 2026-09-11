@@ -841,7 +841,7 @@ final class SettingsStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let secretStore: KeychainSecretStoring
+    private let secretCoordinator: SettingsSecretCoordinator
     private let recordingPreferences: RecordingPreferencesStore
     private let trackerExportSettings: TrackerExportSettingsStore
     private let launchAtLoginService: any LaunchAtLoginControlling
@@ -857,9 +857,6 @@ final class SettingsStore: ObservableObject {
     private var isSynchronizingHotkeys = false
     private var isSynchronizingLaunchAtLogin = false
     private var lastLocalProviderReachabilityURL: URL?
-    private var sessionOnlySecrets: [SecretSlot: String] = [:]
-    private var committedSecrets: [SecretSlot: String] = [:]
-    private var committedSecretStates: [SecretSlot: APIKeyPersistenceState] = [:]
 
     init(
         defaults: UserDefaults = .standard,
@@ -872,7 +869,11 @@ final class SettingsStore: ObservableObject {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
         self.trackerExportSettings = TrackerExportSettingsStore(defaults: defaults)
-        self.secretStore = KeychainSecretStore(keychainService: keychainService)
+        self.secretCoordinator = SettingsSecretCoordinator(
+            defaults: defaults,
+            secretStore: KeychainSecretStore(keychainService: keychainService),
+            aiProviderCredentialProviderKey: Keys.aiProviderCredentialProvider
+        )
         self.launchAtLoginService = launchAtLoginService
         self.localProviderReachabilityProbe = localProviderReachabilityProbe
         self.localProviderSession = localProviderSession
@@ -1095,10 +1096,11 @@ final class SettingsStore: ObservableObject {
         defer { hasLoaded = previousHasLoaded }
 
         for slot in slots {
-            let secret = loadSecret(
-                for: slot,
+            let secret = secretCoordinator.load(
+                slot: slot,
                 allowInteraction: allowInteraction,
-                includeLegacyServices: includeLegacyServices
+                includeLegacyServices: includeLegacyServices,
+                aiProvider: aiProvider
             )
 
             switch slot {
@@ -1116,8 +1118,7 @@ final class SettingsStore: ObservableObject {
                 setPersistenceState(secret.state, for: slot)
             }
 
-            committedSecrets[slot] = slot == .openAI && secret.state == .keychain ? "" : secret.value
-            committedSecretStates[slot] = secret.state
+            secretCoordinator.recordLoaded(secret, for: slot)
         }
 
         logger.debug(
@@ -1344,152 +1345,22 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    /// Best-effort removal of a secret from a slot's legacy service names.
-    /// Missing items are not an error (KeychainService treats not-found as
-    /// success); a genuine failure is logged but does not block the primary
-    /// operation, since the canonical service-name delete is what matters.
-    private func deleteLegacySecrets(for slot: SecretSlot) {
-        for failure in secretStore.deleteLegacyValues(for: slot) {
-            logger.warning(
-                "secret_legacy_clear_failed",
-                "A legacy secure value could not be removed from Keychain.",
-                metadata: [
-                    "slot": slot.redactionSafeName,
-                    "error": failure.redactedDetail
-                ]
-            )
-        }
-    }
-
     @discardableResult
     private func persistSecret(_ value: String, for slot: SecretSlot) -> APIKeyPersistenceState {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmedValue.isEmpty {
-            sessionOnlySecrets.removeValue(forKey: slot)
-            do {
-                try secretStore.deleteCanonicalValue(for: slot)
-            } catch {
-                // KeychainService maps "item not found" to success, so any thrown
-                // error means the secret is still resident. Surface it instead of
-                // reporting the credential as cleared — otherwise the UI/state
-                // would diverge from what is actually in the Keychain.
-                logger.warning(
-                    "secret_clear_failed",
-                    "A secure value could not be removed from Keychain.",
-                    metadata: [
-                        "slot": slot.redactionSafeName,
-                        "error": KeychainSecretStore.redactedErrorDetail(error)
-                    ]
-                )
-                committedSecretStates[slot] = .keychain
-                return .keychain
-            }
-            deleteLegacySecrets(for: slot)
-            logger.info(
-                "secret_cleared",
-                "A secure value was cleared from persistent storage.",
-                metadata: ["slot": slot.redactionSafeName]
-            )
-            if slot == .openAI {
-                defaults.removeObject(forKey: Keys.aiProviderCredentialProvider)
-            }
-            committedSecrets[slot] = ""
-            committedSecretStates[slot] = .empty
-            return .empty
-        }
-
-        do {
-            try secretStore.saveCanonicalValue(trimmedValue, for: slot)
-            deleteLegacySecrets(for: slot)
-            sessionOnlySecrets.removeValue(forKey: slot)
-            logger.info(
-                "secret_persisted",
-                "A secure value was saved to Keychain.",
-                metadata: ["slot": slot.redactionSafeName]
-            )
-            if slot == .openAI {
-                defaults.set(aiProvider.rawValue, forKey: Keys.aiProviderCredentialProvider)
-            }
-            committedSecrets[slot] = slot == .openAI ? "" : trimmedValue
-            committedSecretStates[slot] = .keychain
-            return .keychain
-        } catch {
-            sessionOnlySecrets[slot] = trimmedValue
-            logger.warning(
-                "secret_persisted_in_memory",
-                "Keychain storage was unavailable, so a secure value is only kept in memory for this run.",
-                metadata: ["slot": slot.redactionSafeName]
-            )
-            if slot == .openAI {
-                defaults.set(aiProvider.rawValue, forKey: Keys.aiProviderCredentialProvider)
-            }
-            committedSecrets[slot] = trimmedValue
-            committedSecretStates[slot] = .sessionOnly
-            return .sessionOnly
-        }
+        secretCoordinator.persist(value, for: slot, aiProvider: aiProvider)
     }
 
     private func loadSecret(
         for slot: SecretSlot,
         allowInteraction: Bool,
         includeLegacyServices: Bool
-    ) -> (value: String, state: APIKeyPersistenceState) {
-        do {
-            if let keychainValue = try secretStore.readCanonicalValue(
-                for: slot,
-                allowInteraction: allowInteraction
-            ),
-               !keychainValue.isEmpty {
-                return (keychainValue, .keychain)
-            }
-
-            if includeLegacyServices,
-               let legacyValue = try secretStore.readFirstLegacyValue(
-                for: slot,
-                allowInteraction: allowInteraction
-               ) {
-                _ = persistSecret(legacyValue, for: slot)
-                return (legacyValue, .keychain)
-            }
-        } catch {
-            if let sessionOnlyValue = sessionOnlySecrets[slot], !sessionOnlyValue.isEmpty {
-                logger.warning(
-                    "secret_fallback_to_memory",
-                    "Keychain access failed, so BugNarrator fell back to an in-memory secure value.",
-                    metadata: ["slot": slot.redactionSafeName]
-                )
-                return (sessionOnlyValue, .sessionOnly)
-            }
-
-            if case KeychainError.interactionRequired = error {
-                logger.debug(
-                    "secret_locked",
-                    "A secure value remains in Keychain, but BugNarrator skipped the unlock prompt until a user-initiated action needs it.",
-                    metadata: [
-                        "slot": slot.redactionSafeName,
-                        "allow_interaction": allowInteraction ? "yes" : "no"
-                    ]
-                )
-                return ("", .keychainLocked)
-            }
-
-            logger.debug(
-                "secret_unavailable",
-                "A secure value was unavailable during reload.",
-                metadata: [
-                    "slot": slot.redactionSafeName,
-                    "allow_interaction": allowInteraction ? "yes" : "no"
-                ]
-            )
-            return ("", .empty)
-        }
-
-        if let sessionOnlyValue = sessionOnlySecrets[slot], !sessionOnlyValue.isEmpty {
-            return (sessionOnlyValue, .sessionOnly)
-        }
-
-        return ("", .empty)
+    ) -> LoadedSecret {
+        secretCoordinator.load(
+            slot: slot,
+            allowInteraction: allowInteraction,
+            includeLegacyServices: includeLegacyServices,
+            aiProvider: aiProvider
+        )
     }
 
     private func persistHotkey(_ shortcut: HotkeyShortcut, key: String) {
@@ -1550,21 +1421,10 @@ final class SettingsStore: ObservableObject {
     }
 
     private func secretDidChange(_ slot: SecretSlot) {
-        let currentValue = currentSecretValue(for: slot).trimmingCharacters(in: .whitespacesAndNewlines)
-        let committedValue = (committedSecrets[slot] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let committedState = committedSecretStates[slot] ?? .empty
-
-        if currentValue == committedValue {
-            setPersistenceState(committedState, for: slot)
-            return
-        }
-
-        if currentValue.isEmpty && committedState == .empty {
-            setPersistenceState(.empty, for: slot)
-            return
-        }
-
-        setPersistenceState(.pendingSave, for: slot)
+        setPersistenceState(
+            secretCoordinator.stateAfterEditing(currentSecretValue(for: slot), for: slot),
+            for: slot
+        )
     }
 
     private func hasPendingSecretChanges(for slot: SecretSlot) -> Bool {
