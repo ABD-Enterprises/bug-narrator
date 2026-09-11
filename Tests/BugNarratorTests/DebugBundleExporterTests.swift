@@ -87,7 +87,7 @@ final class DebugBundleExporterTests: XCTestCase {
         defaults: UserDefaults,
         keychainService: MockKeychainService
     ) -> SettingsStore {
-        SettingsStore(
+        makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychainService,
             launchAtLoginService: MockLaunchAtLoginService()

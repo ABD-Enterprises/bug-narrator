@@ -266,7 +266,7 @@ private final class SupportDataControllerHarness {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
         let keychainService = MockKeychainService()
-        let settingsStore = SettingsStore(
+        let settingsStore = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychainService,
             launchAtLoginService: MockLaunchAtLoginService()

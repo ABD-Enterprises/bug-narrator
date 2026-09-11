@@ -253,7 +253,7 @@ private final class PostTranscriptionPipelineControllerHarness {
     }
 
     private static func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
-        SettingsStore(
+        makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
             launchAtLoginService: MockLaunchAtLoginService()

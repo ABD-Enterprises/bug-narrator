@@ -162,7 +162,7 @@ private final class LocalDataDeletionControllerHarness {
         defaults: UserDefaults,
         keychainService: MockKeychainService
     ) -> SettingsStore {
-        SettingsStore(
+        makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychainService,
             launchAtLoginService: MockLaunchAtLoginService()
