@@ -31,11 +31,12 @@ final class LocalTranscriptionManager: ObservableObject {
     @Published private(set) var running = false
     @Published private(set) var message = ""
     let directory: URL
-    private var server: Process?
+    private var server: (any LocalServerProcess)?
     private var operation: Task<Void, Never>?
     private var startOperation: Task<Void, Never>?
     private var terminationObserver: AnyCancellable?
     private let session: URLSession
+    private let dependencies: Dependencies
 
     var executable: URL { directory.appendingPathComponent("bugnarrator-transcription") }
     var downloadSize: String {
@@ -49,10 +50,11 @@ final class LocalTranscriptionManager: ObservableObject {
         #endif
     }
 
-    init(directory: URL? = nil, session: URLSession = .shared) {
+    init(directory: URL? = nil, session: URLSession = .shared, dependencies: Dependencies = .live) {
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("BugNarrator/LocalTranscription", isDirectory: true)
         self.session = session
+        self.dependencies = dependencies
         installed = FileManager.default.fileExists(atPath: self.directory.appendingPathComponent("bugnarrator-transcription").path)
         terminationObserver = NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
             .sink { [weak self] _ in
@@ -83,11 +85,25 @@ final class LocalTranscriptionManager: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            let url = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases?per_page=30")!
-            let (data, response) = try await session.data(from: url)
-            try Self.requireSuccess(response)
-            package = Self.selectPackage(from: try JSONDecoder().decode([Release].self, from: data))
-            message = package == nil ? "No compatible signed server release was found. Try again later or choose OpenAI." : ""
+            // App and server releases have independent cadences. Search bounded pages.
+            for page in 1...20 {
+                try Task.checkCancellation()
+                let url = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases?per_page=30&page=\(page)")!
+                let (data, response) = try await session.data(from: url)
+                try Self.requireSuccess(response)
+                let releases = try JSONDecoder().decode([Release].self, from: data)
+                if let found = Self.selectPackage(from: releases) {
+                    package = found
+                    message = ""
+                    return
+                }
+                if releases.count < 30 {
+                    message = "No compatible signed server release was found. Try again later or choose OpenAI."
+                    return
+                }
+            }
+            message = "Server release search reached its limit. Check the project releases or choose OpenAI."
+
         } catch { message = "Could not check server releases: \(error.localizedDescription). Try again." }
     }
 
@@ -112,12 +128,12 @@ final class LocalTranscriptionManager: ObservableObject {
                 try Task.checkCancellation()
                 self.message = "Verifying and installing the signed server…"
                 let destination = self.directory
-                try await Task.detached {
-                    try Self.installImage(temporary, checksum: checksum, expectedSize: package.image.size, directory: destination)
-                }.value
+                try await self.dependencies.install(temporary, checksum, package.image.size, destination)
                 self.installed = true
                 try Task.checkCancellation()
                 self.start()
+            } catch is CancellationError {
+                self.message = "Installation canceled. You can retry."
             } catch { self.message = "Installation failed: \(error.localizedDescription). You can retry." }
         }
     }
@@ -129,33 +145,23 @@ final class LocalTranscriptionManager: ObservableObject {
         startOperation = Task {
             defer { busy = false; startOperation = nil }
             do {
-                try await Task.detached { try Self.verifyBinary(binary) }.value
+                try await dependencies.verify(binary)
                 try Task.checkCancellation()
                 launchVerifiedServer()
+            } catch is CancellationError {
+                message = "Server start canceled."
             } catch { message = "Could not start the server: \(error.localizedDescription). Remove and reinstall it if verification failed." }
         }
     }
 
     private func launchVerifiedServer() {
         do {
-            let process = Process()
-            process.executableURL = executable
-            process.arguments = ["--preload"]
-            var environment = ProcessInfo.processInfo.environment
-            environment["HF_HOME"] = directory.appendingPathComponent("Models").path
-            process.environment = environment
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            process.terminationHandler = { [weak self] process in
-                let status = process.terminationStatus
-                Task { @MainActor in
-                    guard let self, self.server === process else { return }
-                    self.server = nil
-                    self.running = false
-                    self.message = status == 0 ? "Local server stopped." : "Local server exited (\(status)). Try starting it again."
-                }
+            let process = try dependencies.launch(executable, directory.appendingPathComponent("Models")) { [weak self] status, detail in
+                guard let self else { return }
+                self.server = nil
+                self.running = false
+                self.message = status == 0 ? "Local server stopped." : "Local server exited (\(status)). \(detail.isEmpty ? "Try starting it again." : detail)"
             }
-            try process.run()
             server = process
             running = true
             message = "Server starting. The first start downloads model weights; recording becomes ready when the server responds."
@@ -165,7 +171,7 @@ final class LocalTranscriptionManager: ObservableObject {
     func stop() {
         operation?.cancel()
         startOperation?.cancel()
-        if let server, server.isRunning { server.terminate() }
+        server?.terminate()
     }
 
     func remove() {
@@ -196,48 +202,109 @@ final class LocalTranscriptionManager: ObservableObject {
         guard actual == expected.lowercased() else { throw Failure("The server download failed its SHA-256 check") }
     }
 
-    nonisolated private static func verifyBinary(_ binary: URL) throws {
+    nonisolated static func verifyBinary(_ binary: URL, command: Command = run) throws {
         let values = try binary.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true else { throw Failure("Invalid server executable") }
-        try run("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement + " and identifier \"bugnarrator-transcription\"", binary.path])
+        try command("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement + " and identifier \"bugnarrator-transcription\"", binary.path])
     }
 
-    nonisolated private static func installImage(_ image: URL, checksum: Data, expectedSize: Int64, directory: URL) throws {
+    nonisolated static func installImage(_ image: URL, checksum: Data, expectedSize: Int64, directory: URL, command: Command = run) throws {
+        try Task.checkCancellation()
         try verifyChecksum(file: image, manifest: checksum, expectedSize: expectedSize)
-        try run("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement, image.path])
+        try command("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement, image.path])
+        try Task.checkCancellation()
         let files = FileManager.default
         let mount = files.temporaryDirectory.appendingPathComponent("BugNarrator-Server-\(UUID().uuidString)")
         try files.createDirectory(at: mount, withIntermediateDirectories: true)
-        defer { try? files.removeItem(at: mount) }
-        try run("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-mountpoint", mount.path, image.path])
-        defer { try? run("/usr/bin/hdiutil", ["detach", mount.path]) }
+        // Even an interrupted attach can have mounted the image. Cleanup ignores task
+        // cancellation, has its own timeout, and must detach before removing the path.
+        var detached = false
+        defer {
+            if !detached {
+                detached = (try? command("/usr/bin/hdiutil", ["detach", "-force", mount.path])) != nil
+            }
+            if detached { try? files.removeItem(at: mount) }
+        }
+        try command("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-mountpoint", mount.path, image.path])
+        try Task.checkCancellation()
         let source = mount.appendingPathComponent("bugnarrator-transcription")
-        try verifyBinary(source)
+        try verifyBinary(source, command: command)
         try files.createDirectory(at: directory, withIntermediateDirectories: true)
         guard try directory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
             throw Failure("Install directory must not be a symbolic link")
         }
         let staging = directory.appendingPathComponent(".install-\(UUID().uuidString)")
         defer { try? files.removeItem(at: staging) }
+        try Task.checkCancellation()
         try files.copyItem(at: source, to: staging)
-        try verifyBinary(staging)
+        try verifyBinary(staging, command: command)
+        try command("/usr/bin/hdiutil", ["detach", mount.path])
+        detached = true
+        try Task.checkCancellation()
         try files.moveItem(at: staging, to: directory.appendingPathComponent("bugnarrator-transcription"))
     }
 
-    nonisolated private static func run(_ executable: String, _ arguments: [String]) throws {
+    typealias Command = @Sendable (String, [String]) throws -> Void
+
+    nonisolated static func run(_ executable: String, _ arguments: [String]) throws {
+        try runCommand(executable, arguments, timeout: 60)
+    }
+
+    nonisolated static func runCommand(_ executable: String, _ arguments: [String], timeout: TimeInterval) throws {
+        let cleanup = executable == "/usr/bin/hdiutil" && arguments.first == "detach"
+        if !cleanup { try Task.checkCancellation() }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         let errors = Pipe()
+        let diagnostic = LocalServerDiagnostic()
         process.standardError = errors
+        diagnostic.read(from: errors)
+        defer { diagnostic.finishReading(errors) }
         try process.run()
-        let data = errors.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let detail = String(decoding: data.prefix(2048), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(detail)")
+        errors.fileHandleForWriting.closeFile()
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning {
+            if (!cleanup && Task.isCancelled) || Date() >= deadline {
+                process.terminate()
+                // A misbehaving helper must not keep installation busy forever.
+                let grace = Date().addingTimeInterval(0.5)
+                while process.isRunning && Date() < grace { Thread.sleep(forTimeInterval: 0.01) }
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+                process.waitUntilExit()
+                if !cleanup && Task.isCancelled { throw CancellationError() }
+                throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) timed out. Retry installation.")
+            }
+            Thread.sleep(forTimeInterval: 0.01)
         }
+        diagnostic.finishReading(errors)
+        guard process.terminationStatus == 0 else {
+            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(diagnostic.text)")
+        }
+    }
+
+    nonisolated static func background(_ action: @escaping @Sendable () throws -> Void) async throws {
+        let worker = Task.detached { try action() }
+        try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+
+    struct Dependencies: Sendable {
+        var install: @Sendable (URL, Data, Int64, URL) async throws -> Void
+        var verify: @Sendable (URL) async throws -> Void
+        var launch: @MainActor @Sendable (URL, URL, @escaping @MainActor @Sendable (Int32, String) -> Void) throws -> any LocalServerProcess
+
+        static let live = Dependencies(
+            install: { image, checksum, size, directory in
+                try await background { try installImage(image, checksum: checksum, expectedSize: size, directory: directory) }
+            },
+            verify: { binary in try await background { try verifyBinary(binary) } },
+            launch: { binary, models, onExit in try ManagedLocalServerProcess(binary: binary, models: models, onExit: onExit) }
+        )
     }
 
     struct Failure: LocalizedError {
@@ -254,5 +321,86 @@ private final class LocalServerDownloadProgress: NSObject, URLSessionDownloadDel
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         if totalBytesExpectedToWrite > 0 { progress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)) }
+    }
+}
+
+@MainActor
+protocol LocalServerProcess: AnyObject {
+    func terminate()
+}
+
+private final class LocalServerDiagnostic: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    private let ended = DispatchSemaphore(value: 0)
+    private var finished = false
+    func read(from pipe: Pipe) {
+        pipe.fileHandleForReading.readabilityHandler = { [self] handle in
+            let next = handle.availableData
+            if next.isEmpty {
+                handle.readabilityHandler = nil
+                ended.signal()
+            } else { append(next) }
+        }
+    }
+    func finishReading(_ pipe: Pipe) {
+        let first = lock.withLock {
+            if finished { return false }
+            finished = true
+            return true
+        }
+        guard first else { return }
+        _ = ended.wait(timeout: .now() + 0.2)
+        pipe.fileHandleForReading.readabilityHandler = nil
+    }
+    func append(_ next: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        data.append(next)
+        if data.count > 2048 { data = Data(data.suffix(2048)) }
+    }
+    var text: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+@MainActor
+private final class ManagedLocalServerProcess: LocalServerProcess {
+    private let process: Process
+    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
+        let process = Process()
+        self.process = process
+        process.executableURL = binary
+        process.arguments = ["--preload"]
+        var environment = ProcessInfo.processInfo.environment
+        environment["HF_HOME"] = models.path
+        process.environment = environment
+        process.standardOutput = FileHandle.nullDevice
+        let errors = Pipe()
+        let diagnostic = LocalServerDiagnostic()
+        process.standardError = errors
+        diagnostic.read(from: errors)
+        process.terminationHandler = { process in
+            diagnostic.finishReading(errors)
+            let status = process.terminationStatus
+            let detail = diagnostic.text
+            Task { @MainActor in onExit(status, detail) }
+        }
+        do {
+            try process.run()
+            errors.fileHandleForWriting.closeFile()
+        }
+        catch { errors.fileHandleForReading.readabilityHandler = nil; throw error }
+    }
+    func terminate() {
+        guard process.isRunning else { return }
+        process.terminate()
+        let process = self.process
+        Task.detached {
+            try? await Task.sleep(for: .seconds(2))
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        }
     }
 }
