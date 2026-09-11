@@ -984,7 +984,20 @@ final class SettingsStore: ObservableObject {
         )
 
         preferredModel = stringValue(forKey: Keys.preferredModel) ?? "whisper-1"
-        aiProvider = AIProvider(rawValue: stringValue(forKey: Keys.aiProvider) ?? "") ?? .parakeetLocal
+        if let savedProvider = stringValue(forKey: Keys.aiProvider).flatMap(AIProvider.init(rawValue:)) {
+            aiProvider = savedProvider
+        } else {
+            let hadPreviousConfiguration = hasAPIKey ||
+                boolValue(forKey: Keys.didMigrateLegacyBuiltInHotkeys) == true ||
+                boolValue(forKey: Keys.hasCompletedFirstRunOnboarding) == true ||
+                stringValue(forKey: Keys.preferredModel) != nil ||
+                stringValue(forKey: Keys.openAIBaseURL) != nil ||
+                boolValue(forKey: Keys.autoExtractIssues) != nil
+            aiProvider = hadPreviousConfiguration ? .openAI : .parakeetLocal
+        }
+        // load() runs before didSet persistence is enabled. Save the decision
+        // now so subsequent launches cannot reinterpret a once-fresh profile.
+        defaults.set(aiProvider.rawValue, forKey: Keys.aiProvider)
         openAIBaseURL = stringValue(forKey: Keys.openAIBaseURL) ?? ""
         languageHint = stringValue(forKey: Keys.languageHint) ?? Self.defaultLanguageHint
         transcriptionPrompt = stringValue(forKey: Keys.transcriptionPrompt) ?? ""

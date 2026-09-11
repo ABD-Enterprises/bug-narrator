@@ -4,6 +4,32 @@ import XCTest
 @testable import BugNarrator
 
 final class SettingsStoreTests: XCTestCase {
+    func testLegacyProfileWithoutProviderPreservesOpenAIAndExtraction() {
+        let name = "BugNarrator-LegacyProvider-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(true, forKey: "settings.didMigrateLegacyBuiltInHotkeys")
+        defaults.set(true, forKey: "settings.autoExtractIssues")
+        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderReachabilityProbe: { _ in false })
+        XCTAssertEqual(store.aiProvider, .openAI)
+        XCTAssertEqual(store.preferredModel, "whisper-1")
+        XCTAssertTrue(store.autoExtractIssues)
+        XCTAssertEqual(defaults.string(forKey: "settings.aiProvider"), AIProvider.openAI.rawValue)
+    }
+
+    func testFreshProviderChoiceRemainsLocalAcrossLaunches() {
+        let name = "BugNarrator-FreshProvider-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let first = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderReachabilityProbe: { _ in false })
+        XCTAssertEqual(first.aiProvider, .parakeetLocal)
+        let second = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                   localProviderReachabilityProbe: { _ in false })
+        XCTAssertEqual(second.aiProvider, .parakeetLocal)
+    }
+
     func testDefaultLegacyDefaultsDomainsOnlyIncludeSessionMic() {
         XCTAssertEqual(
             SettingsStore.defaultLegacyDefaultsDomains,
