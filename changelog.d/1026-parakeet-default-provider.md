@@ -1,0 +1,1 @@
+- [FEATURE] Make Local (Parakeet) the default transcription provider and require localhost reachability before recording. (#1026)

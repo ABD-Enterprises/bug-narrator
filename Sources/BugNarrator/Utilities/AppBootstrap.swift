@@ -31,12 +31,25 @@ struct AppBootstrap {
                 status: runtimeEnvironment.testLaunchAtLoginStatus
             )
             self.storageMode = .isolatedForTests
-            self.settingsStore = SettingsStore(
-                defaults: defaults,
-                keychainService: InMemoryKeychainService(),
-                launchAtLoginService: launchAtLoginService,
-                legacyDefaultsDomains: []
-            )
+            if let reachable = runtimeEnvironment.testLocalServerIsReachable {
+                self.settingsStore = SettingsStore(
+                    defaults: defaults,
+                    keychainService: InMemoryKeychainService(),
+                    launchAtLoginService: launchAtLoginService,
+                    legacyDefaultsDomains: [],
+                    localProviderReachabilityProbe: { _ in reachable }
+                )
+            } else {
+                self.settingsStore = SettingsStore(
+                    defaults: defaults,
+                    keychainService: InMemoryKeychainService(),
+                    launchAtLoginService: launchAtLoginService,
+                    legacyDefaultsDomains: []
+                )
+            }
+            if let testProvider = runtimeEnvironment.testAIProvider {
+                self.settingsStore.aiProvider = testProvider
+            }
             self.transcriptStore = TranscriptStore(
                 fileManager: fileManager,
                 storageURL: storageRootURL.appendingPathComponent("sessions.json"),

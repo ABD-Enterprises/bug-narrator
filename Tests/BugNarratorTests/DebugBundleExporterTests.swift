@@ -17,6 +17,7 @@ final class DebugBundleExporterTests: XCTestCase {
 
         let keychainService = MockKeychainService()
         let settingsStore = makeHermeticSettingsStore(defaults: defaults, keychainService: keychainService)
+        settingsStore.aiProvider = .openAI
         settingsStore.apiKey = "fixture-openai-key"
         settingsStore.preferredModel = "whisper-1"
         settingsStore.issueExtractionModel = "gpt-4.1-mini"
