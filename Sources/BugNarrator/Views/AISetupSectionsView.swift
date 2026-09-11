@@ -428,7 +428,10 @@ struct AISetupSectionsView: View {
                             .disabled(localServer.busy)
                     }
                 }
-                if let progress = localServer.progress { ProgressView(value: progress) }
+                if let progress = localServer.progress {
+                    ProgressView(value: progress)
+                    Button("Cancel installation") { localServer.stop() }
+                }
                 Text("Install location: \(localServer.directory.path)")
                     .font(.caption)
                     .textSelection(.enabled)
