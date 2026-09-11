@@ -637,7 +637,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var localProviderSetupDetail: String {
-        "Download bugnarrator-transcription from the BugNarrator releases page, then run \(localProviderSetupCommand) in Terminal."
+        "Install and start the local server in AI Engines settings, or choose another provider."
     }
 
     var localProviderUnreachableMessage: String {

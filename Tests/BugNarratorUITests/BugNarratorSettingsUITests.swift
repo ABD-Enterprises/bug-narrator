@@ -77,11 +77,11 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Local transcription is selected."].waitForExistence(timeout: 5))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value == %@", "BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Start the local transcription server before recording.")).firstMatch
+            app.staticTexts.matching(NSPredicate(format: "value == %@", "BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Install and start the local server below before recording.")).firstMatch
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
-            app.staticTexts["Download bugnarrator-transcription from the releases page, then run in Terminal: ./bugnarrator-transcription --preload"]
+            app.staticTexts["Use the download controls below to install, start, or remove the local server."]
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(app.staticTexts["No AI provider credential required"].firstMatch.waitForExistence(timeout: 5))

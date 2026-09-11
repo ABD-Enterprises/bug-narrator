@@ -6,6 +6,7 @@ struct AISetupSectionsView: View {
     let secureControlsDisabled: Bool
 
     @State private var revealCredential = false
+    @StateObject private var localServer = LocalTranscriptionManager.shared
 
     var body: some View {
         GroupBox("AI Provider Setup") {
@@ -72,7 +73,7 @@ struct AISetupSectionsView: View {
                         .disabled(secureControlsDisabled || settingsStore.aiProvider == .parakeetLocal)
                         .accessibilityLabel("AI provider base URL")
                         .help(settingsStore.aiProvider == .parakeetLocal
-                            ? "Parakeet uses localhost:8422 automatically. Download bugnarrator-transcription from the releases page and run it with --preload."
+                            ? "Parakeet uses localhost:8422 automatically. Install and start the server using the controls below."
                             : "The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
                 }
 
@@ -81,32 +82,7 @@ struct AISetupSectionsView: View {
                     .foregroundStyle(.secondary)
 
                 if settingsStore.aiProvider == .parakeetLocal {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if settingsStore.localProviderReachability == .unreachable {
-                            Label("Local transcription server not reachable", systemImage: "exclamationmark.triangle.fill")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.orange)
-
-                            Text(settingsStore.localProviderSetupDetail)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Text("Run in Terminal: \(settingsStore.localProviderSetupCommand)")
-                            .font(.footnote.monospaced())
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-
-                        // One click to the signed, notarized server build (#959).
-                        Button("Download the local transcription server") {
-                            appState.openLocalTranscriptionDownload()
-                        }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                        .help("Opens the BugNarrator releases page, where bugnarrator-transcription is published.")
-                        .accessibilityLabel("Download the local transcription server")
-                    }
+                    localServerControls
                 }
 
                 if let warning = settingsStore.aiBaseURLPlaintextWarning {
@@ -426,6 +402,47 @@ struct AISetupSectionsView: View {
             Text(title)
                 .frame(width: 170, alignment: .leading)
             content()
+        }
+    }
+
+    private var localServerControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if localServer.supported {
+                Text("Local server download: \(localServer.downloadSize). Model weights download on first start and require additional disk space.")
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                if localServer.installed {
+                    HStack {
+                        Button(localServer.running ? "Stop local server" : "Start local server") {
+                            if localServer.running { localServer.stop() } else { localServer.start() }
+                        }
+                        .disabled(localServer.busy)
+                        Button("Remove local server and models", role: .destructive) { localServer.remove() }
+                            .disabled(localServer.busy || localServer.running)
+                    }
+                } else {
+                    Button("Download the local transcription server") { localServer.installAndStart() }
+                        .disabled(localServer.busy || localServer.package == nil)
+                    if localServer.package == nil {
+                        Button("Check server download") { Task { await localServer.discover() } }
+                            .disabled(localServer.busy)
+                    }
+                }
+                if let progress = localServer.progress { ProgressView(value: progress) }
+                Text("Install location: \(localServer.directory.path)")
+                    .font(.caption)
+                    .textSelection(.enabled)
+                if !localServer.message.isEmpty {
+                    Text(localServer.message).font(.footnote).fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text("The local server requires an Apple silicon Mac. Choose OpenAI or another compatible provider on this Mac.")
+                    .font(.footnote)
+            }
+            Button("Use OpenAI instead") { settingsStore.aiProvider = .openAI }
+        }
+        .task {
+            if !AppRuntimeEnvironment().usesIsolatedRuntime { await localServer.discover() }
         }
     }
 
