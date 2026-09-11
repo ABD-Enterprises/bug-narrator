@@ -74,6 +74,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         }
         defer { MockURLProtocol.requestHandler = nil }
         let manager = LocalTranscriptionManager(session: makeMockURLSession())
+        try XCTSkipUnless(manager.supported, "Server packages require Apple Silicon")
         await manager.discover()
         XCTAssertNotNil(manager.package)
         XCTAssertFalse(manager.busy)
@@ -131,6 +132,17 @@ final class LocalTranscriptionManagerTests: XCTestCase {
             try fixture.install()
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.destination.appendingPathComponent("bugnarrator-transcription").path))
+        XCTAssertTrue(fixture.detached)
+    }
+
+    func testInstallerSignatureRejectionCleansMountWithoutCommitting() async throws {
+        let fixture = try InstallerFixture(rejectBinary: true)
+        defer { fixture.remove() }
+        do {
+            try await LocalTranscriptionManager.background { try fixture.install() }
+            XCTFail("Expected signature rejection")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("signature")) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.destination.appendingPathComponent("bugnarrator-transcription").path))
         XCTAssertTrue(fixture.detached)
     }
 
@@ -200,13 +212,15 @@ private final class InstallerFixture: @unchecked Sendable {
     let manifest: Data
     let resume = DispatchSemaphore(value: 0)
     private let pauseBeforeCommit: Bool
+    private let rejectBinary: Bool
     private let lock = NSLock()
     private var didPause = false
     private var didDetach = false
     var paused: Bool { lock.withLock { didPause } }
     var detached: Bool { lock.withLock { didDetach } }
 
-    init(pauseBeforeCommit: Bool = false) throws {
+    init(pauseBeforeCommit: Bool = false, rejectBinary: Bool = false) throws {
+        self.rejectBinary = rejectBinary
         self.pauseBeforeCommit = pauseBeforeCommit
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         destination = root.appendingPathComponent("installed")
@@ -224,6 +238,8 @@ private final class InstallerFixture: @unchecked Sendable {
                 try Data("verified server".utf8).write(to: mount.appendingPathComponent("bugnarrator-transcription"))
             } else if command == "/usr/bin/hdiutil", args.first == "detach" {
                 self.lock.withLock { self.didDetach = true }
+            } else if command == "/usr/bin/codesign", args.last!.hasSuffix("bugnarrator-transcription"), self.rejectBinary {
+                throw LocalTranscriptionManager.Failure("Rejected binary signature")
             } else if command == "/usr/bin/codesign", args.last!.contains(".install-"), self.pauseBeforeCommit {
                 self.lock.withLock { self.didPause = true }
                 guard self.resume.wait(timeout: .now() + 3) == .success else {
