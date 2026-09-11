@@ -44,6 +44,19 @@ final class TranscriptStore: ObservableObject {
     private let backupIndexURL: URL
     private let sessionsDirectoryURL: URL
     private let sessionDataProtector: any SessionDataProtecting
+    private var hasPartitionedBodies: Bool {
+        // An unreadable directory is not evidence that it is empty.
+        guard fileManager.fileExists(atPath: sessionsDirectoryURL.path) else { return false }
+        return (try? fileManager.contentsOfDirectory(atPath: sessionsDirectoryURL.path).isEmpty) != true
+    }
+    private var hasPartitionedHistory: Bool {
+        hasPartitionedBodies || [indexURL, backupIndexURL].contains { url in
+            var isDirectory: ObjCBool = false
+            return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
+        }
+    }
+    private var writesAllowed = false
+    private var migrationMarkerURL: URL { storageURL.deletingLastPathComponent().appendingPathComponent("sessions.migrated") }
     private var sessionLookup: [UUID: TranscriptSession] = [:]
 
     init(
@@ -71,6 +84,7 @@ final class TranscriptStore: ObservableObject {
     }
 
     func add(_ session: TranscriptSession) throws {
+        try requireWritableStorage()
         var updatedEntries = libraryEntries
         updatedEntries.removeAll { $0.id == session.id }
         updatedEntries.insert(SessionLibraryEntry(session: session), at: 0)
@@ -109,6 +123,7 @@ final class TranscriptStore: ObservableObject {
             return []
         }
 
+        try requireWritableStorage()
         let removedSessions = ids.compactMap { session(with: $0) }
         let remainingEntries = libraryEntries.filter { !ids.contains($0.id) }
 
@@ -201,8 +216,10 @@ final class TranscriptStore: ObservableObject {
     }
 
     private func load() {
+        writesAllowed = false
         if let state = loadPartitionedState(from: indexURL) {
             replaceState(with: state.entries, loadedSessions: state.loadedSessions)
+            finishRecovery()
             lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
@@ -223,6 +240,7 @@ final class TranscriptStore: ObservableObject {
                     error: error
                 )
             }
+            finishRecovery()
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
                 recoveredSessionCount: backupState.entries.count
@@ -235,11 +253,13 @@ final class TranscriptStore: ObservableObject {
             return
         }
 
-        if let storedSessions = loadSessions(from: storageURL) {
+        if !hasPartitionedHistory, !fileManager.fileExists(atPath: migrationMarkerURL.path),
+           let storedSessions = loadSessions(from: storageURL) {
             let normalizedStoredSessions = normalizedSessions(storedSessions)
             let entries = normalizedStoredSessions.map(SessionLibraryEntry.init(session:))
             do {
                 try persist(normalizedStoredSessions)
+                writesAllowed = true
             } catch {
                 logStorageFailure(
                     "session_store_migration_failed",
@@ -247,7 +267,7 @@ final class TranscriptStore: ObservableObject {
                     error: error
                 )
             }
-            replaceState(with: entries, loadedSessions: [])
+            replaceState(with: entries, loadedSessions: writesAllowed ? [] : normalizedStoredSessions)
             lastLoadRecoveryEvent = nil
             logger.info(
                 "session_store_loaded",
@@ -257,11 +277,13 @@ final class TranscriptStore: ObservableObject {
             return
         }
 
-        if let backupSessions = loadSessions(from: backupStorageURL) {
+        if !hasPartitionedHistory, !fileManager.fileExists(atPath: migrationMarkerURL.path),
+           let backupSessions = loadSessions(from: backupStorageURL) {
             let normalizedBackupSessions = normalizedSessions(backupSessions)
             let entries = normalizedBackupSessions.map(SessionLibraryEntry.init(session:))
             do {
                 try persist(normalizedBackupSessions)
+                writesAllowed = true
             } catch {
                 logStorageFailure(
                     "session_store_migration_failed",
@@ -269,7 +291,7 @@ final class TranscriptStore: ObservableObject {
                     error: error
                 )
             }
-            replaceState(with: entries, loadedSessions: [])
+            replaceState(with: entries, loadedSessions: writesAllowed ? [] : normalizedBackupSessions)
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(
                 source: .backup,
                 recoveredSessionCount: normalizedBackupSessions.count
@@ -286,9 +308,12 @@ final class TranscriptStore: ObservableObject {
         if fileManager.fileExists(atPath: storageURL.path) ||
             fileManager.fileExists(atPath: indexURL.path) ||
             fileManager.fileExists(atPath: backupStorageURL.path) ||
-            fileManager.fileExists(atPath: backupIndexURL.path) {
+            fileManager.fileExists(atPath: backupIndexURL.path) ||
+            fileManager.fileExists(atPath: migrationMarkerURL.path) ||
+            hasPartitionedBodies {
             lastLoadRecoveryEvent = TranscriptStoreRecoveryEvent(source: .failed, recoveredSessionCount: 0)
         } else {
+            writesAllowed = true
             lastLoadRecoveryEvent = nil
         }
         logger.info("session_store_empty", "No existing session history was found on disk.")
@@ -311,7 +336,65 @@ final class TranscriptStore: ObservableObject {
         }
 
         try persistIndex(normalizedSessions.map(SessionLibraryEntry.init(session:)))
+        try retireLegacyStorage(entries: normalizedSessions.map(SessionLibraryEntry.init(session:)))
         try cleanupUnreferencedSessionFiles(retainedIDs: normalizedIDs)
+    }
+
+    /// Retry recovery before a mutation, including after a temporarily locked keychain.
+    /// An unreadable library must never be treated as an empty retention set.
+    private func requireWritableStorage() throws {
+        if !writesAllowed {
+            let recoveredEntries = libraryEntries
+            let recoveredSessions = sessions
+            let recoveryEvent = lastLoadRecoveryEvent
+            load()
+            if !writesAllowed && !recoveredEntries.isEmpty {
+                // A retry must not hide a legacy snapshot already recovered in memory.
+                replaceState(with: recoveredEntries, loadedSessions: recoveredSessions)
+                lastLoadRecoveryEvent = recoveryEvent
+            }
+        }
+        guard writesAllowed else {
+            throw AppError.storageFailure("Session history could not be recovered safely. Restore access to the existing history before saving or deleting sessions.")
+        }
+    }
+
+    private func finishRecovery() {
+        do {
+            try retireLegacyStorage(entries: libraryEntries)
+            writesAllowed = true
+        } catch {
+            logStorageFailure("session_store_migration_failed", "Legacy storage could not be safely retired; writes remain disabled.", error: error)
+        }
+    }
+
+    private func retireLegacyStorage(entries: [SessionLibraryEntry]) throws {
+        let legacyURLs = [storageURL, backupStorageURL].filter { fileManager.fileExists(atPath: $0.path) }
+        guard !legacyURLs.isEmpty else { return }
+
+        // Read back both indexes and every retained body before retiring the source.
+        // This also repairs installations migrated by older versions which left plaintext behind.
+        let primaryData = try Data(contentsOf: indexURL)
+        let index = try decoder.decode(TranscriptStoreIndex.self, from: sessionDataProtector.unprotect(primaryData))
+        guard index.entries == entries else {
+            throw AppError.storageFailure("The migrated session index could not be verified.")
+        }
+        for entry in entries {
+            guard let session = loadSessionFile(with: entry.id), SessionLibraryEntry(session: session) == entry else {
+                throw AppError.storageFailure("A migrated session body could not be verified.")
+            }
+        }
+        // A valid primary is authoritative. Repair a missing or stale backup instead
+        // of permanently blocking retirement on damage we can recover safely.
+        try primaryData.write(to: backupIndexURL, options: [.atomic])
+        let backup = try decoder.decode(TranscriptStoreIndex.self, from: sessionDataProtector.unprotect(Data(contentsOf: backupIndexURL)))
+        guard backup.entries == entries else {
+            throw AppError.storageFailure("The migrated backup index could not be verified.")
+        }
+        // Commit the format boundary before deleting either source. A crash or removal
+        // failure cannot make a stale legacy copy authoritative on a subsequent launch.
+        try Data("partitioned\n".utf8).write(to: migrationMarkerURL, options: [.atomic])
+        for url in legacyURLs { try fileManager.removeItem(at: url) }
     }
 
     private func loadSessions(from url: URL) -> [TranscriptSession]? {

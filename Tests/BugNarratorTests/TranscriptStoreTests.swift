@@ -3,6 +3,149 @@ import XCTest
 @testable import BugNarrator
 
 final class TranscriptStoreTests: XCTestCase {
+    func testFailedRecoveryRejectsMutationsAndPreservesBodiesUntilIndexesAreRestored() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        try TranscriptStore(storageURL: storage).add(session)
+        let indexes = ["sessions.index.json", "sessions.index.backup.json"].map { root.appendingPathComponent($0) }
+        let originalIndex = try Data(contentsOf: indexes[0])
+        let body = root.appendingPathComponent("Sessions/\(session.id).json")
+        let originalBody = try Data(contentsOf: body)
+        let corrupt = Data("corrupt".utf8)
+        for index in indexes { try corrupt.write(to: index) }
+        var artifactRemovals = 0
+        let store = TranscriptStore(storageURL: storage, artifactsRemover: { _ in
+            artifactRemovals += 1
+            return .removed
+        })
+        XCTAssertThrowsError(try store.add(makeSampleTranscriptSession(index: 2)))
+        XCTAssertThrowsError(try store.removeSessions(withIDs: [session.id]))
+        XCTAssertEqual(try Data(contentsOf: body), originalBody)
+        for index in indexes { XCTAssertEqual(try Data(contentsOf: index), corrupt) }
+        XCTAssertEqual(artifactRemovals, 0)
+        XCTAssertEqual(store.lastLoadRecoveryEvent?.source, .failed)
+
+        for index in indexes { try originalIndex.write(to: index) }
+        let newSession = makeSampleTranscriptSession(index: 3)
+        try store.add(newSession)
+        XCTAssertEqual(Set(store.allStoredSessionIDs()), [session.id, newSession.id])
+        XCTAssertEqual(store.session(with: session.id), session)
+    }
+
+    func testUnreadableBodyDirectoryDoesNotEnableWrites() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        try TranscriptStore(storageURL: storage).add(session)
+        for name in ["sessions.index.json", "sessions.index.backup.json"] {
+            try FileManager.default.removeItem(at: root.appendingPathComponent(name))
+        }
+        let files = UnreadableSessionDirectoryFileManager()
+        let store = TranscriptStore(fileManager: files, storageURL: storage)
+        XCTAssertEqual(store.lastLoadRecoveryEvent?.source, .failed)
+        files.denyEnumeration = false
+        XCTAssertThrowsError(try store.add(makeSampleTranscriptSession(index: 2)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sessions/\(session.id).json").path))
+    }
+
+    func testOrphanedBodiesWithoutIndexesDoNotBecomeAnEmptyWritableStore() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        try TranscriptStore(storageURL: storage).add(session)
+        for name in ["sessions.index.json", "sessions.index.backup.json"] {
+            try FileManager.default.removeItem(at: root.appendingPathComponent(name))
+        }
+        let store = TranscriptStore(storageURL: storage)
+        XCTAssertThrowsError(try store.add(makeSampleTranscriptSession(index: 2)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sessions/\(session.id).json").path))
+    }
+
+    func testLegacyCopiesAreRetiredAndCannotResurrectDeletedSessions() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let backup = root.appendingPathComponent("sessions.backup.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        let legacy = try JSONEncoder().encode([session])
+        try legacy.write(to: storage)
+        try legacy.write(to: backup)
+        let store = TranscriptStore(storageURL: storage)
+        XCTAssertEqual(store.session(with: session.id), session)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storage.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.path))
+        try store.removeSessions(withIDs: [session.id])
+        // Even a stale source restored externally must not cross the committed format boundary.
+        try legacy.write(to: backup)
+        for name in ["sessions.index.json", "sessions.index.backup.json"] {
+            try Data("corrupt".utf8).write(to: root.appendingPathComponent(name))
+        }
+        let reloaded = TranscriptStore(storageURL: storage)
+        XCTAssertTrue(reloaded.libraryEntries.isEmpty)
+        XCTAssertEqual(reloaded.lastLoadRecoveryEvent?.source, .failed)
+        XCTAssertThrowsError(try reloaded.add(makeSampleTranscriptSession(index: 2)))
+    }
+
+    func testStaleLegacyCannotResurrectAnEmptyPartitionedHistory() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        let store = TranscriptStore(storageURL: storage)
+        try store.add(session)
+        try store.removeSessions(withIDs: [session.id])
+        try JSONEncoder().encode([session]).write(to: storage)
+        for name in ["sessions.index.json", "sessions.index.backup.json"] {
+            try Data("corrupt".utf8).write(to: root.appendingPathComponent(name))
+        }
+        let reloaded = TranscriptStore(storageURL: storage)
+        XCTAssertTrue(reloaded.libraryEntries.isEmpty)
+        XCTAssertEqual(reloaded.lastLoadRecoveryEvent?.source, .failed)
+        XCTAssertThrowsError(try reloaded.add(makeSampleTranscriptSession(index: 2)))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sessions/\(session.id).json").path))
+    }
+
+    func testStaleLegacyCannotReplaceUnreadablePartitionedHistory() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let older = makeSampleTranscriptSession(index: 1)
+        let newer = makeSampleTranscriptSession(index: 2)
+        let store = TranscriptStore(storageURL: storage)
+        try store.add(older)
+        try store.add(newer)
+        let legacy = try JSONEncoder().encode([older])
+        try legacy.write(to: storage)
+        for name in ["sessions.index.json", "sessions.index.backup.json"] {
+            try Data("corrupt".utf8).write(to: root.appendingPathComponent(name))
+        }
+        let reloaded = TranscriptStore(storageURL: storage)
+        XCTAssertEqual(reloaded.lastLoadRecoveryEvent?.source, .failed)
+        XCTAssertThrowsError(try reloaded.add(makeSampleTranscriptSession(index: 3)))
+        XCTAssertEqual(try Data(contentsOf: storage), legacy)
+        for session in [older, newer] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sessions/\(session.id).json").path))
+        }
+    }
+
+    func testExistingPartitionedStoreRetiresLeftoverLegacyCopies() throws {
+        let root = makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("sessions.json")
+        let session = makeSampleTranscriptSession(index: 1)
+        try TranscriptStore(storageURL: storage).add(session)
+        try JSONEncoder().encode([session]).write(to: storage)
+        try Data("corrupt".utf8).write(to: root.appendingPathComponent("sessions.index.backup.json"))
+        let reloaded = TranscriptStore(storageURL: storage)
+        XCTAssertEqual(reloaded.session(with: session.id), session)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storage.path))
+        try reloaded.add(makeSampleTranscriptSession(index: 2))
+    }
+
     func testTranscriptStorePersistsSessionsAcrossReloads() throws {
         let rootDirectoryURL = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
@@ -170,6 +313,10 @@ final class TranscriptStoreTests: XCTestCase {
         let store = TranscriptStore(storageURL: storageURL)
 
         XCTAssertEqual(store.libraryEntries.map(\.id), [session.id])
+        XCTAssertEqual(store.session(with: session.id), session)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        XCTAssertThrowsError(try store.removeSessions(withIDs: [session.id]))
+        XCTAssertThrowsError(try store.add(makeSampleTranscriptSession(index: 2)))
         XCTAssertEqual(store.session(with: session.id), session)
         XCTAssertEqual(
             store.lastLoadRecoveryEvent,
@@ -394,4 +541,15 @@ final class TranscriptStoreTests: XCTestCase {
         )
     }
 
+}
+
+private final class UnreadableSessionDirectoryFileManager: FileManager, @unchecked Sendable {
+    var denyEnumeration = true
+
+    override func contentsOfDirectory(atPath path: String) throws -> [String] {
+        if denyEnumeration && URL(fileURLWithPath: path).lastPathComponent == "Sessions" {
+            throw CocoaError(.fileReadNoPermission)
+        }
+        return try super.contentsOfDirectory(atPath: path)
+    }
 }
