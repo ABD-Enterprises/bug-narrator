@@ -1,8 +1,109 @@
+import AppKit
 import CryptoKit
 import XCTest
 @testable import BugNarrator
 
 final class LocalTranscriptionManagerTests: XCTestCase {
+    @MainActor
+    func testTerminationVetoDoesNotStartCleanup() {
+        let coordinator = AppTerminationCoordinator(shouldTerminate: { .terminateCancel }, shutdown: {
+            XCTFail("Recording/transcription veto must precede cleanup")
+        })
+        XCTAssertEqual(coordinator.request { _ in XCTFail("No deferred reply on veto") }, .terminateCancel)
+    }
+
+    @MainActor
+    func testAllowedQuitRepliesOnlyAfterCleanup() async {
+        let gate = ShutdownTestGate()
+        var replyCount = 0
+        let replied = expectation(description: "Allowed deferred termination")
+        let coordinator = AppTerminationCoordinator(shouldTerminate: { .terminateNow }, shutdown: { await gate.wait() })
+        XCTAssertEqual(coordinator.request { allowed in
+            XCTAssertTrue(allowed)
+            replyCount += 1
+            replied.fulfill()
+        }, .terminateLater)
+        await Task.yield()
+        XCTAssertEqual(replyCount, 0)
+        await gate.release()
+        await fulfillment(of: [replied], timeout: 2)
+        XCTAssertEqual(replyCount, 1)
+    }
+
+    @MainActor
+    func testDuplicateQuitWaitsForCleanupAndRechecksVeto() async {
+        let gate = ShutdownTestGate()
+        var allowed = true
+        var cleanups = 0
+        let replied = expectation(description: "One deferred termination reply")
+        replied.assertForOverFulfill = true
+        let coordinator = AppTerminationCoordinator(shouldTerminate: { allowed ? .terminateNow : .terminateCancel }, shutdown: {
+            cleanups += 1
+            await gate.wait()
+        })
+        XCTAssertEqual(coordinator.request { result in
+            XCTAssertFalse(result, "Late recording/transcription must veto termination")
+            replied.fulfill()
+        }, .terminateLater)
+        XCTAssertEqual(coordinator.request { _ in XCTFail("Duplicate quit must not reply twice") }, .terminateLater)
+        allowed = false
+        await gate.release()
+        await fulfillment(of: [replied], timeout: 2)
+        XCTAssertEqual(cleanups, 1)
+    }
+
+    @MainActor
+    func testShutdownWaitsForCanceledStartAndPreventsLaunch() async throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        try Data("server".utf8).write(to: fixture.destination.appendingPathComponent("bugnarrator-transcription"))
+        let gate = ShutdownTestGate()
+        let entered = expectation(description: "Verification entered")
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.verify = { _ in entered.fulfill(); await gate.wait() }
+        dependencies.launch = { _, _, _ in XCTFail("Canceled start must not launch"); return FakeLocalServerProcess() }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
+        manager.start()
+        await fulfillment(of: [entered], timeout: 2)
+        var finished = false
+        let shutdown = Task { await manager.shutdown(); finished = true }
+        await Task.yield()
+        XCTAssertFalse(finished)
+        await gate.release()
+        await shutdown.value
+        XCTAssertTrue(finished)
+        XCTAssertFalse(manager.running)
+        XCTAssertFalse(manager.busy)
+    }
+
+    @MainActor
+    func testShutdownWaitsForProcessExitAndAllowsAlreadyExitedWaiters() async throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        try Data("server".utf8).write(to: fixture.destination.appendingPathComponent("bugnarrator-transcription"))
+        let process = FakeLocalServerProcess()
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.verify = { _ in }
+        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
+        manager.start()
+        for _ in 0..<100 where manager.busy { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertTrue(manager.running)
+        var finished = false
+        let shutdown = Task { await manager.shutdown(); finished = true }
+        for _ in 0..<100 where !process.terminated { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertTrue(process.terminated)
+        XCTAssertFalse(finished)
+        process.completeExit()
+        process.onExit?(0, "")
+        await shutdown.value
+        await process.waitForExit()
+        XCTAssertTrue(finished)
+        XCTAssertFalse(manager.running)
+    }
+
     @MainActor
     func testReleaseSelectionSkipsAppOnlyReleaseAndRequiresChecksum() throws {
         let image = LocalTranscriptionManager.Asset(name: LocalTranscriptionManager.assetName, size: 135_684_157,
@@ -202,7 +303,19 @@ final class LocalTranscriptionManagerTests: XCTestCase {
 private final class FakeLocalServerProcess: LocalServerProcess {
     var terminated = false
     var onExit: (@MainActor @Sendable (Int32, String) -> Void)?
+    private var exited = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     func terminate() { terminated = true }
+    func waitForExit() async {
+        if exited { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func completeExit() {
+        exited = true
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
+    }
 }
 
 private final class InstallerFixture: @unchecked Sendable {
@@ -247,5 +360,20 @@ private final class InstallerFixture: @unchecked Sendable {
                 }
             }
         }
+    }
+}
+
+private actor ShutdownTestGate {
+    private var released = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if released { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func release() {
+        released = true
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
     }
 }
