@@ -720,7 +720,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "BugNarrator could not reach the local transcription server at http://localhost:8422. Download bugnarrator-transcription from the BugNarrator releases page, then run ./bugnarrator-transcription --preload in Terminal."
+            "BugNarrator could not reach the local transcription server at http://localhost:8422. Install and start the local server in AI Engines settings, or choose another provider."
         )
     }
 
