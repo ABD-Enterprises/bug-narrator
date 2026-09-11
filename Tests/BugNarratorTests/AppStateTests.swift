@@ -29,6 +29,10 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         XCTAssertTrue(harness.appState.needsAPIKeySetup)
 
         var appStateChangeCount = 0
@@ -117,6 +121,10 @@ final class AppStateTests: XCTestCase {
     func testStartSessionWithoutAPIKeyBlocksRecordingAndOpensSettings() async {
         let harness = AppStateHarness(apiKey: "")
         defer { harness.cleanup() }
+
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
 
         var didOpenSettings = false
         harness.appState.showSettingsWindow = {
@@ -382,6 +390,10 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         let session = TranscriptSession(
             id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
             createdAt: Date(),
@@ -641,6 +653,10 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         let recordedAudio = try harness.makeRecordedAudio(fileName: "missing-key-on-stop")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
 
@@ -714,6 +730,10 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         let recordedAudio = try harness.makeRecordedAudio(fileName: "invalid-key-on-stop")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
         await harness.transcriptionClient.enqueue(.failure(AppError.invalidAPIKey))
@@ -763,6 +783,10 @@ final class AppStateTests: XCTestCase {
     func testRetryPendingTranscriptionHonorsAutoIssueExtraction() async throws {
         let harness = AppStateHarness(autoExtractIssues: true)
         defer { harness.cleanup() }
+
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
 
         let recordedAudio = try harness.makeRecordedAudio(fileName: "retry-pending-session-auto-extract")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
@@ -1132,6 +1156,10 @@ final class AppStateTests: XCTestCase {
         let harness = AppStateHarness(autoExtractIssues: true)
         defer { harness.cleanup() }
 
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
+
         let recordedAudio = try harness.makeRecordedAudio(fileName: "auto-extract")
         harness.audioRecorder.stopResults = [.success(recordedAudio)]
         await harness.transcriptionClient.enqueue(
@@ -1165,6 +1193,10 @@ final class AppStateTests: XCTestCase {
     func testExtractIssuesWithoutAPIKeyFailsAndOpensSettings() async throws {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
+
+        // Pinned: this test verifies the KEYED-provider path, so it must not
+        // depend on whatever the global default happens to be (#1026).
+        harness.settingsStore.aiProvider = .openAI
 
         let session = TranscriptSession(
             createdAt: Date(),
