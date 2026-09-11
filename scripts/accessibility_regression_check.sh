@@ -56,11 +56,11 @@ check_literal \
   '.accessibilityAddTraits(.isHeader)' \
   'review workspace section heading announcement'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/IssueReviewWorkspaceView.swift" \
   'Select issue ' \
   'issue export checkbox labeling'
 check_literal \
-  "$ROOT_DIR/Sources/BugNarrator/Views/TranscriptView.swift" \
+  "$ROOT_DIR/Sources/BugNarrator/Views/Transcript/IssueReviewWorkspaceView.swift" \
   'Export targets for ' \
   'per-issue export target labeling'
 check_literal \
