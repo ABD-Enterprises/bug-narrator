@@ -89,8 +89,8 @@ final class TranscriptSectionBuilderTests: XCTestCase {
     }
 
     func testZeroDurationKeepsTheTranscriptReadable() {
-        // Every fraction collapses; that is the one case the whole-transcript
-        // fallback exists for.
+        // With duration 0 the fractions default to 0 and 1, so the single slice
+        // is the whole transcript on its own — no fallback involved.
         let sections = build(markers: [marker(1, at: 0)], duration: 0)
 
         XCTAssertEqual(sections.count, 1)
