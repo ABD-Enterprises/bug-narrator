@@ -20,6 +20,7 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
 
     private let maxChunkDuration: TimeInterval
     private let minimumTailDuration: TimeInterval
+    private let maximumSourceBytes: Int64
 
     /// - Parameters:
     ///   - maxChunkDuration: upper bound per chunk. 8 minutes of m4a is a few MB,
@@ -31,21 +32,41 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
     ///     separate API call for half a second of audio — and a total one ulp
     ///     over a multiple of max yielded a tail of ~6e-14 s, well under the
     ///     0.1 s floor providers such as OpenAI enforce.
-    init(maxChunkDuration: TimeInterval = 8 * 60, minimumTailDuration: TimeInterval = 1) {
+    ///   - maximumSourceBytes: a source larger than this is never shipped whole,
+    ///     whatever its duration. Debug mode records 16-bit 44.1 kHz mono WAV
+    ///     (~5.05 MiB/min), which crosses the 24 MiB upload gate at ~4.75 min —
+    ///     under the duration threshold, so it used to ship untouched and be
+    ///     rejected (#1099). Re-encoding to m4a is what makes it uploadable.
+    init(
+        maxChunkDuration: TimeInterval = 8 * 60,
+        minimumTailDuration: TimeInterval = 1,
+        maximumSourceBytes: Int64 = Int64(AudioUploadPolicy.maximumSingleUploadBytes)
+    ) {
         self.maxChunkDuration = maxChunkDuration
         self.minimumTailDuration = minimumTailDuration
+        self.maximumSourceBytes = maximumSourceBytes
     }
 
     /// The pure part: decide the spans for a recording of `totalDuration`. Kept
     /// synchronous and free of AVFoundation so the boundary math can be tested
     /// without an asset. An empty result means "do not chunk; send the file whole".
+    ///
+    /// `sourceExceedsUploadLimit` forces re-encoding: a source over the byte limit
+    /// that is still within one chunk's duration is planned as a single span
+    /// covering the whole recording, so it is exported to m4a instead of shipped
+    /// as-is. Chunk boundaries themselves are still decided by duration — 8 min
+    /// of m4a is a few MB regardless of what the source format was.
     static func plan(
         totalDuration: TimeInterval,
         maxChunkDuration: TimeInterval,
-        minimumTailDuration: TimeInterval
+        minimumTailDuration: TimeInterval,
+        sourceExceedsUploadLimit: Bool = false
     ) -> [Span] {
-        guard totalDuration.isFinite, maxChunkDuration > 0, totalDuration > maxChunkDuration else {
+        guard totalDuration.isFinite, totalDuration > 0, maxChunkDuration > 0 else {
             return []
+        }
+        guard totalDuration > maxChunkDuration else {
+            return sourceExceedsUploadLimit ? [Span(startTime: 0, duration: totalDuration)] : []
         }
 
         var spans: [Span] = []
@@ -73,11 +94,13 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
         let asset = AVURLAsset(url: fileURL)
         let durationTime = try await asset.load(.duration)
         let totalDuration = CMTimeGetSeconds(durationTime)
+        let sourceBytes = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0
 
         let spans = Self.plan(
             totalDuration: totalDuration,
             maxChunkDuration: maxChunkDuration,
-            minimumTailDuration: minimumTailDuration
+            minimumTailDuration: minimumTailDuration,
+            sourceExceedsUploadLimit: sourceBytes > maximumSourceBytes
         )
         guard !spans.isEmpty else {
             return [TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)]
