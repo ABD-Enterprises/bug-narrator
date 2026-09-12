@@ -112,6 +112,15 @@ jobs:
             echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
           fi
 
+      # ruff is not preinstalled on ubuntu-latest (shellcheck is). Pinned so a
+      # ruff release adding rules cannot turn this gate red on its own; bump
+      # deliberately alongside ruff.toml. validate.sh reports NOT RUN when the
+      # tool is absent, so this step is what makes the Python lint enforced.
+      - name: Install ruff
+        run: |
+          python3 -m pip install --user 'ruff==0.16.6'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       # Hermetic on purpose (#962). This job blocks merges, so it must not
       # depend on live board state: a board hiccup or one mislabeled issue
       # would fail every open PR and teach reviewers to read red as noise.

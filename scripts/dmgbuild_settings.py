@@ -1,3 +1,7 @@
+# ruff: noqa: F821
+# `defines` is not defined here on purpose: dmgbuild executes this file with the
+# `-D key=value` pairs from scripts/build_dmg.sh injected as `defines`. Pyflakes
+# cannot see that, so F821 is suppressed for this file only.
 import os
 
 app_path = defines["app_path"]

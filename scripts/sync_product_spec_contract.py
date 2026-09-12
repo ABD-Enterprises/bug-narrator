@@ -110,7 +110,7 @@ def report_stale(expected: dict[str, object], current: bytes) -> None:
                 print(f"  {bucket}:", file=sys.stderr)
                 print(f"    spec:    {json.dumps(expected[bucket])}", file=sys.stderr)
                 print(f"    fixture: {json.dumps(fixture_paths)}", file=sys.stderr)
-    print(f"Run python3 scripts/sync_product_spec_contract.py and commit the result.", file=sys.stderr)
+    print("Run python3 scripts/sync_product_spec_contract.py and commit the result.", file=sys.stderr)
 
 
 def main() -> int:

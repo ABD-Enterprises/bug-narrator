@@ -45,7 +45,7 @@ def main() -> int:
         "",
         f"- Target version/tag: `{version}`",
         f"- Generated at: `{generated_at}`",
-        f"- Source changelog section: `CHANGELOG.md -> Unreleased`",
+        "- Source changelog section: `CHANGELOG.md -> Unreleased`",
         "",
         "## Candidate Changes",
     ]

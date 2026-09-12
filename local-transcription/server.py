@@ -16,7 +16,6 @@ import argparse
 import asyncio
 import contextlib
 from concurrent.futures import ThreadPoolExecutor
-import json
 import logging
 import os
 import signal
