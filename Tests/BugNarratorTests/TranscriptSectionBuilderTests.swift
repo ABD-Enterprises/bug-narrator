@@ -138,3 +138,33 @@ final class TranscriptSectionBuilderTests: XCTestCase {
         XCTAssertEqual(sections[0].text, String(transcript.prefix(50)))
     }
 }
+
+// MARK: - markers past the end of the recording (#1109)
+
+extension TranscriptSectionBuilderTests {
+    func testMarkerPastTheRecordingEndDoesNotTrapAndYieldsAnEmptySection() {
+        let sections = build(markers: [marker(1, at: 120)])
+
+        XCTAssertEqual(sections.map(\.title), ["Opening Notes", "M1"])
+        XCTAssertEqual(sections[0].text, transcript, "everything before the late marker is still the opening")
+        XCTAssertEqual(sections[1].text, "")
+        XCTAssertEqual(sections[1].startTime, 120)
+        XCTAssertEqual(sections[1].endTime, 120, "end is clamped up to the marker, never below it")
+    }
+
+    func testMarkerPastTheRecordingEndWithSegmentsDoesNotTrap() {
+        let segments = [TranscriptionSegment(start: 0, end: 90, text: "spoken")]
+        let sections = build(segments: segments, markers: [marker(1, at: 50), marker(2, at: 120)])
+
+        // M1 [50, 120) has no segment (the only one has midpoint 45), so it gets
+        // its character slice — the second half — and the late marker is empty.
+        XCTAssertEqual(sections.map(\.text), ["spoken", String(transcript.suffix(50)), ""])
+    }
+
+    func testMarkerExactlyAtTheRecordingEndIsAnEmptyLastSection() {
+        let sections = build(markers: [marker(1, at: 100)])
+
+        XCTAssertEqual(sections[0].text, transcript)
+        XCTAssertEqual(sections[1].text, "")
+    }
+}

@@ -89,7 +89,11 @@ enum TranscriptSectionBuilder {
         return intervals.enumerated().map { index, interval in
             let startFraction = duration > 0 ? interval.start / duration : 0
             let endFraction = duration > 0 ? interval.end / duration : 1
-            let startIndex = max(Int(Double(characters.count) * startFraction), 0)
+            // A marker can sit past the recording's end: its time is
+            // max(recorder clock, wall clock) while `duration` is the recorder's
+            // clock at stop. Clamp both bounds into the transcript, and keep
+            // start <= end, or the slice below traps (#1109).
+            let startIndex = min(max(Int(Double(characters.count) * startFraction), 0), characters.count)
             let endIndex: Int
 
             if index == intervals.count - 1 {
