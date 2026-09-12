@@ -100,12 +100,17 @@ enum TranscriptSectionBuilder {
 
             let slice = characters[startIndex..<endIndex]
             let sectionText = String(slice).trimmingCharacters(in: .whitespacesAndNewlines)
+            // An empty slice is an empty section. This used to fall back to the
+            // whole transcript, so two markers pressed 0.2 s apart put the entire
+            // transcript under the first one. No fallback is needed for a
+            // degenerate duration either: with duration <= 0 the fractions above
+            // default to 0 and 1, so every slice is already the full transcript.
 
             return TranscriptSection(
                 title: interval.title,
                 startTime: interval.start,
                 endTime: interval.end,
-                text: sectionText.isEmpty ? transcript : sectionText,
+                text: sectionText,
                 markerID: interval.marker?.id,
                 screenshotIDs: interval.marker?.screenshotID.map { [$0] } ?? []
             )
