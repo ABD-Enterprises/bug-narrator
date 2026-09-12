@@ -121,6 +121,14 @@ jobs:
           python3 -m pip install --user 'ruff==0.16.6'
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      # The local-transcription unit suite needs the server's runtime deps
+      # importable. parakeet-mlx is Apple-only and imported lazily, so it is
+      # filtered out; every other pin comes from requirements.txt unchanged.
+      - name: Install local-transcription test dependencies
+        run: |
+          grep -v '^parakeet-mlx' local-transcription/requirements.txt \
+            | python3 -m pip install --user -r /dev/stdin
+
       # Hermetic on purpose (#962). This job blocks merges, so it must not
       # depend on live board state: a board hiccup or one mislabeled issue
       # would fail every open PR and teach reviewers to read red as noise.
