@@ -180,6 +180,38 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.hasSuffix(marker))
     }
 
+    func testMakeURLRequestSendsASingleLineTitleWithinGitHubsLimit() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Crash\non launch " + String(repeating: "when the window is restored ", count: 20),
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            )
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertFalse(payload.title.contains("\n"))
+        XCTAssertTrue(payload.title.hasPrefix("Crash on launch when the window"))
+        XCTAssertLessThanOrEqual(payload.title.count, TrackerExportPayloadBudget.gitHubTitleLimit)
+        XCTAssertTrue(payload.title.hasSuffix("…"))
+    }
+
     func testFindOpenIssuesBuildsSearchRequestAndParsesMatches() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
