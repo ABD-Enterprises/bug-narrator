@@ -12,10 +12,61 @@ protocol TranscriptionChunking: Sendable {
 }
 
 struct DefaultTranscriptionChunker: TranscriptionChunking {
-    private let maxChunkDuration: TimeInterval
+    /// One planned slice of the source audio: where it starts and how long it is.
+    struct Span: Equatable, Sendable {
+        let startTime: TimeInterval
+        let duration: TimeInterval
+    }
 
-    init(maxChunkDuration: TimeInterval = 8 * 60) {
+    private let maxChunkDuration: TimeInterval
+    private let minimumTailDuration: TimeInterval
+
+    /// - Parameters:
+    ///   - maxChunkDuration: upper bound per chunk. 8 minutes of m4a is a few MB,
+    ///     well inside the 25 MB the OpenAI transcription endpoint accepts, so a
+    ///     tail merged onto the last chunk cannot push it over that limit.
+    ///   - minimumTailDuration: a final slice shorter than this is folded into the
+    ///     previous chunk instead of exported on its own. A recording of
+    ///     8:00.5 used to yield a 0.5 s second chunk — a separate export and a
+    ///     separate API call for half a second of audio — and a total one ulp
+    ///     over a multiple of max yielded a tail of ~6e-14 s, well under the
+    ///     0.1 s floor providers such as OpenAI enforce.
+    init(maxChunkDuration: TimeInterval = 8 * 60, minimumTailDuration: TimeInterval = 1) {
         self.maxChunkDuration = maxChunkDuration
+        self.minimumTailDuration = minimumTailDuration
+    }
+
+    /// The pure part: decide the spans for a recording of `totalDuration`. Kept
+    /// synchronous and free of AVFoundation so the boundary math can be tested
+    /// without an asset. An empty result means "do not chunk; send the file whole".
+    static func plan(
+        totalDuration: TimeInterval,
+        maxChunkDuration: TimeInterval,
+        minimumTailDuration: TimeInterval
+    ) -> [Span] {
+        guard totalDuration.isFinite, maxChunkDuration > 0, totalDuration > maxChunkDuration else {
+            return []
+        }
+
+        var spans: [Span] = []
+        var startTime: TimeInterval = 0
+        while startTime < totalDuration {
+            let remaining = totalDuration - startTime
+            var duration = min(maxChunkDuration, remaining)
+            // If what would be left after this chunk is a sub-threshold tail,
+            // absorb it now rather than exporting it as its own chunk.
+            let tailAfterThis = remaining - duration
+            if tailAfterThis > 0, tailAfterThis < minimumTailDuration {
+                duration = remaining
+            }
+            // A zero-length span would never advance startTime. The loop
+            // condition already prevents it; this makes a future regression fail
+            // loudly (an empty plan) instead of hanging the caller.
+            guard duration > 0 else { return [] }
+            spans.append(Span(startTime: startTime, duration: duration))
+            startTime += duration
+        }
+        return spans
     }
 
     func chunks(for fileURL: URL) async throws -> [TranscriptionAudioChunk] {
@@ -23,39 +74,37 @@ struct DefaultTranscriptionChunker: TranscriptionChunking {
         let durationTime = try await asset.load(.duration)
         let totalDuration = CMTimeGetSeconds(durationTime)
 
-        guard totalDuration.isFinite, totalDuration > maxChunkDuration else {
+        let spans = Self.plan(
+            totalDuration: totalDuration,
+            maxChunkDuration: maxChunkDuration,
+            minimumTailDuration: minimumTailDuration
+        )
+        guard !spans.isEmpty else {
             return [TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)]
         }
 
         var chunks: [TranscriptionAudioChunk] = []
-        var startTime: TimeInterval = 0
-
-        while startTime < totalDuration {
-            let chunkDuration = min(maxChunkDuration, totalDuration - startTime)
+        for span in spans {
             let chunkURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("BugNarrator-Chunk-\(UUID().uuidString)")
                 .appendingPathExtension("m4a")
 
             try await exportChunk(
                 from: asset,
-                startTime: startTime,
-                duration: chunkDuration,
+                startTime: span.startTime,
+                duration: span.duration,
                 outputURL: chunkURL
             )
 
             chunks.append(
                 TranscriptionAudioChunk(
                     fileURL: chunkURL,
-                    startTime: startTime,
+                    startTime: span.startTime,
                     isTemporary: true
                 )
             )
-            startTime += chunkDuration
         }
-
-        return chunks.isEmpty
-            ? [TranscriptionAudioChunk(fileURL: fileURL, startTime: 0, isTemporary: false)]
-            : chunks
+        return chunks
     }
 
     private func exportChunk(
