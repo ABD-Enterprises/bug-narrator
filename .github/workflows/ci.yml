@@ -221,13 +221,28 @@ jobs:
       - name: Build (Debug, macOS)
         run: |
           set -o pipefail
+          # build-for-testing, not build: a Sources-only build never compiles the
+          # test target, so test-target warnings are invisible to it. #1014 closed
+          # against a change that left its warnings in place and nothing noticed
+          # for weeks because no gate read a log that contained them.
           xcodebuild \
             -project BugNarrator.xcodeproj \
             -scheme BugNarrator \
             -configuration Debug \
             -destination 'platform=macOS' \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build-for-testing 2>&1 | tee build.log
+
+      - name: Fail on Swift warnings from Sources/ or Tests/
+        run: |
+          # Local builds stay advisory; CI enforces. Only first-party code counts —
+          # linker and appintentsmetadataprocessor noise is excluded.
+          if grep -E 'warning:' build.log | grep -E '/(Sources|Tests)/' | grep -v 'appintentsmetadataprocessor' > swift-warnings.txt; then
+            echo "::error::Swift warnings in first-party code (the target must stay warning-free, #1076):"
+            sed 's/^/  /' swift-warnings.txt
+            exit 1
+          fi
+          echo "No Swift warnings from Sources/ or Tests/."
 
       - name: Run unit tests (BugNarratorTests)
         run: |
