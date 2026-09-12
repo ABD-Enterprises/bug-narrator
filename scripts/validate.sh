@@ -12,6 +12,7 @@
 #   semgrep-status.txt      PASS / NOT RUN with the runner that produced it
 #   swift-parse-status.txt  PASS / NOT RUN from swift-parse-check.sh
 #   shell-lint-status.txt   PASS / NOT RUN from the shell script lint (see below)
+#   python-lint-status.txt  PASS / NOT RUN from ruff over scripts/*.py and local-transcription/*.py
 
 set -euo pipefail
 
@@ -41,6 +42,7 @@ EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
 REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
 SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
+RUFF_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/python-lint-status.txt"
 REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
 rm -f \
@@ -52,7 +54,8 @@ rm -f \
   "$EFFORT_LEAK_OUTPUT_FILE" \
   "$REPO_DOCS_STATUS_FILE" \
   "$REPO_DOCS_OUTPUT_FILE" \
-  "$SHELLCHECK_STATUS_FILE"
+  "$SHELLCHECK_STATUS_FILE" \
+  "$RUFF_STATUS_FILE"
 
 should_skip_semgrep_target() {
   local target="$1"
@@ -252,6 +255,25 @@ elif command -v shellcheck >/dev/null 2>&1; then
 else
   printf 'NOT RUN: shellcheck is not on PATH; %d shell script(s) were not linted\n' "${#SHELL_TARGETS[@]}" \
     | tee "$SHELLCHECK_STATUS_FILE"
+fi
+
+# Python scripts: same contract as the shell gate. Bug-class rules only (see
+# ruff.toml); a missing tool is NOT RUN on stdout, never a silent pass.
+PY_TARGETS=()
+while IFS= read -r f; do PY_TARGETS+=("$f"); done < <(
+  find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.py' -type f 2>/dev/null | sort
+)
+if [[ ${#PY_TARGETS[@]} -eq 0 ]]; then
+  printf 'PASS: no Python scripts found to lint\n' | tee "$RUFF_STATUS_FILE"
+elif command -v ruff >/dev/null 2>&1; then
+  if ruff check --config "$ROOT/ruff.toml" "${PY_TARGETS[@]}"; then
+    printf 'PASS: ruff clean (pyflakes rules) across %d script(s)\n' "${#PY_TARGETS[@]}" | tee "$RUFF_STATUS_FILE"
+  else
+    printf 'FAIL: ruff reported findings\n' | tee "$RUFF_STATUS_FILE" >&2
+    exit 1
+  fi
+else
+  printf 'NOT RUN: ruff is not on PATH; %d Python script(s) were not linted\n' "${#PY_TARGETS[@]}" | tee "$RUFF_STATUS_FILE"
 fi
 
 if [[ -x "$ROOT/scripts/accessibility_regression_check.sh" ]]; then
