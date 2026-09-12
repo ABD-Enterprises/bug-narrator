@@ -550,11 +550,6 @@ final class TranscriptStoreTests: XCTestCase {
 
 }
 
-// NEGATIVE CONTROL for #1088 — must turn CI red, then be reverted.
-private func negativeControlForWarningGate() {
-    let unusedForNegativeControl = 1
-}
-
 private final class UnreadableSessionDirectoryFileManager: FileManager {
     var denyEnumeration = true
 
