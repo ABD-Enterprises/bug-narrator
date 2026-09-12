@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import BugNarrator
 
@@ -123,5 +124,155 @@ final class TranscriptionChunkerTests: XCTestCase {
             Span(startTime: 0, duration: 480),
             Span(startTime: 480, duration: 0.5),
         ])
+    }
+
+    // MARK: - size forces re-encoding even under the duration threshold (#1099)
+
+    func testOversizedSourceWithinOneChunkIsPlannedAsASingleSpan() {
+        XCTAssertEqual(
+            DefaultTranscriptionChunker.plan(totalDuration: 360, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true),
+            [Span(startTime: 0, duration: 360)]
+        )
+        // Exactly one chunk long is still "within one chunk": one span, not none.
+        XCTAssertEqual(
+            DefaultTranscriptionChunker.plan(totalDuration: 480, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true),
+            [Span(startTime: 0, duration: 480)]
+        )
+    }
+
+    func testSizeFlagDoesNotChangeDurationDrivenBoundaries() {
+        // Over the duration threshold the plan is identical either way: the
+        // size flag only decides whether a within-one-chunk source is exported.
+        let withFlag = DefaultTranscriptionChunker.plan(totalDuration: 1000, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true)
+        XCTAssertEqual(withFlag, plan(1000))
+        XCTAssertEqual(withFlag, [Span(startTime: 0, duration: 480), Span(startTime: 480, duration: 480), Span(startTime: 960, duration: 40)])
+    }
+
+    func testOversizedSourceWithNoDurationIsNotPlanned() {
+        // A zero or unreadable duration must not yield a zero-length export.
+        XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: 0, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
+        XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: -5, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
+        XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: .nan, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
+        XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: 360, maxChunkDuration: 0, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
+    }
+}
+
+// MARK: - size-driven chunking (#1099)
+
+/// Debug mode records 16-bit 44.1 kHz mono WAV (~5.05 MiB/min). Between ~4.75
+/// and 8 minutes such a file is under the duration threshold but over
+/// `AudioUploadPolicy.maximumSingleUploadBytes`, so it used to ship whole and be
+/// rejected by the upload gate. These tests drive the real chunker with a
+/// generated WAV of the offending length: the plan must re-encode it.
+final class TranscriptionChunkerSizeTests: XCTestCase {
+
+    private var temporaryURLs: [URL] = []
+
+    override func tearDown() {
+        for url in temporaryURLs { try? FileManager.default.removeItem(at: url) }
+        temporaryURLs = []
+        super.tearDown()
+    }
+
+    /// Writes a valid silent PCM WAV (16-bit, 44.1 kHz, mono) of `seconds`.
+    private func makeSilentWAV(seconds: Int, name: String) throws -> URL {
+        let sampleRate: UInt32 = 44_100
+        let channels: UInt16 = 1
+        let bitsPerSample: UInt16 = 16
+        let blockAlign = UInt16(channels * bitsPerSample / 8)
+        let byteRate = sampleRate * UInt32(blockAlign)
+        let dataSize = UInt32(seconds) * byteRate
+
+        var header = Data()
+        func append<T: FixedWidthInteger>(_ value: T) {
+            var little = value.littleEndian
+            header.append(Data(bytes: &little, count: MemoryLayout<T>.size))
+        }
+        header.append(Data("RIFF".utf8)); append(UInt32(36 + dataSize)); header.append(Data("WAVE".utf8))
+        header.append(Data("fmt ".utf8)); append(UInt32(16)); append(UInt16(1))
+        append(channels); append(sampleRate); append(byteRate); append(blockAlign); append(bitsPerSample)
+        header.append(Data("data".utf8)); append(dataSize)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-\(name)-\(UUID().uuidString)")
+            .appendingPathExtension("wav")
+        temporaryURLs.append(url)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.write(contentsOf: header)
+        try handle.write(contentsOf: Data(count: Int(dataSize)))
+        return url
+    }
+
+    private func fileSize(_ url: URL) throws -> Int64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    func testSixMinuteWAVExceedsTheUploadGateButNotTheDurationThreshold() throws {
+        // The premise of the defect, checked on a real file rather than by arithmetic.
+        let wav = try makeSilentWAV(seconds: 6 * 60, name: "six-minute")
+        XCTAssertGreaterThan(try fileSize(wav), Int64(AudioUploadPolicy.maximumSingleUploadBytes))
+        XCTAssertThrowsError(try AudioUploadPolicy().validate(fileURL: wav))
+    }
+
+    func testSixMinuteWAVIsReencodedIntoAnUploadableChunk() async throws {
+        let wav = try makeSilentWAV(seconds: 6 * 60, name: "six-minute")
+        let chunks = try await DefaultTranscriptionChunker().chunks(for: wav)
+        temporaryURLs.append(contentsOf: chunks.filter(\.isTemporary).map(\.fileURL))
+
+        XCTAssertEqual(chunks.count, 1, "6 minutes is under the 8-minute duration threshold: one chunk")
+        let chunk = try XCTUnwrap(chunks.first)
+        XCTAssertTrue(chunk.isTemporary, "the source is over the upload limit, so it must be re-encoded, not shipped whole")
+        XCTAssertNotEqual(chunk.fileURL, wav)
+        XCTAssertEqual(chunk.fileURL.pathExtension, "m4a")
+        XCTAssertEqual(chunk.startTime, 0)
+        // The whole point: the thing we upload now passes the gate.
+        XCTAssertNoThrow(try AudioUploadPolicy().validate(fileURL: chunk.fileURL))
+    }
+
+    func testWAVUnderTheUploadLimitStillShipsWhole() async throws {
+        let wav = try makeSilentWAV(seconds: 60, name: "one-minute")
+        XCTAssertLessThanOrEqual(try fileSize(wav), Int64(AudioUploadPolicy.maximumSingleUploadBytes))
+        let chunks = try await DefaultTranscriptionChunker().chunks(for: wav)
+        temporaryURLs.append(contentsOf: chunks.filter(\.isTemporary).map(\.fileURL))
+        XCTAssertEqual(chunks.map(\.fileURL), [wav])
+        XCTAssertEqual(chunks.map(\.isTemporary), [false])
+    }
+
+    /// The pre-existing contract: an m4a under 8 minutes is uploaded as-is.
+    func testM4AUnderEightMinutesShipsWholeAndUntouched() async throws {
+        let m4a = try makeSilentM4A(seconds: 30, name: "half-minute")
+        let bytesBefore = try Data(contentsOf: m4a)
+
+        let chunks = try await DefaultTranscriptionChunker().chunks(for: m4a)
+        temporaryURLs.append(contentsOf: chunks.filter(\.isTemporary).map(\.fileURL))
+
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(chunks.first?.fileURL, m4a)
+        XCTAssertEqual(chunks.first?.isTemporary, false)
+        XCTAssertEqual(chunks.first?.startTime, 0)
+        XCTAssertEqual(try Data(contentsOf: m4a), bytesBefore, "the source file must not be rewritten")
+    }
+
+    /// Writes a silent AAC m4a of `seconds` via AVAudioFile (44.1 kHz mono).
+    private func makeSilentM4A(seconds: Int, name: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarrator-\(name)-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+        temporaryURLs.append(url)
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+        let file = try AVAudioFile(forWriting: url, settings: AudioRecorderCaptureFormat.aacM4A.recordingSettings)
+        let frames = AVAudioFrameCount(4_096)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        buffer.frameLength = frames
+        var written: AVAudioFramePosition = 0
+        let total = AVAudioFramePosition(seconds) * 44_100
+        while written < total {
+            try file.write(from: buffer)
+            written += AVAudioFramePosition(frames)
+        }
+        return url
     }
 }
