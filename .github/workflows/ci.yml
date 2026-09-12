@@ -116,6 +116,11 @@ jobs:
       # ruff release adding rules cannot turn this gate red on its own; bump
       # deliberately alongside ruff.toml. validate.sh reports NOT RUN when the
       # tool is absent, so this step is what makes the Python lint enforced.
+      - name: Install ruff
+        run: |
+          python3 -m pip install --user 'ruff==0.16.6'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       # The local-transcription unit suite needs the server's runtime deps
       # importable. parakeet-mlx is Apple-only and imported lazily, so it is
       # filtered out; every other pin comes from requirements.txt unchanged.
@@ -123,11 +128,6 @@ jobs:
         run: |
           grep -v '^parakeet-mlx' local-transcription/requirements.txt \
             | python3 -m pip install --user -r /dev/stdin
-
-      - name: Install ruff
-        run: |
-          python3 -m pip install --user 'ruff==0.16.6'
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Hermetic on purpose (#962). This job blocks merges, so it must not
       # depend on live board state: a board hiccup or one mislabeled issue

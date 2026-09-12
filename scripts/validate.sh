@@ -290,10 +290,14 @@ fi
 
 if [[ -f "$ROOT/local-transcription/server.py" ]]; then
   if command -v python3 >/dev/null 2>&1; then
-    python3 -m py_compile \
+    if ! python3 -m py_compile \
       "$ROOT/local-transcription/server.py" \
       "$ROOT/local-transcription/test_server.py" \
-      >"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1
+      >"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1; then
+      cat "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" >&2
+      printf 'FAIL: local transcription server syntax check failed\n' | tee "$LOCAL_TRANSCRIPTION_STATUS_FILE" >&2
+      exit 1
+    fi
   else
     printf 'NOT RUN: python3 is not available for local transcription syntax checks\n' \
       >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
@@ -318,7 +322,11 @@ if [[ -f "$ROOT/local-transcription/server.py" ]]; then
       -s "$ROOT/local-transcription" \
       -p 'test_*.py' \
       >>"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1; then
-      printf 'PASS: local transcription server syntax and unit checks passed (%s)\n' "$local_transcription_python" \
+      # Surface the count: CI does not upload the output file, so without this
+      # a green job proves only "exit 0", not that any tests ran.
+      printf 'PASS: local transcription server syntax and unit checks passed (%s; %s)\n' \
+        "$local_transcription_python" \
+        "$(grep -E '^Ran [0-9]+ tests?' "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" | tail -1)" \
         | tee "$LOCAL_TRANSCRIPTION_STATUS_FILE"
     else
       cat "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" >&2
