@@ -300,20 +300,33 @@ if [[ -f "$ROOT/local-transcription/server.py" ]]; then
     exit 0
   fi
 
+  # Interpreter resolution: the repo venv when present (developer machines),
+  # otherwise any python3 that already has the server's runtime deps (CI installs
+  # requirements.txt minus the Apple-only parakeet-mlx; server.py imports that
+  # lazily). Neither available is NOT RUN, printed to stdout like the other
+  # gates — it used to be recorded as PASS in the status file only, so CI
+  # skipped all 16 tests while looking green.
   local_transcription_python="$ROOT/local-transcription/venv/bin/python"
+  # The probe must cover every import `server.py` needs at load time: a
+  # python3 with fastapi but without python-multipart passes a narrower probe
+  # and then fails inside FastAPI's Form() setup, which is a FAIL, not NOT RUN.
+  if [[ ! -x "$local_transcription_python" ]] && python3 -c 'import fastapi, uvicorn, python_multipart' >/dev/null 2>&1; then
+    local_transcription_python="$(command -v python3)"
+  fi
   if [[ -x "$local_transcription_python" ]]; then
     if "$local_transcription_python" -m unittest discover \
       -s "$ROOT/local-transcription" \
       -p 'test_*.py' \
       >>"$LOCAL_TRANSCRIPTION_OUTPUT_FILE" 2>&1; then
-      printf 'PASS: local transcription server syntax and unit checks passed\n' \
-        >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
+      printf 'PASS: local transcription server syntax and unit checks passed (%s)\n' "$local_transcription_python" \
+        | tee "$LOCAL_TRANSCRIPTION_STATUS_FILE"
     else
       cat "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" >&2
+      printf 'FAIL: local transcription server unit checks failed\n' | tee "$LOCAL_TRANSCRIPTION_STATUS_FILE" >&2
       exit 1
     fi
   else
-    printf 'PASS: local transcription server syntax checks passed; unit checks not run because local-transcription/venv is missing\n' \
-      >"$LOCAL_TRANSCRIPTION_STATUS_FILE"
+    printf 'NOT RUN: local transcription unit checks skipped; syntax checks passed but no interpreter has fastapi+uvicorn+python-multipart (create local-transcription/venv or pip install -r local-transcription/requirements.txt)\n' \
+      | tee "$LOCAL_TRANSCRIPTION_STATUS_FILE"
   fi
 fi
