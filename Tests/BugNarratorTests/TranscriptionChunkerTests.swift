@@ -151,6 +151,7 @@ final class TranscriptionChunkerTests: XCTestCase {
     func testOversizedSourceWithNoDurationIsNotPlanned() {
         // A zero or unreadable duration must not yield a zero-length export.
         XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: 0, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
+        XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: -5, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
         XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: .nan, maxChunkDuration: max, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
         XCTAssertEqual(DefaultTranscriptionChunker.plan(totalDuration: 360, maxChunkDuration: 0, minimumTailDuration: minTail, sourceExceedsUploadLimit: true), [])
     }
@@ -209,7 +210,7 @@ final class TranscriptionChunkerSizeTests: XCTestCase {
         return (attributes[.size] as? NSNumber)?.int64Value ?? 0
     }
 
-    func testSixMinuteWAVExceedsTheUploadGateButNotTheDurationThreshold() async throws {
+    func testSixMinuteWAVExceedsTheUploadGateButNotTheDurationThreshold() throws {
         // The premise of the defect, checked on a real file rather than by arithmetic.
         let wav = try makeSilentWAV(seconds: 6 * 60, name: "six-minute")
         XCTAssertGreaterThan(try fileSize(wav), Int64(AudioUploadPolicy.maximumSingleUploadBytes))
@@ -235,6 +236,7 @@ final class TranscriptionChunkerSizeTests: XCTestCase {
         let wav = try makeSilentWAV(seconds: 60, name: "one-minute")
         XCTAssertLessThanOrEqual(try fileSize(wav), Int64(AudioUploadPolicy.maximumSingleUploadBytes))
         let chunks = try await DefaultTranscriptionChunker().chunks(for: wav)
+        temporaryURLs.append(contentsOf: chunks.filter(\.isTemporary).map(\.fileURL))
         XCTAssertEqual(chunks.map(\.fileURL), [wav])
         XCTAssertEqual(chunks.map(\.isTemporary), [false])
     }
@@ -245,6 +247,7 @@ final class TranscriptionChunkerSizeTests: XCTestCase {
         let bytesBefore = try Data(contentsOf: m4a)
 
         let chunks = try await DefaultTranscriptionChunker().chunks(for: m4a)
+        temporaryURLs.append(contentsOf: chunks.filter(\.isTemporary).map(\.fileURL))
 
         XCTAssertEqual(chunks.count, 1)
         XCTAssertEqual(chunks.first?.fileURL, m4a)
