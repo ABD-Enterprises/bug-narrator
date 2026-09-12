@@ -72,12 +72,11 @@ if [[ "$NOTARIZE" == "YES" ]]; then
 fi
 
 if [[ -z "$PYTHON" ]]; then
-    for candidate in python3.12; do
-        if command -v "$candidate" >/dev/null 2>&1; then
-            PYTHON="$(command -v "$candidate")"
-            break
-        fi
-    done
+    # 3.12 is the only supported interpreter (checked again at the version gate
+    # below), so this is a direct lookup rather than a candidate list.
+    if command -v python3.12 >/dev/null 2>&1; then
+        PYTHON="$(command -v python3.12)"
+    fi
 fi
 
 if [[ -z "$PYTHON" ]]; then
