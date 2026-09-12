@@ -11,6 +11,7 @@
 # check is visible in CI artifacts:
 #   semgrep-status.txt      PASS / NOT RUN with the runner that produced it
 #   swift-parse-status.txt  PASS / NOT RUN from swift-parse-check.sh
+#   shell-lint-status.txt   PASS / NOT RUN from the shell script lint (see below)
 
 set -euo pipefail
 
@@ -39,6 +40,7 @@ LOCAL_TRANSCRIPTION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-
 EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
 REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
+SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
 REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
 rm -f \
@@ -49,7 +51,8 @@ rm -f \
   "$EFFORT_LEAK_STATUS_FILE" \
   "$EFFORT_LEAK_OUTPUT_FILE" \
   "$REPO_DOCS_STATUS_FILE" \
-  "$REPO_DOCS_OUTPUT_FILE"
+  "$REPO_DOCS_OUTPUT_FILE" \
+  "$SHELLCHECK_STATUS_FILE"
 
 should_skip_semgrep_target() {
   local target="$1"
@@ -228,6 +231,29 @@ fi
 # path. It was written for OPS-004, wired into CI, then orphaned when 1b8f3e2
 # removed that wiring in May — leaving a working gate referenced by nothing
 # (#1012).
+# Shell scripts gate the release path — build_dmg.sh signs and notarizes, and
+# build_standalone.sh produces the Parakeet artifact — yet nothing linted them.
+# Mirror the semgrep contract: a missing tool is reported as NOT RUN on stdout,
+# never silently as a pass (#1031 is why).
+SHELL_TARGETS=()
+while IFS= read -r f; do SHELL_TARGETS+=("$f"); done < <(
+  find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.sh' -type f 2>/dev/null | sort
+)
+if [[ ${#SHELL_TARGETS[@]} -eq 0 ]]; then
+  printf 'PASS: no shell scripts found to lint\n' | tee "$SHELLCHECK_STATUS_FILE"
+elif command -v shellcheck >/dev/null 2>&1; then
+  if shellcheck --severity=info "${SHELL_TARGETS[@]}"; then
+    printf 'PASS: shellcheck clean at info severity across %d script(s)\n' "${#SHELL_TARGETS[@]}" \
+      | tee "$SHELLCHECK_STATUS_FILE"
+  else
+    printf 'FAIL: shellcheck reported findings at info severity or above\n' | tee "$SHELLCHECK_STATUS_FILE" >&2
+    exit 1
+  fi
+else
+  printf 'NOT RUN: shellcheck is not on PATH; %d shell script(s) were not linted\n' "${#SHELL_TARGETS[@]}" \
+    | tee "$SHELLCHECK_STATUS_FILE"
+fi
+
 if [[ -x "$ROOT/scripts/accessibility_regression_check.sh" ]]; then
   if ! "$ROOT/scripts/accessibility_regression_check.sh"; then
     exit 1
