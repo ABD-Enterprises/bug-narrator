@@ -103,7 +103,6 @@ VERIFY_DEVICE=""
 detach_attachment() {
     local target="$1"
     local mountpoint="$2"
-    local attempt
 
     if [[ -n "$target" || -n "$mountpoint" ]]; then
         if [[ -z "$target" ]]; then
@@ -111,7 +110,7 @@ detach_attachment() {
         fi
 
         if [[ -n "$mountpoint" && -d "$mountpoint" ]] && mount | grep -Fq "on $mountpoint "; then
-            for attempt in 1 2 3; do
+            for _ in 1 2 3; do
                 if hdiutil detach "$target" -quiet >/dev/null 2>&1; then
                     break
                 fi
