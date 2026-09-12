@@ -237,7 +237,11 @@ jobs:
         run: |
           # Local builds stay advisory; CI enforces. Only first-party code counts —
           # linker and appintentsmetadataprocessor noise is excluded.
-          if grep -E 'warning:' build.log | grep -E '/(Sources|Tests)/' | grep -v 'appintentsmetadataprocessor' > swift-warnings.txt; then
+          # The log must exist and be non-empty: a missing file makes grep exit 2,
+          # which the `if` would otherwise read as "no warnings". Anchoring to the
+          # workspace keeps a future SPM checkout's Sources/ from tripping the gate.
+          test -s build.log || { echo "::error::build.log is missing or empty; the Build step did not produce a log to gate on"; exit 1; }
+          if grep -E 'warning:' build.log | grep -E "^${GITHUB_WORKSPACE}/(Sources|Tests)/" | grep -v 'appintentsmetadataprocessor' > swift-warnings.txt; then
             echo "::error::Swift warnings in first-party code (the target must stay warning-free, #1076):"
             sed 's/^/  /' swift-warnings.txt
             exit 1
