@@ -66,4 +66,58 @@ final class SettingsStoreDisplayMaskTests: XCTestCase {
 
         XCTAssertEqual(harness.settingsStore.maskedJiraAPIToken, "••••••••1234")
     }
+
+    // MARK: - keychainLocked placeholders for the token slots (#1105)
+    // The OpenAI slot's locked placeholder is pinned in SettingsStoreTests; the
+    // token slots use a different word ("token", not "key") and were not.
+
+    func test_maskedGitHubToken_keychainLocked_returnsSavedTokenLocked() throws {
+        let (store, cleanup) = makeLockedStore(key: "BugNarrator.GitHub::github-token", value: "ghp_locked")
+        defer { cleanup() }
+
+        XCTAssertEqual(store.githubTokenPersistenceState, .keychainLocked)
+        XCTAssertEqual(store.maskedGitHubToken, "Saved token locked")
+    }
+
+    func test_maskedJiraAPIToken_keychainLocked_returnsSavedTokenLocked() throws {
+        let (store, cleanup) = makeLockedStore(key: "BugNarrator.Jira::jira-api-token", value: "jira_locked")
+        defer { cleanup() }
+
+        XCTAssertEqual(store.jiraTokenPersistenceState, .keychainLocked)
+        XCTAssertEqual(store.maskedJiraAPIToken, "Saved token locked")
+    }
+
+    // MARK: - suffix length
+
+    func test_mask_neverShowsMoreThanFourCharacters() throws {
+        let harness = AppStateHarness(apiKey: "sk-live-abcdefghijklmnop")
+        harness.settingsStore.aiProvider = .openAI
+
+        let masked = harness.settingsStore.maskedAPIKey
+        XCTAssertTrue(masked.hasPrefix("••••••••"))
+        XCTAssertEqual(masked.count, 8 + 4)
+        XCTAssertFalse(masked.contains("sk-live"))
+    }
+
+    func test_mask_shortSecretIsShownInFullAfterTheBullets() throws {
+        // Pinned, not endorsed: a secret of four characters or fewer has nothing
+        // left to hide once the last four are shown, so "••••••••abcd" IS the
+        // whole secret. Real credentials are far longer; if a clamp is ever
+        // wanted, this is the test that will need to change.
+        let harness = AppStateHarness(apiKey: "abcd")
+        harness.settingsStore.aiProvider = .openAI
+
+        XCTAssertEqual(harness.settingsStore.maskedAPIKey, "••••••••abcd")
+    }
+
+    private func makeLockedStore(key: String, value: String) -> (SettingsStore, () -> Void) {
+        let suiteName = "BugNarrator-DisplayMaskTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let keychain = MockKeychainService()
+        keychain.values[key] = value
+        keychain.interactionRequiredKeys = [key]
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: keychain)
+        return (store, { defaults.removePersistentDomain(forName: suiteName) })
+    }
 }
