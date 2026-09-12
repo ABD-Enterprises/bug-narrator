@@ -59,7 +59,47 @@ final class IssueExportReviewPolicyTests: XCTestCase {
         XCTAssertEqual(prepared.map(\.id), [kept.id])
     }
 
+    func testLinkAsRelatedHonoursTheSelectedMatchNotTheFirstCandidate() throws {
+        let first = makeMatch("ACME-1", title: "First", confidence: 0.9, reasoning: "r1")
+        let second = makeMatch("ACME-2", title: "Second", confidence: 0.5, reasoning: "r2")
+        var item = IssueExportReviewItem(issue: makeIssue("Crash"), matches: [first, second], resolution: .linkAsRelated)
+        item.selectMatch(id: second.id)
+
+        let prepared = try IssueExportReviewPolicy.preparedIssues(from: makeReview(items: [item]))
+
+        XCTAssertEqual(prepared.first?.note, "Related to ACME-2 (50% match): Second. r2")
+    }
+
+    func testLinkAsRelatedWithCandidatesButNoSelectionStillThrows() {
+        // "No selection" is distinct from "no candidates": a policy that fell
+        // back to matches.first would silently link the wrong issue here.
+        let match = makeMatch("ACME-1", title: "First", confidence: 0.9, reasoning: "r1")
+        var item = IssueExportReviewItem(issue: makeIssue("Crash"), matches: [match], resolution: .linkAsRelated)
+        item.selectedMatchID = nil
+
+        XCTAssertThrowsError(try IssueExportReviewPolicy.preparedIssues(from: makeReview(items: [item])))
+    }
+
     // MARK: - duplicateMatchResults
+
+    func testDuplicateMatchResultsHonoursTheSelectedMatchNotTheFirstCandidate() throws {
+        let first = makeMatch("GH-1", title: "First", confidence: 0.9, reasoning: "r1")
+        let second = makeMatch("GH-2", title: "Second", confidence: 0.5, reasoning: "r2")
+        var item = IssueExportReviewItem(issue: makeIssue("Dup"), matches: [first, second], resolution: .markDuplicate)
+        item.selectMatch(id: second.id)
+
+        let results = try IssueExportReviewPolicy.duplicateMatchResults(from: makeReview(items: [item]))
+
+        XCTAssertEqual(results.map(\.remoteIdentifier), ["GH-2"])
+    }
+
+    func testDuplicateMatchResultsWithCandidatesButNoSelectionStillThrows() {
+        let match = makeMatch("GH-1", title: "First", confidence: 0.9, reasoning: "r1")
+        var item = IssueExportReviewItem(issue: makeIssue("Dup"), matches: [match], resolution: .markDuplicate)
+        item.selectedMatchID = nil
+
+        XCTAssertThrowsError(try IssueExportReviewPolicy.duplicateMatchResults(from: makeReview(items: [item])))
+    }
 
     func testDuplicateMatchResultsMapsOnlyMarkedItemsToTheirMatch() throws {
         let exported = makeIssue("Exported")
@@ -136,8 +176,10 @@ final class IssueExportReviewPolicyTests: XCTestCase {
     }
 
     func testSummaryNeverReportsANegativeCreatedCount() {
-        // duplicateCount larger than results is a caller bug; the summary must
-        // still read sanely rather than say "Exported -1".
+        // duplicateCount larger than results is a caller bug. This pins that the
+        // linked-only wording is chosen; the max(0, …) clamp itself is not
+        // observable (any duplicateCount > 0 avoids the branches that print
+        // createdCount), so a reviewer's mutant removing it is equivalent.
         XCTAssertEqual(
             IssueExportReviewPolicy.exportSummary(for: makeResults(1), duplicateCount: 2, destination: .github),
             "Linked 2 issues to existing GitHub items without creating duplicates."

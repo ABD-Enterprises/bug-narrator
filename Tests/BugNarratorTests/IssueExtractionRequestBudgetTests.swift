@@ -59,13 +59,14 @@ final class IssueExtractionRequestBudgetTests: XCTestCase {
 
     func testScreenshotLineListsOnlyResolvableIDs() {
         let known = SessionScreenshot(elapsedTime: 3, filePath: "/tmp/shots/login-1.png")
+        let second = SessionScreenshot(elapsedTime: 4, filePath: "/tmp/shots/login-2.png")
         let unknown = UUID()
-        let section = TranscriptSection(title: "Login", startTime: 0, endTime: 10, text: "t", markerID: nil, screenshotIDs: [unknown, known.id])
-        let session = makeSession(transcript: "", screenshots: [known], sections: [section])
+        let section = TranscriptSection(title: "Login", startTime: 0, endTime: 10, text: "t", markerID: nil, screenshotIDs: [unknown, known.id, second.id])
+        let session = makeSession(transcript: "", screenshots: [known, second], sections: [section])
 
         let lines = IssueExtractionRequestBudget.transcriptLines(for: session)
 
-        XCTAssertEqual(lines[1], "Screenshots: login-1.png")
+        XCTAssertEqual(lines[1], "Screenshots: login-1.png, login-2.png")
     }
 
     func testScreenshotLineIsOmittedWhenNoIDResolves() {
@@ -90,6 +91,15 @@ final class IssueExtractionRequestBudgetTests: XCTestCase {
         XCTAssertTrue(lines.contains("bbbbb"))
         XCTAssertFalse(lines.contains("## C [\(third.timeRangeLabel)]"))
         XCTAssertEqual(lines.last, "[Budget note: omitted \(7 + 30) transcript character(s) from the extraction request. Export or inspect the full transcript locally if needed.]")
+    }
+
+    func testACutWithOneCharacterOfBudgetLeftKeepsThatCharacter() {
+        let first = TranscriptSection(title: "A", startTime: 0, endTime: 1, text: String(repeating: "a", count: budget - 1), markerID: nil, screenshotIDs: [])
+        let second = TranscriptSection(title: "B", startTime: 1, endTime: 2, text: "bbb", markerID: nil, screenshotIDs: [])
+        let lines = IssueExtractionRequestBudget.transcriptLines(for: makeSession(transcript: "", sections: [first, second]))
+
+        XCTAssertTrue(lines.contains("b"))
+        XCTAssertTrue(lines.last?.contains("omitted 2 transcript character(s)") == true)
     }
 
     func testHeadersAndScreenshotLinesAreNotChargedToTheBudget() {
