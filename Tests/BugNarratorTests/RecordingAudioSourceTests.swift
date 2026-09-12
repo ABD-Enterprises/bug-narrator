@@ -45,9 +45,12 @@ final class RecordingAudioSourceTests: XCTestCase {
     }
 
     func testMicrophoneInputLevelTapCanDeliverFromRealtimeQueue() throws {
-        let buffer = try makePCMBuffer(samples: [0.125, -0.125, 0.125, -0.125])
+        // Handed to the realtime thread once and never touched again here. The
+        // compiler cannot see that through Thread's ObjC @Sendable block, so the
+        // transfer is declared rather than hidden behind a file-wide @preconcurrency.
+        nonisolated(unsafe) let buffer = try makePCMBuffer(samples: [0.125, -0.125, 0.125, -0.125])
         let deliveredLevel = expectation(description: "delivered microphone level")
-        let tap = MicrophoneInputLevelTapFactory.makeTap { level in
+        nonisolated(unsafe) let tap = MicrophoneInputLevelTapFactory.makeTap { level in
             XCTAssertGreaterThan(level, 0)
             deliveredLevel.fulfill()
         }

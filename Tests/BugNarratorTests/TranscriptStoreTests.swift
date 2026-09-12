@@ -550,7 +550,7 @@ final class TranscriptStoreTests: XCTestCase {
 
 }
 
-private final class UnreadableSessionDirectoryFileManager: FileManager, @unchecked Sendable {
+private final class UnreadableSessionDirectoryFileManager: FileManager {
     var denyEnumeration = true
 
     override func contentsOfDirectory(atPath path: String) throws -> [String] {
