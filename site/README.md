@@ -1,9 +1,11 @@
 # BugNarrator docs site
 
-A [Docusaurus](https://docusaurus.io) site. Its pages under `docs/` are
-mirrors of canonical files in the repository root's `docs/`; `scripts/validate.sh`
-fails if they drift, so edit the canonical file and let the sync regenerate the
-mirror rather than editing here.
+A [Docusaurus](https://docusaurus.io) site. One page,
+`docs/user/user-manual.md`, is a generated mirror of the repository root's
+`docs/user/user-manual.md` (see `scripts/sync_site_docs.py`); `scripts/validate.sh`
+and the publish workflow fail if it drifts, so edit the canonical file and run
+`scripts/sync_site_docs.py` to regenerate the mirror. The other pages are
+hand-written summaries that link back to the canonical repo docs.
 
 ## Building locally
 
@@ -16,15 +18,15 @@ scripts/site_npm.sh start     # dev server with live reload
 ```
 
 `scripts/site_npm.sh` is `npm --prefix site` with a pinned toolchain in front of
-it. On first use it:
+it. Every run reads the exact Node version from
+[`.node-version`](.node-version) (currently `v22.22.2`). If that toolchain is
+not installed yet, it:
 
-1. reads the exact Node version from [`.node-version`](.node-version)
-   (currently `v22.22.2`),
-2. downloads that release for your platform (macOS or Linux, x64 or arm64) from
+1. downloads that release for your platform (macOS or Linux, x64 or arm64) from
    `nodejs.org/dist`,
-3. verifies the archive's SHA-256 against the release's published
+2. verifies the archive's SHA-256 against the release's published
    `SHASUMS256.txt` and refuses to extract on a mismatch,
-4. installs it under `build/tooling/node-<version>-<platform>/` (gitignored),
+3. installs it under `build/tooling/node-<version>-<platform>/` (gitignored),
 
 and then `exec`s that toolchain's `npm` with your arguments. Later runs skip the
 download. Delete the `build/tooling` directory to force a fresh install.
@@ -33,9 +35,16 @@ out-of-tree builds.
 
 ## What CI uses
 
-The `docs-site-validation` job in `.github/workflows/ci.yml` runs
-`npm ci --prefix site` and `npm run build --prefix site` on a Node provided by
-`actions/setup-node` with `node-version: 22`. That is a **major-version** pin,
-not `node-version-file`, so CI may build on a different `22.x` patch release
-than the one `.node-version` pins for local builds. Treat `.node-version` as the
-reference: when you bump it, check that CI is still on the same major line.
+Two workflows build the site, and they pin Node differently:
+
+- **PR gate** — the `docs-site-validation` job in `.github/workflows/ci.yml`
+  (runs only when docs changed) does `npm ci --prefix site` and
+  `npm run build --prefix site` on `actions/setup-node` with `node-version: 22`.
+  That is a **major-version** pin, so this job may build on a different `22.x`
+  patch release than `.node-version`.
+- **Publish** — `.github/workflows/docs-site.yml` (push to `main`) uses
+  `node-version-file: site/.node-version`, the same exact pin as the local
+  wrapper, and also runs the mirror check.
+
+Treat `.node-version` as the reference: when you bump it, check that the PR
+gate is still on the same major line.
