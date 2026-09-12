@@ -1,0 +1,6 @@
+# Bug-class rules only. Style families (UP, I, SIM, B) would produce a dozen
+# findings of churn on first run and are deliberately not enabled; the gate in
+# scripts/validate.sh exists to catch undefined names, unused imports, and
+# malformed f-strings, not to restyle scripts.
+[lint]
+select = ["F"]
