@@ -16,6 +16,10 @@ final class WindowCoordinator {
     private let transcriptStore: TranscriptStore
 
     private var recordingControlWindowController: NSWindowController?
+    // nonisolated(unsafe) because `deinit` is nonisolated in Swift 6 and must be
+    // able to read this to remove the observer. It is written exactly once, in
+    // `init` (which cannot run twice), and read again only in `deinit`; a deinit cannot
+    // run concurrently with a live write, so there is no race to check.
     private nonisolated(unsafe) var singleInstanceActivationObserver: NSObjectProtocol?
     private var shouldRestoreRecordingControlWindowAfterScreenshotSelection = false
     private var pendingSceneIDs: Set<String> = []
