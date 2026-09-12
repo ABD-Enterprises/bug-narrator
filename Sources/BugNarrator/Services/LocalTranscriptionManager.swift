@@ -340,6 +340,11 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 }
 
+// Thread-safety invariant: the only stored property is `progress`, an immutable
+// `@Sendable` closure, so there is no mutable state to race on. The delegate
+// callbacks arrive on URLSession's delegate queue and only invoke that closure.
+// `@unchecked` exists solely because NSObject subclasses cannot be checked
+// structurally; nothing here needs a lock.
 private final class LocalServerDownloadProgress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     let progress: @Sendable (Double) -> Void
     init(progress: @escaping @Sendable (Double) -> Void) { self.progress = progress }
@@ -356,6 +361,13 @@ protocol LocalServerProcess: AnyObject {
     func terminate()
 }
 
+// Thread-safety invariant: every access to the mutable state (`data`, `finished`)
+// is serialized through `lock` — `append` and `text` take it directly,
+// `finishReading` uses `withLock`. `ended` is a DispatchSemaphore, safe by
+// construction. The readability handler runs on a background queue and only
+// calls the locked `append`, clears its own handler, and signals `ended` — none
+// of which touches the buffer unlocked — so the pipe reader and the caller of
+// `text` never race on it. Hence the `@unchecked` is sound.
 private final class LocalServerDiagnostic: @unchecked Sendable {
     private let lock = NSLock()
     private var data = Data()
