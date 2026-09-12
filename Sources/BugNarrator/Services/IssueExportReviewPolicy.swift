@@ -54,7 +54,7 @@ enum IssueExportReviewPolicy {
             return "Linked \(duplicateCount) issue\(duplicateCount == 1 ? "" : "s") to existing \(destination.rawValue) items without creating duplicates."
         }
 
-        return "Exported \(createdCount) issues to \(destination.rawValue)."
+        return "Exported \(createdCount) issue\(createdCount == 1 ? "" : "s") to \(destination.rawValue)."
     }
 
     private static func trackerContextNote(for resolution: SimilarIssueResolution, match: SimilarIssueMatch) -> String {
