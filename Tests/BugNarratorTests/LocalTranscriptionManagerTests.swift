@@ -495,9 +495,11 @@ final class LocalTranscriptionManagerTests: XCTestCase {
 
     @MainActor
     func testWrapperJobControlNoiseNeverReachesTheExitMessage() async throws {
-        // A server that ignores TERM is KILLed after the grace; the shell wrapper's
-        // own "Killed: 9" report must not become the user-facing detail.
-        let (binary, ready) = try makeServerStandIn("signal.signal(signal.SIGTERM, signal.SIG_IGN)")
+        // The shell wrapper reports a signalled child on ITS stderr ("line 1:
+        // NNN Killed: 9 …"). That path is only reachable when the child dies on
+        // its own — the app's terminate() KILLs the wrapper right after the
+        // group — so the stand-in kills itself once it is ready.
+        let (binary, ready) = try makeServerStandIn("import os\nsignal.signal(signal.SIGALRM, lambda *_: os.kill(os.getpid(), signal.SIGKILL))\nsignal.setitimer(signal.ITIMER_REAL, 0.3)")
         defer { try? FileManager.default.removeItem(at: binary.deletingLastPathComponent()) }
         let exited = expectation(description: "server exits")
         nonisolated(unsafe) var result: (Int32, String)?
@@ -506,12 +508,12 @@ final class LocalTranscriptionManagerTests: XCTestCase {
             exited.fulfill()
         }
         try await waitForReady(ready)
-        process.terminate()
         await fulfillment(of: [exited], timeout: 6)
         let (status, detail) = try XCTUnwrap(result)
-        XCTAssertNotEqual(status, 0)
+        XCTAssertEqual(status, 137, "the wrapper must report the child's own death, not its own")
         XCTAssertFalse(detail.contains("bug-narrator-process-lifecycle:"), detail)
         XCTAssertFalse(detail.contains("Killed: 9"), detail)
+        withExtendedLifetime(process) {}
     }
 
     func testCommandTimeoutAndCancellationAreBounded() async throws {
