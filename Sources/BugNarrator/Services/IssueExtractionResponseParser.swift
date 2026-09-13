@@ -429,17 +429,28 @@ private struct IssuePayload {
     }
 
     private static func firstDouble(in dictionary: [String: Any], keys: [String]) -> Double? {
+        finiteDouble(in: dictionary, keys: keys)
+    }
+
+    /// Every model-sourced number passes through here. `Double(String)` accepts
+    /// "nan", "inf" and overflow, and `min(max(.nan, 0), 1)` is still NaN, so a
+    /// non-finite value would survive downstream clamping and trap at the first
+    /// `Int(...)` (confidenceLabel, exportDescription, ElapsedTimeFormatter).
+    /// Non-finite is treated as absent (#1125).
+    static func finiteDouble(in dictionary: [String: Any], keys: [String]) -> Double? {
         for key in keys {
+            let candidate: Double?
             if let value = dictionary[key] as? Double {
-                return value
+                candidate = value
+            } else if let value = dictionary[key] as? NSNumber {
+                candidate = value.doubleValue
+            } else if let value = dictionary[key] as? String {
+                candidate = Double(value)
+            } else {
+                candidate = nil
             }
-
-            if let value = dictionary[key] as? NSNumber {
-                return value.doubleValue
-            }
-
-            if let value = dictionary[key] as? String, let doubleValue = Double(value) {
-                return doubleValue
+            if let candidate, candidate.isFinite {
+                return candidate
             }
         }
 
@@ -524,16 +535,24 @@ private struct IssuePayload {
             return nil
         }
 
+        // "nan:00" and "1e309:00" parse as Double. A non-finite part (or a sum
+        // that overflows) means no timestamp at all — never a reinterpretation
+        // with that part dropped ("01:nan:00" must not become 01:00).
         let parts = value.split(separator: ":").compactMap { Double($0) }
+        guard parts.allSatisfy(\.isFinite) else {
+            return nil
+        }
 
+        let total: TimeInterval
         switch parts.count {
         case 2:
-            return (parts[0] * 60) + parts[1]
+            total = (parts[0] * 60) + parts[1]
         case 3:
-            return (parts[0] * 3_600) + (parts[1] * 60) + parts[2]
+            total = (parts[0] * 3_600) + (parts[1] * 60) + parts[2]
         default:
             return nil
         }
+        return total.isFinite ? total : nil
     }
 }
 
@@ -669,21 +688,7 @@ private struct IssueScreenshotAnnotationPayload {
     }
 
     private static func firstDouble(in dictionary: [String: Any], keys: [String]) -> Double? {
-        for key in keys {
-            if let value = dictionary[key] as? Double {
-                return value
-            }
-
-            if let value = dictionary[key] as? NSNumber {
-                return value.doubleValue
-            }
-
-            if let value = dictionary[key] as? String, let doubleValue = Double(value) {
-                return doubleValue
-            }
-        }
-
-        return nil
+        IssuePayload.finiteDouble(in: dictionary, keys: keys)
     }
 }
 
