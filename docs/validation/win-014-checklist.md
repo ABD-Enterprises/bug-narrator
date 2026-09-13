@@ -76,7 +76,7 @@ This is the least-validated row and the most hardware-dependent.
 
 ### 9. Debug Bundle support export
 
-- `[human]` With a real provider key configured, export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`, and the configured key appears nowhere in any of them — search the bundle for the key's first eight characters. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
+- `[human]` With a provider key configured — any value works; the app does not need to reach a provider for this — export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`, and the configured key appears nowhere in any of them — search the bundle for the key's first eight characters. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
 - `[automation]` **Closed.** `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk.
 
 ### 10. Missing or invalid AI provider recovery
@@ -109,7 +109,8 @@ Every `[human]` item above. The specific inputs a person must bring:
 | A real Windows desktop with the app built from a named SHA | all |
 | Two monitors, one at 125 % or 150 % scale | 5 |
 | A microphone and an active audio output | 12 |
-| A real OpenAI key, one compatible hosted endpoint, one local endpoint | 10, 11 |
+| A real OpenAI key, one compatible hosted endpoint, one local endpoint | 11 |
+| A previously recorded session on disk, with no provider configured | 10 |
 | A GitHub token and a scratch repository | 13 |
 | A Jira token and a scratch project | 13 |
 
