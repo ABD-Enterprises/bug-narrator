@@ -535,13 +535,15 @@ private struct IssuePayload {
             return nil
         }
 
-        // "nan:00" and "1e309:00" parse as Double. A non-finite part (or a sum
-        // that overflows) means no timestamp at all — never a reinterpretation
-        // with that part dropped ("01:nan:00" must not become 01:00).
-        let parts = value.split(separator: ":").compactMap { Double($0) }
-        guard parts.allSatisfy(\.isFinite) else {
+        // Every part must be a finite number. "nan:00" and "1e309:00" parse as
+        // Double but are not finite; "01:xx:00" has a part that does not parse
+        // at all. Either means no timestamp — never a reinterpretation with the
+        // bad part dropped ("01:xx:00" must not become 01:00).
+        let maybeParts = value.split(separator: ":").map { Double($0) }
+        guard maybeParts.allSatisfy({ $0?.isFinite == true }) else {
             return nil
         }
+        let parts = maybeParts.compactMap { $0 }
 
         let total: TimeInterval
         switch parts.count {
