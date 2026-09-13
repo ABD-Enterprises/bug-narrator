@@ -208,7 +208,7 @@ final class GitHubExportProviderTests: XCTestCase {
         let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
         XCTAssertFalse(payload.title.contains("\n"))
         XCTAssertTrue(payload.title.hasPrefix("Crash on launch when the window"))
-        XCTAssertLessThanOrEqual(payload.title.count, TrackerExportPayloadBudget.gitHubTitleLimit)
+        XCTAssertEqual(payload.title.count, TrackerExportPayloadBudget.gitHubTitleLimit, "cut at GitHub's cap, not Jira's")
         XCTAssertTrue(payload.title.hasSuffix("…"))
     }
 

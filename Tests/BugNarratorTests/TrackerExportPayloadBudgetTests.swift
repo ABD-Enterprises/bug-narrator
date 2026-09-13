@@ -36,11 +36,16 @@ final class TrackerExportPayloadBudgetTests: XCTestCase {
     }
 
     func testCutDoesNotLeaveATrailingSpaceBeforeTheEllipsis() {
-        let title = String(repeating: "word ", count: 60) // 300 chars; position 254 is a space
-        let result = TrackerExportPayloadBudget.trackerTitle(title, maxCharacters: 255)
+        // With max 2 the kept prefix is "a " — the space must go before the ellipsis.
+        XCTAssertEqual(TrackerExportPayloadBudget.trackerTitle("a bcd", maxCharacters: 2), "a…")
 
+        // And at the real cap: "w " has period 2, so the last kept index (253,
+        // odd) is a space and must be trimmed away.
+        let title = String(repeating: "w ", count: 150)
+        let result = TrackerExportPayloadBudget.trackerTitle(title, maxCharacters: 255)
         XCTAssertFalse(result.hasSuffix(" …"))
-        XCTAssertLessThanOrEqual(result.count, 255)
+        XCTAssertTrue(result.hasSuffix("w…"))
+        XCTAssertEqual(result.count, 254)
     }
 
     func testCollapsingHappensBeforeMeasuring() {
@@ -50,8 +55,12 @@ final class TrackerExportPayloadBudgetTests: XCTestCase {
     }
 
     func testCapCountsCharactersNotBytes() {
-        let title = String(repeating: "é", count: 300)
-        XCTAssertEqual(TrackerExportPayloadBudget.trackerTitle(title, maxCharacters: 255).count, 255)
+        let over = String(repeating: "é", count: 300)
+        XCTAssertEqual(TrackerExportPayloadBudget.trackerTitle(over, maxCharacters: 255).count, 255)
+
+        // 200 characters but 400 UTF-8 bytes: a byte-counting cap would cut this.
+        let under = String(repeating: "é", count: 200)
+        XCTAssertEqual(TrackerExportPayloadBudget.trackerTitle(under, maxCharacters: 255), under)
     }
 
     func testHardLimitsMatchTheTrackers() {

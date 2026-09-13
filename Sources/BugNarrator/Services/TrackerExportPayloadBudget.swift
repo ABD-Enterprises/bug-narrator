@@ -12,7 +12,10 @@ enum TrackerExportPayloadBudget {
     static let screenshotListLimit = 10
     /// Jira Cloud rejects a `summary` over 255 characters or containing a
     /// newline; GitHub rejects an issue `title` over 256. Both are hard server
-    /// limits, unlike the body budgets above, which are self-imposed.
+    /// limits, unlike the body budgets above, which are self-imposed. Jira
+    /// counts UTF-16 code units while `trackerTitle` counts Characters, so a
+    /// title dense in astral-plane emoji or combining sequences can sit at the
+    /// Character cap and still exceed Jira's — accepted for bug titles.
     static let jiraSummaryLimit = 255
     static let gitHubTitleLimit = 256
 
