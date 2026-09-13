@@ -6,8 +6,16 @@ extension GitHubExportProvider {
     /// cross-links, inject raw HTML, or start new block-level structure
     /// (headings, quotes, lists, tables, code fences).
     static func neutralizingUntrustedMarkdown(_ text: String) -> String {
-        let lines = text.components(separatedBy: "\n").map { line -> String in
-            var escaped = line
+        // GitHub treats a lone CR as a line break; splitting on "\n" alone would
+        // leave every line-start escape below unapplied after one.
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalized.components(separatedBy: "\n").map { line -> String in
+            let escaped = line
+                // First, so an attacker's own backslash cannot pair with one we
+                // add below ("\\[" is a literal backslash followed by a LIVE "[").
+                .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "<", with: "&lt;")
                 .replacingOccurrences(of: ">", with: "&gt;")
                 // A zero-width space after @/# breaks GitHub's mention and issue
@@ -15,10 +23,29 @@ extension GitHubExportProvider {
                 // text visually identical.
                 .replacingOccurrences(of: "@", with: "@\u{200B}")
                 .replacingOccurrences(of: "#", with: "#\u{200B}")
-            if let first = escaped.first, "-*+|=`~".contains(first) {
-                escaped = "\\" + escaped
+                // An escaped "[" cannot open a link or image label, so
+                // [text](url), ![alt](url) and [ref]: url all render literally.
+                // Bare URLs are left alone: GitHub autolinks them and the
+                // target is what the reader sees (#1117).
+                .replacingOccurrences(of: "[", with: "\\[")
+                // "GH-123" is an issue reference GitHub links just like "#123".
+                .replacingOccurrences(of: #"(?i)(gh-)"#, with: "$1\u{200B}", options: .regularExpression)
+            // Block-level syntax is decided by the first NON-SPACE character
+            // (CommonMark allows up to three spaces of indent), so look past
+            // indentation; "_" covers "___" thematic breaks, and "1." / "1)"
+            // ordered lists could renumber or forge items in our own lists.
+            let indent = escaped.prefix { $0 == " " }
+            let body = String(escaped.dropFirst(indent.count))
+            // ":" starts a table delimiter row (":--|:--") with no leading pipe.
+            if let first = body.first, "-*+|=`~_:".contains(first) {
+                return indent + "\\" + body
             }
-            return escaped
+            // "1. x" → "1\. x": the escaped delimiter can no longer start a list.
+            return indent + body.replacingOccurrences(
+                of: #"^(\d{1,9})([.)])(?=\s|$)"#,
+                with: "$1\\\\$2",
+                options: .regularExpression
+            )
         }
         return lines.joined(separator: "\n")
     }
@@ -58,7 +85,16 @@ extension GitHubExportProvider {
             lines.append("- Component: \(Self.neutralizingUntrustedMarkdown(component))")
         }
 
-        lines.append("- Deduplication hint: `\(issue.deduplicationHint)`")
+        // Inside a code span markdown is inert, but a backtick would close the
+        // span early and a blank line ends the paragraph (and the list) outright,
+        // dropping the rest of the hint into raw markdown. The hint is a one-line
+        // key by intent, so collapse it to one line and strip backticks.
+        let hint = issue.deduplicationHint
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .replacingOccurrences(of: "`", with: "\u{2019}")
+        lines.append("- Deduplication hint: `\(hint)`")
 
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
             lines.append("- Transcript section: \(Self.neutralizingUntrustedMarkdown(sectionTitle))")
@@ -75,14 +111,24 @@ extension GitHubExportProvider {
         if let note = issue.note?.trimmingCharacters(in: .whitespacesAndNewlines),
            !note.isEmpty {
             lines.append("")
-            // `note` is set by our own dedup policy (trackerContextNote) and may
-            // deliberately contain a "Related to #123" cross-link, so it is not
-            // neutralized here.
+            // `note` is composed by our dedup policy (trackerContextNote), but it
+            // embeds the matched REMOTE issue's title and the model's reasoning —
+            // in a public repository that title is attacker-controlled, so the
+            // note is neutralized like every other untrusted field. The one link
+            // we authored ourselves, the leading "#123" cross-reference, is then
+            // restored: it is digits only and anchored to a fixed prefix.
             lines.append("## Tracker Context")
-            lines.append(
+            let neutralizedNote = Self.neutralizingUntrustedMarkdown(
                 TrackerExportPayloadBudget.truncated(
                     note,
                     maxCharacters: TrackerExportPayloadBudget.noteLimit
+                )
+            )
+            lines.append(
+                neutralizedNote.replacingOccurrences(
+                    of: #"^(Related to|Marked as duplicate of) #\x{200B}(\d+)\b"#,
+                    with: "$1 #$2",
+                    options: .regularExpression
                 )
             )
         }
@@ -162,11 +208,13 @@ extension GitHubExportProvider {
 
     private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
         try annotationRenderer.annotatedScreenshotExports(for: issue, session: session).map { export in
+            // `summaries` is built from model-authored annotation labels.
+            let summaries = Self.neutralizingUntrustedMarkdown(export.summaries)
             if let renderedFileName = export.renderedFileName {
-                return "- \(renderedFileName) from `\(export.screenshotFileName)` (`\(export.timeLabel)`) — \(export.summaries)"
+                return "- \(renderedFileName) from `\(export.screenshotFileName)` (`\(export.timeLabel)`) — \(summaries)"
             }
 
-            return "- \(export.screenshotFileName) (`\(export.timeLabel)`) — \(export.summaries)"
+            return "- \(export.screenshotFileName) (`\(export.timeLabel)`) — \(summaries)"
         }
     }
 }
