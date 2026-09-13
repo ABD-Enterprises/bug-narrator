@@ -135,11 +135,16 @@ final class HotkeySettingsCoordinator {
         for action in HotkeyAction.allCases {
             let shortcut = snapshot[action]
             if shortcut.isEnabled && seen.contains(shortcut) {
+                // Preserve the existing startup behavior: disable the later
+                // duplicate in memory for this launch without rewriting the
+                // user's stored assignment.
                 snapshot[action] = .disabled
-            } else if shortcut.isEnabled {
+                continue
+            }
+            if shortcut.isEnabled {
                 seen.insert(shortcut)
             }
-            persist(snapshot[action], for: action)
+            persist(shortcut, for: action)
         }
     }
 
