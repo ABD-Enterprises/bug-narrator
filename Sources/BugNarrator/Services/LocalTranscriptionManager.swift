@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import CryptoKit
+import Darwin
 import Foundation
 
 @MainActor
@@ -398,16 +399,34 @@ private final class LocalServerDiagnostic: @unchecked Sendable {
 // allow a short grace period, then send KILL and wait for exit. Keeping that
 // policy here prevents either installer helpers or the long-lived server from
 // acquiring a different shutdown contract.
+private enum LocalServerProcessLifecycleError: LocalizedError {
+    case processIsolationFailed
+
+    var errorDescription: String? { "Could not isolate the local helper process lifecycle" }
+}
+
 private final class LocalServerProcessLifecycle: @unchecked Sendable {
     let process = Process()
     private let errors = Pipe()
+    private let startupInput = Pipe()
+    private let processGroupOutput = Pipe()
     private let diagnostic = LocalServerDiagnostic()
+    private var processGroup: pid_t?
 
     init(executable: String, arguments: [String], environment: [String: String]? = nil) {
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
+        // A non-interactive shell with job control puts its background job in a
+        // dedicated process group. The first stdout line is the owned group ID;
+        // the launched program's stdout remains discarded as before.
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            "set -m; ( read ready && exec \"$@\" ) >/dev/null & child=$!; set +m; printf '%s\\n' \"$child\"; exec 1>/dev/null; wait \"$child\"",
+            "bug-narrator-process-lifecycle",
+            executable,
+        ] + arguments
         process.environment = environment
-        process.standardOutput = FileHandle.nullDevice
+        process.standardInput = startupInput
+        process.standardOutput = processGroupOutput
         process.standardError = errors
         diagnostic.read(from: errors)
     }
@@ -416,19 +435,48 @@ private final class LocalServerProcessLifecycle: @unchecked Sendable {
         do {
             try process.run()
             errors.fileHandleForWriting.closeFile()
+            processGroupOutput.fileHandleForWriting.closeFile()
+            let data = processGroupOutput.fileHandleForReading.readData(ofLength: 32)
+            let value = String(decoding: data, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let group = pid_t(value), group > 1, group != getpgrp() else {
+                process.terminate()
+                process.waitUntilExit()
+                throw LocalServerProcessLifecycleError.processIsolationFailed
+            }
+            guard getpgid(group) == group else {
+                startupInput.fileHandleForWriting.closeFile()
+                process.terminate()
+                process.waitUntilExit()
+                throw LocalServerProcessLifecycleError.processIsolationFailed
+            }
+            processGroup = group
+            startupInput.fileHandleForWriting.write(Data("ready\n".utf8))
+            startupInput.fileHandleForWriting.closeFile()
         } catch {
+            try? startupInput.fileHandleForWriting.close()
             errors.fileHandleForReading.readabilityHandler = nil
             throw error
         }
     }
 
     func terminateAndWait() {
-        guard process.isRunning else { return }
+        let group = processGroup
+        guard process.isRunning || group.map(Self.isGroupAlive) == true else { return }
+        if let group, Self.isGroupAlive(group) { kill(-group, SIGTERM) }
         process.terminate()
         let deadline = Date().addingTimeInterval(0.5)
-        while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        while Date() < deadline,
+              process.isRunning || group.map(Self.isGroupAlive) == true {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if let group, Self.isGroupAlive(group) { kill(-group, SIGKILL) }
         if process.isRunning { kill(process.processIdentifier, SIGKILL) }
         process.waitUntilExit()
+    }
+
+    private static func isGroupAlive(_ group: pid_t) -> Bool {
+        kill(-group, 0) == 0 || errno == EPERM
     }
 
     func finishDiagnostics() { diagnostic.finishReading(errors) }
@@ -462,7 +510,7 @@ private final class ManagedLocalServerProcess: LocalServerProcess {
     }
 
     func terminate() {
-        guard lifecycle.process.isRunning, terminationTask == nil else { return }
+        guard terminationTask == nil else { return }
         let lifecycle = lifecycle
         terminationTask = Task.detached { lifecycle.terminateAndWait() }
     }
