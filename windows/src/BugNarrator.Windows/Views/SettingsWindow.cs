@@ -41,6 +41,7 @@ public sealed class SettingsWindow : Window
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly TextBlock statusTextBlock;
     private readonly CheckBox systemAudioConsentCheckBox;
+    private readonly CheckBox experimentalSystemAudioCheckBox;
     private readonly ITranscriptionClient transcriptionClient;
 
     public SettingsWindow(
@@ -123,6 +124,12 @@ public sealed class SettingsWindow : Window
             Margin = new Thickness(0, 0, 0, 14),
             DisplayMemberPath = nameof(AudioRecordingSourceProfile.DisplayName),
             ItemsSource = AudioRecordingSourceProfile.All,
+        };
+
+        experimentalSystemAudioCheckBox = new CheckBox
+        {
+            Margin = new Thickness(0, -4, 0, 8),
+            Content = "System audio capture modes (experimental)",
         };
 
         systemAudioConsentCheckBox = new CheckBox
@@ -312,6 +319,7 @@ public sealed class SettingsWindow : Window
                     BuildLabel("Recording Audio Source"),
                     audioRecordingSourceComboBox,
                     BuildHint("Choose Microphone for normal narration, System Audio for app/computer playback, or Microphone + System Audio to see the currently tracked mixed-capture limitation."),
+                    experimentalSystemAudioCheckBox,
                     systemAudioConsentCheckBox,
                     BuildLabel("Microphone Input Device"),
                     audioInputDeviceComboBox,
@@ -529,6 +537,7 @@ public sealed class SettingsWindow : Window
             issueExtractionModelTextBox.Text = settings.EffectiveIssueExtractionModel;
             audioRecordingSourceComboBox.SelectedItem = settings.EffectiveRecordingAudioSourceProfile;
             systemAudioConsentCheckBox.IsChecked = settings.HasAcceptedSystemAudioRecordingConsent;
+            experimentalSystemAudioCheckBox.IsChecked = settings.IsExperimentalSystemAudioEnabled;
             PopulateAudioInputDevices(settings.EffectiveAudioInputDeviceName);
             gitHubTokenPasswordBox.Password = gitHubToken ?? string.Empty;
             gitHubOwnerTextBox.Text = settings.NormalizedGitHubRepositoryOwner;
@@ -581,7 +590,8 @@ public sealed class SettingsWindow : Window
                 ScreenshotHotkey: draftHotkeys[WindowsHotkeyAction.CaptureScreenshot],
                 AiProvider: GetSelectedAiProviderProfile().StorageValue,
                 RecordingAudioSource: GetSelectedRecordingAudioSourceProfile().StorageValue,
-                HasAcceptedSystemAudioRecordingConsent: systemAudioConsentCheckBox.IsChecked == true);
+                HasAcceptedSystemAudioRecordingConsent: systemAudioConsentCheckBox.IsChecked == true,
+                IsExperimentalSystemAudioEnabled: experimentalSystemAudioCheckBox.IsChecked == true);
 
             if (settings.AiProviderCompatibilityIssue is { } aiProviderIssue)
             {

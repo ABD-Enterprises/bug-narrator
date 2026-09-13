@@ -23,7 +23,10 @@ public sealed record WindowsAppSettings(
     WindowsHotkeyShortcut ScreenshotHotkey = default,
     string AiProvider = "openAI",
     string RecordingAudioSource = "microphone",
-    bool HasAcceptedSystemAudioRecordingConsent = false)
+    bool HasAcceptedSystemAudioRecordingConsent = false,
+    // The experimental "System audio capture modes" toggle macOS has. Defaults false so a
+    // settings file written before it existed loads with the feature off, as the spec requires.
+    bool IsExperimentalSystemAudioEnabled = false)
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -43,7 +46,8 @@ public sealed record WindowsAppSettings(
         ScreenshotHotkey: WindowsHotkeyShortcut.NotSet,
         AiProvider: WindowsAiProviderProfile.Default.StorageValue,
         RecordingAudioSource: AudioRecordingSourceProfile.Default.StorageValue,
-        HasAcceptedSystemAudioRecordingConsent: false);
+        HasAcceptedSystemAudioRecordingConsent: false,
+        IsExperimentalSystemAudioEnabled: false);
 
     public WindowsAiProviderProfile EffectiveAiProviderProfile =>
         WindowsAiProviderProfile.FromStorageValue(AiProvider);
@@ -61,6 +65,16 @@ public sealed record WindowsAppSettings(
     {
         get
         {
+            // The spec gates system-audio and mixed capture on three things at once: the experimental
+            // flag, a system-audio source, and consent. This is the one place that rule lives; the
+            // lifecycle service refuses to start on any non-null issue. The flag is checked first,
+            // matching the macOS RoutingAudioRecorder message order.
+            if (EffectiveRecordingAudioSourceProfile.UsesSystemAudio
+                && !IsExperimentalSystemAudioEnabled)
+            {
+                return "System audio recording rejected: the experimental \"System audio capture modes\" toggle in Settings is off.";
+            }
+
             if (EffectiveRecordingAudioSourceProfile.UsesSystemAudio
                 && !HasAcceptedSystemAudioRecordingConsent)
             {
