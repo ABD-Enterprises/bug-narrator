@@ -16,7 +16,7 @@ A **`[human]`** item is closed only by an `orc add-evidence` comment on #1133 th
 
 Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Later Windows changes to a row's implementation re-open its item — evidence is pinned to a SHA and is not carried forward silently.
 
-An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under CI. No comment is needed: CI is the evidence, and it re-proves the item on every commit. If the named test is later deleted or skipped, the item reopens. Three items below are closed this way on the commit this file landed in.
+An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under CI. No comment is needed: CI is the evidence, and it re-proves the item on every commit. If the named test is later deleted or skipped, the item reopens. Four items below are closed this way on the commit this file landed in.
 
 A matrix row moves to `Shipped` only in a PR that cites the closing evidence for every item under it — the comment for each `[human]` item and the test name for each `[automation]` item.
 
@@ -32,7 +32,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 ### 1. Durable workflow: `record -> review -> refine -> export`
 
 - `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots, add one marker, stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing showing `session.json`, `session.wav`, `transcript.md`, plus `summary.md` if extraction ran, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
-- `[automation]` The workflow's state transitions are covered by `BugNarrator.Windows.Tests`. Evidence: the test names that pin start → stop → save → export, listed in the closing PR.
+- `[automation]` **Closed.** Each transition is pinned in `BugNarrator.Windows.Tests`: start by `AudioInputDeviceSelectionTests.StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone`, stop → save by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession`, refine by `ReviewSessionActionServiceTests.ExtractIssuesAsync_WithConfiguredApiKey_SavesUpdatedSession`, export by `BundleExporterTests.FileSessionBundleExporter_ExportsTranscriptAndScreenshots`. No single test runs the whole chain; the human item above is what proves it end to end.
 
 ### 2. Compact launch surface (tray shell)
 
@@ -81,7 +81,7 @@ This is the least-validated row and the most hardware-dependent.
 
 ### 10. Missing or invalid AI provider recovery
 
-- `[human]` With a completed session on disk, remove the provider key and attempt extraction. The app reports the missing provider and the session is unchanged on disk. Evidence: the status text screenshot and an unchanged `session.json` hash.
+- `[human]` With a completed session on disk, remove the provider key and attempt extraction. The app reports the missing provider and the session is unchanged on disk. Evidence: the status text screenshot and an unchanged `session.json` hash. (The transcription side of this path is already pinned by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithoutApiKey_SavesSessionAsNotConfigured`; the extraction side is not, which is why this item and #1135 exist.)
 - `[automation]` The same for an invalid key (HTTP 401), a forbidden key (403), and a server error (HTTP 500), served by a fake endpoint. Verified missing; tracked as #1135 (WIN-016). Evidence: the test names once #1135 lands.
 
 ### 11. Configurable AI provider setup
