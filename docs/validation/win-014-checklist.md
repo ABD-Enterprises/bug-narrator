@@ -72,6 +72,7 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 - `[human]` The library lists every session under `%LOCALAPPDATA%\BugNarrator\Sessions`, newest first, with title, date, and duration matching each `session.json`. Opening one lands in the review workspace. Evidence: a screenshot beside a directory listing with the same count.
 - `[human]` Deleting a session removes it from the list and from disk. Evidence: before/after directory listing.
 - `[human]` Every date filter the spec names is offered — `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `Retry Needed`, `All Sessions`, `Custom Date Range` — and `Retry Needed` shows only sessions whose transcription failed. Evidence: a screenshot of the filter list and one of `Retry Needed` applied to a library containing one failed session.
+- `[human]` Search narrows the list by a word that appears only in one session (title or transcript), and the sort control flips between newest-first and oldest-first with the order visibly reversing. Evidence: two screenshots of the search result and two of each sort order.
 - `[automation]` Not covered today, and the behaviour itself is missing: `SessionLibraryDateRange` has no `Retry Needed` value. Tracked as #1144 (WIN-023).
 
 ### 7. Review Workspace tabs
@@ -89,12 +90,14 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 ### 9. Debug Bundle support export
 
-- `[human]` With a provider key configured — any value works; the app does not need to reach a provider for this — export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`, and the configured key appears nowhere in any of them — search the bundle for the key's first eight characters. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
-- `[automation]` Covered today. `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk.
+- `[human]` With a provider key configured — any value works; the app does not need to reach a provider for this — export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`. Configure distinct AI-provider, GitHub, and Jira credentials first (any values); none of the three appears in any file — search the whole bundle for the first eight characters of each. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
+- `[automation]` Covered today. `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk. The test carries AI and GitHub canaries only and checks two named files, not the whole bundle; the Jira canary and whole-bundle scan are #1148 (WIN-027).
 
 ### 10. Missing or invalid AI provider recovery
 
 - `[human]` With a completed session on disk, remove the provider key and attempt extraction. The app reports the missing provider and the session is unchanged on disk. Evidence: the status text screenshot and an unchanged `session.json` hash. (The transcription side of this path is already pinned by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithoutApiKey_SavesSessionAsNotConfigured`; the extraction side is not, which is why this item and #1135 exist.)
+- `[human]` Stop a recording with no provider configured, then restore the key and retry transcription from the library; the session gains a transcript. The spec requires this later retry. Evidence: the `Retry Needed` filter before, the retry action, and the transcript after.
+- `[automation]` Not covered today, and the behaviour itself is missing: Windows has no retry-transcription action; the only transcription call is at stop time. Tracked as #1146 (WIN-025).
 - `[automation]` The same for an invalid key (HTTP 401), a forbidden key (403), and a server error (HTTP 500), served by a fake endpoint. Verified missing; tracked as #1135 (WIN-016). Evidence: the test names once #1135 lands.
 
 ### 11. Configurable AI provider setup
@@ -106,6 +109,8 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 - `[human]` Record three short sessions on real hardware — microphone only, WASAPI loopback only while audio is playing, and mixed — and play back each `session.wav`. Microphone-only contains the narration and not the playback; loopback-only contains the playback and not the narration; mixed contains both at intelligible levels. Evidence: the three WAV durations and a one-line listening note per file. Do not upload the audio.
 - `[human]` Selecting loopback when no output device is active fails with guidance, not a silent empty file. Evidence: the status text.
+- `[human]` System-audio and mixed capture start only when all three of the spec gate hold — experimental flag on, system-audio source selected, consent ticked — and are refused with a consent-style error when any one is missing. Evidence: the refusal text for each missing condition.
+- `[automation]` Not covered today, and the behaviour itself is missing: `WindowsAppSettings` has the source and the consent but no experimental flag, so Windows gates on two of three. Tracked as #1147 (WIN-026).
 
 ### 13. Experimental GitHub and Jira export
 
@@ -155,4 +160,7 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
 - **Row 14** — no `AutomationProperties` anywhere in the Windows views (which are C#; `App.xaml` is the only XAML file); nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020), whose test walks constructed windows because the views are C#, not XAML.
+- **Row 9** — the redaction test has no Jira canary and checks two files, not the bundle. Filed as #1148 (WIN-027).
+- **Row 10** — no retry-transcription action exists. Filed as #1146 (WIN-025).
+- **Row 12** — no experimental system-audio flag; the gate is two of three. Filed as #1147 (WIN-026).
 - **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
