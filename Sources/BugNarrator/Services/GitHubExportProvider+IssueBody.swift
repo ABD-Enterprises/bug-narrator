@@ -29,7 +29,7 @@ extension GitHubExportProvider {
                 // target is what the reader sees (#1117).
                 .replacingOccurrences(of: "[", with: "\\[")
                 // "GH-123" is an issue reference GitHub links just like "#123".
-                .replacingOccurrences(of: "GH-", with: "GH-\u{200B}", options: .caseInsensitive)
+                .replacingOccurrences(of: #"(?i)(gh-)"#, with: "$1\u{200B}", options: .regularExpression)
             // Block-level syntax is decided by the first NON-SPACE character
             // (CommonMark allows up to three spaces of indent), so look past
             // indentation; "_" covers "___" thematic breaks, and "1." / "1)"
