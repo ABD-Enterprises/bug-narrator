@@ -95,6 +95,41 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(payloadString.contains("modal-shot-annotated"))
     }
 
+    func testMakeURLRequestSendsASingleLineSummaryWithinJirasLimit() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Crash\non launch " + String(repeating: "when the window is restored ", count: 20),
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: try requestBodyData(from: request)) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        let summary = try XCTUnwrap(fields["summary"] as? String)
+        XCTAssertFalse(summary.contains("\n"))
+        XCTAssertTrue(summary.hasPrefix("Crash on launch when the window"))
+        XCTAssertLessThanOrEqual(summary.count, TrackerExportPayloadBudget.jiraSummaryLimit)
+        XCTAssertTrue(summary.hasSuffix("…"))
+    }
+
     func testMakeURLRequestPreservesExportFingerprintWhenDescriptionIsTruncated() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let marker = TrackerExportFingerprint.marker(for: "bnexp-fixture")

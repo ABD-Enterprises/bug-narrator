@@ -92,7 +92,7 @@ extension GitHubExportProvider {
         )
         request.httpBody = try JSONEncoder().encode(
             GitHubIssueRequest(
-                title: issue.title,
+                title: TrackerExportPayloadBudget.trackerTitle(issue.title, maxCharacters: TrackerExportPayloadBudget.gitHubTitleLimit),
                 body: try makeIssueBody(
                     issue: issue,
                     session: reviewSession,

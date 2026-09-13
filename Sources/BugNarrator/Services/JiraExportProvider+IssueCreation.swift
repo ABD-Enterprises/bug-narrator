@@ -94,7 +94,7 @@ extension JiraExportProvider {
             JiraIssueRequest(
                 fields: .init(
                     project: .init(key: configuration.projectKey),
-                    summary: issue.title,
+                    summary: TrackerExportPayloadBudget.trackerTitle(issue.title, maxCharacters: TrackerExportPayloadBudget.jiraSummaryLimit),
                     issueType: .init(id: configuration.issueTypeID, name: configuration.issueTypeName),
                     description: try makeDescription(
                         issue: issue,

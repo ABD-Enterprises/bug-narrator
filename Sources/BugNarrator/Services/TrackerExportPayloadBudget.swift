@@ -10,6 +10,14 @@ enum TrackerExportPayloadBudget {
     static let reproductionStepLimit = 10
     static let listEntryLimit = 500
     static let screenshotListLimit = 10
+    /// Jira Cloud rejects a `summary` over 255 characters or containing a
+    /// newline; GitHub rejects an issue `title` over 256. Both are hard server
+    /// limits, unlike the body budgets above, which are self-imposed. Jira
+    /// counts UTF-16 code units while `trackerTitle` counts Characters, so a
+    /// title dense in astral-plane emoji or combining sequences can sit at the
+    /// Character cap and still exceed Jira's — accepted for bug titles.
+    static let jiraSummaryLimit = 255
+    static let gitHubTitleLimit = 256
 
     static func truncated(_ value: String, maxCharacters: Int) -> String {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -36,6 +44,25 @@ enum TrackerExportPayloadBudget {
         }
 
         return trimmedValues
+    }
+
+    /// A title for a tracker's single-line field: whitespace runs (including
+    /// newlines) collapse to one space, the result is trimmed, and anything past
+    /// `maxCharacters` is cut with a single "…" — no "[truncated …]" suffix,
+    /// which would consume most of a short field.
+    static func trackerTitle(_ value: String, maxCharacters: Int) -> String {
+        let collapsed = value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard collapsed.count > maxCharacters else {
+            return collapsed
+        }
+
+        let keep = max(0, maxCharacters - 1)
+        let cut = collapsed[..<collapsed.index(collapsed.startIndex, offsetBy: keep)]
+            .trimmingCharacters(in: .whitespaces)
+        return cut + "…"
     }
 
     static func hardLimitMarkdown(_ value: String, maxCharacters: Int) -> String {
