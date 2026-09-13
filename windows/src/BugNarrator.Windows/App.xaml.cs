@@ -119,7 +119,8 @@ public partial class App : Application
             hotkeyService,
             recordingLifecycleService,
             windowCoordinator,
-            trayShell);
+            trayShell,
+            new ShellExternalLinkLauncher());
 
         if (!appShell.Initialize())
         {
