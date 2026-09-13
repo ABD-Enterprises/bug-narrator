@@ -12,7 +12,7 @@ extension GitHubExportProvider {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
         let lines = normalized.components(separatedBy: "\n").map { line -> String in
-            var escaped = line
+            let escaped = line
                 // First, so an attacker's own backslash cannot pair with one we
                 // add below ("\\[" is a literal backslash followed by a LIVE "[").
                 .replacingOccurrences(of: "\\", with: "\\\\")
