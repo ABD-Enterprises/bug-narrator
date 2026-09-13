@@ -35,6 +35,7 @@ public static class SessionLibraryQueryEvaluator
             SessionLibraryDateRange.Yesterday => sessionLocalDate == localNow.Date.AddDays(-1),
             SessionLibraryDateRange.Last7Days => sessionLocalDate >= localNow.Date.AddDays(-6),
             SessionLibraryDateRange.Last30Days => sessionLocalDate >= localNow.Date.AddDays(-29),
+            SessionLibraryDateRange.RetryNeeded => session.RequiresTranscriptionRetry,
             SessionLibraryDateRange.CustomRange => IsWithinCustomRange(
                 sessionLocalDate,
                 query.CustomRangeStart,

@@ -22,4 +22,12 @@ public sealed record CompletedSession(
     IReadOnlyList<SessionTimelineMoment> TimelineMoments)
 {
     public TimeSpan Duration => RecordingStoppedAt - RecordingStartedAt;
+
+    /// <summary>
+    /// The session was preserved without a completed transcript — provider not configured, or the
+    /// transcription failed — and can be transcribed later once the provider is fixed. The Windows
+    /// equivalent of macOS <c>TranscriptSession.requiresTranscriptionRetry</c>
+    /// (<c>pendingTranscription != nil</c>).
+    /// </summary>
+    public bool RequiresTranscriptionRetry => TranscriptionStatus != SessionTranscriptionStatus.Completed;
 }

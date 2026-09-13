@@ -81,6 +81,7 @@ public sealed class SessionLibraryWindow : Window
         AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.Yesterday, "Yesterday");
         AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.Last7Days, "Last 7 Days");
         AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.Last30Days, "Last 30 Days");
+        AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.RetryNeeded, "Retry Needed");
         AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.All, "All Sessions");
         AddComboBoxOption(dateRangeComboBox, SessionLibraryDateRange.CustomRange, "Custom Date Range");
         SetSelectedComboBoxValue(dateRangeComboBox, SessionLibraryDateRange.Today);
@@ -1160,6 +1161,7 @@ public sealed class SessionLibraryWindow : Window
             SessionLibraryDateRange.Yesterday => "No sessions were saved yesterday.",
             SessionLibraryDateRange.Last7Days => "No sessions were saved in the last 7 days.",
             SessionLibraryDateRange.Last30Days => "No sessions were saved in the last 30 days.",
+            SessionLibraryDateRange.RetryNeeded => "No sessions need a transcription retry.",
             SessionLibraryDateRange.CustomRange => "No sessions fall inside the selected custom date range.",
             _ => "No completed review sessions are available in the local session library.",
         };
