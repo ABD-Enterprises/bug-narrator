@@ -26,7 +26,7 @@ A matrix row moves to `Shipped` only in a PR that cites the evidence for every i
 
 ## Classification
 
-- **`[human]`** — needs a person at a real Windows desktop, real hardware, or a real credential. Automation cannot satisfy it. Their status is tracked on #1133, which stays under `ai/blocked` until a person captures the evidence.
+- **`[human]`** — needs a person at a real Windows desktop, real hardware, or a real credential. Automation cannot satisfy it. Their status is tracked on #1133.
 - **`[automation]`** — can be proven by a test, a scripted run, or an emulated environment. If the checklist shows the proof is missing, a separate small implementation ticket is filed; it is not done here.
 
 Most rows carry both kinds. A row moves to `Shipped` only when every item under it has evidence on #1133.
@@ -41,6 +41,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 ### 2. Compact launch surface (tray shell)
 
 - `[human]` After launch, the tray icon is visible (or reachable through the overflow chevron) and its context menu shows the entries `TrayShell.BuildMenu` creates, which are also the canonical terms in `product-spec.md`: a `Status: …` line, `Start Recording`, `Stop Recording`, `Capture Screenshot`, `Show Recording Controls`, `Open Session Library`, `Settings`, `About`, `Quit`. Evidence: one screenshot of the open menu, and one with the icon in the overflow flyout if Windows placed it there.
+- `[automation]` Not covered today, and the behaviour itself is missing: the spec (product-spec.md, compact launch surface) also requires recovery guidance when something blocks progress and access to documentation, changelog, support, issue reporting, and updates; `TrayShell.BuildMenu` offers none of those and `AboutWindow` is a placeholder. Tracked as #1143 (WIN-022). This row cannot move to `Shipped` on the current menu alone.
 - `[human]` `Quit` from the tray exits cleanly: no `BugNarrator.Windows` process remains and the log ends with `app exit`. Evidence: the log tail and a process-list line.
 
 ### 3. Recording Controls surface
@@ -70,11 +71,15 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 - `[human]` The library lists every session under `%LOCALAPPDATA%\BugNarrator\Sessions`, newest first, with title, date, and duration matching each `session.json`. Opening one lands in the review workspace. Evidence: a screenshot beside a directory listing with the same count.
 - `[human]` Deleting a session removes it from the list and from disk. Evidence: before/after directory listing.
+- `[human]` Every date filter the spec names is offered — `Today`, `Yesterday`, `Last 7 Days`, `Last 30 Days`, `Retry Needed`, `All Sessions`, `Custom Date Range` — and `Retry Needed` shows only sessions whose transcription failed. Evidence: a screenshot of the filter list and one of `Retry Needed` applied to a library containing one failed session.
+- `[automation]` Not covered today, and the behaviour itself is missing: `SessionLibraryDateRange` has no `Retry Needed` value. Tracked as #1144 (WIN-023).
 
 ### 7. Review Workspace tabs
 
 - `[human]` The four tabs the product spec names (`docs/architecture/product-spec.md`, "Session Library And Review Workspace") are present and switch without error: `Transcript`, `Screenshots`, `Extracted Issues`, `Summary`. Export is an action on the workspace, not a tab. Evidence: one screenshot per tab on the same session.
 - `[human]` An edit made on the `Extracted Issues` tab survives closing and reopening the session. Evidence: `session.json` diff showing the edited field.
+- `[human]` Run extraction on a session whose transcript yields no issues (a few words of small talk): the workspace lands on `Summary`, not an empty `Extracted Issues` list, as product-spec.md requires. Evidence: a screenshot after extraction.
+- `[automation]` Not covered today, and the behaviour itself is missing: `SessionLibraryWindow.ExtractIssuesAsync` never changes the selected tab. Tracked as #1145 (WIN-024).
 
 ### 8. Session Bundle export
 
@@ -134,7 +139,7 @@ Every `[human]` item above. The specific inputs a person must bring:
 | A GitHub token and a scratch repository | 13 |
 | A Jira token and a scratch project | 13 |
 
-Until those exist, #1133 stays under `ai/blocked` with this table as the stated missing input. Automation is not permitted to satisfy a `[human]` item.
+This table is the stated missing input; the ticket state that reflects it lives on #1133. Automation is not permitted to satisfy a `[human]` item.
 
 ## Automation gaps, verified and filed
 
@@ -142,8 +147,11 @@ Status of each is on its own ticket, not here.
 
 Checked on the commit this file landed in, by searching `windows/tests` for the coverage each item names:
 
+- **Row 2** — the tray menu lacks the recovery-guidance entry and the documentation/changelog/support/issue-reporting/updates entries the spec requires. Filed as #1143 (WIN-022).
 - **Row 3** — `RecordingControlsWindow` shows no elapsed time at all; macOS does. A behaviour gap, not just a coverage gap. Filed as #1142 (WIN-021).
 - **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
+- **Row 6** — no `Retry Needed` filter. Filed as #1144 (WIN-023).
+- **Row 7** — no fallback to `Summary` after an empty extraction. Filed as #1145 (WIN-024).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
 - **Row 14** — no `AutomationProperties` anywhere in the Windows views (which are C#; `App.xaml` is the only XAML file); nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020), whose test walks constructed windows because the views are C#, not XAML.
