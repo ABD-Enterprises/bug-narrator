@@ -41,7 +41,7 @@ Structured counterpart: [docs/testing/testing.md](testing/testing.md)
 - Verify the support window shows a single PayPal support action.
 - Verify the support button opens the configured PayPal donation page in the default browser.
 - Open `What’s New` from the menu bar or the About window.
-- Verify the changelog window opens and displays the bundled `CHANGELOG.md` content.
+- Verify the changelog window opens and displays the bundled `CHANGELOG-archive.md` content.
 - Verify `Check for Updates` opens the GitHub releases page.
 - Confirm there are no dead or mislabeled menu items in the project-info section.
 

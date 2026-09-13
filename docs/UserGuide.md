@@ -404,4 +404,4 @@ output.
 - [Quickstart](../QUICKSTART.md)
 - [Distribution and DMG packaging](Distribution.md)
 - [Security Notes](../SECURITY.md)
-- [Project Changelog](../CHANGELOG.md)
+- [Project release history](../CHANGELOG-archive.md)

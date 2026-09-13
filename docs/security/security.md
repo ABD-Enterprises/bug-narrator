@@ -57,14 +57,11 @@ Tracked active risks include:
     2.0.2 is the newest version on the registry, so no upgrade exists. `npm audit` reports it as
     17 "high" findings because it counts once per `@docusaurus/*` package that transitively
     depends on it — it is one advisory. **Revisit when any `image-size` release above 2.0.2 appears.**
-  - **`qs`, `express`, `webpack-dev-server`** (moderate): reachable only through the dev server
-    (`npm start`), never in the built static output. Forward fixes exist only as major versions
-    outside Docusaurus's declared dependency ranges (`express` 5, `webpack-dev-server` 6), and
-    `qs` 6.16 is outside the range its parent pins. **`npm audit fix` must not be applied here:**
-    on 2026-09-12 it resolved these by *downgrading* four packages (selfsigned 5.5.0→2.4.1,
-    webpack-dev-server 5.2.6→5.2.2, qs 6.15.2→6.14.2, express 4.22.2→4.22.1) into ranges the
-    audit database does not flag — a worse state that reads as an improvement. **Revisit when
-    Docusaurus raises its ranges.**
+
+The 1.1.0 release pins patched transitive versions of `qs` 6.16.0 and `joi` 17.13.8.
+That clears the four corresponding Dependabot alerts without applying npm's unsafe
+downgrade-based audit fix. The remaining audit output is the documented `image-size`
+build-time exception above.
 
 Track these in [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
 
