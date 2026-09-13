@@ -46,7 +46,8 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 ### 4. Single active recording session
 
-- `[automation]` Already partly proven: #44's packaged probe launched a duplicate instance, which exited 0 and left one process, and the log shows `focus request received from secondary instance`. That evidence is accepted for the *process* half. Evidence: link to the #44 comment.
+- `[human]` Launch the packaged app a second time while it is running: the second process exits 0, one `BugNarrator.Windows` process remains, and the log shows `focus request received from secondary instance`. #44's packaged probe observed exactly this, but its comment names neither a SHA nor a host, so it does not meet the closure rule above and is prior art, not evidence. Evidence: the process-list line and the log excerpt, re-captured.
+- `[automation]` No test in `windows/tests` exercises the single-instance path (the only "duplicate" test is a hotkey-conflict check). Verified missing; tracked as #1136 (WIN-017).
 - `[human]` While recording, choosing `Start Recording` again from the tray is refused or is a no-op — the log shows no second `recording started`, and the session saved at stop contains one audio track. Evidence: the log excerpt and the bundle listing.
 
 ### 5. Screenshot evidence during recording
@@ -70,7 +71,7 @@ This is the least-validated row and the most hardware-dependent.
 
 ### 8. Session Bundle export
 
-- `[automation]` **Closed.** `transcript.md` is byte-compared against `contract-fixtures/transcript.golden.md` on both platforms (#1003). `summary.md` is pinned on its shared subset by `contract-fixtures/summary.golden.md` (#1020); the structure differences outside that subset are deliberate and listed in the matrix's "Current Deliberate Differences" section, so they are not a validation gap. Evidence: the fixture tests in `BugNarrator.Windows.Tests`.
+- `[automation]` **Closed.** `transcript.md` is byte-compared against `contract-fixtures/transcript.golden.md` on both platforms (#1003). `summary.md` is pinned on its shared subset by `contract-fixtures/summary.golden.md` (#1020); the structure differences outside that subset are deliberate and listed in the matrix's "Current Deliberate Differences" section, so they are not a validation gap. Evidence: `TranscriptMarkdown_MatchesTheCommittedGolden` and `SummaryMarkdownSharedSubset_MatchesTheCommittedGolden` in `BugNarrator.Core.Tests`.
 - `[human]` An exported bundle on disk contains exactly `session.json`, `session.wav`, `transcript.md`, and — only when extraction has run — `summary.md`. No stray files. Evidence: the directory listing.
 
 ### 9. Debug Bundle support export
@@ -97,7 +98,7 @@ This is the least-validated row and the most hardware-dependent.
 
 - `[human]` With a real GitHub token, export one issue that carries severity, component, reproduction steps, and a screenshot annotation. The created issue's body has the same sections in the same order as the macOS export. Evidence: the issue URL on a scratch repo.
 - `[human]` The same against a real Jira project. Evidence: the issue key on a scratch project.
-- `[automation]` **Closed.** Body rendering is pinned by `IssueExportProviderTests` and the `TrackerExportPayloadBudget` caps. Evidence: the test names.
+- `[automation]` **Closed.** Body rendering is pinned in `IssueExportProviderTests` (`BugNarrator.Windows.Tests`) by `GitHubBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `JiraBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `GitHubBuildRequest_RendersReproductionStepsLikeMac`, `JiraBuildRequest_RendersReproductionStepsInTheMacTextShape`, `GitHubBuildRequest_RendersAnnotatedScreenshotsLikeMac`, and `GitHubBuildRequest_CapsReproductionStepsAtTheTrackerBudget`.
 
 ## Blocked on a human
 
@@ -118,5 +119,6 @@ Until those exist, #1133 stays open under `ai/blocked` with this table as the st
 
 Checked on the commit this file landed in, by searching `windows/tests` for the coverage each item names:
 
+- **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
