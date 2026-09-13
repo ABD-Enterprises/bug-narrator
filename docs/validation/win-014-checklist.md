@@ -91,7 +91,7 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 ### 9. Debug Bundle support export
 
 - `[human]` With a provider key configured — any value works; the app does not need to reach a provider for this — export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`. Configure distinct AI-provider, GitHub, and Jira credentials first (any values); none of the three appears in any file — search the whole bundle for the first eight characters of each. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
-- `[automation]` Covered today. `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk. The test carries AI and GitHub canaries only and checks two named files, not the whole bundle; the Jira canary and whole-bundle scan are #1148 (WIN-027).
+- `[automation]` Covered today. `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk. `FileDebugBundleExporter_LeaksNoneOfTheThreeCredentialTypesIntoAnyFile` (#1148) carries AI, GitHub, and Jira canaries — bare and as a Basic pair — and scans every file the bundle wrote; it caught a bare Atlassian token leaking before the redactor learned that shape.
 
 ### 10. Missing or invalid AI provider recovery
 
@@ -160,7 +160,7 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
 - **Row 14** — no `AutomationProperties` anywhere in the Windows views (which are C#; `App.xaml` is the only XAML file); nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020), whose test walks constructed windows because the views are C#, not XAML.
-- **Row 9** — the redaction test has no Jira canary and checks two files, not the bundle. Filed as #1148 (WIN-027).
+- **Row 9** — was a gap (no Jira canary, two files checked); closed by #1148, which also found and fixed a real bare-token leak.
 - **Row 10** — no retry-transcription action exists. Filed as #1146 (WIN-025).
 - **Row 12** — no experimental system-audio flag; the gate is two of three. Filed as #1147 (WIN-026).
 - **Row 10 (401/403/500)** — was a gap; closed by #1135, see the row.
