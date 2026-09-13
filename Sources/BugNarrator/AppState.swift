@@ -145,325 +145,99 @@ final class AppState: ObservableObject {
         runtimeEnvironment: AppRuntimeEnvironment = AppRuntimeEnvironment(),
         localTranscriptionManager: LocalTranscriptionManager? = nil
     ) {
-        self.settingsStore = settingsStore
-        self.transcriptStore = transcriptStore
-        self.localTranscriptionManager = localTranscriptionManager ?? (runtimeEnvironment.usesIsolatedRuntime
-            ? .isolated(directory: FileManager.default.temporaryDirectory.appendingPathComponent("BugNarrator-LocalServer-\(UUID())", isDirectory: true))
-            : LocalTranscriptionManager())
-        self.recordingTimer = recordingTimer
-        let presentationState = AppPresentationState()
-        self.presentationState = presentationState
-        self.errorPresenter = AppErrorPresenter(
-            presentationState: presentationState,
-            telemetryRecorder: telemetryRecorder,
-            provider: { [settingsStore] in settingsStore.aiProvider }
-        )
-        let transientToastController = TransientToastController(presentationState: presentationState)
-        self.transientToastController = transientToastController
-        let recordingSessionController = RecordingSessionController(
+        let graph = AppStateRuntimeGraph(
+            settingsStore: settingsStore,
+            transcriptStore: transcriptStore,
             audioRecorder: audioRecorder,
             microphonePermissionService: microphonePermissionService,
-            artifactsService: artifactsService,
-            recordingTimer: recordingTimer
-        )
-        self.recordingSessionController = recordingSessionController
-        self.recordingSessionStopReadinessPresenter = RecordingSessionStopReadinessPresenter(
-            errorPresenter: self.errorPresenter
-        )
-        self.recordingSessionCancelStatusPresenter = RecordingSessionCancelStatusPresenter(
-            setStatus: { status in presentationState.setStatus(status, error: nil) }
-        )
-        let recordingStatusMessages = RecordingStatusMessageProvider {
-            RecordingStatusMessageSnapshot(
-                audioSource: settingsStore.recordingAudioSource,
-                aiProvider: settingsStore.aiProvider,
-                hasUsableAIProviderCredential: settingsStore.hasUsableAIProviderCredential,
-                aiProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue,
-                autoExtractIssues: settingsStore.autoExtractIssues,
-                autoCopyTranscript: settingsStore.autoCopyTranscript
-            )
-        }
-        self.recordingStatusMessages = recordingStatusMessages
-        self.recordingSessionStartStatusPresenter = RecordingSessionStartStatusPresenter(
-            errorPresenter: self.errorPresenter,
-            recordingStatusMessages: recordingStatusMessages,
-            startDiagnosticsMetadata: {
-                [
-                    "audio_source": settingsStore.recordingAudioSource.diagnosticsValue,
-                    "has_ai_provider_credential": settingsStore.hasUsableAIProviderCredential ? "yes" : "no",
-                    "ai_provider": settingsStore.aiProvider.rawValue
-                ]
-            },
-            telemetryRecorder: telemetryRecorder
-        )
-        let sessionLibrary = SessionLibraryController(
-            transcriptStore: transcriptStore,
-            artifactsService: artifactsService,
-            clipboardService: clipboardService
-        )
-        self.sessionLibrary = sessionLibrary
-        self.sessionLibraryStatusPresenter = SessionLibraryStatusPresenter(
-            errorPresenter: self.errorPresenter
-        )
-        self.exportHistoryController = ExportHistoryController(exportService: exportService)
-        let issueExtractionController = IssueExtractionController(
-            sessionLibrary: sessionLibrary,
-            issueExtractionService: issueExtractionService
-        )
-        self.issueExtractionController = issueExtractionController
-        let issueExportController = IssueExportController(
-            settingsStore: settingsStore,
-            sessionLibrary: sessionLibrary,
-            exportService: exportService
-        )
-        self.issueExportController = issueExportController
-        let permissionRecoveryController = PermissionRecoveryController(
-            microphonePermissionService: microphonePermissionService,
             screenCapturePermissionService: screenCapturePermissionService,
-            urlHandler: urlHandler,
-            runtimeEnvironment: runtimeEnvironment
-        )
-        self.permissionRecoveryController = permissionRecoveryController
-        self.permissionRecoveryStatusPresenter = PermissionRecoveryStatusPresenter(
-            errorPresenter: self.errorPresenter
-        )
-        self.launchDiagnosticsReporter = AppLaunchDiagnosticsReporter(
-            permissionRecoveryController: permissionRecoveryController,
-            transcriptStore: transcriptStore
-        )
-        let appUtilityActions = AppUtilityActionController(
-            urlHandler: urlHandler,
-            permissionRecoveryController: permissionRecoveryController
-        )
-        self.appUtilityActions = appUtilityActions
-        self.recordingSessionStopFailurePresenter = RecordingSessionStopFailurePresenter(
-            errorPresenter: self.errorPresenter,
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
-        )
-        self.postTranscriptionStatusPresenter = PostTranscriptionStatusPresenter(
-            recordingStatusMessages: recordingStatusMessages,
-            setStatus: { status in presentationState.setStatus(status, error: nil) },
-            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
-        )
-        self.postTranscriptionFailurePresenter = PostTranscriptionFailurePresenter(
-            errorPresenter: self.errorPresenter,
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
-        )
-        self.postTranscriptionPipeline = PostTranscriptionPipelineController(
-            settingsStore: settingsStore,
-            sessionLibrary: sessionLibrary,
-            issueExtractionController: issueExtractionController,
-            recordingSessionController: recordingSessionController,
-            statusPresenter: self.postTranscriptionStatusPresenter,
-            telemetryRecorder: telemetryRecorder,
-            transcriptionLogger: transcriptionLogger
-        )
-        self.manualIssueExtractionStatusPresenter = ManualIssueExtractionStatusPresenter(
-            errorPresenter: self.errorPresenter,
-            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
-        )
-        self.issueExtractionFailurePresenter = IssueExtractionFailurePresenter(
-            errorPresenter: self.errorPresenter
-        )
-        self.issueExportPresentationController = IssueExportPresentationController(
-            errorPresenter: self.errorPresenter,
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() }
-        )
-        self.transcriptPersistenceFailurePresenter = TranscriptPersistenceFailurePresenter(
-            errorPresenter: self.errorPresenter,
-            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
-        )
-        let appUtilityActionPresenter = AppUtilityActionResultPresenter(
-            statusPhase: { presentationState.status.phase },
-            setStatus: { status in
-                presentationState.setStatus(status, error: nil)
-            }
-        )
-        self.appUtilityActionPresenter = appUtilityActionPresenter
-        self.finishedRecordingPostTranscriptionResultHandler = FinishedRecordingPostTranscriptionResultHandler(
-            sessionLibrary: sessionLibrary,
-            recordingSessionController: recordingSessionController,
-            statusPresenter: self.postTranscriptionStatusPresenter,
-            transcriptPersistenceFailurePresenter: self.transcriptPersistenceFailurePresenter,
-            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
-            autoCopyTranscript: { settingsStore.autoCopyTranscript },
-            cleanupPendingRecordedAudio: {
-                recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
-            },
-            preserveRecordedAudioForReview: { session in
-                // A low-quality transcript "succeeded" but is likely unusable;
-                // preserve the recording into the session assets dir so it can be
-                // re-transcribed. Only remove the pending temp after preservation
-                // succeeds; on failure keep it so the recording is never lost (#466).
-                guard let artifactsDirectoryURL = session.artifactsDirectoryURL,
-                      let recordedAudio = recordingSessionController.pendingRecordedAudioSnapshot else {
-                    return
-                }
-
-                let logger = DiagnosticsLogger(category: .transcription)
-                do {
-                    let preservedURL = try artifactsService.preserveRecordedAudio(
-                        recordedAudio,
-                        in: artifactsDirectoryURL
-                    )
-                    recordingSessionController.cleanupPendingRecordedAudioIfNeeded(debugMode: settingsStore.debugMode)
-                    logger.info(
-                        "low_quality_recording_preserved",
-                        "Preserved the recording for a low-quality transcript so it can be re-transcribed.",
-                        metadata: [
-                            "session_id": session.id.uuidString,
-                            "file_name": preservedURL.lastPathComponent
-                        ]
-                    )
-                } catch {
-                    logger.error(
-                        "low_quality_recording_preserve_failed",
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
-                        metadata: ["session_id": session.id.uuidString]
-                    )
-                }
-            },
-            showSavedSessionReveal: { session in
-                guard let artifactsDirectoryURL = session.artifactsDirectoryURL else {
-                    return
-                }
-
-                transientToastController.showToast(
-                    "Session saved",
-                    style: .success,
-                    durationNanoseconds: 5_000_000_000,
-                    action: TransientToastAction(
-                        title: "Reveal",
-                        accessibilityLabel: "Reveal in Finder"
-                    ) {
-                        appUtilityActionPresenter.present(appUtilityActions.revealInFinder(artifactsDirectoryURL))
-                    }
-                )
-            }
-        )
-        self.supportDataActionPresenter = SupportDataActionPresenter(
-            presentationState: presentationState,
-            errorPresenter: self.errorPresenter,
-            utilityActions: appUtilityActions,
-            utilityResultPresenter: appUtilityActionPresenter
-        )
-        self.supportDataController = SupportDataController(
-            settingsStore: settingsStore,
-            transcriptStore: transcriptStore,
+            transcriptionClient: transcriptionClient,
+            hotkeyManager: hotkeyManager,
+            screenshotCaptureService: screenshotCaptureService,
+            screenshotSelectionService: screenshotSelectionService,
+            issueExtractionService: issueExtractionService,
             exportService: exportService,
+            artifactsService: artifactsService,
             clipboardService: clipboardService,
+            urlHandler: urlHandler,
             debugBundleExporter: debugBundleExporter,
             privacyDataExporter: privacyDataExporter,
             telemetryRecorder: telemetryRecorder,
-            localPrivacyDataManager: localPrivacyDataManager
+            localPrivacyDataManager: localPrivacyDataManager,
+            recordingTimer: recordingTimer,
+            runtimeEnvironment: runtimeEnvironment,
+            localTranscriptionManager: localTranscriptionManager
         )
-        self.localDataDeletionController = LocalDataDeletionController(
-            transcriptStore: transcriptStore,
-            sessionLibrary: sessionLibrary,
-            supportDataController: self.supportDataController,
-            exportHistoryController: self.exportHistoryController
-        )
-        let transcriptionRecovery = TranscriptionRecoveryController(
-            sessionLibrary: sessionLibrary,
-            artifactsService: artifactsService
-        )
-        self.transcriptionRecovery = transcriptionRecovery
-        self.retryTranscriptionStatusPresenter = RetryTranscriptionStatusPresenter(
-            errorPresenter: self.errorPresenter,
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
-            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() }
-        )
-        self.pendingTranscriptionRetryFailureHandler = PendingTranscriptionRetryFailureHandler(
-            transcriptionRecovery: self.transcriptionRecovery,
-            recordingSessionController: recordingSessionController,
-            retryStatusPresenter: self.retryTranscriptionStatusPresenter,
-            provider: { settingsStore.aiProvider }
-        )
-        self.retryableSessionPreservationPresenter = RetryableSessionPreservationPresenter(
-            errorPresenter: self.errorPresenter,
-            showTranscriptWindow: { appUtilityActions.showTranscriptWindow?() },
-            showSettingsWindow: { appUtilityActions.showSettingsWindow?() },
-            provider: { settingsStore.aiProvider }
-        )
-        self.retryPostTranscriptionResultHandler = RetryPostTranscriptionResultHandler(
-            transcriptionRecovery: self.transcriptionRecovery,
-            recordingSessionController: recordingSessionController,
-            statusPresenter: self.postTranscriptionStatusPresenter,
-            sessionLibraryStatusPresenter: self.sessionLibraryStatusPresenter,
-            postTranscriptionFailurePresenter: self.postTranscriptionFailurePresenter,
-            debugMode: { settingsStore.debugMode }
-        )
-        let screenshotCoordinator = ScreenshotCoordinator(
-            screenCapturePermissionService: screenCapturePermissionService,
-            screenshotCaptureService: screenshotCaptureService,
-            screenshotSelectionService: screenshotSelectionService,
-            artifactsService: artifactsService
-        )
-        self.screenshotCoordinator = screenshotCoordinator
-        self.screenshotCaptureController = ScreenshotCaptureController(
-            screenshotCoordinator: screenshotCoordinator,
-            recordingSessionController: recordingSessionController,
-            errorPresenter: self.errorPresenter,
-            statusPhase: { presentationState.status.phase },
-            elapsedDuration: { recordingTimer.elapsedDuration },
-            recordingDetailMessage: {
-                recordingStatusMessages.recordingDetailMessage()
-            },
-            setStatus: { status, error in
-                presentationState.setStatus(status, error: error)
-            },
-            showToast: { message, style in
-                transientToastController.showToast(message, style: style)
-            }
-        )
-        self.transcriptionClient = transcriptionClient
-        self.hotkeyManager = hotkeyManager
-        self.hotkeySettingsBinder = HotkeySettingsBinder(hotkeyManager: hotkeyManager)
-        self.objectChangeForwarder = ObservableObjectChangeForwarder()
-        self.lifecycleNotificationBinder = AppLifecycleNotificationBinder()
-        self.artifactsService = artifactsService
-        self.trackerIntegration = TrackerIntegrationController(
-            settingsStore: settingsStore,
-            exportService: exportService
-        )
-        self.aiProviderSettings = AIProviderSettingsController(
-            settingsStore: settingsStore,
-            transcriptionClient: transcriptionClient
-        )
-        let recordingWorkInProgress = {
-            transcriptionRecovery.retryingSessionID != nil || recordingSessionController.hasInFlightRecordingWork(statusPhase: presentationState.status.phase)
-        }
-        self.recordingWorkInProgress = recordingWorkInProgress
-        let applicationTerminationController = ApplicationTerminationController(
-            isRecordingInProgress: recordingWorkInProgress,
-            statusPhase: { presentationState.status.phase },
-            activeRecordingSession: { recordingSessionController.activeRecordingSession },
-            isExtractingIssues: { issueExtractionController.issueExtractionSessionID != nil },
-            isExporting: { issueExportController.exportDestinationInProgress != nil },
-            cancelPendingScreenshotSelection: { reason in
-                screenshotCoordinator.cancelPendingSelection(reason: reason)
-            },
-            showRecordingControls: {
-                appUtilityActions.openRecordingControls()
-            },
-            showToast: { message, style in
-                transientToastController.showToast(message, style: style)
-            },
-            dismissToast: {
-                transientToastController.dismissToast()
-            },
-            unregisterHotkeys: {
-                hotkeyManager.unregisterAll()
-            },
-            stopTimer: { resetElapsed in
-                recordingSessionController.stopTimer(resetElapsed: resetElapsed)
-            },
-            endActivity: {
-                recordingSessionController.endActivity()
-            }
-        )
-        self.applicationTerminationController = applicationTerminationController
+        self.settingsStore = graph.settingsStore
+        self.transcriptStore = graph.transcriptStore
+        self.localTranscriptionManager = graph.localTranscriptionManager
+        self.trackerIntegration = graph.trackerIntegration
+        self.aiProviderSettings = graph.aiProviderSettings
+        self.recordingTimer = graph.recordingTimer
+        self.presentationState = graph.presentationState
+        self.errorPresenter = graph.errorPresenter
+        self.transcriptPersistenceFailurePresenter = graph.transcriptPersistenceFailurePresenter
+        self.postTranscriptionFailurePresenter = graph.postTranscriptionFailurePresenter
+        self.transientToastController = graph.transientToastController
+        self.recordingSessionController = graph.recordingSessionController
+        self.recordingSessionStartStatusPresenter = graph.recordingSessionStartStatusPresenter
+        self.recordingSessionStopReadinessPresenter = graph.recordingSessionStopReadinessPresenter
+        self.recordingSessionStopFailurePresenter = graph.recordingSessionStopFailurePresenter
+        self.recordingSessionCancelStatusPresenter = graph.recordingSessionCancelStatusPresenter
+        self.recordingStatusMessages = graph.recordingStatusMessages
+        self.postTranscriptionStatusPresenter = graph.postTranscriptionStatusPresenter
+        self.postTranscriptionPipeline = graph.postTranscriptionPipeline
+        self.finishedRecordingPostTranscriptionResultHandler = graph.finishedRecordingPostTranscriptionResultHandler
+        self.retryPostTranscriptionResultHandler = graph.retryPostTranscriptionResultHandler
+        self.sessionLibrary = graph.sessionLibrary
+        self.sessionLibraryStatusPresenter = graph.sessionLibraryStatusPresenter
+        self.exportHistoryController = graph.exportHistoryController
+        self.issueExtractionController = graph.issueExtractionController
+        self.manualIssueExtractionStatusPresenter = graph.manualIssueExtractionStatusPresenter
+        self.issueExtractionFailurePresenter = graph.issueExtractionFailurePresenter
+        self.issueExportController = graph.issueExportController
+        self.issueExportPresentationController = graph.issueExportPresentationController
+        self.permissionRecoveryController = graph.permissionRecoveryController
+        self.permissionRecoveryStatusPresenter = graph.permissionRecoveryStatusPresenter
+        self.appUtilityActions = graph.appUtilityActions
+        self.appUtilityActionPresenter = graph.appUtilityActionPresenter
+        self.recordingWorkInProgress = graph.recordingWorkInProgress
+        self.applicationTerminationController = graph.applicationTerminationController
+        self.supportDataController = graph.supportDataController
+        self.supportDataActionPresenter = graph.supportDataActionPresenter
+        self.localDataDeletionController = graph.localDataDeletionController
+        self.transcriptionRecovery = graph.transcriptionRecovery
+        self.retryTranscriptionStatusPresenter = graph.retryTranscriptionStatusPresenter
+        self.pendingTranscriptionRetryFailureHandler = graph.pendingTranscriptionRetryFailureHandler
+        self.retryableSessionPreservationPresenter = graph.retryableSessionPreservationPresenter
+        self.screenshotCoordinator = graph.screenshotCoordinator
+        self.screenshotCaptureController = graph.screenshotCaptureController
+        self.transcriptionClient = graph.transcriptionClient
+        self.hotkeyManager = graph.hotkeyManager
+        self.hotkeySettingsBinder = graph.hotkeySettingsBinder
+        self.objectChangeForwarder = graph.objectChangeForwarder
+        self.lifecycleNotificationBinder = graph.lifecycleNotificationBinder
+        self.launchDiagnosticsReporter = graph.launchDiagnosticsReporter
+        self.artifactsService = graph.artifactsService
+
+        let presentationState = graph.presentationState
+        let recordingSessionController = graph.recordingSessionController
+        let recordingSessionStartStatusPresenter = graph.recordingSessionStartStatusPresenter
+        let sessionLibrary = graph.sessionLibrary
+        let exportHistoryController = graph.exportHistoryController
+        let issueExtractionController = graph.issueExtractionController
+        let issueExtractionFailurePresenter = graph.issueExtractionFailurePresenter
+        let issueExportController = graph.issueExportController
+        let permissionRecoveryController = graph.permissionRecoveryController
+        let transcriptionRecovery = graph.transcriptionRecovery
+        let screenshotCoordinator = graph.screenshotCoordinator
+        let trackerIntegration = graph.trackerIntegration
+        let aiProviderSettings = graph.aiProviderSettings
+        let applicationTerminationController = graph.applicationTerminationController
+        let objectChangeForwarder = graph.objectChangeForwarder
+        let lifecycleNotificationBinder = graph.lifecycleNotificationBinder
+        let hotkeySettingsBinder = graph.hotkeySettingsBinder
+        let launchDiagnosticsReporter = graph.launchDiagnosticsReporter
 
         BugNarratorDiagnostics.setDebugModeEnabled(settingsStore.debugMode)
 
