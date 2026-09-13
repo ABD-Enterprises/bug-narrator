@@ -439,7 +439,9 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let start = Date()
         do {
             try await LocalTranscriptionManager.background {
-                try LocalTranscriptionManager.runCommand("/bin/sleep", ["10"], timeout: 0.05)
+                // This process ignores TERM, so completion proves the lifecycle
+                // escalates to KILL instead of leaving an installer helper alive.
+                try LocalTranscriptionManager.runCommand("/bin/sh", ["-c", "trap '' TERM; while :; do :; done"], timeout: 0.05)
             }
             XCTFail("Expected timeout")
         } catch { XCTAssertTrue(error.localizedDescription.contains("timed out")) }

@@ -273,34 +273,22 @@ final class LocalTranscriptionManager: ObservableObject {
     nonisolated static func runCommand(_ executable: String, _ arguments: [String], timeout: TimeInterval) throws {
         let cleanup = executable == "/usr/bin/hdiutil" && arguments.first == "detach"
         if !cleanup { try Task.checkCancellation() }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        let errors = Pipe()
-        let diagnostic = LocalServerDiagnostic()
-        process.standardError = errors
-        diagnostic.read(from: errors)
-        defer { diagnostic.finishReading(errors) }
-        try process.run()
-        errors.fileHandleForWriting.closeFile()
+        let lifecycle = LocalServerProcessLifecycle(executable: executable, arguments: arguments)
+        let process = lifecycle.process
+        defer { lifecycle.finishDiagnostics() }
+        try lifecycle.run()
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning {
             if (!cleanup && Task.isCancelled) || Date() >= deadline {
-                process.terminate()
-                // A misbehaving helper must not keep installation busy forever.
-                let grace = Date().addingTimeInterval(0.5)
-                while process.isRunning && Date() < grace { Thread.sleep(forTimeInterval: 0.01) }
-                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                process.waitUntilExit()
+                lifecycle.terminateAndWait()
                 if !cleanup && Task.isCancelled { throw CancellationError() }
                 throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) timed out. Retry installation.")
             }
             Thread.sleep(forTimeInterval: 0.01)
         }
-        diagnostic.finishReading(errors)
+        lifecycle.finishDiagnostics()
         guard process.terminationStatus == 0 else {
-            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(diagnostic.text)")
+            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(lifecycle.diagnosticText)")
         }
     }
 
@@ -405,48 +393,78 @@ private final class LocalServerDiagnostic: @unchecked Sendable {
     }
 }
 
-@MainActor
-private final class ManagedLocalServerProcess: LocalServerProcess {
-    private let process: Process
-    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
-        let process = Process()
-        self.process = process
-        process.executableURL = binary
-        process.arguments = ["--preload"]
-        var environment = ProcessInfo.processInfo.environment
-        environment["HF_HOME"] = models.path
+// Every locally launched process follows this lifecycle: start its bounded stderr
+// drain, wait for normal completion, and on cancellation or timeout send TERM,
+// allow a short grace period, then send KILL and wait for exit. Keeping that
+// policy here prevents either installer helpers or the long-lived server from
+// acquiring a different shutdown contract.
+private final class LocalServerProcessLifecycle: @unchecked Sendable {
+    let process = Process()
+    private let errors = Pipe()
+    private let diagnostic = LocalServerDiagnostic()
+
+    init(executable: String, arguments: [String], environment: [String: String]? = nil) {
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         process.environment = environment
         process.standardOutput = FileHandle.nullDevice
-        let errors = Pipe()
-        let diagnostic = LocalServerDiagnostic()
         process.standardError = errors
         diagnostic.read(from: errors)
-        process.terminationHandler = { process in
-            diagnostic.finishReading(errors)
-            let status = process.terminationStatus
-            let detail = diagnostic.text
-            Task { @MainActor in onExit(status, detail) }
-        }
+    }
+
+    func run() throws {
         do {
             try process.run()
             errors.fileHandleForWriting.closeFile()
-        }
-        catch { errors.fileHandleForReading.readabilityHandler = nil; throw error }
-    }
-    func waitForExit() async {
-        while process.isRunning {
-            try? await Task.sleep(for: .milliseconds(10))
+        } catch {
+            errors.fileHandleForReading.readabilityHandler = nil
+            throw error
         }
     }
 
-    func terminate() {
+    func terminateAndWait() {
         guard process.isRunning else { return }
         process.terminate()
-        let process = self.process
-        Task.detached {
-            try? await Task.sleep(for: .seconds(2))
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        let deadline = Date().addingTimeInterval(0.5)
+        while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        process.waitUntilExit()
+    }
+
+    func finishDiagnostics() { diagnostic.finishReading(errors) }
+    var diagnosticText: String { diagnostic.text }
+}
+
+@MainActor
+private final class ManagedLocalServerProcess: LocalServerProcess {
+    private let lifecycle: LocalServerProcessLifecycle
+    private var terminationTask: Task<Void, Never>?
+    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
+        var environment = ProcessInfo.processInfo.environment
+        environment["HF_HOME"] = models.path
+        let lifecycle = LocalServerProcessLifecycle(executable: binary.path, arguments: ["--preload"], environment: environment)
+        self.lifecycle = lifecycle
+        let process = lifecycle.process
+        process.terminationHandler = { [weak lifecycle] process in
+            guard let lifecycle else { return }
+            lifecycle.finishDiagnostics()
+            let status = process.terminationStatus
+            let detail = lifecycle.diagnosticText
+            Task { @MainActor in onExit(status, detail) }
         }
+        try lifecycle.run()
+    }
+    func waitForExit() async {
+        while lifecycle.process.isRunning {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        await terminationTask?.value
+    }
+
+    func terminate() {
+        guard lifecycle.process.isRunning, terminationTask == nil else { return }
+        let lifecycle = lifecycle
+        terminationTask = Task.detached { lifecycle.terminateAndWait() }
     }
 }
 
