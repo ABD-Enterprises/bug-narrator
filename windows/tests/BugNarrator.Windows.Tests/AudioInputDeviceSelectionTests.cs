@@ -69,6 +69,7 @@ public sealed class AudioInputDeviceSelectionTests
         {
             RecordingAudioSource = "systemAudio",
             HasAcceptedSystemAudioRecordingConsent = true,
+            IsExperimentalSystemAudioEnabled = true,
         };
         harness.AudioInputDeviceCatalog.Devices = [];
 
@@ -81,6 +82,64 @@ public sealed class AudioInputDeviceSelectionTests
         Assert.Equal(0, harness.MicrophonePreflightService.CallCount);
     }
 
+    /// <summary>
+    /// The spec's three-way gate: system-audio or mixed capture starts only when the experimental
+    /// flag is on AND a system-audio source is selected AND consent is ticked. Every combination of
+    /// the three, for both system-audio sources; the microphone source is unaffected by the other two.
+    /// </summary>
+    [Theory]
+    [InlineData("systemAudio", true, true, true)]
+    [InlineData("systemAudio", true, false, false)]
+    [InlineData("systemAudio", false, true, false)]
+    [InlineData("systemAudio", false, false, false)]
+    [InlineData("microphoneAndSystemAudio", true, true, true)]
+    [InlineData("microphoneAndSystemAudio", true, false, false)]
+    [InlineData("microphoneAndSystemAudio", false, true, false)]
+    [InlineData("microphoneAndSystemAudio", false, false, false)]
+    [InlineData("microphone", false, false, true)]
+    [InlineData("microphone", true, true, true)]
+    public async Task StartRecordingAsync_SystemAudioStartsOnlyWhenFlagAndSourceAndConsentAllHold(
+        string source, bool flag, bool consent, bool expectRecording)
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = source,
+            IsExperimentalSystemAudioEnabled = flag,
+            HasAcceptedSystemAudioRecordingConsent = consent,
+        };
+        // Every source that uses the microphone needs one to exist; only pure system audio does not.
+        harness.AudioInputDeviceCatalog.Devices = source == "systemAudio"
+            ? []
+            : [new AudioInputDeviceOption(0, "Fixture Microphone")];
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(
+            expectRecording ? RecordingWorkflowState.Recording : RecordingWorkflowState.Failed,
+            harness.Service.CurrentState.WorkflowState);
+        Assert.Equal(expectRecording, harness.AudioRecorderService.IsRecording);
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithSystemAudioAndFlagOff_FailsWithTheMacMessage()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            RecordingAudioSource = "systemAudio",
+            IsExperimentalSystemAudioEnabled = false,
+            HasAcceptedSystemAudioRecordingConsent = true,
+        };
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
+        // The same sentence RoutingAudioRecorder.swift emits on macOS.
+        Assert.Contains("\"System audio capture modes\" toggle in Settings is off", harness.Service.CurrentState.StatusMessage);
+        Assert.False(harness.AudioRecorderService.IsRecording);
+    }
+
     [Fact]
     public async Task StartRecordingAsync_WithSystemAudioWithoutConsent_FailsBeforeCapture()
     {
@@ -89,6 +148,7 @@ public sealed class AudioInputDeviceSelectionTests
         {
             RecordingAudioSource = "systemAudio",
             HasAcceptedSystemAudioRecordingConsent = false,
+            IsExperimentalSystemAudioEnabled = true,
         };
 
         await harness.Service.StartRecordingAsync();
@@ -106,6 +166,7 @@ public sealed class AudioInputDeviceSelectionTests
         {
             RecordingAudioSource = "microphoneAndSystemAudio",
             HasAcceptedSystemAudioRecordingConsent = true,
+            IsExperimentalSystemAudioEnabled = true,
             AudioInputDeviceName = "Built-in Microphone",
         };
         harness.AudioInputDeviceCatalog.Devices =
@@ -130,6 +191,7 @@ public sealed class AudioInputDeviceSelectionTests
         {
             RecordingAudioSource = "microphoneAndSystemAudio",
             HasAcceptedSystemAudioRecordingConsent = false,
+            IsExperimentalSystemAudioEnabled = true,
             AudioInputDeviceName = "Built-in Microphone",
         };
         harness.AudioInputDeviceCatalog.Devices =
