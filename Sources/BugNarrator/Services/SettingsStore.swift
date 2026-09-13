@@ -844,9 +844,8 @@ final class SettingsStore: ObservableObject {
     private let secretCoordinator: SettingsSecretCoordinator
     private let recordingPreferences: RecordingPreferencesStore
     private let trackerExportSettings: TrackerExportSettingsStore
+    private let hotkeySettings: HotkeySettingsCoordinator
     private let launchAtLoginService: any LaunchAtLoginControlling
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
     private let legacyDefaultsDomains: [String]
     private let localProviderReachabilityProbe: ((URL) -> Bool)?
     private var localProviderTask: AnyCancellable?
@@ -854,7 +853,7 @@ final class SettingsStore: ObservableObject {
     private var localProviderRefresh: DispatchWorkItem?
     private var localProviderRequestID = UUID()
     private var hasLoaded = false
-    private var isSynchronizingHotkeys = false
+    private var isApplyingHotkeyChange = false
     private var isSynchronizingLaunchAtLogin = false
     private var lastLocalProviderReachabilityURL: URL?
 
@@ -874,16 +873,31 @@ final class SettingsStore: ObservableObject {
             secretStore: KeychainSecretStore(keychainService: keychainService),
             aiProviderCredentialProviderKey: Keys.aiProviderCredentialProvider
         )
+        let resolvedLegacyDefaultsDomains: [String]
+        if let legacyDefaultsDomains {
+            resolvedLegacyDefaultsDomains = legacyDefaultsDomains
+        } else if defaults === UserDefaults.standard {
+            resolvedLegacyDefaultsDomains = Self.defaultLegacyDefaultsDomains
+        } else {
+            resolvedLegacyDefaultsDomains = []
+        }
+        self.hotkeySettings = HotkeySettingsCoordinator(
+            defaults: defaults,
+            legacyDefaultsDomains: resolvedLegacyDefaultsDomains,
+            keys: HotkeySettingsCoordinator.Keys(
+                startRecording: Keys.startRecordingHotkeyShortcut,
+                legacyRecording: Keys.legacyRecordingHotkeyShortcut,
+                legacyStartRecording: Keys.legacyStartRecordingHotkeyShortcut,
+                stopRecording: Keys.stopRecordingHotkeyShortcut,
+                obsoleteMarker: Keys.markerHotkeyShortcut,
+                captureScreenshot: Keys.screenshotHotkeyShortcut,
+                didMigrateLegacyBuiltIns: Keys.didMigrateLegacyBuiltInHotkeys
+            )
+        )
         self.launchAtLoginService = launchAtLoginService
         self.localProviderReachabilityProbe = localProviderReachabilityProbe
         self.localProviderSession = localProviderSession
-        if let legacyDefaultsDomains {
-            self.legacyDefaultsDomains = legacyDefaultsDomains
-        } else if defaults === UserDefaults.standard {
-            self.legacyDefaultsDomains = Self.defaultLegacyDefaultsDomains
-        } else {
-            self.legacyDefaultsDomains = []
-        }
+        self.legacyDefaultsDomains = resolvedLegacyDefaultsDomains
 
         load()
         hasLoaded = true
@@ -1037,19 +1051,10 @@ final class SettingsStore: ObservableObject {
         ) ?? false
         syncLaunchAtLoginState(launchAtLoginService.currentStatus())
 
-        startRecordingHotkeyShortcut = loadHotkey(
-            key: Keys.startRecordingHotkeyShortcut,
-            legacyKeys: [Keys.legacyStartRecordingHotkeyShortcut, Keys.legacyRecordingHotkeyShortcut]
-        )
-        stopRecordingHotkeyShortcut = loadHotkey(
-            key: Keys.stopRecordingHotkeyShortcut,
-            legacyKeys: []
-        )
-        screenshotHotkeyShortcut = loadHotkey(
-            key: Keys.screenshotHotkeyShortcut,
-            legacyKeys: []
-        )
-        removeObsoleteMarkerHotkeyIfNeeded()
+        let hotkeys = hotkeySettings.loadAndNormalize()
+        startRecordingHotkeyShortcut = hotkeys.startRecording
+        stopRecordingHotkeyShortcut = hotkeys.stopRecording
+        screenshotHotkeyShortcut = hotkeys.captureScreenshot
 
         githubRepositoryOwner = stringValue(forKey: TrackerExportSettingsStore.Keys.githubRepositoryOwner) ?? ""
         githubRepositoryName = stringValue(forKey: TrackerExportSettingsStore.Keys.githubRepositoryName) ?? ""
@@ -1067,8 +1072,6 @@ final class SettingsStore: ObservableObject {
         operationalTelemetryEnabled = boolValue(forKey: Keys.operationalTelemetryEnabled) ?? true
         autoShowChangelogOnUpdate = boolValue(forKey: Keys.autoShowChangelogOnUpdate) ?? true
         suppressSystemAudioExplainer = boolValue(forKey: RecordingPreferencesStore.Keys.suppressSystemAudioExplainer) ?? false
-        migrateLegacyBuiltInHotkeysIfNeeded()
-        normalizeLoadedHotkeyConflicts()
         BugNarratorDiagnostics.setDebugModeEnabled(debugMode)
         logger.info(
             "settings_loaded",
@@ -1132,160 +1135,46 @@ final class SettingsStore: ObservableObject {
         )
     }
 
-    private func loadHotkey(key: String, legacyKeys: [String]) -> HotkeyShortcut {
-        if let data = dataValue(forKey: key),
-           let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
-            return decodedShortcut
-        }
-
-        for legacyKey in legacyKeys {
-            if let data = dataValue(forKey: legacyKey),
-               let decodedShortcut = try? decoder.decode(HotkeyShortcut.self, from: data) {
-                defaults.set(data, forKey: key)
-                return decodedShortcut
-            }
-        }
-
-        return .disabled
-    }
-
     private func hotkeyDidChange(_ changedAction: HotkeyAction, previousShortcut: HotkeyShortcut) {
-        let changedShortcut = shortcut(for: changedAction)
-
-        if isSynchronizingHotkeys {
-            persistHotkey(changedShortcut, key: storageKey(for: changedAction))
-            return
+        guard !isApplyingHotkeyChange else { return }
+        let snapshot = currentHotkeySnapshot
+        if let conflict = hotkeySettings.persistChange(
+            action: changedAction,
+            previousShortcut: previousShortcut,
+            snapshot: snapshot
+        ) {
+            hotkeyConflictMessage = "\(conflict.shortcut.displayString) is already assigned to \(conflict.action.title). Clear it first or choose a different shortcut."
+            conflictingHotkeyAction = conflict.action
+            isApplyingHotkeyChange = true
+            setHotkey(previousShortcut, for: changedAction)
+            isApplyingHotkeyChange = false
+        } else {
+            hotkeyConflictMessage = nil
+            conflictingHotkeyAction = nil
         }
-
-        isSynchronizingHotkeys = true
-        defer { isSynchronizingHotkeys = false }
-
-        if changedShortcut.isEnabled,
-           let conflictingAction = HotkeyAction.allCases.first(where: {
-               $0 != changedAction && shortcut(for: $0) == changedShortcut
-           }) {
-            logger.warning(
-                "hotkey_conflict_rejected",
-                "A conflicting hotkey assignment was rejected.",
-                metadata: [
-                    "action": changedAction.title,
-                    "conflict_action": conflictingAction.title,
-                    "shortcut": changedShortcut.displayString
-                ]
-            )
-            hotkeyConflictMessage = "\(changedShortcut.displayString) is already assigned to \(conflictingAction.title). Clear it first or choose a different shortcut."
-            conflictingHotkeyAction = conflictingAction
-            setShortcut(previousShortcut, for: changedAction)
-            return
-        }
-
-        hotkeyConflictMessage = nil
-        conflictingHotkeyAction = nil
-        persistHotkey(changedShortcut, key: storageKey(for: changedAction))
     }
 
     /// Clears the binding for the named action, resolving a reported conflict.
     func clearHotkey(for action: HotkeyAction) {
-        setShortcut(.disabled, for: action)
+        setHotkey(.disabled, for: action)
         hotkeyConflictMessage = nil
         conflictingHotkeyAction = nil
     }
 
-    private func migrateLegacyBuiltInHotkeysIfNeeded() {
-        guard defaults.object(forKey: Keys.didMigrateLegacyBuiltInHotkeys) == nil else {
-            return
-        }
-
-        var clearedActions: [String] = []
-
-        for action in HotkeyAction.allCases {
-            guard let legacyBuiltInShortcut = action.legacyBuiltInShortcut,
-                  shortcut(for: action) == legacyBuiltInShortcut else {
-                continue
-            }
-
-            setShortcut(.disabled, for: action)
-            persistHotkey(.disabled, key: storageKey(for: action))
-            clearedActions.append(action.title)
-        }
-
-        defaults.set(true, forKey: Keys.didMigrateLegacyBuiltInHotkeys)
-
-        if !clearedActions.isEmpty {
-            logger.info(
-                "legacy_hotkey_defaults_cleared",
-                "Cleared previously built-in hotkey defaults so shortcuts start unassigned.",
-                metadata: ["cleared_actions": clearedActions.joined(separator: ",")]
-            )
-        }
-    }
-
-    private func normalizeLoadedHotkeyConflicts() {
-        isSynchronizingHotkeys = true
-
-        var seenShortcuts = Set<HotkeyShortcut>()
-        for action in HotkeyAction.allCases {
-            let shortcut = shortcut(for: action)
-            guard shortcut.isEnabled else {
-                persistHotkey(shortcut, key: storageKey(for: action))
-                continue
-            }
-
-            if seenShortcuts.contains(shortcut) {
-                setShortcut(.disabled, for: action)
-                continue
-            }
-
-            seenShortcuts.insert(shortcut)
-            persistHotkey(shortcut, key: storageKey(for: action))
-        }
-
-        isSynchronizingHotkeys = false
-    }
-
-    private func shortcut(for action: HotkeyAction) -> HotkeyShortcut {
-        switch action {
-        case .startRecording:
-            return startRecordingHotkeyShortcut
-        case .stopRecording:
-            return stopRecordingHotkeyShortcut
-        case .captureScreenshot:
-            return screenshotHotkeyShortcut
-        }
-    }
-
-    private func setShortcut(_ shortcut: HotkeyShortcut, for action: HotkeyAction) {
-        switch action {
-        case .startRecording:
-            startRecordingHotkeyShortcut = shortcut
-        case .stopRecording:
-            stopRecordingHotkeyShortcut = shortcut
-        case .captureScreenshot:
-            screenshotHotkeyShortcut = shortcut
-        }
-    }
-
-    private func storageKey(for action: HotkeyAction) -> String {
-        switch action {
-        case .startRecording:
-            return Keys.startRecordingHotkeyShortcut
-        case .stopRecording:
-            return Keys.stopRecordingHotkeyShortcut
-        case .captureScreenshot:
-            return Keys.screenshotHotkeyShortcut
-        }
-    }
-
-    private func removeObsoleteMarkerHotkeyIfNeeded() {
-        guard defaults.object(forKey: Keys.markerHotkeyShortcut) != nil else {
-            return
-        }
-
-        defaults.removeObject(forKey: Keys.markerHotkeyShortcut)
-        logger.info(
-            "removed_obsolete_marker_hotkey",
-            "Removed the obsolete standalone marker hotkey assignment during settings load."
+    private var currentHotkeySnapshot: HotkeySettingsSnapshot {
+        HotkeySettingsSnapshot(
+            startRecording: startRecordingHotkeyShortcut,
+            stopRecording: stopRecordingHotkeyShortcut,
+            captureScreenshot: screenshotHotkeyShortcut
         )
+    }
+
+    private func setHotkey(_ shortcut: HotkeyShortcut, for action: HotkeyAction) {
+        switch action {
+        case .startRecording: startRecordingHotkeyShortcut = shortcut
+        case .stopRecording: stopRecordingHotkeyShortcut = shortcut
+        case .captureScreenshot: screenshotHotkeyShortcut = shortcut
+        }
     }
 
     private func updateLaunchAtLoginPreference(enabled: Bool) {
@@ -1361,14 +1250,6 @@ final class SettingsStore: ObservableObject {
             includeLegacyServices: includeLegacyServices,
             aiProvider: aiProvider
         )
-    }
-
-    private func persistHotkey(_ shortcut: HotkeyShortcut, key: String) {
-        guard let data = try? encoder.encode(shortcut) else {
-            return
-        }
-
-        defaults.set(data, forKey: key)
     }
 
     private func migrateLegacyPlaintextJiraEmailIfNeeded() {
