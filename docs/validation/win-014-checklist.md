@@ -31,7 +31,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 ### 1. Durable workflow: `record -> review -> refine -> export`
 
-- `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots, add one marker, stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing showing `session.json`, `session.wav`, `transcript.md`, plus `summary.md` if extraction ran, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
+- `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots, add one marker, stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing matching the layout in row 8, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
 - `[automation]` **Closed.** Each transition is pinned in `BugNarrator.Windows.Tests`: start by `AudioInputDeviceSelectionTests.StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone`, stop → save by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession`, refine by `ReviewSessionActionServiceTests.ExtractIssuesAsync_WithConfiguredApiKey_SavesUpdatedSession`, export by `BundleExporterTests.FileSessionBundleExporter_ExportsTranscriptAndScreenshots`. No single test runs the whole chain; the human item above is what proves it end to end.
 
 ### 2. Compact launch surface (tray shell)
@@ -72,7 +72,8 @@ This is the least-validated row and the most hardware-dependent.
 ### 8. Session Bundle export
 
 - `[automation]` **Closed.** `transcript.md` is byte-compared against `contract-fixtures/transcript.golden.md` on both platforms (#1003). `summary.md` is pinned on its shared subset by `contract-fixtures/summary.golden.md` (#1020); the structure differences outside that subset are deliberate and listed in the matrix's "Current Deliberate Differences" section, so they are not a validation gap. Evidence: `TranscriptMarkdown_MatchesTheCommittedGolden` and `SummaryMarkdownSharedSubset_MatchesTheCommittedGolden` in `BugNarrator.Core.Tests`.
-- `[human]` An exported bundle on disk contains exactly `session.json`, `session.wav`, `transcript.md`, and — only when extraction has run — `summary.md`. No stray files. Evidence: the directory listing.
+- `[automation]` **Open — defect.** The bundle *layout* is a shared contract too: `contract-fixtures/session-bundle-layout.json` says `manifest.json`, `screenshots/`, and `transcript.md` are always present and `summary.md` only when extraction has run. macOS writes all of that and `TranscriptExporterTests.swift` binds the fixture. Windows writes no `manifest.json` and no Windows test reads the fixture. Tracked as #1137 (WIN-018).
+- `[human]` An exported bundle on disk matches the shared layout: `manifest.json`, `transcript.md`, a `screenshots/` directory holding the session's captures, `summary.md` only when extraction has run, and — Windows-only, allowed by the row's parity decision — `annotated-exports/` when annotated images were rendered. `session.json` and `session.wav` are internal session storage and must *not* be in the bundle. Evidence: the directory listing, captured after #1137 lands. Anything outside that list is a stray file.
 
 ### 9. Debug Bundle support export
 
@@ -122,4 +123,5 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 
 - **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
+- **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
 - **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
