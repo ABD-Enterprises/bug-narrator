@@ -294,7 +294,7 @@ Before opening a PR or spending CI runner time, run the cheap local-first valida
 ./scripts/validate.sh origin/main
 ```
 
-That command mirrors the portable CI guardrails: changed-file Semgrep when available, Swift parse checks, local-transcription syntax checks, repository docs drift checks, and effort-leak issue/PR state checks.
+That command mirrors the portable CI guardrails, in execution order: the session-bundle contract fixture against the product spec, changed-file Semgrep (Docker, or a local install) when available, Swift parse checks, the effort-leak board audit (skippable with `VALIDATE_SKIP_BOARD_AUDIT=1`), repository docs drift checks, CLAUDE.md/AGENTS.md/.agent/rules.md body identity, shellcheck at info severity over `scripts/` and `local-transcription/`, ruff (pyflakes rules) over the Python scripts, the accessibility regression check, site doc mirrors, and the local-transcription syntax check plus its unit suite (reported `NOT RUN` when no interpreter has the server's dependencies).
 
 Open `BugNarrator.xcodeproj` in Xcode and build the `BugNarrator` scheme, or use:
 
