@@ -12,7 +12,7 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/BugNarrator
-      - path: CHANGELOG.md
+      - path: CHANGELOG-archive.md
         buildPhase: resources
       - path: Resources/Assets.xcassets
         buildPhase: resources

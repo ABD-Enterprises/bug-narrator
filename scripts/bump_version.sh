@@ -43,6 +43,29 @@ fi
 
 TODAY="$(date +%Y-%m-%d)"
 
+# Validate every changelog precondition before changing any version source.
+python3 <<'PY'
+from pathlib import Path
+
+active_path = Path("CHANGELOG.md")
+archive_path = Path("CHANGELOG-archive.md")
+if not active_path.is_file():
+    raise SystemExit("error: CHANGELOG.md is missing")
+if not archive_path.is_file():
+    raise SystemExit("error: CHANGELOG-archive.md is missing")
+
+active = active_path.read_text()
+marker = "## Unreleased"
+if marker not in active:
+    raise SystemExit("error: CHANGELOG.md is missing ## Unreleased")
+
+body = active.split(marker, 1)[1].strip()
+if not body:
+    raise SystemExit("error: CHANGELOG.md Unreleased section is empty")
+if body.startswith("## ") or "\n## " in body:
+    raise SystemExit("error: CHANGELOG.md contains a released section; move it to CHANGELOG-archive.md")
+PY
+
 # 1. VERSION file.
 printf '%s\n' "$NEW_VERSION" > VERSION
 
@@ -64,15 +87,7 @@ active_path = Path("CHANGELOG.md")
 archive_path = Path("CHANGELOG-archive.md")
 
 active = active_path.read_text()
-marker = "## Unreleased"
-if marker not in active:
-    raise SystemExit("error: CHANGELOG.md is missing ## Unreleased")
-
-body = active.split(marker, 1)[1].strip()
-if not body:
-    raise SystemExit("error: CHANGELOG.md Unreleased section is empty")
-if body.startswith("## "):
-    raise SystemExit("error: CHANGELOG.md contains a released section; move it to CHANGELOG-archive.md")
+body = active.split("## Unreleased", 1)[1].strip()
 
 archive = archive_path.read_text().rstrip()
 heading_end = archive.find("\n## ")
