@@ -92,6 +92,26 @@ public sealed class RecordingElapsedTimePresenterTests
     }
 
     [Fact]
+    public void StoppingWithoutAStamp_ThenSavingWithOne_AdoptsTheAuthoritativeStop()
+    {
+        // The real lifecycle order: Stopping is published before RecordingStoppedAt is stamped, and
+        // Saving arrives carrying it. The provisional value must yield to the authoritative one.
+        var presenter = new RecordingElapsedTimePresenter();
+        presenter.Text(State(RecordingWorkflowState.Recording, Start), Start.AddSeconds(74));
+
+        var stopping = State(RecordingWorkflowState.Stopping, Start, stoppedAt: null);
+        Assert.Equal("01:17", presenter.Text(stopping, Start.AddSeconds(77.2)));
+        // Re-rendering Stopping does not keep counting.
+        Assert.Equal("01:17", presenter.Text(stopping, Start.AddSeconds(90)));
+
+        var saving = State(RecordingWorkflowState.Saving, Start, stoppedAt: Start.AddSeconds(75.9));
+        Assert.Equal("01:15", presenter.Text(saving, Start.AddSeconds(91)));
+
+        var completed = RecordingControlState.Idle() with { WorkflowState = RecordingWorkflowState.Completed };
+        Assert.Equal("01:15", presenter.Text(completed, Start.AddSeconds(400)));
+    }
+
+    [Fact]
     public void NextRecording_ResetsAndCountsFromTheNewStart()
     {
         var presenter = new RecordingElapsedTimePresenter();

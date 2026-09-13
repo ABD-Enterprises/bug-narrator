@@ -16,6 +16,7 @@ public sealed class RecordingElapsedTimePresenter
 {
     private string cachedText = string.Empty;
     private DateTimeOffset? recordingStartedAt;
+    private string? provisionalStopText;
 
     /// <summary>
     /// The text to show for <paramref name="state"/> at <paramref name="now"/>, or an empty string
@@ -26,19 +27,36 @@ public sealed class RecordingElapsedTimePresenter
         if (state.WorkflowState == RecordingWorkflowState.Recording && state.ActiveSession is not null)
         {
             recordingStartedAt = state.ActiveSession.RecordingStartedAt;
+            provisionalStopText = null;
             cachedText = SessionTimeFormatter.FormatDuration(now - recordingStartedAt.Value);
             return cachedText;
         }
 
         // Leaving Recording: freeze at the transition, not at the last timer tick, which can be up to
-        // a full interval (or more, if the UI thread was busy) behind the real stop. The draft carries
-        // the authoritative RecordingStoppedAt while it still exists (Stopping, Saving); when the
-        // transition lands directly in a draft-less state, the call time is the best available.
+        // a full interval (or more, if the UI thread was busy) behind the real stop. The lifecycle
+        // publishes Stopping *before* it stamps RecordingStoppedAt and publishes Saving with it, so
+        // the first post-Recording render uses the call time as a provisional stop and the start is
+        // kept until a draft arrives carrying the authoritative timestamp, which then replaces it.
+        // The start is released once that timestamp is seen or the draft is gone for good.
         if (recordingStartedAt is { } startedAt)
         {
-            var stoppedAt = state.ActiveSession?.RecordingStoppedAt ?? now;
-            cachedText = SessionTimeFormatter.FormatDuration(stoppedAt - startedAt);
-            recordingStartedAt = null;
+            if (state.ActiveSession?.RecordingStoppedAt is { } stoppedAt)
+            {
+                cachedText = SessionTimeFormatter.FormatDuration(stoppedAt - startedAt);
+                recordingStartedAt = null;
+            }
+            else if (state.ActiveSession is not null)
+            {
+                // Stopping with no stamp yet: provisional, keep waiting for the authoritative one.
+                cachedText = provisionalStopText ??= SessionTimeFormatter.FormatDuration(now - startedAt);
+            }
+            else
+            {
+                // No draft and none coming: the provisional value (or the call time) is final.
+                cachedText = provisionalStopText ?? SessionTimeFormatter.FormatDuration(now - startedAt);
+                recordingStartedAt = null;
+            }
+
             return cachedText;
         }
 
