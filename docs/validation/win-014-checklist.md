@@ -53,7 +53,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 ### 4. Single active recording session
 
 - `[human]` Launch the packaged app a second time while it is running: the second process exits 0, one `BugNarrator.Windows` process remains, and the log shows `focus request received from secondary instance`. #44's packaged probe observed exactly this, but its comment names neither a SHA nor a host, so it does not meet the evidence rule above and is prior art, not evidence. Evidence: the process-list line and the log excerpt, re-captured.
-- `[automation]` No test in `windows/tests` exercises the single-instance path (the only "duplicate" test is a hotkey-conflict check). Verified missing; tracked as #1136 (WIN-017).
+- `[automation]` Covered today. `SingleInstanceTests.SecondInstance_IsRefusedAndSignalsTheFirstToFocus` and `PrimaryInstance_IsReleasedOnDispose_SoTheNextLaunchCanOwnIt` pin the process half with two instances on separate threads (the mutex is re-entrant per thread, so same-thread would prove nothing); `AudioInputDeviceSelectionTests.StartRecordingAsync_WhileAlreadyRecording_IsRefusedWithoutStartingASecondCapture` pins the second-Start half (#1136).
 - `[human]` While recording, choosing `Start Recording` again from the tray is refused or is a no-op — the log shows no second `recording started`, and the session saved at stop contains one audio track. Evidence: the log excerpt and the bundle listing.
 
 ### 5. Screenshot evidence during recording
@@ -154,7 +154,7 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 
 - **Row 2** — the tray menu lacks the recovery-guidance entry and the documentation/changelog/support/issue-reporting/updates entries the spec requires. Filed as #1143 (WIN-022).
 - **Row 3** — `RecordingControlsWindow` shows no elapsed time at all; macOS does. A behaviour gap, not just a coverage gap. Filed as #1142 (WIN-021).
-- **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
+- **Row 4** — was a gap; closed by #1136, see the row.
 - **Row 6** — no `Retry Needed` filter. Filed as #1144 (WIN-023).
 - **Row 7** — no fallback to `Summary` after an empty extraction. Filed as #1145 (WIN-024).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).

@@ -121,6 +121,30 @@ public sealed class AudioInputDeviceSelectionTests
         Assert.Equal(expectRecording, harness.AudioRecorderService.IsRecording);
     }
 
+    /// <summary>
+    /// The other half of "single active recording session" (SingleInstanceTests covers the process
+    /// half): a second Start while recording is a no-op that leaves the one capture running.
+    /// </summary>
+    [Fact]
+    public async Task StartRecordingAsync_WhileAlreadyRecording_IsRefusedWithoutStartingASecondCapture()
+    {
+        using var harness = new RecordingHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AudioInputDeviceName = "Fixture Microphone" };
+        harness.AudioInputDeviceCatalog.Devices = [new AudioInputDeviceOption(0, "Fixture Microphone")];
+
+        await harness.Service.StartRecordingAsync();
+        var firstSessionId = harness.Service.CurrentState.ActiveSession?.SessionId;
+        Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.NotNull(firstSessionId);
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.Equal(firstSessionId, harness.Service.CurrentState.ActiveSession?.SessionId);
+        Assert.Equal(1, harness.AudioRecorderService.StartCallCount);
+        Assert.Equal("A recording session is already active.", harness.Service.CurrentState.StatusMessage);
+    }
+
     [Fact]
     public async Task StartRecordingAsync_WithSystemAudioAndFlagOff_FailsWithTheMacMessage()
     {
@@ -277,6 +301,7 @@ public sealed class AudioInputDeviceSelectionTests
     private sealed class FakeAudioRecorderService : IAudioRecorderService
     {
         public bool IsRecording { get; private set; }
+        public int StartCallCount { get; private set; }
 
         public void Dispose()
         {
@@ -286,6 +311,7 @@ public sealed class AudioInputDeviceSelectionTests
 
         public Task StartAsync(string audioFilePath, AudioRecordingRequest request, CancellationToken cancellationToken = default)
         {
+            StartCallCount++;
             LastRequest = request;
             IsRecording = true;
             return Task.CompletedTask;
