@@ -36,7 +36,7 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 - [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
 - [Hosted documentation](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
 - [Report a bug or request a feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
-- [View the changelog](CHANGELOG.md)
+- [View the release history](CHANGELOG-archive.md)
 
 ## What BugNarrator Does
 
@@ -281,7 +281,7 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 - [Hosted user guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
 - [Report a bug or request a feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
 - [Support development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
-- [Changelog](CHANGELOG.md)
+- [Release history](CHANGELOG-archive.md)
 - [GitHub issues](https://github.com/ABD-Enterprises/bug-narrator/issues)
 
 ## Build From Source

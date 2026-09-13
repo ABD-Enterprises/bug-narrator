@@ -231,7 +231,6 @@
 		98BEEBB0A54A385DAC55987E /* AppLaunchDiagnosticsReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CC17094DFD9502DBA94345 /* AppLaunchDiagnosticsReporter.swift */; };
 		99268A7BF811CD29DB330195 /* SessionScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B60FF3096207405A3ECB6D0 /* SessionScreenshot.swift */; };
 		994C5601BD2578CC3A980002 /* AIProviderSettingsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99BC67525B274B5A01ADACF9 /* AIProviderSettingsController.swift */; };
-		99A01D146ED4D77DA20484A5 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 792A02D8EE4EBB2A02D4043D /* CHANGELOG.md */; };
 		9B55193838FDEC8E03DE78B5 /* RecordingSetupCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6F91AF8040F5D9B6BD0C8F1 /* RecordingSetupCopy.swift */; };
 		9B7715D5A1E1CC278326FF3F /* MenuBarView+RecoverySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D6E45277416812256952C18 /* MenuBarView+RecoverySections.swift */; };
 		9BDE73A1F0BA27B80A72F736 /* SessionLibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33027EA9F37EA57406F2D1A /* SessionLibraryItem.swift */; };
@@ -316,6 +315,7 @@
 		D05B48ECBEFAF80A63A7E3CF /* AppErrorPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC68E525601D89A4E993FC89 /* AppErrorPresenter.swift */; };
 		D0754552F75E1CE6B4128800 /* TranscriptExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29D8D293162593D9A0B296 /* TranscriptExporter.swift */; };
 		D089C488B66D1CCBF625BDA9 /* TranscriptionRecoveryPresenters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F271FCF4D5A2759B4D6DCE4 /* TranscriptionRecoveryPresenters.swift */; };
+		D0EEC3351825B88F4AEE4047 /* CHANGELOG-archive.md in Resources */ = {isa = PBXBuildFile; fileRef = 9F9C2A1C56580654567949A4 /* CHANGELOG-archive.md */; };
 		D1508F661FB05C078F386D60 /* AppState+WindowManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B7F0C1392B31892BE5A796 /* AppState+WindowManagement.swift */; };
 		D1816E560B00B71EB9A625EA /* SystemAudioFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCEC36FA2A05A4FD9CE5F0B /* SystemAudioFileWriter.swift */; };
 		D2AEB3EA7C80F6B47D0193C5 /* SimilarIssueReviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBF2173AAF872E97F8645F4 /* SimilarIssueReviewService.swift */; };
@@ -589,7 +589,6 @@
 		7881C3E0425DCA7D35C6C10E /* AppState+ExportReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ExportReview.swift"; sourceTree = "<group>"; };
 		78DB2CC94CABCD51955891BF /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		78EFF170BAD57E66A7CB20AB /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		792A02D8EE4EBB2A02D4043D /* CHANGELOG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.md; sourceTree = "<group>"; };
 		793E176AE9D548B28D857BEF /* LocalTranscriptionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionManagerTests.swift; sourceTree = "<group>"; };
 		7A7A34EF1391E51E6B1DB8BF /* TranscriptSectionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSectionBuilder.swift; sourceTree = "<group>"; };
 		7CE7687249AD70EDFF06A569 /* SystemAudioAggregateDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioAggregateDevice.swift; sourceTree = "<group>"; };
@@ -648,6 +647,7 @@
 		9E3A2F0B7AFCAA4E2E0020CF /* OpenAIErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIErrorMapperTests.swift; sourceTree = "<group>"; };
 		9E5530F00F9B6ABE2F8E52B8 /* SessionArtifactsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionArtifactsService.swift; sourceTree = "<group>"; };
 		9F9009216340E4AF51C9EDBA /* TranscriptStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStore.swift; sourceTree = "<group>"; };
+		9F9C2A1C56580654567949A4 /* CHANGELOG-archive.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "CHANGELOG-archive.md"; sourceTree = "<group>"; };
 		9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophonePermissionServiceTests.swift; sourceTree = "<group>"; };
 		A1FB2471D46615DC915080D1 /* TranscriptionChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionChunker.swift; sourceTree = "<group>"; };
 		A31B0939DF668FFC71CD64FD /* TranscriptionRecoveryControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionRecoveryControllerTests.swift; sourceTree = "<group>"; };
@@ -788,7 +788,7 @@
 		1EFE1C893B3A928C8554689D = {
 			isa = PBXGroup;
 			children = (
-				792A02D8EE4EBB2A02D4043D /* CHANGELOG.md */,
+				9F9C2A1C56580654567949A4 /* CHANGELOG-archive.md */,
 				B13C6FEF8FF0A3D6AF5BE3F1 /* Resources */,
 				45DEAACD4F515836768D8B20 /* Sources */,
 				CB3EEF79B152E0F9021DDA27 /* Tests */,
@@ -1366,7 +1366,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3426E7C93FFCC254F7016A99 /* Assets.xcassets in Resources */,
-				99A01D146ED4D77DA20484A5 /* CHANGELOG.md in Resources */,
+				D0EEC3351825B88F4AEE4047 /* CHANGELOG-archive.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1824,7 +1824,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/BugNarrator.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -1833,7 +1833,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.46;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator;
 				PRODUCT_NAME = BugNarrator;
 				SDKROOT = macosx;
@@ -1847,7 +1847,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/BugNarrator.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -1856,7 +1856,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.46;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.abdenterprises.bugnarrator;
 				PRODUCT_NAME = BugNarrator;
 				SDKROOT = macosx;

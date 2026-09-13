@@ -176,4 +176,4 @@ Scope completed:
 - `docs/architecture/product-spec.md` is the source of truth for product behavior, terminology, and artifact contracts
 - `docs/roadmap/roadmap.md` is the source of truth for historical roadmap context and completed phase history
 - GitHub Issues are the source of truth for active AI planning and task state
-- `CHANGELOG.md` is the source of truth for shipped change history
+- `CHANGELOG-archive.md` is the source of truth for shipped change history

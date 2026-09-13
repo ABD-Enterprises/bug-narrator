@@ -14,7 +14,7 @@ struct ChangelogDocument: Equatable {
     }
 
     init(bundle: Bundle = .main) {
-        if let url = bundle.url(forResource: "CHANGELOG", withExtension: "md"),
+        if let url = bundle.url(forResource: "CHANGELOG-archive", withExtension: "md"),
            let data = try? Data(contentsOf: url),
            let markdown = String(data: data, encoding: .utf8),
            !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
