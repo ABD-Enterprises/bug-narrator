@@ -88,6 +88,43 @@ public sealed class WindowsHotkeySettingsTests : IDisposable
     }
 
     [Fact]
+    public async Task FileWindowsAppSettingsStore_RoundTripsTheExperimentalSystemAudioFlag()
+    {
+        var store = new FileWindowsAppSettingsStore(storagePaths);
+
+        await store.SaveAsync(WindowsAppSettings.Default with { IsExperimentalSystemAudioEnabled = true });
+
+        Assert.True((await store.LoadAsync()).IsExperimentalSystemAudioEnabled);
+    }
+
+    [Fact]
+    public async Task FileWindowsAppSettingsStore_LoadsASettingsFileWrittenBeforeTheFlagExistedWithItOff()
+    {
+        // A settings.json from a build that predates IsExperimentalSystemAudioEnabled: consent and a
+        // system-audio source are present, the flag is absent. It must load, and the feature must
+        // be off — the spec's gate is opt-in, so an older file cannot opt in by omission.
+        var legacyJson = """
+            {
+              "transcriptionModel": "whisper-1",
+              "languageHint": "",
+              "jiraIssueType": "Task",
+              "aiProvider": "openAI",
+              "recordingAudioSource": "systemAudio",
+              "hasAcceptedSystemAudioRecordingConsent": true
+            }
+            """;
+        Directory.CreateDirectory(Path.GetDirectoryName(storagePaths.SettingsFilePath)!);
+        await File.WriteAllTextAsync(storagePaths.SettingsFilePath, legacyJson);
+
+        var loaded = await new FileWindowsAppSettingsStore(storagePaths).LoadAsync();
+
+        Assert.Equal("systemAudio", loaded.NormalizedRecordingAudioSource);
+        Assert.True(loaded.HasAcceptedSystemAudioRecordingConsent);
+        Assert.False(loaded.IsExperimentalSystemAudioEnabled);
+        Assert.NotNull(loaded.RecordingAudioSourceCompatibilityIssue);
+    }
+
+    [Fact]
     public async Task ApplySettingsAsync_RegistersUniqueHotkeysAndRoutesInvocations()
     {
         var platform = new FakeWindowsHotkeyPlatform();
