@@ -436,6 +436,86 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         withExtendedLifetime(process) {}
     }
 
+    /// Writes an executable Python stand-in for the server binary (`--preload` is
+    /// ignored). Python, not sh: bash 3.2 exits 143 when a child it is waiting on
+    /// dies of the same TERM the shell received, before any trap runs, so a shell
+    /// script cannot model a server that drains after a process-group TERM.
+    private func makeServerStandIn(_ body: String) throws -> (binary: URL, ready: URL) {
+        // The script lives in its own fresh directory: Python puts the script's
+        // directory first on sys.path and lists it on the first import, and a
+        // developer's temp directory can hold tens of thousands of entries —
+        // enough that the stand-in was still importing `signal` seconds later
+        // and died of the TERM. The stand-in signals readiness through a file
+        // so the test terminates it only once the handler is installed.
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("bug-narrator-server-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("server.py")
+        let ready = directory.appendingPathComponent("ready")
+        try """
+        #!/usr/bin/python3
+        import signal, sys, time
+        \(body)
+        open(\"\(ready.path)\", "w").close()
+        while True:
+            time.sleep(0.05)
+
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return (url, ready)
+    }
+
+    @MainActor
+    private func waitForReady(_ ready: URL) async throws {
+        let deadline = Date().addingTimeInterval(5)
+        while !FileManager.default.fileExists(atPath: ready.path) {
+            XCTAssertLessThan(Date(), deadline, "stand-in server never became ready")
+            guard Date() < deadline else { return }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    @MainActor
+    func testServerThatNeedsASecondToDrainAfterTermExitsCleanly() async throws {
+        // #1124 cut the grace to 0.5 s, so this child was KILLed (137) mid-drain.
+        let (binary, ready) = try makeServerStandIn("signal.signal(signal.SIGTERM, lambda *_: (time.sleep(1), sys.exit(0)))")
+        defer { try? FileManager.default.removeItem(at: binary.deletingLastPathComponent()) }
+        let exited = expectation(description: "server exits")
+        nonisolated(unsafe) var result: (Int32, String)?
+        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory) { status, detail in
+            result = (status, detail)
+            exited.fulfill()
+        }
+        try await waitForReady(ready)
+        process.terminate()
+        await fulfillment(of: [exited], timeout: 5)
+        let (status, detail) = try XCTUnwrap(result)
+        XCTAssertEqual(status, 0, "a TERM-honouring server that drains within the grace must not be KILLed: \(detail)")
+        XCTAssertFalse(detail.contains("bug-narrator-process-lifecycle:"), detail)
+    }
+
+    @MainActor
+    func testWrapperJobControlNoiseNeverReachesTheExitMessage() async throws {
+        // The shell wrapper reports a signalled child on ITS stderr ("line 1:
+        // NNN Killed: 9 …"). That path is only reachable when the child dies on
+        // its own — the app's terminate() KILLs the wrapper right after the
+        // group — so the stand-in kills itself once it is ready.
+        let (binary, ready) = try makeServerStandIn("import os\nsignal.signal(signal.SIGALRM, lambda *_: os.kill(os.getpid(), signal.SIGKILL))\nsignal.setitimer(signal.ITIMER_REAL, 0.3)")
+        defer { try? FileManager.default.removeItem(at: binary.deletingLastPathComponent()) }
+        let exited = expectation(description: "server exits")
+        nonisolated(unsafe) var result: (Int32, String)?
+        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory) { status, detail in
+            result = (status, detail)
+            exited.fulfill()
+        }
+        try await waitForReady(ready)
+        await fulfillment(of: [exited], timeout: 6)
+        let (status, detail) = try XCTUnwrap(result)
+        XCTAssertEqual(status, 137, "the wrapper must report the child's own death, not its own")
+        XCTAssertFalse(detail.contains("bug-narrator-process-lifecycle:"), detail)
+        XCTAssertFalse(detail.contains("Killed: 9"), detail)
+        withExtendedLifetime(process) {}
+    }
+
     func testCommandTimeoutAndCancellationAreBounded() async throws {
         let start = Date()
         do {
@@ -555,3 +635,4 @@ private actor ShutdownTestGate {
         for waiter in pending { waiter.resume() }
     }
 }
+
