@@ -412,15 +412,28 @@ private final class LocalServerProcessLifecycle: @unchecked Sendable {
     private let processGroupOutput = Pipe()
     private let diagnostic = LocalServerDiagnostic()
     private var processGroup: pid_t?
+    /// Seconds between TERM and KILL. Installer helpers get the short default;
+    /// the long-lived server needs long enough for uvicorn to finish an
+    /// in-flight request, or a clean stop turns into a KILL (#1128).
+    private let terminationGrace: TimeInterval
 
-    init(executable: String, arguments: [String], environment: [String: String]? = nil) {
+    init(executable: String, arguments: [String], environment: [String: String]? = nil, terminationGrace: TimeInterval = 0.5) {
+        self.terminationGrace = terminationGrace
         // A non-interactive shell with job control puts its background job in a
         // dedicated process group. The first stdout line is the owned group ID;
-        // the launched program's stdout remains discarded as before.
+        // the launched program's stdout remains discarded as before. After the
+        // child is forked (it has already inherited our stderr pipe) the shell
+        // silences its OWN stderr, so its job-control report of a signalled
+        // child ("line 1: NNN Killed: 9 …") cannot end up in the user-facing
+        // exit message; the child's stderr still arrives. The shell also ignores
+        // TERM from then on (the already-forked child keeps the default
+        // disposition): Process.terminate() targets the shell, and a shell that
+        // died of TERM reported status 15 for every stop, clean or not, instead
+        // of the child's own exit status (#1128).
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [
             "-c",
-            "set -m; ( read ready && exec \"$@\" ) >/dev/null & child=$!; set +m; printf '%s\\n' \"$child\"; exec 1>/dev/null; wait \"$child\"",
+            "set -m; ( read ready && exec \"$@\" ) >/dev/null & child=$!; set +m; trap '' TERM; printf '%s\\n' \"$child\"; exec 1>/dev/null 2>/dev/null; wait \"$child\"",
             "bug-narrator-process-lifecycle",
             executable,
         ] + arguments
@@ -465,7 +478,7 @@ private final class LocalServerProcessLifecycle: @unchecked Sendable {
         guard process.isRunning || group.map(Self.isGroupAlive) == true else { return }
         if let group, Self.isGroupAlive(group) { kill(-group, SIGTERM) }
         process.terminate()
-        let deadline = Date().addingTimeInterval(0.5)
+        let deadline = Date().addingTimeInterval(terminationGrace)
         while Date() < deadline,
               process.isRunning || group.map(Self.isGroupAlive) == true {
             Thread.sleep(forTimeInterval: 0.01)
@@ -485,12 +498,20 @@ private final class LocalServerProcessLifecycle: @unchecked Sendable {
 
 @MainActor
 private final class ManagedLocalServerProcess: LocalServerProcess {
+    /// The pre-#1124 contract: TERM, then two seconds for uvicorn to drain
+    /// in-flight requests, then KILL.
+    static let terminationGrace: TimeInterval = 2
     private let lifecycle: LocalServerProcessLifecycle
     private var terminationTask: Task<Void, Never>?
     init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
         var environment = ProcessInfo.processInfo.environment
         environment["HF_HOME"] = models.path
-        let lifecycle = LocalServerProcessLifecycle(executable: binary.path, arguments: ["--preload"], environment: environment)
+        let lifecycle = LocalServerProcessLifecycle(
+            executable: binary.path,
+            arguments: ["--preload"],
+            environment: environment,
+            terminationGrace: Self.terminationGrace
+        )
         self.lifecycle = lifecycle
         let process = lifecycle.process
         process.terminationHandler = { [weak lifecycle] process in
