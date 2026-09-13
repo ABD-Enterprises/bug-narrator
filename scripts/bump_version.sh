@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Atomically bump the app version across every source of truth and promote the
-# CHANGELOG "Unreleased" section. VERSION is the source of truth.
+# Atomically bump the app version across every source of truth and move the
+# CHANGELOG "Unreleased" section into CHANGELOG-archive.md. VERSION is the
+# source of truth.
 #
 # Usage:
 #   scripts/bump_version.sh <marketing-version> [build-number]
@@ -52,21 +53,38 @@ printf '%s\n' "$NEW_VERSION" > VERSION
     -e "s/^\([[:space:]]*CURRENT_PROJECT_VERSION:[[:space:]]*\).*$/\1$NEW_BUILD/" \
     project.yml
 
-# 3. Promote the CHANGELOG "## Unreleased" heading to the new version, leaving a
-#    fresh empty Unreleased section above it. Only runs if Unreleased exists.
-if grep -qE '^##[[:space:]]+[Uu]nreleased' CHANGELOG.md; then
-    awk -v ver="$NEW_VERSION" -v today="$TODAY" '
-        !done && /^##[[:space:]]+[Uu]nreleased/ {
-            print "## Unreleased"
-            print ""
-            print "## " ver " - " today
-            done = 1
-            next
-        }
-        { print }
-    ' CHANGELOG.md > CHANGELOG.md.tmp
-    mv CHANGELOG.md.tmp CHANGELOG.md
-fi
+# 3. Archive the Unreleased body and reset the active changelog. The active file
+#    intentionally contains no released sections so agent reads stay bounded.
+python3 - "$NEW_VERSION" "$TODAY" <<'PY'
+from pathlib import Path
+import sys
+
+version, today = sys.argv[1:]
+active_path = Path("CHANGELOG.md")
+archive_path = Path("CHANGELOG-archive.md")
+
+active = active_path.read_text()
+marker = "## Unreleased"
+if marker not in active:
+    raise SystemExit("error: CHANGELOG.md is missing ## Unreleased")
+
+body = active.split(marker, 1)[1].strip()
+if not body:
+    raise SystemExit("error: CHANGELOG.md Unreleased section is empty")
+if body.startswith("## "):
+    raise SystemExit("error: CHANGELOG.md contains a released section; move it to CHANGELOG-archive.md")
+
+archive = archive_path.read_text().rstrip()
+heading_end = archive.find("\n## ")
+section = f"## {version} - {today}\n\n{body}\n"
+if heading_end == -1:
+    updated_archive = f"{archive}\n\n{section}"
+else:
+    updated_archive = f"{archive[:heading_end].rstrip()}\n\n{section}\n{archive[heading_end + 1:].lstrip()}"
+
+archive_path.write_text(updated_archive)
+active_path.write_text("# Changelog\n\n## Unreleased\n")
+PY
 
 echo "Bumped to $NEW_VERSION (build $NEW_BUILD)."
 echo "Verifying consistency..."

@@ -4,7 +4,7 @@
 #   - VERSION                              (human-facing marketing version)
 #   - project.yml MARKETING_VERSION        (XcodeGen → Info.plist CFBundleShortVersionString)
 #   - project.yml CURRENT_PROJECT_VERSION  (build number; must be a positive integer)
-#   - CHANGELOG.md latest released heading  (first "## X.Y.Z" below any "## Unreleased")
+#   - CHANGELOG-archive.md latest released heading
 #
 # VERSION is the source of truth. Run scripts/bump_version.sh to change it; this
 # check guards against the three files drifting apart (e.g. a release shipping
@@ -30,9 +30,8 @@ CURRENT_PROJECT_VERSION="$(awk -F': *' '/^[[:space:]]*CURRENT_PROJECT_VERSION:/ 
 [[ -n "$MARKETING_VERSION" ]] || fail "project.yml is missing MARKETING_VERSION"
 [[ -n "$CURRENT_PROJECT_VERSION" ]] || fail "project.yml is missing CURRENT_PROJECT_VERSION"
 
-# Latest released CHANGELOG version: first "## X.Y.Z" heading, skipping "## Unreleased".
+# Latest released version: first "## X.Y.Z" heading in the release archive.
 CHANGELOG_VERSION="$(awk '
-    /^##[[:space:]]+[Uu]nreleased/ { next }
     /^##[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+/ {
         line = $0
         sub(/^##[[:space:]]+/, "", line)
@@ -40,9 +39,9 @@ CHANGELOG_VERSION="$(awk '
         print line
         exit
     }
-' CHANGELOG.md)"
+' CHANGELOG-archive.md)"
 
-[[ -n "$CHANGELOG_VERSION" ]] || fail "CHANGELOG.md has no released '## X.Y.Z' heading"
+[[ -n "$CHANGELOG_VERSION" ]] || fail "CHANGELOG-archive.md has no released '## X.Y.Z' heading"
 
 errors=0
 
@@ -52,7 +51,7 @@ if [[ "$VERSION_FILE_VALUE" != "$MARKETING_VERSION" ]]; then
 fi
 
 if [[ "$VERSION_FILE_VALUE" != "$CHANGELOG_VERSION" ]]; then
-    echo "drift: VERSION ($VERSION_FILE_VALUE) != latest released CHANGELOG version ($CHANGELOG_VERSION)" >&2
+    echo "drift: VERSION ($VERSION_FILE_VALUE) != latest archived CHANGELOG version ($CHANGELOG_VERSION)" >&2
     errors=1
 fi
 
