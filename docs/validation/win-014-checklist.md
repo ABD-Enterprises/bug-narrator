@@ -35,7 +35,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 ### 1. Durable workflow: `record -> review -> refine -> export`
 
-- `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots, add one marker, stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing matching the layout in row 8, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
+- `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots (each capture is what creates a timeline marker on Windows — `ScreenshotCapturePlanner` is the only producer of `SessionTimelineMoment`; there is no standalone marker action), stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing matching the layout in row 8, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
 - `[automation]` Covered today. Each transition is pinned in `BugNarrator.Windows.Tests`: start by `AudioInputDeviceSelectionTests.StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone`, stop → save by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession`, refine by `ReviewSessionActionServiceTests.ExtractIssuesAsync_WithConfiguredApiKey_SavesUpdatedSession`, export by `BundleExporterTests.FileSessionBundleExporter_ExportsTranscriptAndScreenshots`. No single test runs the whole chain; the human item above is what proves it end to end.
 
 ### 2. Compact launch surface (tray shell)
@@ -45,7 +45,8 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 ### 3. Recording Controls surface
 
-- `[human]` `Recording Controls` opens the window; it shows the idle state, transitions to recording on `Start`, shows elapsed time advancing, and returns to idle on `Stop`. Evidence: three screenshots (idle, recording, idle again) on the same SHA.
+- `[human]` `Show Recording Controls` opens the window; it shows the idle state, transitions to recording on `Start`, and returns to idle on `Stop`. Evidence: three screenshots (idle, recording, idle again) on the same SHA.
+- `[automation]` Not covered today, and the behaviour itself is missing: `RecordingControlsWindow` has no elapsed-time display or timer (macOS `RecordingControlPanelView` has one), so "elapsed time advancing" cannot pass on any current build. Tracked as #1142 (WIN-021); once it lands, the human item above gains "shows elapsed time advancing" with the #1142 test as its automation half.
 - `[human]` Closing the window while recording does not stop the recording; reopening it shows the live state. Evidence: screenshot after reopen plus the log showing no `recording stopped` between close and reopen.
 
 ### 4. Single active recording session
@@ -93,7 +94,7 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 ### 11. Configurable AI provider setup
 
-- `[human]` Each of the three provider modes reaches a real endpoint: OpenAI with a real key, one OpenAI-compatible hosted endpoint, one local-compatible endpoint. `Validate` reports success for each, and one transcription completes through each. Evidence: the masked status text per mode and the resulting `transcript.md` line count. Never the key.
+- `[human]` Each of the three provider modes reaches a real endpoint: OpenAI with a real key, one OpenAI-compatible hosted endpoint, one local-compatible endpoint. `Validate` reports success for each, one transcription completes through each, **and one issue extraction completes through each** — transcription (`OpenAiTranscriptionClient`, `audio/transcriptions`) and extraction (`OpenAiIssueExtractionService`, `chat/completions`) are separate consumers, and an endpoint can serve one and not the other. Evidence: the masked status text per mode, the resulting `transcript.md` line count, and the extracted issue count per mode. Never the key.
 - `[human]` A wrong key produces a clear failure, not a hang. Evidence: the status text and the log line.
 
 ### 12. Recording audio source selection
@@ -116,7 +117,7 @@ The product spec's Accessibility Contract names five surfaces: the compact launc
 - `[human]` Keyboard-only use of the tray: with the mouse unplugged, reach the tray icon (Win+B, then arrow keys), open its menu with Enter or the menu key, move through every entry with the arrow keys, and activate `Show Recording Controls`. Evidence: a screenshot of the open menu with keyboard focus on an entry, and the log line for the window it opened.
 - `[human]` Keyboard-only traversal of Settings, Recording Controls, Session Library, and the review workspace's four tabs: every control is reachable with Tab/Shift+Tab in a sensible order, every action is operable with Enter/Space, tabs switch with the arrow keys, the selected tab and any selected filter announce as selected, dialogs close with Esc, and focus is visible at each step. Evidence: a short screen recording or a numbered list of the focus order per window with a screenshot of the focus ring on at least one control per window.
 - `[human]` Narrator reads each control on those surfaces with a meaningful name and role — not "button" with no label — and announces transient status changes (recording started, recording stopped, export finished). Evidence: the spoken names transcribed per window, or an Accessibility Insights for Windows snapshot of each.
-- `[automation]` Not covered today. No `AutomationProperties` appear anywhere in the Windows XAML, so unlabeled controls have nothing for Narrator to read, and no test would notice a label being added and later lost. Tracked as #1141 (WIN-020): explicit names on non-self-describing controls plus a test that parses the XAML and fails on any control without one.
+- `[automation]` Not covered today. No `AutomationProperties` appear anywhere in the Windows views, so unlabeled controls have nothing for Narrator to read, and no test would notice a label being added and later lost. Tracked as #1141 (WIN-020): explicit names on non-self-describing controls plus a test that constructs each window on an STA thread and walks its controls — the views are built in C# (`App.xaml` is the only XAML file), so a XAML-parsing test would pass vacuously.
 
 ## Blocked on a human
 
@@ -141,8 +142,9 @@ Status of each is on its own ticket, not here.
 
 Checked on the commit this file landed in, by searching `windows/tests` for the coverage each item names:
 
+- **Row 3** — `RecordingControlsWindow` shows no elapsed time at all; macOS does. A behaviour gap, not just a coverage gap. Filed as #1142 (WIN-021).
 - **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
-- **Row 14** — no `AutomationProperties` anywhere in the Windows XAML; nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020).
+- **Row 14** — no `AutomationProperties` anywhere in the Windows views (which are C#; `App.xaml` is the only XAML file); nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020), whose test walks constructed windows because the views are C#, not XAML.
 - **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
