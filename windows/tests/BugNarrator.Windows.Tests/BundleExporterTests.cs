@@ -199,6 +199,50 @@ public sealed class BundleExporterTests : IDisposable
     }
 
     /// <summary>
+    /// The debug bundle contract (product-spec.md, "Debug Bundle") excludes AI-provider, GitHub, and
+    /// Jira credentials. The older test above carries two canaries and reads two named files; this
+    /// one carries all three in the shapes the app actually logs them — an Authorization header, a
+    /// Basic pair, and a bare token — and scans every file the bundle wrote, so a leak into any
+    /// file, including one added later, fails.
+    /// </summary>
+    [Fact]
+    public async Task FileDebugBundleExporter_LeaksNoneOfTheThreeCredentialTypesIntoAnyFile()
+    {
+        const string openAiCanary = "sk-fixturecanaryOPENAI0001";
+        const string gitHubCanary = "ghp_fixturecanaryGITHUB00001";
+        const string jiraCanary = "ATATT3xFfGF0fixturecanaryJIRA000000001";
+        var jiraBasic = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"tester@example.test:{jiraCanary}"));
+
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        diagnostics.Info("export", $"Authorization: Bearer {openAiCanary}");
+        diagnostics.Info("export", $"github token {gitHubCanary} rejected");
+        diagnostics.Info("export", $"Authorization: Basic {jiraBasic}");
+        diagnostics.Info("export", $"jira api token {jiraCanary} rejected");
+
+        var exporter = new FileDebugBundleExporter(storagePaths, new FakeWindowsAppSettingsStore(), diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        var files = Directory.GetFiles(bundlePath, "*", SearchOption.AllDirectories);
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var content = await File.ReadAllTextAsync(file);
+            foreach (var canary in new[] { openAiCanary, gitHubCanary, jiraCanary, jiraBasic })
+            {
+                Assert.False(
+                    content.Contains(canary, StringComparison.Ordinal),
+                    $"{Path.GetFileName(file)} contains the credential canary {canary[..8]}…");
+            }
+        }
+
+        // The log lines themselves survived, redacted — the test is not passing because logging failed.
+        var recentLog = await File.ReadAllTextAsync(Path.Combine(bundlePath, "recent-log.txt"));
+        Assert.Contains("jira api token [REDACTED] rejected", recentLog, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The bundle layout is a shared contract: contract-fixtures/session-bundle-layout.json is the
     /// same file Tests/BugNarratorTests/TranscriptExporterTests.swift reads on macOS. Reading it here
     /// rather than restating its entries means both platforms fail together when the layout changes.
