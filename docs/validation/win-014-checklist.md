@@ -6,13 +6,19 @@ Those rows used to cite #44 (`RR-002`) as the home of their remaining validation
 
 ## How an item is closed
 
-An item is closed only by an `orc add-evidence` comment on #1133 that names, in this order:
+The two classifications close differently, because their evidence differs in kind: a test on `main` is continuous proof that re-runs on every commit, while a screenshot is a snapshot of one build on one machine.
+
+A **`[human]`** item is closed only by an `orc add-evidence` comment on #1133 that names, in this order:
 
 1. the artifact (screenshot, log excerpt, bundle listing, exported body);
 2. the commit SHA of `main` the build under test came from;
 3. the host id it ran on.
 
-A matrix row moves to `Shipped` only in a PR that cites that comment. Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Later Windows changes to a row's implementation re-open its item — evidence is pinned to a SHA and is not carried forward silently.
+Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Later Windows changes to a row's implementation re-open its item — evidence is pinned to a SHA and is not carried forward silently.
+
+An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under CI. No comment is needed: CI is the evidence, and it re-proves the item on every commit. If the named test is later deleted or skipped, the item reopens. Three items below are closed this way on the commit this file landed in.
+
+A matrix row moves to `Shipped` only in a PR that cites the closing evidence for every item under it — the comment for each `[human]` item and the test name for each `[automation]` item.
 
 ## Classification
 
