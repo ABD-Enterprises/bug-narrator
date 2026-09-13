@@ -157,6 +157,58 @@ public sealed class OpenAiIssueExtractionServiceTests : IDisposable
         Assert.Contains("could not reach AI provider issue extraction", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The recovery contract (product-spec.md, "Missing or invalid AI provider recovery") needs the
+    /// user-facing message for a rejected, forbidden, or failing provider to be the one
+    /// BuildFailureMessage maps, not a raw status. Until now the only status this harness ever
+    /// returned was 200. The exception type matters too: ReviewSessionActionService saves the session
+    /// only after ExtractAsync returns, so a throw here is what keeps the session on disk unchanged.
+    /// </summary>
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "The AI provider credential was rejected for issue extraction.")]
+    [InlineData(HttpStatusCode.Forbidden, "The AI provider issue extraction request was forbidden.")]
+    [InlineData(HttpStatusCode.InternalServerError, "AI provider issue extraction failed with HTTP 500.")]
+    public async Task ExtractAsync_WhenTheProviderRejectsTheRequest_ThrowsTheMappedMessage(HttpStatusCode status, string expectedMessage)
+    {
+        var diagnostics = new WindowsDiagnostics(storagePaths);
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        var service = new OpenAiIssueExtractionService(
+            diagnostics,
+            new HttpClient(new TestHttpMessageHandler((request, cancellationToken) =>
+                Task.FromResult(new HttpResponseMessage(status)
+                {
+                    // No JSON error envelope: the status-code mapping must carry the message.
+                    Content = new StringContent("upstream failure", Encoding.UTF8, "text/plain"),
+                }))));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini", providerBaseUrl: null));
+
+        Assert.Equal(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_WhenTheProviderReturnsAnErrorEnvelope_PrefersItsMessage()
+    {
+        var diagnostics = new WindowsDiagnostics(storagePaths);
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        var service = new OpenAiIssueExtractionService(
+            diagnostics,
+            new HttpClient(new TestHttpMessageHandler((request, cancellationToken) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                {
+                    Content = new StringContent(
+                        """{"error":{"message":"Incorrect API key provided: sk-****."}}""",
+                        Encoding.UTF8,
+                        "application/json"),
+                }))));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ExtractAsync(session, "fixture-openai-key", "gpt-4.1-mini", providerBaseUrl: null));
+
+        Assert.Equal("Incorrect API key provided: sk-****.", exception.Message);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(rootDirectory))
