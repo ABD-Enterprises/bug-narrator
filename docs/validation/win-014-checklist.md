@@ -98,7 +98,7 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 - `[human]` With a completed session on disk, remove the provider key and attempt extraction. The app reports the missing provider and the session is unchanged on disk. Evidence: the status text screenshot and an unchanged `session.json` hash. (The transcription side of this path is already pinned by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithoutApiKey_SavesSessionAsNotConfigured`; the extraction side is not, which is why this item and #1135 exist.)
 - `[human]` Stop a recording with no provider configured, then restore the key and retry transcription from the library; the session gains a transcript. The spec requires this later retry. Evidence: the `Retry Needed` filter before, the retry action, and the transcript after.
 - `[automation]` Not covered today, and the behaviour itself is missing: Windows has no retry-transcription action; the only transcription call is at stop time. Tracked as #1146 (WIN-025).
-- `[automation]` The same for an invalid key (HTTP 401), a forbidden key (403), and a server error (HTTP 500), served by a fake endpoint. Verified missing; tracked as #1135 (WIN-016). Evidence: the test names once #1135 lands.
+- `[automation]` Covered today. `OpenAiIssueExtractionServiceTests.ExtractAsync_WhenTheProviderRejectsTheRequest_ThrowsTheMappedMessage` (401, 403, 500) and `ExtractAsync_WhenTheProviderReturnsAnErrorEnvelope_PrefersItsMessage` pin the user-facing text and the exception type that keeps the session unsaved (#1135). The session-on-disk guarantee itself is structural in `ReviewSessionActionService`, which saves only after `ExtractAsync` returns.
 
 ### 11. Configurable AI provider setup
 
@@ -163,4 +163,4 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 - **Row 9** — the redaction test has no Jira canary and checks two files, not the bundle. Filed as #1148 (WIN-027).
 - **Row 10** — no retry-transcription action exists. Filed as #1146 (WIN-025).
 - **Row 12** — no experimental system-audio flag; the gate is two of three. Filed as #1147 (WIN-026).
-- **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
+- **Row 10 (401/403/500)** — was a gap; closed by #1135, see the row.
