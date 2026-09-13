@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import Darwin
 import XCTest
 @testable import BugNarrator
 
@@ -439,7 +440,9 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let start = Date()
         do {
             try await LocalTranscriptionManager.background {
-                try LocalTranscriptionManager.runCommand("/bin/sleep", ["10"], timeout: 0.05)
+                // This process ignores TERM, so completion proves the lifecycle
+                // escalates to KILL instead of leaving an installer helper alive.
+                try LocalTranscriptionManager.runCommand("/bin/sh", ["-c", "trap '' TERM; while :; do :; done"], timeout: 0.05)
             }
             XCTFail("Expected timeout")
         } catch { XCTAssertTrue(error.localizedDescription.contains("timed out")) }
@@ -451,6 +454,25 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         worker.cancel()
         do { try await worker.value; XCTFail("Expected cancellation") }
         catch is CancellationError {}
+
+        let childPIDFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bug-narrator-child-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: childPIDFile) }
+        let command = "spawn_child() { trap '' TERM; while :; do sleep 1; done; }; trap 'spawn_child & echo $! > \"\(childPIDFile.path)\"; exit 0' TERM; while :; do sleep 1; done"
+        do {
+            try await LocalTranscriptionManager.background {
+                try LocalTranscriptionManager.runCommand("/bin/sh", ["-c", command], timeout: 0.1)
+            }
+            XCTFail("Expected process-tree timeout")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("timed out")) }
+        let childPID = try XCTUnwrap(
+            Int32(String(contentsOf: childPIDFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines))
+        )
+        defer { if kill(childPID, 0) == 0 { kill(childPID, SIGKILL) } }
+        for _ in 0..<100 where kill(childPID, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotEqual(kill(childPID, 0), 0, "TERM-resistant child survived forced process-tree termination")
     }
 
 }

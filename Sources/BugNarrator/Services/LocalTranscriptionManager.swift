@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import CryptoKit
+import Darwin
 import Foundation
 
 @MainActor
@@ -273,34 +274,22 @@ final class LocalTranscriptionManager: ObservableObject {
     nonisolated static func runCommand(_ executable: String, _ arguments: [String], timeout: TimeInterval) throws {
         let cleanup = executable == "/usr/bin/hdiutil" && arguments.first == "detach"
         if !cleanup { try Task.checkCancellation() }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        let errors = Pipe()
-        let diagnostic = LocalServerDiagnostic()
-        process.standardError = errors
-        diagnostic.read(from: errors)
-        defer { diagnostic.finishReading(errors) }
-        try process.run()
-        errors.fileHandleForWriting.closeFile()
+        let lifecycle = LocalServerProcessLifecycle(executable: executable, arguments: arguments)
+        let process = lifecycle.process
+        defer { lifecycle.finishDiagnostics() }
+        try lifecycle.run()
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning {
             if (!cleanup && Task.isCancelled) || Date() >= deadline {
-                process.terminate()
-                // A misbehaving helper must not keep installation busy forever.
-                let grace = Date().addingTimeInterval(0.5)
-                while process.isRunning && Date() < grace { Thread.sleep(forTimeInterval: 0.01) }
-                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                process.waitUntilExit()
+                lifecycle.terminateAndWait()
                 if !cleanup && Task.isCancelled { throw CancellationError() }
                 throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) timed out. Retry installation.")
             }
             Thread.sleep(forTimeInterval: 0.01)
         }
-        diagnostic.finishReading(errors)
+        lifecycle.finishDiagnostics()
         guard process.terminationStatus == 0 else {
-            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(diagnostic.text)")
+            throw Failure("\(URL(fileURLWithPath: executable).lastPathComponent) failed: \(lifecycle.diagnosticText)")
         }
     }
 
@@ -405,48 +394,125 @@ private final class LocalServerDiagnostic: @unchecked Sendable {
     }
 }
 
-@MainActor
-private final class ManagedLocalServerProcess: LocalServerProcess {
-    private let process: Process
-    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
-        let process = Process()
-        self.process = process
-        process.executableURL = binary
-        process.arguments = ["--preload"]
-        var environment = ProcessInfo.processInfo.environment
-        environment["HF_HOME"] = models.path
+// Every locally launched process follows this lifecycle: start its bounded stderr
+// drain, wait for normal completion, and on cancellation or timeout send TERM,
+// allow a short grace period, then send KILL and wait for exit. Keeping that
+// policy here prevents either installer helpers or the long-lived server from
+// acquiring a different shutdown contract.
+private enum LocalServerProcessLifecycleError: LocalizedError {
+    case processIsolationFailed
+
+    var errorDescription: String? { "Could not isolate the local helper process lifecycle" }
+}
+
+private final class LocalServerProcessLifecycle: @unchecked Sendable {
+    let process = Process()
+    private let errors = Pipe()
+    private let startupInput = Pipe()
+    private let processGroupOutput = Pipe()
+    private let diagnostic = LocalServerDiagnostic()
+    private var processGroup: pid_t?
+
+    init(executable: String, arguments: [String], environment: [String: String]? = nil) {
+        // A non-interactive shell with job control puts its background job in a
+        // dedicated process group. The first stdout line is the owned group ID;
+        // the launched program's stdout remains discarded as before.
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            "set -m; ( read ready && exec \"$@\" ) >/dev/null & child=$!; set +m; printf '%s\\n' \"$child\"; exec 1>/dev/null; wait \"$child\"",
+            "bug-narrator-process-lifecycle",
+            executable,
+        ] + arguments
         process.environment = environment
-        process.standardOutput = FileHandle.nullDevice
-        let errors = Pipe()
-        let diagnostic = LocalServerDiagnostic()
+        process.standardInput = startupInput
+        process.standardOutput = processGroupOutput
         process.standardError = errors
         diagnostic.read(from: errors)
-        process.terminationHandler = { process in
-            diagnostic.finishReading(errors)
-            let status = process.terminationStatus
-            let detail = diagnostic.text
-            Task { @MainActor in onExit(status, detail) }
-        }
+    }
+
+    func run() throws {
         do {
             try process.run()
             errors.fileHandleForWriting.closeFile()
-        }
-        catch { errors.fileHandleForReading.readabilityHandler = nil; throw error }
-    }
-    func waitForExit() async {
-        while process.isRunning {
-            try? await Task.sleep(for: .milliseconds(10))
+            processGroupOutput.fileHandleForWriting.closeFile()
+            let data = processGroupOutput.fileHandleForReading.readData(ofLength: 32)
+            let value = String(decoding: data, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let group = pid_t(value), group > 1, group != getpgrp() else {
+                process.terminate()
+                process.waitUntilExit()
+                throw LocalServerProcessLifecycleError.processIsolationFailed
+            }
+            guard getpgid(group) == group else {
+                startupInput.fileHandleForWriting.closeFile()
+                process.terminate()
+                process.waitUntilExit()
+                throw LocalServerProcessLifecycleError.processIsolationFailed
+            }
+            processGroup = group
+            startupInput.fileHandleForWriting.write(Data("ready\n".utf8))
+            startupInput.fileHandleForWriting.closeFile()
+        } catch {
+            try? startupInput.fileHandleForWriting.close()
+            errors.fileHandleForReading.readabilityHandler = nil
+            throw error
         }
     }
 
-    func terminate() {
-        guard process.isRunning else { return }
+    func terminateAndWait() {
+        let group = processGroup
+        guard process.isRunning || group.map(Self.isGroupAlive) == true else { return }
+        if let group, Self.isGroupAlive(group) { kill(-group, SIGTERM) }
         process.terminate()
-        let process = self.process
-        Task.detached {
-            try? await Task.sleep(for: .seconds(2))
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        let deadline = Date().addingTimeInterval(0.5)
+        while Date() < deadline,
+              process.isRunning || group.map(Self.isGroupAlive) == true {
+            Thread.sleep(forTimeInterval: 0.01)
         }
+        if let group, Self.isGroupAlive(group) { kill(-group, SIGKILL) }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        process.waitUntilExit()
+    }
+
+    private static func isGroupAlive(_ group: pid_t) -> Bool {
+        kill(-group, 0) == 0 || errno == EPERM
+    }
+
+    func finishDiagnostics() { diagnostic.finishReading(errors) }
+    var diagnosticText: String { diagnostic.text }
+}
+
+@MainActor
+private final class ManagedLocalServerProcess: LocalServerProcess {
+    private let lifecycle: LocalServerProcessLifecycle
+    private var terminationTask: Task<Void, Never>?
+    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
+        var environment = ProcessInfo.processInfo.environment
+        environment["HF_HOME"] = models.path
+        let lifecycle = LocalServerProcessLifecycle(executable: binary.path, arguments: ["--preload"], environment: environment)
+        self.lifecycle = lifecycle
+        let process = lifecycle.process
+        process.terminationHandler = { [weak lifecycle] process in
+            guard let lifecycle else { return }
+            lifecycle.finishDiagnostics()
+            let status = process.terminationStatus
+            let detail = lifecycle.diagnosticText
+            Task { @MainActor in onExit(status, detail) }
+        }
+        try lifecycle.run()
+    }
+    func waitForExit() async {
+        while lifecycle.process.isRunning {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        await terminationTask?.value
+    }
+
+    func terminate() {
+        guard terminationTask == nil else { return }
+        let lifecycle = lifecycle
+        terminationTask = Task.detached { lifecycle.terminateAndWait() }
     }
 }
 
