@@ -340,8 +340,14 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("  2) forged"), "  2\\) forged")
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("3.5 seconds"), "3.5 seconds", "a decimal is not a list")
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("v1.2"), "v1.2")
-        // GH-123 is an issue reference too.
+        // GH-123 is an issue reference too, in any case.
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("see GH-42"), "see GH-\u{200B}42")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("see gh-42"), "see gh-\u{200B}42")
+        // A lone CR is a line break to GitHub: line-start escapes must still apply.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("Title\r===\r```"), "Title\n\\===\n\\```")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("a\r\n- b"), "a\n\\- b")
+        // A colon-led delimiter row makes a table without any leading pipe.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown(":--|:--"), "\\:--|:--")
     }
 
     func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {

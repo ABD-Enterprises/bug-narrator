@@ -6,7 +6,12 @@ extension GitHubExportProvider {
     /// cross-links, inject raw HTML, or start new block-level structure
     /// (headings, quotes, lists, tables, code fences).
     static func neutralizingUntrustedMarkdown(_ text: String) -> String {
-        let lines = text.components(separatedBy: "\n").map { line -> String in
+        // GitHub treats a lone CR as a line break; splitting on "\n" alone would
+        // leave every line-start escape below unapplied after one.
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalized.components(separatedBy: "\n").map { line -> String in
             var escaped = line
                 // First, so an attacker's own backslash cannot pair with one we
                 // add below ("\\[" is a literal backslash followed by a LIVE "[").
@@ -24,14 +29,15 @@ extension GitHubExportProvider {
                 // target is what the reader sees (#1117).
                 .replacingOccurrences(of: "[", with: "\\[")
                 // "GH-123" is an issue reference GitHub links just like "#123".
-                .replacingOccurrences(of: "GH-", with: "GH-\u{200B}")
+                .replacingOccurrences(of: "GH-", with: "GH-\u{200B}", options: .caseInsensitive)
             // Block-level syntax is decided by the first NON-SPACE character
             // (CommonMark allows up to three spaces of indent), so look past
             // indentation; "_" covers "___" thematic breaks, and "1." / "1)"
             // ordered lists could renumber or forge items in our own lists.
             let indent = escaped.prefix { $0 == " " }
             let body = String(escaped.dropFirst(indent.count))
-            if let first = body.first, "-*+|=`~_".contains(first) {
+            // ":" starts a table delimiter row (":--|:--") with no leading pipe.
+            if let first = body.first, "-*+|=`~_:".contains(first) {
                 return indent + "\\" + body
             }
             // "1. x" → "1\. x": the escaped delimiter can no longer start a list.
