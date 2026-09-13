@@ -41,7 +41,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 ### 2. Compact launch surface (tray shell)
 
 - `[human]` After launch, the tray icon is visible (or reachable through the overflow chevron) and its context menu shows the entries `TrayShell.BuildMenu` creates, which are also the canonical terms in `product-spec.md`: a `Status: …` line, `Start Recording`, `Stop Recording`, `Capture Screenshot`, `Show Recording Controls`, `Open Session Library`, `Settings`, `About`, `Quit`. Evidence: one screenshot of the open menu, and one with the icon in the overflow flyout if Windows placed it there.
-- `[automation]` Partly covered today. `TrayPresentationStateTests.SupportEntries_MatchTheMacProductInfoMenuInOrder` and `Links_EqualTheMacConstants` (#1143) pin the View Documentation, Report an Issue, View Changelog, and Support Development entries and their macOS destinations. Still missing against the spec: the recovery-guidance entry and Check for Updates — both need surfaces Windows does not have yet (a structured blocker model; an update checker) and are not filed until someone decides their shape.
+- `[automation]` Partly covered today. `TrayPresentationStateTests.SupportEntries_MatchTheMacProductInfoMenuInOrder` and `Links_EqualTheMacConstants` (#1143) pin the entry *data* — labels, order, and the macOS destinations — not the WinForms menu that renders it; `TrayShell.BuildMenu` has no test harness, so the rendered menu is what the human item above checks. Still missing against the spec: the recovery-guidance entry (#1160, WIN-028) and Check for Updates (#1161, WIN-029).
 - `[human]` `Quit` from the tray exits cleanly: no `BugNarrator.Windows` process remains and the log ends with `app exit`. Evidence: the log tail and a process-list line.
 
 ### 3. Recording Controls surface
@@ -152,7 +152,7 @@ Status of each is on its own ticket, not here.
 
 Checked on the commit this file landed in, by searching `windows/tests` for the coverage each item names:
 
-- **Row 2** — the four help entries landed in #1143; recovery guidance and Check for Updates remain unfiled pending a design decision (see the row).
+- **Row 2** — the four help entries landed in #1143; recovery guidance is #1160 and Check for Updates is #1161.
 - **Row 3** — `RecordingControlsWindow` shows no elapsed time at all; macOS does. A behaviour gap, not just a coverage gap. Filed as #1142 (WIN-021).
 - **Row 4** — was a gap; closed by #1136, see the row.
 - **Row 6** — no `Retry Needed` filter. Filed as #1144 (WIN-023).
