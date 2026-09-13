@@ -3,6 +3,7 @@ using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace BugNarrator.Windows.Views;
 
@@ -15,7 +16,13 @@ public sealed class RecordingControlsWindow : Window
     private readonly Button stopButton;
     private readonly Button screenshotButton;
     private readonly TextBlock stateTextBlock;
+    private readonly TextBlock elapsedTextBlock;
     private readonly TextBlock statusTextBlock;
+    // The presenter decides what to show and caches the final duration across the states that
+    // carry no draft; the timer only ticks while recording (RecordingElapsedTimePresenter.ShouldTick).
+    private readonly RecordingElapsedTimePresenter elapsedPresenter = new();
+    private readonly DispatcherTimer elapsedTimer;
+    private RecordingControlState currentState;
 
     public RecordingControlsWindow(
         IRecordingLifecycleService recordingLifecycleService,
@@ -63,6 +70,14 @@ public sealed class RecordingControlsWindow : Window
         stateTextBlock = new TextBlock
         {
             FontWeight = FontWeights.SemiBold,
+        };
+
+        elapsedTextBlock = new TextBlock
+        {
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold,
+            Visibility = Visibility.Collapsed,
         };
 
         statusTextBlock = new TextBlock
@@ -134,6 +149,7 @@ public sealed class RecordingControlsWindow : Window
                 Children =
                 {
                     stateTextBlock,
+                    elapsedTextBlock,
                     statusTextBlock,
                 },
             },
@@ -182,14 +198,32 @@ public sealed class RecordingControlsWindow : Window
             Child = contentGrid,
         };
 
+        elapsedTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        elapsedTimer.Tick += OnElapsedTick;
+
+        currentState = recordingLifecycleService.CurrentState;
         recordingLifecycleService.StateChanged += OnStateChanged;
         Closed += OnClosed;
-        ApplyState(recordingLifecycleService.CurrentState);
+        ApplyState(currentState);
     }
 
     private void ApplyState(RecordingControlState state)
     {
+        currentState = state;
         stateTextBlock.Text = $"State: {state.WorkflowState}";
+        RenderElapsed();
+        if (RecordingElapsedTimePresenter.ShouldTick(state))
+        {
+            elapsedTimer.Start();
+        }
+        else
+        {
+            elapsedTimer.Stop();
+        }
+
         statusTextBlock.Text = state.StatusMessage;
         startButton.IsEnabled = state.CanStart;
         stopButton.IsEnabled = state.CanStop;
@@ -198,7 +232,21 @@ public sealed class RecordingControlsWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        elapsedTimer.Stop();
+        elapsedTimer.Tick -= OnElapsedTick;
         recordingLifecycleService.StateChanged -= OnStateChanged;
+    }
+
+    private void OnElapsedTick(object? sender, EventArgs e)
+    {
+        RenderElapsed();
+    }
+
+    private void RenderElapsed()
+    {
+        var text = elapsedPresenter.Text(currentState, DateTimeOffset.Now);
+        elapsedTextBlock.Text = text;
+        elapsedTextBlock.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnStartRecordingClicked(object? sender, RoutedEventArgs e)
