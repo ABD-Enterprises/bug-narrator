@@ -8,6 +8,9 @@ extension GitHubExportProvider {
     static func neutralizingUntrustedMarkdown(_ text: String) -> String {
         let lines = text.components(separatedBy: "\n").map { line -> String in
             var escaped = line
+                // First, so an attacker's own backslash cannot pair with one we
+                // add below ("\\[" is a literal backslash followed by a LIVE "[").
+                .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "<", with: "&lt;")
                 .replacingOccurrences(of: ">", with: "&gt;")
                 // A zero-width space after @/# breaks GitHub's mention and issue
@@ -20,10 +23,23 @@ extension GitHubExportProvider {
                 // Bare URLs are left alone: GitHub autolinks them and the
                 // target is what the reader sees (#1117).
                 .replacingOccurrences(of: "[", with: "\\[")
-            if let first = escaped.first, "-*+|=`~".contains(first) {
-                escaped = "\\" + escaped
+                // "GH-123" is an issue reference GitHub links just like "#123".
+                .replacingOccurrences(of: "GH-", with: "GH-\u{200B}")
+            // Block-level syntax is decided by the first NON-SPACE character
+            // (CommonMark allows up to three spaces of indent), so look past
+            // indentation; "_" covers "___" thematic breaks, and "1." / "1)"
+            // ordered lists could renumber or forge items in our own lists.
+            let indent = escaped.prefix { $0 == " " }
+            let body = String(escaped.dropFirst(indent.count))
+            if let first = body.first, "-*+|=`~_".contains(first) {
+                return indent + "\\" + body
             }
-            return escaped
+            // "1. x" → "1\. x": the escaped delimiter can no longer start a list.
+            return indent + body.replacingOccurrences(
+                of: #"^(\d{1,9})([.)])(?=\s|$)"#,
+                with: "$1\\\\$2",
+                options: .regularExpression
+            )
         }
         return lines.joined(separator: "\n")
     }
@@ -63,9 +79,16 @@ extension GitHubExportProvider {
             lines.append("- Component: \(Self.neutralizingUntrustedMarkdown(component))")
         }
 
-        // Inside a code span markdown is inert, but a backtick in the hint would
-        // close the span early and render whatever follows it.
-        lines.append("- Deduplication hint: `\(issue.deduplicationHint.replacingOccurrences(of: "`", with: "\u{2019}"))`")
+        // Inside a code span markdown is inert, but a backtick would close the
+        // span early and a blank line ends the paragraph (and the list) outright,
+        // dropping the rest of the hint into raw markdown. The hint is a one-line
+        // key by intent, so collapse it to one line and strip backticks.
+        let hint = issue.deduplicationHint
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .replacingOccurrences(of: "`", with: "\u{2019}")
+        lines.append("- Deduplication hint: `\(hint)`")
 
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
             lines.append("- Transcript section: \(Self.neutralizingUntrustedMarkdown(sectionTitle))")
@@ -179,11 +202,13 @@ extension GitHubExportProvider {
 
     private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
         try annotationRenderer.annotatedScreenshotExports(for: issue, session: session).map { export in
+            // `summaries` is built from model-authored annotation labels.
+            let summaries = Self.neutralizingUntrustedMarkdown(export.summaries)
             if let renderedFileName = export.renderedFileName {
-                return "- \(renderedFileName) from `\(export.screenshotFileName)` (`\(export.timeLabel)`) — \(export.summaries)"
+                return "- \(renderedFileName) from `\(export.screenshotFileName)` (`\(export.timeLabel)`) — \(summaries)"
             }
 
-            return "- \(export.screenshotFileName) (`\(export.timeLabel)`) — \(export.summaries)"
+            return "- \(export.screenshotFileName) (`\(export.timeLabel)`) — \(summaries)"
         }
     }
 }

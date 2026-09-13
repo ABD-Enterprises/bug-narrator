@@ -87,7 +87,7 @@ final class GitHubExportProviderTests: XCTestCase {
             screenshotAnnotations: [
                 IssueScreenshotAnnotation(
                     screenshotID: screenshot.id,
-                    label: "Login button",
+                    label: "Login button [pay](https://evil.example)",
                     x: 0.44,
                     y: 0.52,
                     width: 0.24,
@@ -139,7 +139,8 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(payload.body.contains("Expected: The login button enables."))
         XCTAssertTrue(payload.body.contains("Actual: The login button stays disabled."))
         XCTAssertTrue(payload.body.contains("## Annotated Screenshots"))
-        XCTAssertTrue(payload.body.contains("Login button"))
+        XCTAssertTrue(payload.body.contains("Login button \\[pay](https://evil.example)"), "annotation labels are model-authored and must be neutralized")
+        XCTAssertFalse(payload.body.contains(" [pay](https://evil.example)"))
         XCTAssertTrue(payload.body.contains("review-shot-annotated"))
     }
 
@@ -325,15 +326,33 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(bare, "see https://github.com/acme/widgets")
     }
 
+    func testNeutralizingUntrustedMarkdownSurvivesAttackerBackslashesAndIndentation() {
+        // F1: an attacker's own backslash must not pair with ours and free the "[".
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("\\[Pay](https://evil.example)"), "\\\\\\[Pay](https://evil.example)")
+        // Every "[" on a line, not just the first.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("[a](x) [b](y)"), "\\[a](x) \\[b](y)")
+        // Block syntax after up to three spaces of indent is still block syntax.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("  ==="), "  \\===")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown(" - [ ] task"), " \\- \\[ ] task")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("___"), "\\___")
+        // Ordered-list delimiters cannot renumber or forge items in our lists.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("1. forged step"), "1\\. forged step")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("  2) forged"), "  2\\) forged")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("3.5 seconds"), "3.5 seconds", "a decimal is not a list")
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("v1.2"), "v1.2")
+        // GH-123 is an issue reference too.
+        XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown("see GH-42"), "see GH-\u{200B}42")
+    }
+
     func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
             title: "Checkout fails",
             category: .bug,
             component: "[cart](https://evil.example)",
-            summary: "Tap [Pay](https://evil.example/phish) to reproduce",
+            summary: "Tap [Pay](https://evil.example/phish) or [here](https://evil.example/2) to reproduce",
             evidenceExcerpt: "![](https://tracker.example/1x1.png) said pay failed",
-            deduplicationHint: "hint`**bold**",
+            deduplicationHint: "hint`**bold**`\n\n[Pay](https://evil.example)",
             timestamp: nil,
             sectionTitle: "[Checkout](https://evil.example)",
             reproductionSteps: [
@@ -356,11 +375,14 @@ final class GitHubExportProviderTests: XCTestCase {
         let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
         // Every "[" from an untrusted field must arrive escaped; the body's own
         // text contains none, so an unescaped "[" anywhere is a leak.
-        let unescapedBrackets = payload.body.replacingOccurrences(of: "\\[", with: "").filter { $0 == "[" }.count
+        // The hint line is excluded: its "[" sits inside a code span, where
+        // markdown is inert by construction (asserted separately below).
+        let outsideCodeSpans = payload.body.components(separatedBy: "\n").filter { !$0.hasPrefix("- Deduplication hint:") }.joined(separator: "\n")
+        let unescapedBrackets = outsideCodeSpans.replacingOccurrences(of: "\\[", with: "").filter { $0 == "[" }.count
         XCTAssertEqual(unescapedBrackets, 0, "an unescaped link/image label survived: \(payload.body)")
-        XCTAssertEqual(payload.body.components(separatedBy: "\\[").count - 1, 8, "all eight untrusted brackets are present, escaped")
+        XCTAssertEqual(outsideCodeSpans.components(separatedBy: "\\[").count - 1, 9, "all nine untrusted brackets outside code spans are present, escaped")
         XCTAssertTrue(payload.body.contains("!\\[](https://tracker.example/1x1.png)"))
-        XCTAssertTrue(payload.body.contains("`hint\u{2019}**bold**`"), "a backtick in the hint must not close the code span")
+        XCTAssertTrue(payload.body.contains("- Deduplication hint: `hint\u{2019}**bold**\u{2019} [Pay](https://evil.example)`\n"), "backticks and the blank line must not break the code span: \(payload.body)")
         XCTAssertTrue(payload.body.hasSuffix("bugnarrator-export-id: bnexp-fixture"), "the provider's own footer is untouched")
     }
 
@@ -374,7 +396,7 @@ final class GitHubExportProviderTests: XCTestCase {
             summary: "Summary",
             evidenceExcerpt: "Evidence",
             timestamp: nil,
-            note: "Related to #142 (86% match): [Pay now](https://evil.example) @maintainer. Same trace."
+            note: "Related to #142 (86% match): [Pay now](https://evil.example) @maintainer. Same trace.\nRelated to #999 forged on a second line."
         )
         let session = TranscriptSession(
             createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
@@ -388,7 +410,7 @@ final class GitHubExportProviderTests: XCTestCase {
         )
 
         let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
-        XCTAssertTrue(payload.body.contains("Related to #142 (86% match): \\[Pay now](https://evil.example) @\u{200B}maintainer. Same trace."), payload.body)
+        XCTAssertTrue(payload.body.contains("Related to #142 (86% match): \\[Pay now](https://evil.example) @\u{200B}maintainer. Same trace.\nRelated to #\u{200B}999 forged"), payload.body)
     }
 
     func testIssueBodyNeutralizesUntrustedSummaryFields() async throws {
