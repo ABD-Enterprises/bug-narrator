@@ -49,18 +49,46 @@ public sealed class RecordingElapsedTimePresenterTests
     [InlineData(RecordingWorkflowState.Completed)]
     [InlineData(RecordingWorkflowState.Failed)]
     [InlineData(RecordingWorkflowState.Idle)]
-    public void LeavingRecording_FreezesTheLastValueThroughEveryLaterState(RecordingWorkflowState later)
+    public void LeavingRecording_FreezesAtTheTransitionAndStaysFrozenThroughEveryLaterState(RecordingWorkflowState later)
     {
         var presenter = new RecordingElapsedTimePresenter();
         presenter.Text(State(RecordingWorkflowState.Recording, Start), Start.AddSeconds(75));
 
-        // Completed and Failed carry no draft — that is exactly why the presenter must cache.
+        // Completed, Failed, and Idle carry no draft — that is exactly why the presenter must cache.
         var laterState = later is RecordingWorkflowState.Stopping or RecordingWorkflowState.Saving
-            ? State(later, Start)
+            ? State(later, Start, stoppedAt: Start.AddSeconds(76))
             : RecordingControlState.Idle() with { WorkflowState = later };
 
-        Assert.Equal("01:15", presenter.Text(laterState, Start.AddSeconds(500)));
+        // The transition itself lands at 76 s and freezes there...
+        Assert.Equal("01:16", presenter.Text(laterState, Start.AddSeconds(76)));
+        // ...and a much later render still shows 76 s, not 500 s.
+        Assert.Equal("01:16", presenter.Text(laterState, Start.AddSeconds(500)));
         Assert.False(RecordingElapsedTimePresenter.ShouldTick(laterState));
+    }
+
+    [Fact]
+    public void StoppingBetweenTicks_FreezesAtTheDraftStopTimestampNotTheLastTick()
+    {
+        var presenter = new RecordingElapsedTimePresenter();
+        presenter.Text(State(RecordingWorkflowState.Recording, Start), Start.AddSeconds(74));
+
+        // The lifecycle stops at 75.9 s, between the 74 s tick and the one that never comes.
+        var stopping = State(RecordingWorkflowState.Stopping, Start, stoppedAt: Start.AddSeconds(75.9));
+        Assert.Equal("01:15", presenter.Text(stopping, Start.AddSeconds(77)));
+    }
+
+    [Fact]
+    public void StoppingBetweenTicks_WithoutADraft_FreezesAtTheTransitionTime()
+    {
+        var presenter = new RecordingElapsedTimePresenter();
+        presenter.Text(State(RecordingWorkflowState.Recording, Start), Start.AddSeconds(74));
+
+        // A transition straight to a draft-less state: the call time is the only stop time there is,
+        // and it must be used rather than the stale 74 s tick.
+        var failed = RecordingControlState.Idle() with { WorkflowState = RecordingWorkflowState.Failed };
+        Assert.Equal("01:16", presenter.Text(failed, Start.AddSeconds(76.4)));
+        // And it stays frozen there; later calls do not keep counting.
+        Assert.Equal("01:16", presenter.Text(failed, Start.AddSeconds(300)));
     }
 
     [Fact]
@@ -74,14 +102,14 @@ public sealed class RecordingElapsedTimePresenterTests
         Assert.Equal("00:03", presenter.Text(State(RecordingWorkflowState.Recording, secondStart), secondStart.AddSeconds(3)));
     }
 
-    private static RecordingControlState State(RecordingWorkflowState workflowState, DateTimeOffset startedAt)
+    private static RecordingControlState State(RecordingWorkflowState workflowState, DateTimeOffset startedAt, DateTimeOffset? stoppedAt = null)
     {
         var draft = new RecordingSessionDraft(
             SessionId: Guid.NewGuid(),
             Title: "Elapsed presenter",
             CreatedAt: startedAt,
             RecordingStartedAt: startedAt,
-            RecordingStoppedAt: null,
+            RecordingStoppedAt: stoppedAt,
             SessionDirectory: string.Empty,
             AudioFilePath: string.Empty,
             MetadataFilePath: string.Empty,

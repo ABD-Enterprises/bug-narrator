@@ -15,7 +15,7 @@ namespace BugNarrator.Core.Workflow;
 public sealed class RecordingElapsedTimePresenter
 {
     private string cachedText = string.Empty;
-    private bool wasRecording;
+    private DateTimeOffset? recordingStartedAt;
 
     /// <summary>
     /// The text to show for <paramref name="state"/> at <paramref name="now"/>, or an empty string
@@ -25,15 +25,26 @@ public sealed class RecordingElapsedTimePresenter
     {
         if (state.WorkflowState == RecordingWorkflowState.Recording && state.ActiveSession is not null)
         {
-            wasRecording = true;
-            cachedText = SessionTimeFormatter.FormatDuration(now - state.ActiveSession.RecordingStartedAt);
+            recordingStartedAt = state.ActiveSession.RecordingStartedAt;
+            cachedText = SessionTimeFormatter.FormatDuration(now - recordingStartedAt.Value);
             return cachedText;
         }
 
-        // Idle before any recording in this presenter's lifetime: nothing to show. Idle *after* one
-        // (the app returns to Idle from Completed on the next tick of the lifecycle) keeps the final
-        // duration, like every other post-recording state, until the next recording starts.
-        return wasRecording ? cachedText : string.Empty;
+        // Leaving Recording: freeze at the transition, not at the last timer tick, which can be up to
+        // a full interval (or more, if the UI thread was busy) behind the real stop. The draft carries
+        // the authoritative RecordingStoppedAt while it still exists (Stopping, Saving); when the
+        // transition lands directly in a draft-less state, the call time is the best available.
+        if (recordingStartedAt is { } startedAt)
+        {
+            var stoppedAt = state.ActiveSession?.RecordingStoppedAt ?? now;
+            cachedText = SessionTimeFormatter.FormatDuration(stoppedAt - startedAt);
+            recordingStartedAt = null;
+            return cachedText;
+        }
+
+        // Idle before any recording in this presenter's lifetime: nothing to show. Every later state
+        // keeps the frozen final duration until the next recording starts.
+        return cachedText;
     }
 
     /// <summary>True while the window should be ticking; false in every other state.</summary>
