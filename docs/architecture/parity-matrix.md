@@ -27,7 +27,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 | Configurable AI provider setup | Shipped | In Progress | Must remain aligned | Windows supports OpenAI, OpenAI-compatible hosted endpoints, and local-compatible endpoints; the remaining real-provider validation is tracked in #1133. |
 | Recording audio source selection | Shipped | In Progress | Platform-native capture allowed | Windows supports microphone, WASAPI loopback system audio, and mixed microphone + system audio muxed to one track (`WIN-010` / #453). The remaining real-desktop mixed-capture validation is tracked in #1133. |
 | Experimental GitHub and Jira export | Shipped as experimental | In Progress | Experimental on both platforms | Windows implementation exists; the remaining real-credential validation is tracked in #1133. |
-| Keyboard-first accessibility | Shipped baseline, validated in RR-005 | In Progress | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. |
+| Keyboard-first accessibility | Shipped baseline, validated in RR-005 | In Progress | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. The remaining real-desktop keyboard and Narrator validation is tracked in #1133. |
 | Public release packaging | Shipped as signed, notarized DMG | Repo-side signed tester zip path ready; certificate provisioning required | Platform-native packaging allowed | Windows first tester format is a zip containing signed `BugNarrator.Windows.exe` plus signature and package validation evidence. Installer/MSIX can follow if tester distribution requires it. |
 
 ## Current Deliberate Differences

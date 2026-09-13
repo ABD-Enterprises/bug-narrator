@@ -1,6 +1,6 @@
 # WIN-014: Real-Desktop Validation of the Windows Parity Rows
 
-Owner ticket: #1133. This checklist is the Windows counterpart of [QA_CHECKLIST.md](../QA_CHECKLIST.md), scoped to the thirteen rows in [parity-matrix.md](../architecture/parity-matrix.md) that are still `In Progress` for Windows.
+Owner ticket: #1133. This checklist is the Windows counterpart of [QA_CHECKLIST.md](../QA_CHECKLIST.md), scoped to the fourteen rows in [parity-matrix.md](../architecture/parity-matrix.md) that are still `In Progress` for Windows.
 
 Those rows used to cite #44 (`RR-002`) as the home of their remaining validation. #44 was closed as completed on 2026-05-13 on the strength of a packaged launch probe — the app stayed alive through initialization with one process running. That is a liveness check, not feature validation, and the ticket's own closing comment deferred the rest to #75, which is also closed. Nothing below is therefore assumed done because #44 is closed.
 
@@ -16,7 +16,7 @@ A **`[human]`** item is closed only by an `orc add-evidence` comment on #1133 th
 
 Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Later Windows changes to a row's implementation re-open its item — evidence is pinned to a SHA and is not carried forward silently.
 
-An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under CI. No comment is needed: CI is the evidence, and it re-proves the item on every commit. If the named test is later deleted or skipped, the item reopens. Four items below are closed this way on the commit this file landed in.
+An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under the `windows-build-and-test` CI job. No comment is needed: CI is the evidence. One honest limit: that job is path-gated in `.github/workflows/ci.yml` to `windows/**` and `ci.yml`, so it re-proves the item on every commit *that touches Windows code* — not on every commit. A change to `contract-fixtures/` alone runs neither platform's suite today; that gap is #1140, and until it lands, a fixture-only change is not proof that the named tests still pass. If the named test is later deleted or skipped, the item reopens. Four items below are closed this way on the commit this file landed in.
 
 A matrix row moves to `Shipped` only in a PR that cites the closing evidence for every item under it — the comment for each `[human]` item and the test name for each `[automation]` item.
 
@@ -27,7 +27,7 @@ A matrix row moves to `Shipped` only in a PR that cites the closing evidence for
 
 Most rows carry both kinds. A row moves to `Shipped` only when every item under it is closed.
 
-## The thirteen rows
+## The fourteen rows
 
 ### 1. Durable workflow: `record -> review -> refine -> export`
 
@@ -54,9 +54,11 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 This is the least-validated row and the most hardware-dependent.
 
-- `[human]` On a machine with two monitors where the secondary runs at a non-100 % scale (125 % or 150 %), capture a screenshot on the secondary monitor during recording. The saved PNG's pixel dimensions equal that monitor's physical resolution, not its scaled logical size, and the captured content is the secondary monitor, not the primary. Evidence: the PNG's dimensions (from Explorer properties or `magick identify`), the display settings screenshot showing the scale factor, and the capture itself.
-- `[human]` The same capture on the primary monitor at 100 %. Evidence: as above.
-- `[human]` The capture overlay appears on the monitor where the cursor is, not always on the primary. Evidence: a screenshot of the overlay on the secondary.
+Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOverlayWindow` spans `SystemParameters.VirtualScreen*` (every monitor at once) and prompts "Drag to capture a region", and the PNG is sized from that region. The items test that design, not a whole-screen one.
+
+- `[human]` On a machine with two monitors where the secondary runs at a non-100 % scale (125 % or 150 %), drag a region entirely on the secondary monitor during recording. The saved PNG's pixel dimensions equal the dragged region in *physical* pixels — the logical size the overlay showed multiplied by the scale factor — and the content is what was under the region, not a blurred or offset capture. Evidence: the PNG's dimensions (Explorer properties or `magick identify`), the overlay's reported region size if it shows one, the display settings screenshot showing the scale factor, and the capture itself.
+- `[human]` The same on the primary monitor at 100 %: PNG dimensions equal the dragged region exactly. Evidence: as above.
+- `[human]` The overlay covers every monitor at once, and a region dragged *across* the boundary between two monitors of different scale captures both halves correctly aligned. Evidence: the capture and a screenshot of the overlay spanning both displays.
 - `[automation]` The overlay and capture plumbing under emulated DPI. Verified missing; tracked as #1134 (WIN-015). Do not close this item on the human evidence alone.
 
 ### 6. Session Library archive
@@ -66,8 +68,8 @@ This is the least-validated row and the most hardware-dependent.
 
 ### 7. Review Workspace tabs
 
-- `[human]` Every tab the macOS workspace has is present and switches without error: transcript, issues, screenshots, export. Evidence: one screenshot per tab on the same session.
-- `[human]` An edit made on the issues tab survives closing and reopening the session. Evidence: `session.json` diff showing the edited field.
+- `[human]` The four tabs the product spec names (`docs/architecture/product-spec.md`, "Session Library And Review Workspace") are present and switch without error: `Transcript`, `Screenshots`, `Extracted Issues`, `Summary`. Export is an action on the workspace, not a tab. Evidence: one screenshot per tab on the same session.
+- `[human]` An edit made on the `Extracted Issues` tab survives closing and reopening the session. Evidence: `session.json` diff showing the edited field.
 
 ### 8. Session Bundle export
 
@@ -101,6 +103,14 @@ This is the least-validated row and the most hardware-dependent.
 - `[human]` The same against a real Jira project. Evidence: the issue key on a scratch project.
 - `[automation]` **Closed.** Body rendering is pinned in `IssueExportProviderTests` (`BugNarrator.Windows.Tests`) by `GitHubBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `JiraBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `GitHubBuildRequest_RendersReproductionStepsLikeMac`, `JiraBuildRequest_RendersReproductionStepsInTheMacTextShape`, `GitHubBuildRequest_RendersAnnotatedScreenshotsLikeMac`, and `GitHubBuildRequest_CapsReproductionStepsAtTheTrackerBudget`.
 
+### 14. Keyboard-first accessibility
+
+The matrix row's parity decision is "native implementation allowed": the contract is keyboard and assistive-technology support, not identical widgets. macOS validated its baseline in RR-005 with Accessibility API snapshots of Settings, Recording Controls, and Session Library plus a keyboard-only traversal. Windows has no equivalent yet — no automation names appear in the XAML and nothing in `windows/tests` exercises keyboard or screen-reader behaviour.
+
+- `[human]` Keyboard-only traversal of Settings, Recording Controls, and Session Library on a real desktop with the mouse unplugged: every control is reachable with Tab/Shift+Tab in a sensible order, every action is operable with Enter/Space, dialogs close with Esc, and focus is visible at each step. Evidence: a short screen recording or a numbered list of the focus order per window with a screenshot of the focus ring on at least one control per window.
+- `[human]` Narrator reads each control in the same three windows with a meaningful name and role — not "button" with no label. Evidence: the spoken names transcribed per window, or an Accessibility Insights for Windows snapshot of each.
+- `[automation]` No Windows test covers keyboard reachability or automation names. Whether one is worth adding (Accessibility Insights / UIA automation is heavy) is a decision for after the human items show what is broken; do not file speculatively.
+
 ## Blocked on a human
 
 Every `[human]` item above. The specific inputs a person must bring:
@@ -108,6 +118,7 @@ Every `[human]` item above. The specific inputs a person must bring:
 | Need | Rows |
 | --- | --- |
 | A real Windows desktop with the app built from a named SHA | all |
+| Narrator (built in) and, ideally, Accessibility Insights for Windows | 14 |
 | Two monitors, one at 125 % or 150 % scale | 5 |
 | A microphone and an active audio output | 12 |
 | A real OpenAI key, one compatible hosted endpoint, one local endpoint | 11 |
