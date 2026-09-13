@@ -87,6 +87,36 @@ public sealed class StorageHardeningTests : IDisposable
         Assert.Null(value);
     }
 
+    /// <summary>
+    /// Every session.json written before #1139 starts with a UTF-8 BOM. Those files must keep loading:
+    /// the store reads with File.ReadAllText, which strips the BOM, and this pins that so a later move
+    /// to a byte-level reader cannot silently orphan existing libraries.
+    /// </summary>
+    [Fact]
+    public async Task FileCompletedSessionStore_GetAllAsync_LoadsSessionJsonWrittenWithABom()
+    {
+        var sessionDirectory = Path.Combine(storagePaths.SessionsDirectory, "legacy-bom-session");
+        Directory.CreateDirectory(sessionDirectory);
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            SessionDirectory = sessionDirectory,
+            AudioFilePath = Path.Combine(sessionDirectory, "session.wav"),
+            MetadataFilePath = Path.Combine(sessionDirectory, "session.json"),
+            TranscriptMarkdownFilePath = Path.Combine(sessionDirectory, "transcript.md"),
+            Screenshots = [],
+        };
+
+        var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(session));
+        byte[] bom = [0xEF, 0xBB, 0xBF];
+        await File.WriteAllBytesAsync(Path.Combine(sessionDirectory, "session.json"), [.. bom, .. json]);
+
+        var store = new FileCompletedSessionStore(storagePaths);
+        var loaded = await store.GetAllAsync();
+
+        var match = Assert.Single(loaded, item => item.SessionId == session.SessionId);
+        Assert.Equal(session.Title, match.Title);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(rootDirectory))

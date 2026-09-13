@@ -4,6 +4,13 @@ namespace BugNarrator.Windows.Services.Storage;
 
 internal static class AtomicFileOperations
 {
+    // Encoding.UTF8 (the static instance) emits a byte-order mark, so every text artifact this helper
+    // wrote — transcript.md, summary.md, session.json, the debug bundle — began with EF BB BF. macOS
+    // writes none of its counterparts with a BOM, the shared fixtures have none, and RFC 8259 §8.1
+    // forbids one in JSON. Readers that use File.ReadAllText never noticed because it strips the BOM;
+    // byte-level readers (JsonDocument.Parse on bytes, the fixture comparison) did.
+    private static readonly UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
+
     public static Task WriteAllTextAsync(
         string destinationPath,
         string content,
@@ -11,7 +18,7 @@ internal static class AtomicFileOperations
     {
         return WriteAsync(
             destinationPath,
-            temporaryPath => File.WriteAllTextAsync(temporaryPath, content, Encoding.UTF8, cancellationToken));
+            temporaryPath => File.WriteAllTextAsync(temporaryPath, content, Utf8WithoutBom, cancellationToken));
     }
 
     public static Task WriteAllBytesAsync(

@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using BugNarrator.Core.Models;
+using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Settings;
@@ -287,6 +289,89 @@ public sealed class BundleExporterTests : IDisposable
         Assert.Equal(session.SessionId.ToString().ToUpperInvariant(), root.GetProperty("sessionID").GetString());
         Assert.True(DateTimeOffset.TryParse(root.GetProperty("generatedAt").GetString(), out _));
         Assert.Equal(2, root.GetProperty("notes").GetArrayLength());
+    }
+
+    /// <summary>
+    /// The shared-fixture proof is a chain. TranscriptContractFixtureTests (Core) pins the builder
+    /// string to contract-fixtures/transcript.golden.md under invariant culture and UTC. This test pins
+    /// the bytes the exporter writes to that same builder string, encoded as UTF-8 with no BOM and no
+    /// CRLF. The exporter localizes timestamps on purpose (DefaultTimestampOptions), so the on-disk
+    /// file equals the golden only on a UTC, invariant-culture host; what must hold everywhere is that
+    /// the file is exactly the builder output and nothing more — which is what the BOM broke.
+    /// </summary>
+    [Fact]
+    public async Task FileSessionBundleExporter_ExportedTranscriptIsExactlyTheBuilderBytes()
+    {
+        var goldenPath = Path.Combine(RepositoryRoot(), "contract-fixtures", "transcript.golden.md");
+        Assert.True(File.Exists(goldenPath), $"Missing contract fixture at {goldenPath}.");
+        var goldenFirstLine = (await File.ReadAllLinesAsync(goldenPath))[0];
+
+        // The exporter normalizes artifact paths under the sessions root and rejects empty ones, so
+        // the canonical session gets a real directory here. The transcript never renders paths, so
+        // the bytes are unaffected.
+        var sessionDirectory = Path.Combine(storagePaths.SessionsDirectory, "canonical-contract-session");
+        Directory.CreateDirectory(sessionDirectory);
+        var session = CanonicalContractSession() with
+        {
+            SessionDirectory = sessionDirectory,
+            AudioFilePath = Path.Combine(sessionDirectory, "session.wav"),
+            MetadataFilePath = Path.Combine(sessionDirectory, "session.json"),
+            TranscriptMarkdownFilePath = Path.Combine(sessionDirectory, "transcript.md"),
+        };
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+        var exported = await File.ReadAllBytesAsync(Path.Combine(bundlePath, "transcript.md"));
+
+        var expected = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+            .GetBytes(CompletedSessionMarkdownBuilder.Build(session));
+        Assert.Equal(expected, exported);
+        Assert.DoesNotContain((byte)0x0D, exported);
+        // And the file really is the shared contract shape, not merely self-consistent.
+        Assert.StartsWith(goldenFirstLine + '\n', System.Text.Encoding.UTF8.GetString(exported), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The canonical session from contract-fixtures/README.md — the same field values
+    /// TranscriptContractFixtureTests builds in BugNarrator.Core.Tests, which this project cannot
+    /// reference. Session paths are filled in by the caller; the transcript never renders them.
+    /// </summary>
+    private static CompletedSession CanonicalContractSession()
+    {
+        var createdAt = DateTimeOffset.FromUnixTimeSeconds(1_773_759_600); // 2026-03-17T15:00:00Z
+
+        return new CompletedSession(
+            SessionId: Guid.Parse("00000000-0000-4000-8000-000000000001"),
+            Title: "Checkout button clipped",
+            CreatedAt: createdAt,
+            RecordingStartedAt: createdAt,
+            RecordingStoppedAt: createdAt.AddSeconds(120),
+            SessionDirectory: string.Empty,
+            AudioFilePath: string.Empty,
+            MetadataFilePath: string.Empty,
+            TranscriptMarkdownFilePath: string.Empty,
+            TranscriptText: "The checkout button is clipped on the right at 1280 wide.",
+            ReviewSummary: string.Empty,
+            TranscriptionStatus: SessionTranscriptionStatus.Completed,
+            TranscriptionModel: "whisper-1",
+            LanguageHint: "en",
+            Prompt: null,
+            TranscriptionFailureMessage: null,
+            IssueExtraction: null,
+            Screenshots: [],
+            TimelineMoments:
+            [
+                new SessionTimelineMoment(
+                    MomentId: Guid.Parse("11111111-1111-4111-8111-111111111111"),
+                    Kind: "marker",
+                    CreatedAt: createdAt.AddSeconds(30),
+                    ElapsedSeconds: 30,
+                    Label: "Checkout button clipped",
+                    RelatedScreenshotId: null)
+                {
+                    Note = "Right edge is cut off at 1280 wide.",
+                },
+            ]);
     }
 
     private static bool LayoutEntryExists(string bundlePath, string entry)
