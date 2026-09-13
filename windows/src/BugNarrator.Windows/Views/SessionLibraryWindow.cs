@@ -27,6 +27,7 @@ public sealed class SessionLibraryWindow : Window
     private readonly Button exportGitHubButton;
     private readonly Button exportJiraButton;
     private readonly Button extractIssuesButton;
+    private readonly Button retryTranscriptionButton;
     private readonly StackPanel issueEditorsPanel;
     private readonly TextBlock issuesEmptyStateTextBlock;
     private readonly TextBlock issuesGuidanceTextBlock;
@@ -203,6 +204,11 @@ public sealed class SessionLibraryWindow : Window
             Stretch = Stretch.Uniform,
             MaxHeight = 380,
         };
+
+        retryTranscriptionButton = BuildActionButton("Retry Transcription");
+        retryTranscriptionButton.Click += async (_, _) => await RunReviewActionAsync(
+            "Retrying transcription with the configured AI provider...",
+            RetryTranscriptionAsync);
 
         extractIssuesButton = BuildActionButton("Extract Issues");
         extractIssuesButton.Click += async (_, _) => await RunReviewActionAsync(
@@ -477,6 +483,7 @@ public sealed class SessionLibraryWindow : Window
                         Margin = new Thickness(0, 0, 0, 4),
                         Children =
                         {
+                            retryTranscriptionButton,
                             extractIssuesButton,
                             saveReviewButton,
                             exportBundleButton,
@@ -518,6 +525,14 @@ public sealed class SessionLibraryWindow : Window
             isRunningReviewAction = false;
             ApplyActionButtonState();
         }
+    }
+
+    private async Task RetryTranscriptionAsync()
+    {
+        var session = RequireSelectedSession();
+        var updatedSession = await reviewSessionActionService.RetryTranscriptionAsync(session);
+        ReplaceSession(updatedSession);
+        issuesStatusTextBlock.Text = "Transcription completed. Extract issues to continue the review.";
     }
 
     private async Task ExtractIssuesAsync()
@@ -630,6 +645,11 @@ public sealed class SessionLibraryWindow : Window
             ? issueEditors.Count(editor => editor.IsSelectedForExport)
             : selectedSession?.IssueExtraction?.SelectedIssues.Count ?? 0;
 
+        // Only for sessions the library shows under Retry Needed; hidden otherwise so the row of
+        // actions reads the same as before for a transcribed session.
+        var needsRetry = selectedSession?.RequiresTranscriptionRetry == true;
+        retryTranscriptionButton.Visibility = needsRetry ? Visibility.Visible : Visibility.Collapsed;
+        retryTranscriptionButton.IsEnabled = needsRetry && !isRunningReviewAction;
         extractIssuesButton.IsEnabled = hasSession && hasTranscript && !isRunningReviewAction;
         saveReviewButton.IsEnabled = hasExtraction && !isRunningReviewAction;
         exportBundleButton.IsEnabled = hasSession && !isRunningReviewAction;

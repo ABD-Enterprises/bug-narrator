@@ -6,6 +6,7 @@ using BugNarrator.Windows.Services.Review;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
+using BugNarrator.Windows.Services.Transcription;
 using Xunit;
 
 namespace BugNarrator.Windows.Tests;
@@ -17,6 +18,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private readonly FakeIssueExportService issueExportService;
     private readonly FakeIssueExtractionService issueExtractionService;
     private readonly FakeSecretStore secretStore;
+    private readonly FakeTranscriptionClient transcriptionClient;
     private readonly ReviewSessionActionService service;
 
     public ReviewSessionActionServiceTests()
@@ -36,6 +38,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         issueExtractionService = new FakeIssueExtractionService();
         issueExportService = new FakeIssueExportService();
         secretStore = new FakeSecretStore();
+        transcriptionClient = new FakeTranscriptionClient();
 
         service = new ReviewSessionActionService(
             completedSessionStore,
@@ -45,7 +48,91 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             issueExportService,
             new FakeSessionBundleExporter(),
             new FakeDebugBundleExporter(),
+            transcriptionClient,
             diagnostics);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_WithAProviderNow_TranscribesThePreservedAudioAndSavesCompleted()
+    {
+        // Preserved at stop time with no provider: no transcript, NotConfigured.
+        var preserved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await File.WriteAllBytesAsync(preserved.AudioFilePath, [0x52, 0x49, 0x46, 0x46]);
+        await completedSessionStore.SaveAsync(preserved);
+        Assert.True(preserved.RequiresTranscriptionRetry);
+
+        // The user has since configured a key.
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        transcriptionClient.TranscriptText = "The checkout button is clipped.";
+
+        var updated = await service.RetryTranscriptionAsync(preserved);
+
+        Assert.Equal(1, transcriptionClient.CallCount);
+        Assert.Equal(preserved.AudioFilePath, transcriptionClient.LastAudioFilePath);
+        Assert.Equal(SessionTranscriptionStatus.Completed, updated.TranscriptionStatus);
+        Assert.Equal("The checkout button is clipped.", updated.TranscriptText);
+        Assert.False(updated.RequiresTranscriptionRetry);
+
+        var saved = Assert.Single(await completedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.Completed, saved.TranscriptionStatus);
+        Assert.Equal("The checkout button is clipped.", saved.TranscriptText);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_WithTheProviderStillMissing_LeavesTheSessionNotConfiguredWithGuidance()
+    {
+        var preserved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await File.WriteAllBytesAsync(preserved.AudioFilePath, [0x52, 0x49, 0x46, 0x46]);
+        await completedSessionStore.SaveAsync(preserved);
+        // No key in the secret store.
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(preserved));
+
+        Assert.Contains("AI provider", exception.Message);
+        Assert.Equal(0, transcriptionClient.CallCount);
+        var saved = Assert.Single(await completedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.NotConfigured, saved.TranscriptionStatus);
+        Assert.True(saved.RequiresTranscriptionRetry);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_WhenTheProviderFails_PersistsFailedWithTheReasonAndStaysRetryable()
+    {
+        var preserved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await File.WriteAllBytesAsync(preserved.AudioFilePath, [0x52, 0x49, 0x46, 0x46]);
+        await completedSessionStore.SaveAsync(preserved);
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        transcriptionClient.ExceptionToThrow = new InvalidOperationException("The AI provider credential was rejected.");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(preserved));
+
+        Assert.Equal("The AI provider credential was rejected.", exception.Message);
+        var saved = Assert.Single(await completedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.Failed, saved.TranscriptionStatus);
+        Assert.Equal("The AI provider credential was rejected.", saved.TranscriptionFailureMessage);
+        Assert.True(saved.RequiresTranscriptionRetry);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_OnACompletedSession_Refuses()
+    {
+        var completed = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(completed));
+        Assert.Equal(0, transcriptionClient.CallCount);
     }
 
     [Fact]
@@ -156,6 +243,35 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         {
             IReadOnlyList<IssueExportResult> results = Array.Empty<IssueExportResult>();
             return Task.FromResult(results);
+        }
+    }
+
+    private sealed class FakeTranscriptionClient : ITranscriptionClient
+    {
+        public int CallCount { get; private set; }
+        public Exception? ExceptionToThrow { get; set; }
+        public string? LastAudioFilePath { get; private set; }
+        public string TranscriptText { get; set; } = "Retried transcript.";
+
+        public Task<string> TranscribeToTextAsync(
+            string audioFilePath,
+            string apiKey,
+            OpenAiTranscriptionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            LastAudioFilePath = audioFilePath;
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
+            return Task.FromResult(TranscriptText);
+        }
+
+        public Task ValidateApiKeyAsync(string apiKey, string? providerBaseUrl, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 
