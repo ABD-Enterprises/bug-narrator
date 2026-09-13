@@ -16,7 +16,7 @@ Cheap local-first validation before opening a PR or spending GitHub Actions runn
 ./scripts/validate.sh origin/main
 ```
 
-This is the portable CI runtime-guardrails entry point. It records status files under `artifacts/validation/`, including Semgrep availability, Swift parse checks, local-transcription syntax checks, repository docs drift checks, and effort-leak issue/PR state checks.
+This is the portable CI runtime-guardrails entry point. It records status files under `artifacts/validation/` and runs, in execution order: the session-bundle contract fixture against the product spec, changed-file Semgrep (Docker, or a local install) when available, Swift parse checks, the effort-leak board audit (skippable with `VALIDATE_SKIP_BOARD_AUDIT=1`), repository docs drift checks, CLAUDE.md/AGENTS.md/.agent/rules.md body identity, shellcheck at info severity over `scripts/` and `local-transcription/`, ruff (pyflakes rules) over the Python scripts, the accessibility regression check, site doc mirrors, and the local-transcription syntax check plus its unit suite (reported `NOT RUN` when no interpreter has the server's dependencies).
 
 Current macOS release-readiness baseline:
 
