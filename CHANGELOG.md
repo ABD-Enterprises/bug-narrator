@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 1.1.0 - 2026-09-13
+
+- [FEATURE] Local (Parakeet) is now the default transcription provider for new installs, so recording can begin without an API key once the signed local server is installed and reachable (#1028).
+- [FEATURE] BugNarrator can discover, download, verify, install, start, stop, and remove the signed local transcription server and its managed model cache from Settings (#1051, #1059).
+- [FEATURE] Windows session review now renders screenshot-marker links and shares the expanded `summary.md` bundle contract with macOS (#1020, #1045, #1052).
+
+- [FIX] Existing provider selections and legacy OpenAI credentials survive upgrades without being overwritten or migrated to the wrong owner (#1050, #1056).
+- [FIX] Recording admission is serialized with quit and local-server controls, and app termination waits for bounded server cleanup (#1060, #1065).
+- [FIX] Transcript recovery and legacy index migration preserve recorded audio, screenshots, and recoverable sessions instead of risking data loss (#1064).
+- [FIX] Local server health refreshes asynchronously, test construction stays network-free, and isolated bootstrap paths retain their intended server ownership (#1049, #1057, #1066).
+- [FIX] Debug WAV recordings near the upload limit are re-encoded before upload, and sub-second transcription tails are folded into the preceding chunk (#1098, #1101).
+- [FIX] Near-zero marker intervals no longer duplicate the full transcript, and markers beyond the stopped recording clock no longer crash section building (#1108, #1110).
+- [FIX] Non-finite model numbers in confidence, timestamps, and screenshot annotations are rejected before integer conversion instead of crashing the app, and malformed timestamps such as `01:xx:00` are rejected instead of being reinterpreted (#1126, #1129).
+- [FIX] GitHub and Jira issue titles are normalized and capped to tracker limits, and exported GitHub bodies neutralize untrusted Markdown links, images, block syntax, and deduplication-hint escapes (#1112, #1118).
+- [FIX] Local helper shutdown now owns the complete process group, preserves the server's two-second graceful shutdown window, kills TERM-resistant descendants, and keeps wrapper diagnostics out of user-facing errors (#1124, #1130).
+- [FIX] Release smoke packaging runs the startup Keychain probe by default, Semgrep reports Docker-invisible mounts accurately, and the docs-site dependency graph pins patched `qs` and `joi` releases (#1032, #1034, #1131).
+- [FIX] Session export grammar now reads “Exported 1 issue” for a single issue (#1106).
+
+- [INTERNAL] Settings credential persistence, hotkey coordination, the issue-review workspace, and AppState runtime construction now have focused owners with their existing behavior preserved (#1073, #1075, #1122, #1123).
+- [INTERNAL] Validation now gates shell scripts with ShellCheck, Python scripts with ruff, the local transcription Python suite, source and test warnings, accessibility checks, shared bundle fixtures, and pinned Windows release actions (#1083, #1089, #1100, #1104, #1114, #1116).
+- [INTERNAL] Board audit state handling no longer deadlocks repair work for a red PR that is already in review (#1042).
+- [INTERNAL] Session-library filters and selection, Settings readiness, extraction budgets, display masking, export review policy, and local-first first-run behavior have focused regression coverage (#1040, #1041, #1092, #1096, #1106).
+- [INTERNAL] The docs-site `qs` and `joi` Dependabot alerts are resolved with patched transitive overrides; the remaining `image-size` build-only advisory remains documented as an accepted exception (#1131).
+
 ## 1.0.46 - 2026-08-25
 
 - [FIX] A session library stored in the oldest index format no longer opens empty. That index named its sessions only by id, which the current code refused to parse — so the library appeared empty while every session file sat intact on disk, and the recovery path written for exactly that format could never run. Worse, the empty read could then let a later save delete the very files that would have restored it (#1017).
