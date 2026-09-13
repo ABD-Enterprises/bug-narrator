@@ -230,10 +230,6 @@ if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   fi
 fi
 
-# Hermetic (zero network/docker calls) and fast, so it belongs in the blocking
-# path. It was written for OPS-004, wired into CI, then orphaned when 1b8f3e2
-# removed that wiring in May — leaving a working gate referenced by nothing
-# (#1012).
 # Shell scripts gate the release path — build_dmg.sh signs and notarizes, and
 # build_standalone.sh produces the Parakeet artifact — yet nothing linted them.
 # Mirror the semgrep contract: a missing tool is reported as NOT RUN on stdout,
@@ -276,6 +272,10 @@ else
   printf 'NOT RUN: ruff is not on PATH; %d Python script(s) were not linted\n' "${#PY_TARGETS[@]}" | tee "$RUFF_STATUS_FILE"
 fi
 
+# Hermetic (zero network/docker calls) and fast, so it belongs in the blocking
+# path. It was written for OPS-004, wired into CI, then orphaned when 1b8f3e2
+# removed that wiring in May — leaving a working gate referenced by nothing
+# (#1012).
 if [[ -x "$ROOT/scripts/accessibility_regression_check.sh" ]]; then
   if ! "$ROOT/scripts/accessibility_regression_check.sh"; then
     exit 1

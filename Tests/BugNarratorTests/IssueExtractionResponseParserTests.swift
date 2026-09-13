@@ -150,7 +150,8 @@ final class IssueExtractionResponseParserNonFiniteTests: XCTestCase {
 
     func testNonFiniteTimestampBecomesNilLikeAnAbsentOne() throws {
         // "1e308:00" has finite parts whose product overflows to inf.
-        for value in ["nan:00", "00:inf", "1e309:00", "01:nan:00", "1e308:00", "1e307:1e308"] {
+        // "01:xx:00" used to drop the unparseable part and become 01:00.
+        for value in ["nan:00", "00:inf", "1e309:00", "01:nan:00", "1e308:00", "1e307:1e308", "01:xx:00", "01:05:00Z"] {
             let issue = try parse(issue: #"{\#(base),"timestamp":"\#(value)"}"#)
             XCTAssertNil(issue.timestamp, value)
         }
