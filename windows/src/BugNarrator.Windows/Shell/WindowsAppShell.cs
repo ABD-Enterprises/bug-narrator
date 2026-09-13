@@ -11,6 +11,7 @@ namespace BugNarrator.Windows.Shell;
 public sealed class WindowsAppShell : IDisposable
 {
     private readonly WindowsDiagnostics diagnostics;
+    private readonly IExternalLinkLauncher externalLinkLauncher;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
     private readonly IRecordingLifecycleService recordingLifecycleService;
     private readonly ISingleInstanceService singleInstanceService;
@@ -23,10 +24,12 @@ public sealed class WindowsAppShell : IDisposable
         IWindowsGlobalHotkeyService hotkeyService,
         IRecordingLifecycleService recordingLifecycleService,
         WindowCoordinator windowCoordinator,
-        TrayShell trayShell)
+        TrayShell trayShell,
+        IExternalLinkLauncher externalLinkLauncher)
     {
         this.singleInstanceService = singleInstanceService;
         this.diagnostics = diagnostics;
+        this.externalLinkLauncher = externalLinkLauncher;
         this.hotkeyService = hotkeyService;
         this.recordingLifecycleService = recordingLifecycleService;
         this.windowCoordinator = windowCoordinator;
@@ -41,6 +44,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.OpenSessionLibraryRequested += OnOpenSessionLibraryRequested;
         trayShell.SettingsRequested += OnSettingsRequested;
         trayShell.AboutRequested += OnAboutRequested;
+        trayShell.OpenLinkRequested += OnOpenLinkRequested;
         trayShell.QuitRequested += OnQuitRequested;
     }
 
@@ -97,6 +101,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.OpenSessionLibraryRequested -= OnOpenSessionLibraryRequested;
         trayShell.SettingsRequested -= OnSettingsRequested;
         trayShell.AboutRequested -= OnAboutRequested;
+        trayShell.OpenLinkRequested -= OnOpenLinkRequested;
         trayShell.QuitRequested -= OnQuitRequested;
 
         windowCoordinator.CloseAll();
@@ -126,6 +131,22 @@ public sealed class WindowsAppShell : IDisposable
                 trayShell.ShowWarning("BugNarrator Screenshot", exception.Message);
             }
         });
+    }
+
+    private void OnOpenLinkRequested(object? sender, string url)
+    {
+        try
+        {
+            externalLinkLauncher.Open(url);
+            diagnostics.Info("tray", $"opened external link {url}");
+        }
+        catch (Exception exception)
+        {
+            // Not swallowed: the log has the cause and the tray status line tells the user, the same
+            // way the macOS utility-action presenter reports a failed open.
+            diagnostics.Error("tray", $"failed to open external link {url}", exception);
+            trayShell.ShowStatus("Status: Could not open the link. See the log for details.");
+        }
     }
 
     private void OnAboutRequested(object? sender, EventArgs e)

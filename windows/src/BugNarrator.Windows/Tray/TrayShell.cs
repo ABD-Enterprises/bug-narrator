@@ -37,6 +37,7 @@ public sealed class TrayShell : IDisposable
     }
 
     public event EventHandler? AboutRequested;
+    public event EventHandler<string>? OpenLinkRequested;
     public event EventHandler? CaptureScreenshotRequested;
     public event EventHandler? OpenSessionLibraryRequested;
     public event EventHandler? QuitRequested;
@@ -116,6 +117,13 @@ public sealed class TrayShell : IDisposable
         contextMenu.Items.Add(CreateMenuItem("Settings", RaiseSettingsRequested));
         contextMenu.Items.Add(CreateMenuItem("About", RaiseAboutRequested));
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
+        foreach (var entry in TrayPresentationState.SupportEntries)
+        {
+            var url = entry.Url!;
+            contextMenu.Items.Add(CreateMenuItem(entry.Label, () => OpenLinkRequested?.Invoke(this, url)));
+        }
+
+        contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Quit", RaiseQuitRequested));
     }
 
@@ -132,6 +140,15 @@ public sealed class TrayShell : IDisposable
         var menuItem = new Forms.ToolStripMenuItem(text);
         menuItem.Click += (_, _) => onClick();
         return menuItem;
+    }
+
+    /// <summary>Replaces the status line until the next presentation update.</summary>
+    public void ShowStatus(string text)
+    {
+        if (statusMenuItem is not null)
+        {
+            statusMenuItem.Text = text;
+        }
     }
 
     private void RaiseAboutRequested()
