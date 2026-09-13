@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Settings;
@@ -192,6 +194,113 @@ public sealed class BundleExporterTests : IDisposable
         var bundlePath = await exporter.ExportAsync(tamperedSession);
 
         Assert.Empty(Directory.GetFiles(Path.Combine(bundlePath, "screenshots")));
+    }
+
+    /// <summary>
+    /// The bundle layout is a shared contract: contract-fixtures/session-bundle-layout.json is the
+    /// same file Tests/BugNarratorTests/TranscriptExporterTests.swift reads on macOS. Reading it here
+    /// rather than restating its entries means both platforms fail together when the layout changes.
+    /// </summary>
+    [Fact]
+    public async Task FileSessionBundleExporter_MatchesTheSharedBundleLayoutFixture()
+    {
+        var layoutPath = Path.Combine(RepositoryRoot(), "contract-fixtures", "session-bundle-layout.json");
+        Assert.True(
+            File.Exists(layoutPath),
+            $"Missing contract fixture at {layoutPath}. It is committed at contract-fixtures/session-bundle-layout.json.");
+
+        using var layout = JsonDocument.Parse(await File.ReadAllBytesAsync(layoutPath));
+        var always = layout.RootElement.GetProperty("always").EnumerateArray().Select(entry => entry.GetString()!).ToArray();
+        var whenExtracted = layout.RootElement.GetProperty("whenIssueExtractionHasRun").EnumerateArray().Select(entry => entry.GetString()!).ToArray();
+        Assert.NotEmpty(always);
+        Assert.NotEmpty(whenExtracted);
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+
+        var withoutExtraction = await exporter.ExportAsync(
+            ReviewSessionTestData.CreateCompletedSession(rootDirectory));
+        foreach (var entry in always)
+        {
+            Assert.True(LayoutEntryExists(withoutExtraction, entry), $"{entry} is listed under always but is absent from the bundle.");
+        }
+
+        foreach (var entry in whenExtracted)
+        {
+            Assert.False(LayoutEntryExists(withoutExtraction, entry), $"{entry} must not be written when issue extraction has not run.");
+        }
+
+        var withExtraction = await exporter.ExportAsync(
+            ReviewSessionTestData.CreateCompletedSession(
+                rootDirectory,
+                issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult()));
+        foreach (var entry in always.Concat(whenExtracted))
+        {
+            Assert.True(LayoutEntryExists(withExtraction, entry), $"{entry} is absent from a bundle exported after extraction ran.");
+        }
+    }
+
+    [Fact]
+    public async Task FileSessionBundleExporter_ManifestListsEveryFileWrittenInTheMacOrder()
+    {
+        var present = ReviewSessionTestData.CreateScreenshot(rootDirectory, "present-capture.png", elapsedSeconds: 4);
+        var missing = ReviewSessionTestData.CreateScreenshot(rootDirectory, "missing-capture.png", elapsedSeconds: 9, writeFile: false);
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult(),
+            screenshots: [present, missing]);
+
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+
+        var manifestBytes = await File.ReadAllBytesAsync(Path.Combine(bundlePath, "manifest.json"));
+        // Raw bytes on purpose. File.ReadAllText would silently consume a BOM, and a BOM is exactly the
+        // defect this guards against: RFC 8259 §8.1 forbids one, macOS writes none, and
+        // JsonDocument.Parse rejects it. (The class-wide fix at AtomicFileOperations is #1139.)
+        Assert.False(
+            manifestBytes.Length >= 3 && manifestBytes[0] == 0xEF && manifestBytes[1] == 0xBB && manifestBytes[2] == 0xBF,
+            "manifest.json starts with a UTF-8 BOM.");
+        using var manifest = JsonDocument.Parse(manifestBytes);
+        var root = manifest.RootElement;
+
+        // The exact key set macOS writes (SessionBundleManifest in TranscriptExporter.swift). A key
+        // added on one platform only would break the "reads the same" promise, so this is exact.
+        Assert.Equal(
+            ["copiedScreenshotCount", "exportedFiles", "generatedAt", "missingScreenshots", "notes", "screenshotCount", "sessionID"],
+            root.EnumerateObject().Select(property => property.Name).ToArray());
+
+        var exportedFiles = root.GetProperty("exportedFiles").EnumerateArray().Select(entry => entry.GetString()!).ToArray();
+        Assert.Equal(
+            ["transcript.md", "summary.md", "screenshots/present-capture.png", "manifest.json"],
+            exportedFiles);
+
+        // exportedFiles must agree with what is actually on disk — a manifest that lists a file the
+        // bundle does not contain, or omits one it does, is worse than no manifest.
+        var onDisk = Directory.EnumerateFiles(bundlePath, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(bundlePath, path).Replace('\\', '/'))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(exportedFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(), onDisk);
+
+        Assert.Equal(2, root.GetProperty("screenshotCount").GetInt32());
+        Assert.Equal(1, root.GetProperty("copiedScreenshotCount").GetInt32());
+        Assert.Equal(["missing-capture.png"], root.GetProperty("missingScreenshots").EnumerateArray().Select(entry => entry.GetString()!).ToArray());
+        Assert.Equal(session.SessionId.ToString().ToUpperInvariant(), root.GetProperty("sessionID").GetString());
+        Assert.True(DateTimeOffset.TryParse(root.GetProperty("generatedAt").GetString(), out _));
+        Assert.Equal(2, root.GetProperty("notes").GetArrayLength());
+    }
+
+    private static bool LayoutEntryExists(string bundlePath, string entry)
+    {
+        return entry.EndsWith('/')
+            ? Directory.Exists(Path.Combine(bundlePath, entry.TrimEnd('/')))
+            : File.Exists(Path.Combine(bundlePath, entry));
+    }
+
+    private static string RepositoryRoot([CallerFilePath] string sourceFilePath = "")
+    {
+        // <root>/windows/tests/BugNarrator.Windows.Tests/<this file>
+        var directory = Path.GetDirectoryName(sourceFilePath)!;
+        return Path.GetFullPath(Path.Combine(directory, "..", "..", ".."));
     }
 
     public void Dispose()
