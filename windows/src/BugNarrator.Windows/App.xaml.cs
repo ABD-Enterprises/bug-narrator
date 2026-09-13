@@ -80,6 +80,7 @@ public partial class App : Application
             issueExportService,
             sessionBundleExporter,
             debugBundleExporter,
+            transcriptionClient,
             diagnostics);
         var recordingLifecycleService = new RecordingLifecycleService(
             audioRecorderService,

@@ -5,6 +5,7 @@ using BugNarrator.Windows.Services.Extraction;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
+using BugNarrator.Windows.Services.Transcription;
 
 namespace BugNarrator.Windows.Services.Review;
 
@@ -18,6 +19,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly ISecretStore secretStore;
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
+    private readonly ITranscriptionClient transcriptionClient;
 
     public ReviewSessionActionService(
         ICompletedSessionStore completedSessionStore,
@@ -27,9 +29,11 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         IIssueExportService issueExportService,
         ISessionBundleExporter sessionBundleExporter,
         IDebugBundleExporter debugBundleExporter,
+        ITranscriptionClient transcriptionClient,
         WindowsDiagnostics diagnostics)
     {
         this.completedSessionStore = completedSessionStore;
+        this.transcriptionClient = transcriptionClient;
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
         this.issueExtractionService = issueExtractionService;
@@ -54,6 +58,78 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     {
         await completedSessionStore.DeleteAsync(session, cancellationToken);
         diagnostics.Info("review", $"deleted completed session {session.SessionId}");
+    }
+
+    public async Task<CompletedSession> RetryTranscriptionAsync(
+        CompletedSession session,
+        CancellationToken cancellationToken = default)
+    {
+        if (!session.RequiresTranscriptionRetry)
+        {
+            throw new InvalidOperationException("This session already has a completed transcript.");
+        }
+
+        if (!File.Exists(session.AudioFilePath))
+        {
+            throw new InvalidOperationException("The session audio file is missing, so transcription cannot be retried.");
+        }
+
+        // Same resolution the lifecycle service performs at stop time (RecordingLifecycleService
+        // .BuildCompletedSessionAsync); the difference is that a missing provider is an error here
+        // rather than a NotConfigured save, because the user asked for a retry.
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        if (providerCredential is null)
+        {
+            throw new InvalidOperationException(
+                settings.AiProviderCompatibilityIssue
+                ?? "Finish AI provider setup in Settings before retrying transcription.");
+        }
+
+        var request = new OpenAiTranscriptionRequest(
+            settings.EffectiveTranscriptionModel,
+            settings.EffectiveLanguageHint,
+            settings.EffectiveTranscriptionPrompt,
+            settings.EffectiveAiProviderBaseUrl);
+
+        diagnostics.Info("transcription", $"transcription retry requested for session {session.SessionId} using model {request.Model}");
+        CompletedSession updatedSession;
+        try
+        {
+            var transcriptText = await transcriptionClient.TranscribeToTextAsync(
+                session.AudioFilePath,
+                providerCredential,
+                request,
+                cancellationToken);
+            updatedSession = session with
+            {
+                TranscriptText = transcriptText,
+                TranscriptionStatus = SessionTranscriptionStatus.Completed,
+                TranscriptionModel = request.Model,
+                LanguageHint = request.LanguageHint,
+                Prompt = request.Prompt,
+                TranscriptionFailureMessage = null,
+            };
+            diagnostics.Info("transcription", "transcription retry completed");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Cancellation is not a provider failure: it propagates unchanged and nothing is saved,
+            // so the session stays exactly as it was. Persist a real failure exactly as stop time does, so the library keeps showing the session
+            // under Retry Needed with the current reason, then surface it to the caller.
+            diagnostics.Error("transcription", "transcription retry failed", exception);
+            var failedSession = session with
+            {
+                TranscriptionStatus = SessionTranscriptionStatus.Failed,
+                TranscriptionFailureMessage = exception.Message,
+            };
+            await completedSessionStore.SaveAsync(failedSession, cancellationToken);
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        await completedSessionStore.SaveAsync(updatedSession, cancellationToken);
+        return updatedSession;
     }
 
     public async Task<CompletedSession> ExtractIssuesAsync(
