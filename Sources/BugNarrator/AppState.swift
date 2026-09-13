@@ -229,7 +229,6 @@ final class AppState: ObservableObject {
         let issueExtractionFailurePresenter = graph.issueExtractionFailurePresenter
         let issueExportController = graph.issueExportController
         let permissionRecoveryController = graph.permissionRecoveryController
-        let appUtilityActions = graph.appUtilityActions
         let transcriptionRecovery = graph.transcriptionRecovery
         let screenshotCoordinator = graph.screenshotCoordinator
         let trackerIntegration = graph.trackerIntegration
