@@ -52,6 +52,9 @@ public sealed class SessionLibraryWindow : Window
     private bool isRunningReviewAction;
     private List<IssueEditorRow> issueEditors = [];
     private CompletedSession? selectedSession;
+    // Assigned in BuildWindowContent and retained so an action can move the workspace to the tab
+    // ReviewWorkspaceTabPolicy names.
+    private TabControl? reviewTabs;
 
     public SessionLibraryWindow(
         ICompletedSessionStore completedSessionStore,
@@ -358,7 +361,7 @@ public sealed class SessionLibraryWindow : Window
             },
         };
 
-        var reviewTabs = new TabControl
+        reviewTabs = new TabControl
         {
             Items =
             {
@@ -522,6 +525,13 @@ public sealed class SessionLibraryWindow : Window
         var editableSession = await PersistCurrentEditsAsync(session);
         var updatedSession = await reviewSessionActionService.ExtractIssuesAsync(editableSession);
         ReplaceSession(updatedSession);
+
+        // Success path only: a thrown extraction is caught by RunReviewActionAsync above and never
+        // reaches this line, so the current tab stays put on failure by construction.
+        if (updatedSession.IssueExtraction is { } extraction)
+        {
+            reviewTabs!.SelectedIndex = (int)ReviewWorkspaceTabPolicy.AfterExtraction(extraction);
+        }
 
         var issueCount = updatedSession.IssueExtraction?.Issues.Count ?? 0;
         issuesStatusTextBlock.Text =
