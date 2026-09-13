@@ -135,8 +135,22 @@ final class IssueExtractionResponseParserNonFiniteTests: XCTestCase {
         XCTAssertEqual(try parse(issue: #"{\#(base),"confidence":"0.5"}"#).confidence, 0.5)
     }
 
+    func testBareNegativeOverflowLiteralIsRejectedToo() throws {
+        // JSONSerialization rejects 1e999/NaN/Infinity but accepts -1e999 as -inf,
+        // so the Double branch (not just the String branch) must guard.
+        XCTAssertNil(try parse(issue: #"{\#(base),"confidence":-1e999}"#).confidence)
+        let annotation = #"{"screenshot":"modal.png","label":"a","x":0.5,"y":0.5,"width":0.2,"height":0.2,"confidence":-1e999}"#
+        XCTAssertNil(try parse(issue: #"{\#(base),"screenshotAnnotations":[\#(annotation)]}"#).screenshotAnnotations.first?.confidence)
+    }
+
+    func testNonFinitePrimaryKeyFallsThroughToTheAliasLikeAnyUnparseableValue() throws {
+        // "nan" is treated exactly like "high": not a number, try the next key.
+        XCTAssertEqual(try parse(issue: #"{\#(base),"confidence":"nan","score":0.7}"#).confidence, 0.7)
+    }
+
     func testNonFiniteTimestampBecomesNilLikeAnAbsentOne() throws {
-        for value in ["nan:00", "00:inf", "1e309:00", "01:nan:00"] {
+        // "1e308:00" has finite parts whose product overflows to inf.
+        for value in ["nan:00", "00:inf", "1e309:00", "01:nan:00", "1e308:00", "1e307:1e308"] {
             let issue = try parse(issue: #"{\#(base),"timestamp":"\#(value)"}"#)
             XCTAssertNil(issue.timestamp, value)
         }
