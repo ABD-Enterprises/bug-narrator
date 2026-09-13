@@ -104,6 +104,7 @@
 - [FIX] The docs-site publish runbook pointed at the pre-transfer `deffenda.github.io` URL and hardcoded a maintainer username (#964).
 - [INTERNAL] `site/docs/user/user-manual.md` is now generated from the canonical `docs/user/user-manual.md` by `scripts/sync_site_docs.py`, and `validate.sh` fails when it drifts. It previously claimed to mirror the canonical manual while being a separately written document that had diverged (#964).
 
+<!-- orc-allow-local-ref: historical release note documents the intended loopback default -->
 - [FIX] A remote `http://` AI endpoint is now rejected instead of warned about. Previously the warning was advisory and nothing consumed it as a gate, so one mistyped scheme could send your API key and your recordings across the network unencrypted. Loopback, private-range, `.local`, and single-label hosts are unaffected — the local LM Studio / Ollama / Parakeet paths and the shipped `http://localhost` defaults all still work (#953).
 
 - [CHANGE] **Transcripts are no longer copied to the clipboard automatically.** "Auto-copy transcript to clipboard" (Settings > General) now defaults to off — it put the full transcript on the system pasteboard after every save, where clipboard managers retain it, and that was never disclosed. If you deliberately turned it on, your choice is preserved; if you never touched it and want the old behavior, turn it on (#952).
@@ -193,6 +194,7 @@
 ## 1.0.35 - 2026-05-19
 
 - Added local Parakeet transcription server for offline, zero-cost speech-to-text on Apple Silicon via MLX.
+<!-- orc-allow-local-ref: historical release note documents the intended loopback server -->
 - Added Local (Parakeet) AI provider in Settings that auto-configures to localhost:8422 with no API key required.
 - Added standalone binary builder so the transcription server runs without a Python installation.
 - Fixed Keychain access in debug builds to avoid a stuck modal dialog when the signing identity differs from production.
