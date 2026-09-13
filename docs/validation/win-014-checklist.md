@@ -4,39 +4,43 @@ Owner ticket: #1133. This checklist is the Windows counterpart of [QA_CHECKLIST.
 
 Those rows used to cite #44 (`RR-002`) as the home of their remaining validation. #44 was closed as completed on 2026-05-13 on the strength of a packaged launch probe — the app stayed alive through initialization with one process running. That is a liveness check, not feature validation, and the ticket's own closing comment deferred the rest to #75, which is also closed. Nothing below is therefore assumed done because #44 is closed.
 
-## How an item is closed
+## Where status lives
 
-The two classifications close differently, because their evidence differs in kind: a test on `main` is continuous proof that re-runs on every commit, while a screenshot is a snapshot of one build on one machine.
+This file is a procedure, not a status board. It says what each item requires and what automated coverage exists in the codebase as of the commit it landed in; it does not say whether an item is done. **The status of every item lives on #1133**, per the repository rule that task state stays on the external board and never in repository Markdown. When this file and a comment on #1133 disagree, the comment is current and this file is stale.
 
-A **`[human]`** item is closed only by an `orc add-evidence` comment on #1133 that names, in this order:
+## What counts as evidence
+
+The two classifications are proven differently, because their evidence differs in kind: a test on `main` is continuous proof that re-runs on every commit touching Windows code, while a screenshot is a snapshot of one build on one machine.
+
+A **`[human]`** item is satisfied only by an `orc add-evidence` comment on #1133 that names, in this order:
 
 1. the artifact (screenshot, log excerpt, bundle listing, exported body);
 2. the commit SHA of `main` the build under test came from;
 3. the host id it ran on.
 
-Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Later Windows changes to a row's implementation re-open its item — evidence is pinned to a SHA and is not carried forward silently.
+Evidence that could carry a credential (provider status text, export bodies, debug bundles) passes a redaction review before upload; credentials never appear in a comment. Evidence is pinned to a SHA and is not carried forward silently: a later Windows change to a row's implementation means that row needs fresh evidence, recorded on #1133.
 
-An **`[automation]`** item is closed by naming, in this file, a test that exists on `main` and runs in `dotnet test` under the `windows-build-and-test` CI job. No comment is needed: CI is the evidence. One honest limit: that job is path-gated in `.github/workflows/ci.yml` to `windows/**` and `ci.yml`, so it re-proves the item on every commit *that touches Windows code* — not on every commit. A change to `contract-fixtures/` alone runs neither platform's suite today; that gap is #1140, and until it lands, a fixture-only change is not proof that the named tests still pass. If the named test is later deleted or skipped, the item reopens. Four items below are closed this way on the commit this file landed in.
+An **`[automation]`** item is satisfied by a test that exists on `main` and runs in `dotnet test` under the `windows-build-and-test` CI job. Where such a test exists today, this file names it as a fact about the codebase. One honest limit: that job is path-gated in `.github/workflows/ci.yml` to `windows/**` and `ci.yml`, so it re-proves the item on every commit *that touches Windows code* — not on every commit. A change to `contract-fixtures/` alone runs neither platform's suite today; that gap is #1140, and until it lands, a fixture-only change is not proof that the named tests still pass. If a named test is later deleted or skipped, the item needs a replacement, recorded on #1133.
 
-A matrix row moves to `Shipped` only in a PR that cites the closing evidence for every item under it — the comment for each `[human]` item and the test name for each `[automation]` item.
+A matrix row moves to `Shipped` only in a PR that cites the evidence for every item under it — the comment for each `[human]` item and the test name for each `[automation]` item.
 
 ## Classification
 
-- **`[human]`** — needs a person at a real Windows desktop, real hardware, or a real credential. Automation cannot close it. These stay open on #1133 under `ai/blocked` until a person captures the evidence.
+- **`[human]`** — needs a person at a real Windows desktop, real hardware, or a real credential. Automation cannot satisfy it. Their status is tracked on #1133, which stays under `ai/blocked` until a person captures the evidence.
 - **`[automation]`** — can be proven by a test, a scripted run, or an emulated environment. If the checklist shows the proof is missing, a separate small implementation ticket is filed; it is not done here.
 
-Most rows carry both kinds. A row moves to `Shipped` only when every item under it is closed.
+Most rows carry both kinds. A row moves to `Shipped` only when every item under it has evidence on #1133.
 
 ## The fourteen rows
 
 ### 1. Durable workflow: `record -> review -> refine -> export`
 
 - `[human]` One end-to-end session on a real desktop: start recording from the tray, capture at least two screenshots, add one marker, stop, open the session in the review workspace, edit at least one extracted issue (title and severity), export the session bundle. Evidence: the bundle folder listing matching the layout in row 8, and the `windows-shell.log` lines from `recording started` through `recording stopped and review session saved`.
-- `[automation]` **Closed.** Each transition is pinned in `BugNarrator.Windows.Tests`: start by `AudioInputDeviceSelectionTests.StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone`, stop → save by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession`, refine by `ReviewSessionActionServiceTests.ExtractIssuesAsync_WithConfiguredApiKey_SavesUpdatedSession`, export by `BundleExporterTests.FileSessionBundleExporter_ExportsTranscriptAndScreenshots`. No single test runs the whole chain; the human item above is what proves it end to end.
+- `[automation]` Covered today. Each transition is pinned in `BugNarrator.Windows.Tests`: start by `AudioInputDeviceSelectionTests.StartRecordingAsync_WithMixedAudioAndConsent_StartsMixedCaptureWithMicrophone`, stop → save by `RecordingLifecycleServiceMilestone5Tests.StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession`, refine by `ReviewSessionActionServiceTests.ExtractIssuesAsync_WithConfiguredApiKey_SavesUpdatedSession`, export by `BundleExporterTests.FileSessionBundleExporter_ExportsTranscriptAndScreenshots`. No single test runs the whole chain; the human item above is what proves it end to end.
 
 ### 2. Compact launch surface (tray shell)
 
-- `[human]` After launch, the tray icon is visible (or reachable through the overflow chevron) and its context menu shows `Start Recording`, `Recording Controls`, `Session Library`, `Settings`, `Quit`. Evidence: one screenshot of the open menu, and one with the icon in the overflow flyout if Windows placed it there.
+- `[human]` After launch, the tray icon is visible (or reachable through the overflow chevron) and its context menu shows the entries `TrayShell.BuildMenu` creates, which are also the canonical terms in `product-spec.md`: a `Status: …` line, `Start Recording`, `Stop Recording`, `Capture Screenshot`, `Show Recording Controls`, `Open Session Library`, `Settings`, `About`, `Quit`. Evidence: one screenshot of the open menu, and one with the icon in the overflow flyout if Windows placed it there.
 - `[human]` `Quit` from the tray exits cleanly: no `BugNarrator.Windows` process remains and the log ends with `app exit`. Evidence: the log tail and a process-list line.
 
 ### 3. Recording Controls surface
@@ -46,7 +50,7 @@ Most rows carry both kinds. A row moves to `Shipped` only when every item under 
 
 ### 4. Single active recording session
 
-- `[human]` Launch the packaged app a second time while it is running: the second process exits 0, one `BugNarrator.Windows` process remains, and the log shows `focus request received from secondary instance`. #44's packaged probe observed exactly this, but its comment names neither a SHA nor a host, so it does not meet the closure rule above and is prior art, not evidence. Evidence: the process-list line and the log excerpt, re-captured.
+- `[human]` Launch the packaged app a second time while it is running: the second process exits 0, one `BugNarrator.Windows` process remains, and the log shows `focus request received from secondary instance`. #44's packaged probe observed exactly this, but its comment names neither a SHA nor a host, so it does not meet the evidence rule above and is prior art, not evidence. Evidence: the process-list line and the log excerpt, re-captured.
 - `[automation]` No test in `windows/tests` exercises the single-instance path (the only "duplicate" test is a hotkey-conflict check). Verified missing; tracked as #1136 (WIN-017).
 - `[human]` While recording, choosing `Start Recording` again from the tray is refused or is a no-op — the log shows no second `recording started`, and the session saved at stop contains one audio track. Evidence: the log excerpt and the bundle listing.
 
@@ -73,14 +77,14 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 ### 8. Session Bundle export
 
-- `[automation]` **Closed.** `transcript.md` is byte-compared against `contract-fixtures/transcript.golden.md` on both platforms (#1003). `summary.md` is pinned on its shared subset by `contract-fixtures/summary.golden.md` (#1020); the structure differences outside that subset are deliberate and listed in the matrix's "Current Deliberate Differences" section, so they are not a validation gap. Evidence: `TranscriptMarkdown_MatchesTheCommittedGolden` and `SummaryMarkdownSharedSubset_MatchesTheCommittedGolden` in `BugNarrator.Core.Tests`.
-- `[automation]` **Open — defect.** The bundle *layout* is a shared contract too: `contract-fixtures/session-bundle-layout.json` says `manifest.json`, `screenshots/`, and `transcript.md` are always present and `summary.md` only when extraction has run. macOS writes all of that and `TranscriptExporterTests.swift` binds the fixture. Windows writes no `manifest.json` and no Windows test reads the fixture. Tracked as #1137 (WIN-018).
+- `[automation]` Covered today. `transcript.md` is byte-compared against `contract-fixtures/transcript.golden.md` on both platforms (#1003). `summary.md` is pinned on its shared subset by `contract-fixtures/summary.golden.md` (#1020); the structure differences outside that subset are deliberate and listed in the matrix's "Current Deliberate Differences" section, so they are not a validation gap. Evidence: `TranscriptMarkdown_MatchesTheCommittedGolden` and `SummaryMarkdownSharedSubset_MatchesTheCommittedGolden` in `BugNarrator.Core.Tests`.
+- `[automation]` Not covered today, and the behaviour itself is missing. The bundle *layout* is a shared contract too: `contract-fixtures/session-bundle-layout.json` says `manifest.json`, `screenshots/`, and `transcript.md` are always present and `summary.md` only when extraction has run. macOS writes all of that and `TranscriptExporterTests.swift` binds the fixture. Windows writes no `manifest.json` and no Windows test reads the fixture. Tracked as #1137 (WIN-018).
 - `[human]` An exported bundle on disk matches the shared layout: `manifest.json`, `transcript.md`, a `screenshots/` directory holding the session's captures, `summary.md` only when extraction has run, and — Windows-only, allowed by the row's parity decision — `annotated-exports/` when annotated images were rendered. `session.json` and `session.wav` are internal session storage and must *not* be in the bundle. Evidence: the directory listing, captured after #1137 lands. Anything outside that list is a stray file.
 
 ### 9. Debug Bundle support export
 
 - `[human]` With a provider key configured — any value works; the app does not need to reach a provider for this — export a debug bundle. It contains `system-info.json`, `app-version.txt`, `windows-version.txt`, `recent-log.txt`, `session-metadata.json`, and the configured key appears nowhere in any of them — search the bundle for the key's first eight characters. Evidence: the file listing and the (empty) search result. This item is itself the proof that redaction works; do not upload the bundle.
-- `[automation]` **Closed.** `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk.
+- `[automation]` Covered today. `FileDebugBundleExporter_WritesExpectedFilesWithoutSecrets` in `BundleExporterTests` exports a bundle with a configured credential and asserts it appears in none of the written files. The redactor is covered through the exporter, not by a test of its own; that is accepted here because the exporter is the only caller that reaches disk.
 
 ### 10. Missing or invalid AI provider recovery
 
@@ -101,15 +105,18 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 
 - `[human]` With a real GitHub token, export one issue that carries severity, component, reproduction steps, and a screenshot annotation. The created issue's body has the same sections in the same order as the macOS export. Evidence: the issue URL on a scratch repo.
 - `[human]` The same against a real Jira project. Evidence: the issue key on a scratch project.
-- `[automation]` **Closed.** Body rendering is pinned in `IssueExportProviderTests` (`BugNarrator.Windows.Tests`) by `GitHubBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `JiraBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `GitHubBuildRequest_RendersReproductionStepsLikeMac`, `JiraBuildRequest_RendersReproductionStepsInTheMacTextShape`, `GitHubBuildRequest_RendersAnnotatedScreenshotsLikeMac`, and `GitHubBuildRequest_CapsReproductionStepsAtTheTrackerBudget`.
+- `[automation]` Covered today. Body rendering is pinned in `IssueExportProviderTests` (`BugNarrator.Windows.Tests`) by `GitHubBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `JiraBuildRequest_IncludesSeverityComponentAndDeduplicationHint`, `GitHubBuildRequest_RendersReproductionStepsLikeMac`, `JiraBuildRequest_RendersReproductionStepsInTheMacTextShape`, `GitHubBuildRequest_RendersAnnotatedScreenshotsLikeMac`, and `GitHubBuildRequest_CapsReproductionStepsAtTheTrackerBudget`.
 
 ### 14. Keyboard-first accessibility
 
 The matrix row's parity decision is "native implementation allowed": the contract is keyboard and assistive-technology support, not identical widgets. macOS validated its baseline in RR-005 with Accessibility API snapshots of Settings, Recording Controls, and Session Library plus a keyboard-only traversal. Windows has no equivalent yet — no automation names appear in the XAML and nothing in `windows/tests` exercises keyboard or screen-reader behaviour.
 
-- `[human]` Keyboard-only traversal of Settings, Recording Controls, and Session Library on a real desktop with the mouse unplugged: every control is reachable with Tab/Shift+Tab in a sensible order, every action is operable with Enter/Space, dialogs close with Esc, and focus is visible at each step. Evidence: a short screen recording or a numbered list of the focus order per window with a screenshot of the focus ring on at least one control per window.
-- `[human]` Narrator reads each control in the same three windows with a meaningful name and role — not "button" with no label. Evidence: the spoken names transcribed per window, or an Accessibility Insights for Windows snapshot of each.
-- `[automation]` No Windows test covers keyboard reachability or automation names. Whether one is worth adding (Accessibility Insights / UIA automation is heavy) is a decision for after the human items show what is broken; do not file speculatively.
+The product spec's Accessibility Contract names five surfaces: the compact launch surface, recording controls, session library, review workspace, and settings. On Windows the compact launch surface is the tray icon and its menu.
+
+- `[human]` Keyboard-only use of the tray: with the mouse unplugged, reach the tray icon (Win+B, then arrow keys), open its menu with Enter or the menu key, move through every entry with the arrow keys, and activate `Show Recording Controls`. Evidence: a screenshot of the open menu with keyboard focus on an entry, and the log line for the window it opened.
+- `[human]` Keyboard-only traversal of Settings, Recording Controls, Session Library, and the review workspace's four tabs: every control is reachable with Tab/Shift+Tab in a sensible order, every action is operable with Enter/Space, tabs switch with the arrow keys, the selected tab and any selected filter announce as selected, dialogs close with Esc, and focus is visible at each step. Evidence: a short screen recording or a numbered list of the focus order per window with a screenshot of the focus ring on at least one control per window.
+- `[human]` Narrator reads each control on those surfaces with a meaningful name and role — not "button" with no label — and announces transient status changes (recording started, recording stopped, export finished). Evidence: the spoken names transcribed per window, or an Accessibility Insights for Windows snapshot of each.
+- `[automation]` Not covered today. No `AutomationProperties` appear anywhere in the Windows XAML, so unlabeled controls have nothing for Narrator to read, and no test would notice a label being added and later lost. Tracked as #1141 (WIN-020): explicit names on non-self-describing controls plus a test that parses the XAML and fails on any control without one.
 
 ## Blocked on a human
 
@@ -126,13 +133,16 @@ Every `[human]` item above. The specific inputs a person must bring:
 | A GitHub token and a scratch repository | 13 |
 | A Jira token and a scratch project | 13 |
 
-Until those exist, #1133 stays open under `ai/blocked` with this table as the stated missing input. Automation is not permitted to close it.
+Until those exist, #1133 stays under `ai/blocked` with this table as the stated missing input. Automation is not permitted to satisfy a `[human]` item.
 
 ## Automation gaps, verified and filed
+
+Status of each is on its own ticket, not here.
 
 Checked on the commit this file landed in, by searching `windows/tests` for the coverage each item names:
 
 - **Row 4** — no test exercises the single-instance path; the only test matching "duplicate" is a hotkey-conflict check. #44's probe is a one-time snapshot without a SHA or host. Filed as #1136 (WIN-017).
 - **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
+- **Row 14** — no `AutomationProperties` anywhere in the Windows XAML; nothing names controls for Narrator and nothing tests it. Filed as #1141 (WIN-020).
 - **Row 10** — `OpenAiIssueExtractionService.BuildFailureMessage` maps 401 and 403 to user-facing text, and `OpenAiIssueExtractionServiceTests` already drives `ExtractAsync` through a fake `HttpMessageHandler`, but the only status it ever returns is `OK`; nothing returns 401, 403, or 500. Filed as #1135 (WIN-016), which extends that harness.
