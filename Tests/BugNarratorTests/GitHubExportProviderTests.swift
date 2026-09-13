@@ -307,6 +307,90 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertTrue(fence.hasPrefix("\\`"), "leading code fence should be escaped")
     }
 
+    func testNeutralizingUntrustedMarkdownDefangsLinkMasksImagesAndReferences() {
+        let masked = GitHubExportProvider.neutralizingUntrustedMarkdown("click [here](https://evil.example) now")
+        XCTAssertEqual(masked, "click \\[here](https://evil.example) now")
+
+        let image = GitHubExportProvider.neutralizingUntrustedMarkdown("![pixel](https://tracker.example/p.png)")
+        XCTAssertEqual(image, "!\\[pixel](https://tracker.example/p.png)")
+
+        let reference = GitHubExportProvider.neutralizingUntrustedMarkdown("[docs]: https://evil.example")
+        XCTAssertTrue(reference.hasPrefix("\\[docs]:"))
+
+        let autolink = GitHubExportProvider.neutralizingUntrustedMarkdown("<https://evil.example>")
+        XCTAssertEqual(autolink, "&lt;https://evil.example&gt;")
+
+        // A bare URL is the one link form that stays live: its target is visible.
+        let bare = GitHubExportProvider.neutralizingUntrustedMarkdown("see https://github.com/acme/widgets")
+        XCTAssertEqual(bare, "see https://github.com/acme/widgets")
+    }
+
+    func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            component: "[cart](https://evil.example)",
+            summary: "Tap [Pay](https://evil.example/phish) to reproduce",
+            evidenceExcerpt: "![](https://tracker.example/1x1.png) said pay failed",
+            deduplicationHint: "hint`**bold**",
+            timestamp: nil,
+            sectionTitle: "[Checkout](https://evil.example)",
+            reproductionSteps: [
+                IssueReproductionStep(instruction: "Open [cart](https://evil.example)", expectedResult: "[ok](https://evil.example)", actualResult: "![x](https://evil.example/i.png)")
+            ],
+            note: "[related](https://evil.example)"
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(token: "fixture-github-token", owner: "acme", repository: "bugnarrator", labels: []),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        // Every "[" from an untrusted field must arrive escaped; the body's own
+        // text contains none, so an unescaped "[" anywhere is a leak.
+        let unescapedBrackets = payload.body.replacingOccurrences(of: "\\[", with: "").filter { $0 == "[" }.count
+        XCTAssertEqual(unescapedBrackets, 0, "an unescaped link/image label survived: \(payload.body)")
+        XCTAssertEqual(payload.body.components(separatedBy: "\\[").count - 1, 8, "all eight untrusted brackets are present, escaped")
+        XCTAssertTrue(payload.body.contains("!\\[](https://tracker.example/1x1.png)"))
+        XCTAssertTrue(payload.body.contains("`hint\u{2019}**bold**`"), "a backtick in the hint must not close the code span")
+        XCTAssertTrue(payload.body.hasSuffix("bugnarrator-export-id: bnexp-fixture"), "the provider's own footer is untouched")
+    }
+
+    func testIssueBodyKeepsOurTrackerCrossReferenceLiveButNeutralizesTheRemoteTitleInside() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        // What IssueExportReviewPolicy.trackerContextNote produces when the
+        // matched remote issue carries a crafted title.
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil,
+            note: "Related to #142 (86% match): [Pay now](https://evil.example) @maintainer. Same trace."
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(token: "fixture-github-token", owner: "acme", repository: "bugnarrator", labels: [])
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertTrue(payload.body.contains("Related to #142 (86% match): \\[Pay now](https://evil.example) @\u{200B}maintainer. Same trace."), payload.body)
+    }
+
     func testIssueBodyNeutralizesUntrustedSummaryFields() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(

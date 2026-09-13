@@ -15,6 +15,11 @@ extension GitHubExportProvider {
                 // text visually identical.
                 .replacingOccurrences(of: "@", with: "@\u{200B}")
                 .replacingOccurrences(of: "#", with: "#\u{200B}")
+                // An escaped "[" cannot open a link or image label, so
+                // [text](url), ![alt](url) and [ref]: url all render literally.
+                // Bare URLs are left alone: GitHub autolinks them and the
+                // target is what the reader sees (#1117).
+                .replacingOccurrences(of: "[", with: "\\[")
             if let first = escaped.first, "-*+|=`~".contains(first) {
                 escaped = "\\" + escaped
             }
@@ -58,7 +63,9 @@ extension GitHubExportProvider {
             lines.append("- Component: \(Self.neutralizingUntrustedMarkdown(component))")
         }
 
-        lines.append("- Deduplication hint: `\(issue.deduplicationHint)`")
+        // Inside a code span markdown is inert, but a backtick in the hint would
+        // close the span early and render whatever follows it.
+        lines.append("- Deduplication hint: `\(issue.deduplicationHint.replacingOccurrences(of: "`", with: "\u{2019}"))`")
 
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
             lines.append("- Transcript section: \(Self.neutralizingUntrustedMarkdown(sectionTitle))")
@@ -75,14 +82,24 @@ extension GitHubExportProvider {
         if let note = issue.note?.trimmingCharacters(in: .whitespacesAndNewlines),
            !note.isEmpty {
             lines.append("")
-            // `note` is set by our own dedup policy (trackerContextNote) and may
-            // deliberately contain a "Related to #123" cross-link, so it is not
-            // neutralized here.
+            // `note` is composed by our dedup policy (trackerContextNote), but it
+            // embeds the matched REMOTE issue's title and the model's reasoning —
+            // in a public repository that title is attacker-controlled, so the
+            // note is neutralized like every other untrusted field. The one link
+            // we authored ourselves, the leading "#123" cross-reference, is then
+            // restored: it is digits only and anchored to a fixed prefix.
             lines.append("## Tracker Context")
-            lines.append(
+            let neutralizedNote = Self.neutralizingUntrustedMarkdown(
                 TrackerExportPayloadBudget.truncated(
                     note,
                     maxCharacters: TrackerExportPayloadBudget.noteLimit
+                )
+            )
+            lines.append(
+                neutralizedNote.replacingOccurrences(
+                    of: #"^(Related to|Marked as duplicate of) #\x{200B}(\d+)\b"#,
+                    with: "$1 #$2",
+                    options: .regularExpression
                 )
             )
         }
