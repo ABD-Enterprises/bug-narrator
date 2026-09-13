@@ -126,6 +126,27 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RetryTranscriptionAsync_WhenCancelled_PropagatesCancellationAndSavesNothing()
+    {
+        var preserved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await File.WriteAllBytesAsync(preserved.AudioFilePath, [0x52, 0x49, 0x46, 0x46]);
+        await completedSessionStore.SaveAsync(preserved);
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        using var cancellation = new CancellationTokenSource();
+        transcriptionClient.ExceptionToThrow = new OperationCanceledException(cancellation.Token);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.RetryTranscriptionAsync(preserved, cancellation.Token));
+
+        var saved = Assert.Single(await completedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.NotConfigured, saved.TranscriptionStatus);
+        Assert.Null(saved.TranscriptionFailureMessage);
+    }
+
+    [Fact]
     public async Task RetryTranscriptionAsync_OnACompletedSession_Refuses()
     {
         var completed = ReviewSessionTestData.CreateCompletedSession(rootDirectory);

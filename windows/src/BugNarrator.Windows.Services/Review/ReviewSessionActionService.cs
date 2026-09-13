@@ -113,9 +113,10 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
             };
             diagnostics.Info("transcription", "transcription retry completed");
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Persist the failure exactly as stop time does, so the library keeps showing the session
+            // Cancellation is not a provider failure: it propagates unchanged and nothing is saved,
+            // so the session stays exactly as it was. Persist a real failure exactly as stop time does, so the library keeps showing the session
             // under Retry Needed with the current reason, then surface it to the caller.
             diagnostics.Error("transcription", "transcription retry failed", exception);
             var failedSession = session with
