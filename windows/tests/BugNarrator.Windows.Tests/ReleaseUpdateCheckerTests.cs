@@ -101,6 +101,15 @@ public sealed class ReleaseUpdateCheckerTests
     }
 
     [Fact]
+    public async Task AnyOtherFeedFailure_IsUndeterminedAndStillOffersTheReleasesPage()
+    {
+        var outcome = await CheckAsync("1.0.41", new IOException("connection reset while reading"));
+
+        Assert.Equal(ReleaseUpdateOutcomeKind.Undetermined, outcome.Kind);
+        Assert.Equal(Fallback, outcome.UrlToOpen(Fallback));
+    }
+
+    [Fact]
     public async Task CallerCancellation_Propagates()
     {
         using var cancellation = new CancellationTokenSource();

@@ -241,6 +241,12 @@ public sealed class ReleaseUpdateChecker
         {
             return ReleaseUpdateOutcome.Undetermined("the releases feed returned an unreadable response");
         }
+        catch (Exception exception)
+        {
+            // Any other feed failure (a dropped stream, an IO error) is still "we do not know", so
+            // the caller can keep the never-dead-ends promise and open the releases page.
+            return ReleaseUpdateOutcome.Undetermined(exception.Message);
+        }
 
         var latestVersion = ReleaseVersion.Parse(latest.Tag);
         if (latestVersion is null)
