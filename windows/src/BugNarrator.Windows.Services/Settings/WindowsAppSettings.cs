@@ -114,12 +114,14 @@ public sealed record WindowsAppSettings(
             ? Default.IssueExtractionModel
             : IssueExtractionModel.Trim();
 
+    // Parakeet ignores any saved base URL, as macOS normalizedOpenAIBaseURL does, so a URL left
+    // over from a previously selected provider can never redirect Parakeet requests.
     public string? EffectiveAiProviderBaseUrl =>
-        string.IsNullOrWhiteSpace(AiProviderBaseUrl)
-            ? EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal
-                ? WindowsAiProviderProfile.ParakeetLocalBaseUrl
-                : null
-            : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
+        EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal
+            ? WindowsAiProviderProfile.ParakeetLocalBaseUrl
+            : string.IsNullOrWhiteSpace(AiProviderBaseUrl)
+                ? null
+                : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
 
     /// <summary>
     /// False for transcription-only providers (Local Parakeet). Mirrors

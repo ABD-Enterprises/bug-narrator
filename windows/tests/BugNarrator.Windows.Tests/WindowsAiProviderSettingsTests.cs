@@ -125,6 +125,10 @@ public sealed class WindowsAiProviderSettingsTests
         Assert.Equal(string.Empty, settings.AiProviderCredentialForWorkflow(null));
         Assert.Equal("parakeet-tdt-0.6b-v3", settings.EffectiveTranscriptionModel);
         Assert.Equal("http://localhost:8422", settings.EffectiveAiProviderBaseUrl);
+        // A base URL left over from a previously selected provider never redirects Parakeet.
+        Assert.Equal(
+            "http://localhost:8422",
+            (settings with { AiProviderBaseUrl = "https://gateway.example.com/openai" }).EffectiveAiProviderBaseUrl);
 
         // Extraction is refused with the macOS guidance, even when a key happens to be saved.
         Assert.False(settings.SupportsIssueExtraction);
