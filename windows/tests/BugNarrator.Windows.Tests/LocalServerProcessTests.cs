@@ -158,6 +158,15 @@ public sealed class LocalServerProcessTests : IDisposable
         var tail = LocalServerProcess.ReadStderrTail(log);
 
         Assert.True(System.Text.Encoding.UTF8.GetByteCount(tail) <= LocalServerProcess.StderrTailBytes);
+        Assert.DoesNotContain('�', tail);
+
+        // 4095 ASCII bytes then an unfinished 3-byte lead: no replacement character, still within the cap.
+        var ragged = Path.Combine(root, "ragged.log");
+        File.WriteAllBytes(ragged, [.. Enumerable.Repeat((byte)'a', 4095), 0xE2]);
+        var raggedTail = LocalServerProcess.ReadStderrTail(ragged);
+        Assert.Equal(4095, raggedTail.Length);
+        Assert.DoesNotContain('�', raggedTail);
+
         Assert.Equal(string.Empty, LocalServerProcess.ReadStderrTail(Path.Combine(root, "absent.log")));
     }
 

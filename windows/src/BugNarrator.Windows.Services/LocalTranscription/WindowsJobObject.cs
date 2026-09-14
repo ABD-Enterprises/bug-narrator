@@ -54,6 +54,12 @@ public sealed class WindowsJobObject : IDisposable
         return IsProcessInJob(processHandle, handle, out var result) && result;
     }
 
+    /// <summary>Ends every process in the job now — the last resort when a kill request itself fails.</summary>
+    public void TerminateAll(uint exitCode = 1)
+    {
+        TerminateJobObject(handle, exitCode);
+    }
+
     public void Dispose() => handle.Dispose();
 
     private const int JobObjectExtendedLimitInformationClass = 9;
@@ -70,6 +76,9 @@ public sealed class WindowsJobObject : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool IsProcessInJob(IntPtr process, SafeFileHandle job, out bool result);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateJobObject(SafeFileHandle job, uint exitCode);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct JobObjectBasicLimitInformation

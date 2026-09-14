@@ -79,14 +79,22 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
             // Real NUL handles for stdin/stdout: a zero handle is not "no handle" to a console app.
             nullInput = OpenInheritableNul(FileAccess.Read);
             nullOutput = OpenInheritableNul(FileAccess.Write);
-            var startup = new StartupInfo
+            // Only the three standard handles cross into the server (PROC_THREAD_ATTRIBUTE_HANDLE_LIST);
+            // every other inheritable handle BugNarrator happens to hold stays on this side.
+            var inherited = new[] { nullInput.DangerousGetHandle(), nullOutput.DangerousGetHandle(), stderrHandle.DangerousGetHandle() };
+            using var attributes = ProcThreadAttributeList.ForHandles(inherited);
+            var startup = new StartupInfoEx
             {
-                cb = Marshal.SizeOf<StartupInfo>(),
-                dwFlags = StartfUseStdHandles | StartfUseShowWindow,
-                wShowWindow = SwHide,
-                hStdInput = nullInput.DangerousGetHandle(),
-                hStdOutput = nullOutput.DangerousGetHandle(),
-                hStdError = stderrHandle.DangerousGetHandle(),
+                StartupInfo = new StartupInfo
+                {
+                    cb = Marshal.SizeOf<StartupInfoEx>(),
+                    dwFlags = StartfUseStdHandles | StartfUseShowWindow,
+                    wShowWindow = SwHide,
+                    hStdInput = inherited[0],
+                    hStdOutput = inherited[1],
+                    hStdError = inherited[2],
+                },
+                lpAttributeList = attributes.Pointer,
             };
             var commandLine = new StringBuilder($"\"{executablePath}\" {arguments}");
             var environment = BuildEnvironmentBlock(modelsDirectory);
@@ -99,7 +107,7 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
                         IntPtr.Zero,
                         IntPtr.Zero,
                         bInheritHandles: true,
-                        CreateNewConsole | CreateSuspended | CreateUnicodeEnvironment,
+                        CreateNewConsole | CreateSuspended | CreateUnicodeEnvironment | ExtendedStartupInfoPresent,
                         environmentPointer,
                         workingDirectory,
                         ref startup,
@@ -184,9 +192,12 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
                         process.Kill(entireProcessTree: true);
                     }
                 }
-                catch (InvalidOperationException)
+                catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
                 {
-                    // Exited between the check and the kill.
+                    // Exited between the check and the kill, or the kill itself was refused: the job
+                    // object ends everything in it so shutdown stays deterministic.
+                    LastSignalOutcome += $"; kill failed ({exception.GetType().Name}), job terminated";
+                    job.TerminateAll();
                 }
             }
         });
@@ -247,7 +258,8 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
                 start++;
             }
 
-            return Encoding.UTF8.GetString(buffer, start, buffer.Length - start).Trim();
+            var end = TrimIncompleteTrailingSequence(buffer, start);
+            return Encoding.UTF8.GetString(buffer, start, end - start).Trim();
         }
         catch (IOException)
         {
@@ -265,6 +277,32 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
     /// </summary>
     /// <summary>What the last graceful-stop attempt did; surfaced in diagnostics and tests.</summary>
     public string LastSignalOutcome { get; private set; } = "not attempted";
+
+    /// <summary>The end index that excludes an unfinished multi-byte sequence, so no replacement character can push past the byte cap.</summary>
+    private static int TrimIncompleteTrailingSequence(byte[] buffer, int start)
+    {
+        var end = buffer.Length;
+        var lead = end - 1;
+        while (lead >= start && (buffer[lead] & 0xC0) == 0x80)
+        {
+            lead--;
+        }
+
+        if (lead < start)
+        {
+            return end;
+        }
+
+        var expected = buffer[lead] switch
+        {
+            < 0x80 => 1,
+            >= 0xC0 and < 0xE0 => 2,
+            >= 0xE0 and < 0xF0 => 3,
+            >= 0xF0 => 4,
+            _ => 1,
+        };
+        return end - lead < expected ? lead : end;
+    }
 
     /// <summary>Console attachment is process-wide state; two stops must never interleave.</summary>
     private static readonly object ConsoleGate = new();
@@ -375,6 +413,7 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
     private const uint CreateNewConsole = 0x00000010;
     private const uint CreateSuspended = 0x00000004;
     private const uint CreateUnicodeEnvironment = 0x00000400;
+    private const uint ExtendedStartupInfoPresent = 0x00080000;
     private const int StartfUseShowWindow = 0x00000001;
     private const int StartfUseStdHandles = 0x00000100;
     private const short SwHide = 0;
@@ -395,8 +434,77 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
         uint creationFlags,
         IntPtr environment,
         string? currentDirectory,
-        ref StartupInfo startupInfo,
+        ref StartupInfoEx startupInfo,
         out ProcessInformation processInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool InitializeProcThreadAttributeList(IntPtr attributeList, int attributeCount, int flags, ref IntPtr size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool UpdateProcThreadAttribute(IntPtr attributeList, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previousValue, IntPtr returnSize);
+
+    [DllImport("kernel32.dll")]
+    private static extern void DeleteProcThreadAttributeList(IntPtr attributeList);
+
+    /// <summary>A PROC_THREAD_ATTRIBUTE_HANDLE_LIST naming exactly the handles the child may inherit.</summary>
+    private sealed class ProcThreadAttributeList : IDisposable
+    {
+        private const uint ProcThreadAttributeHandleList = 0x00020002;
+
+        private readonly IntPtr handles;
+
+        public IntPtr Pointer { get; }
+
+        private ProcThreadAttributeList(IntPtr pointer, IntPtr handles)
+        {
+            Pointer = pointer;
+            this.handles = handles;
+        }
+
+        public static ProcThreadAttributeList ForHandles(IntPtr[] inherited)
+        {
+            var size = IntPtr.Zero;
+            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
+            var list = Marshal.AllocHGlobal(size);
+            var handles = Marshal.AllocHGlobal(IntPtr.Size * inherited.Length);
+            try
+            {
+                if (!InitializeProcThreadAttributeList(list, 1, 0, ref size))
+                {
+                    throw new LocalServerFailure($"Could not prepare the server's handle list (error {Marshal.GetLastWin32Error()})");
+                }
+
+                Marshal.Copy(inherited, 0, handles, inherited.Length);
+                if (!UpdateProcThreadAttribute(list, 0, (IntPtr)ProcThreadAttributeHandleList, handles, (IntPtr)(IntPtr.Size * inherited.Length), IntPtr.Zero, IntPtr.Zero))
+                {
+                    DeleteProcThreadAttributeList(list);
+                    throw new LocalServerFailure($"Could not restrict the server's inherited handles (error {Marshal.GetLastWin32Error()})");
+                }
+
+                return new ProcThreadAttributeList(list, handles);
+            }
+            catch
+            {
+                Marshal.FreeHGlobal(list);
+                Marshal.FreeHGlobal(handles);
+                throw;
+            }
+        }
+
+        public void Dispose()
+        {
+            DeleteProcThreadAttributeList(Pointer);
+            Marshal.FreeHGlobal(Pointer);
+            Marshal.FreeHGlobal(handles);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct StartupInfoEx
+    {
+        public StartupInfo StartupInfo;
+        public IntPtr lpAttributeList;
+    }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr thread);
