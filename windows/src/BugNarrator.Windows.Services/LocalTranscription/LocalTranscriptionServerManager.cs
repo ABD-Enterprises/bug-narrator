@@ -54,6 +54,8 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
     private ILocalServerProcess? server;
     private Task? installOperation;
     private Task? startOperation;
+    private TaskCompletionSource? installCompletion;
+    private TaskCompletionSource? startCompletion;
     private CancellationTokenSource? installCancellation;
     private CancellationTokenSource? startCancellation;
     private bool shuttingDown;
@@ -131,12 +133,15 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             installCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             token = installCancellation.Token;
             state = state with { Busy = true, Progress = 0, Message = "Downloading the local server…" };
-            // Published before the task exists so a concurrent ShutdownAsync always finds it.
-            installOperation = new TaskCompletionSource().Task;
+            // Published under the lock so a concurrent ShutdownAsync always finds it; completed by
+            // the work below, never left dangling.
+            installCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            installOperation = installCompletion.Task;
         }
 
+        var completion = installCompletion;
         StateChanged?.Invoke(this, State);
-        installOperation = Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             try
             {
@@ -178,10 +183,15 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             finally
             {
                 Update(s => s with { Busy = startOperation is { IsCompleted: false }, Progress = null });
-                installOperation = null;
+                lock (gate)
+                {
+                    installOperation = null;
+                }
+
+                completion.SetResult();
             }
         }, CancellationToken.None);
-        return installOperation;
+        return completion.Task;
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -197,12 +207,14 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             startCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             token = startCancellation.Token;
             state = state with { Busy = true };
-            // Reserved before the task exists so a concurrent StartAsync sees the operation as live.
-            startOperation = new TaskCompletionSource().Task;
+            // Published under the lock and completed by the work below.
+            startCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            startOperation = startCompletion.Task;
         }
 
+        var completion = startCompletion;
         StateChanged?.Invoke(this, State);
-        startOperation = Task.Run(() =>
+        _ = Task.Run(() =>
         {
             try
             {
@@ -222,10 +234,15 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             finally
             {
                 Update(s => s with { Busy = false });
-                startOperation = null;
+                lock (gate)
+                {
+                    startOperation = null;
+                }
+
+                completion.SetResult();
             }
         }, CancellationToken.None);
-        return startOperation;
+        return completion.Task;
     }
 
     private void LaunchVerifiedServer()
@@ -287,31 +304,56 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
     /// </summary>
     public async Task ShutdownAsync()
     {
-        shuttingDown = true;
+        lock (gate)
+        {
+            // Under the lock so no start or install can be reserved after this point.
+            shuttingDown = true;
+        }
+
         try
         {
-            var installing = installOperation;
-            var starting = startOperation;
-            var process = server;
-            Stop();
-            if (installing is not null)
+            // A start that was already past its cancellation check may still assign a server after
+            // the first snapshot, so re-read until nothing is in flight and no process is live.
+            while (true)
             {
-                await installing;
-            }
+                Task? installing;
+                Task? starting;
+                ILocalServerProcess? process;
+                lock (gate)
+                {
+                    installing = installOperation;
+                    starting = startOperation;
+                    process = server;
+                }
 
-            if (starting is not null)
-            {
-                await starting;
-            }
+                if (installing is null && starting is null && process is null)
+                {
+                    return;
+                }
 
-            if (process is not null)
-            {
-                await process.WaitForExitAsync();
+                Stop();
+                if (installing is not null)
+                {
+                    await installing;
+                }
+
+                if (starting is not null)
+                {
+                    await starting;
+                }
+
+                if (process is not null)
+                {
+                    await process.WaitForExitAsync();
+                }
             }
         }
         finally
         {
-            shuttingDown = false;
+            lock (gate)
+            {
+                shuttingDown = false;
+            }
         }
     }
 

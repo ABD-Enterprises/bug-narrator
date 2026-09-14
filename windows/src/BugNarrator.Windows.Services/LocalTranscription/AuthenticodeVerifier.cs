@@ -13,8 +13,9 @@ public interface IAuthenticodeVerifier
 /// Authenticode check in two halves, the Windows analogue of the macOS <c>codesign --verify --strict -R</c>
 /// on the team OU: WinVerifyTrust validates the signature and the file digest (a binary modified
 /// after signing fails here), then the signer's distinguished name must carry the exact publisher
-/// organization. Revocation is checked online when reachable and does not fail the check offline,
-/// so an offline machine can still start an already-installed server.
+/// organization. Revocation is deliberately not checked — the same posture as macOS codesign, and
+/// what keeps an already-installed server startable offline; the SHA-256 manifest and the publisher
+/// pin remain the integrity guarantees. Nothing is fetched from the network during verification.
 /// </summary>
 public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
 {
@@ -71,11 +72,11 @@ public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
 
     private const uint TrustENoSignature = 0x800B0100;
     private const uint WtdUiNone = 2;
-    private const uint WtdRevokeWholeChain = 1;
+    private const uint WtdRevokeNone = 0;
     private const uint WtdChoiceFile = 1;
     private const uint WtdStateActionVerify = 1;
     private const uint WtdStateActionClose = 2;
-    private const uint WtdRevocationCheckChain = 0x40;
+    private const uint WtdRevocationCheckNone = 0x10;
     private const uint WtdCacheOnlyUrlRetrieval = 0x1000;
     private static readonly Guid WintrustActionGenericVerifyV2 = new("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");
 
@@ -94,13 +95,12 @@ public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
             {
                 cbStruct = (uint)Marshal.SizeOf<WintrustData>(),
                 dwUIChoice = WtdUiNone,
-                fdwRevocationChecks = WtdRevokeWholeChain,
+                fdwRevocationChecks = WtdRevokeNone,
                 dwUnionChoice = WtdChoiceFile,
                 pFile = fileInfoPointer,
                 dwStateAction = WtdStateActionVerify,
-                // Revocation from the chain when reachable; cache-only retrieval keeps an offline
-                // start from hanging on a CRL fetch and does not turn "unreachable" into "revoked".
-                dwProvFlags = WtdRevocationCheckChain | WtdCacheOnlyUrlRetrieval,
+                // No revocation and no network: an offline machine must still start its server.
+                dwProvFlags = WtdRevocationCheckNone | WtdCacheOnlyUrlRetrieval,
             };
             var action = WintrustActionGenericVerifyV2;
             var status = WinVerifyTrust(IntPtr.Zero, ref action, ref data);
