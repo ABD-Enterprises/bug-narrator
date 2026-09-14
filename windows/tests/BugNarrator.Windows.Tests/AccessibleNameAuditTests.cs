@@ -57,6 +57,36 @@ public sealed class AccessibleNameAuditTests
     }
 
     /// <summary>
+    /// The issue editors are built when a session with extracted issues is presented, after the
+    /// constructor's labeling pass — so an empty-store audit alone would miss them. This presents a
+    /// session with an extracted issue and audits the rendered editor.
+    /// </summary>
+    [Fact]
+    public void SessionLibrary_IssueEditorsRenderedForASessionAreLabeled()
+    {
+        var violations = OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = (SessionLibraryWindow)harness.Build("SessionLibraryWindow");
+            try
+            {
+                window.PresentSessionForReview(ReviewSessionTestData.CreateCompletedSession(
+                    harness.RootDirectory,
+                    issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult()));
+                return AccessibleNameAudit.Run(window);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        Assert.True(
+            violations.Count == 0,
+            $"{violations.Count} rendered editor control(s) without an accessible name:\n  " + string.Join("\n  ", violations));
+    }
+
+    /// <summary>
     /// The tray is WinForms, not WPF: a ToolStripMenuItem's Text is its UIA name, so the audit is
     /// that every non-separator item has one. The icon is never shown (Visible stays false until
     /// Initialize), so constructing the shell is safe on the STA thread.
@@ -214,6 +244,8 @@ public sealed class AccessibleNameAuditTests
     private sealed class WindowHarness : IDisposable
     {
         private readonly string rootDirectory = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));
+
+        public string RootDirectory => rootDirectory;
 
         public WindowsDiagnostics Diagnostics()
         {

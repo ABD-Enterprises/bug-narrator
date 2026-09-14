@@ -890,6 +890,20 @@ public sealed class SessionLibraryWindow : Window
             issueEditors.Add(editor);
             issueEditorsPanel.Children.Add(editor.Container);
         }
+
+        // Editors are built after the constructor pass, so they get the same label association here.
+        AccessibleLabels.LabelInputsFromPrecedingText(issueEditorsPanel);
+    }
+
+    /// <summary>
+    /// Presents a session in the review workspace without showing the window or touching the
+    /// store — what selecting it in the list does. Internal so AccessibleNameAuditTests can audit the
+    /// dynamically built issue editors.
+    /// </summary>
+    internal void PresentSessionForReview(CompletedSession session)
+    {
+        selectedSession = session;
+        UpdateReviewWorkspace(session);
     }
 
     private IssueEditorRow CreateIssueEditor(ExtractedIssue issue)
