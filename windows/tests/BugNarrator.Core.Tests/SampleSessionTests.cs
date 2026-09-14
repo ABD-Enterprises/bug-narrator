@@ -28,6 +28,20 @@ public sealed class SampleSessionTests
         var macTranscript = Regex.Replace(literal, @"\\\r?\n\s*", string.Empty);
         macTranscript = string.Join("\n", macTranscript.Split('\n').Select(line => line.StartsWith("    ") ? line[4..] : line)).Replace("\r", string.Empty);
         Assert.Equal(macTranscript, SampleSession.Transcript);
+
+        // Markers: (elapsedTime, title) pairs in order.
+        var macMarkers = Regex.Matches(swift, @"SessionMarker\(index: \d+, elapsedTime: (\d+), title: ""([^""]+)""")
+            .Select(match => (double.Parse(match.Groups[1].Value), match.Groups[2].Value)).ToArray();
+        var session = SampleSession.Make(Path.GetTempPath());
+        Assert.Equal(macMarkers, session.TimelineMoments.Select(moment => (moment.ElapsedSeconds, moment.Label)).ToArray());
+
+        // Issues: title, severity, and timestamp in order — the fields the review workspace shows first.
+        var macIssues = Regex.Matches(swift, @"title: ""([^""]+)"",\s*category: \.\w+,\s*severity: \.(\w+),[\s\S]*?timestamp: (\d+)")
+            .Select(match => (match.Groups[1].Value, match.Groups[2].Value.ToLowerInvariant(), double.Parse(match.Groups[3].Value))).ToArray();
+        Assert.Equal(3, macIssues.Length);
+        Assert.Equal(
+            macIssues,
+            session.IssueExtraction!.Issues.Select(issue => (issue.Title, issue.Severity.ToString().ToLowerInvariant(), issue.TimestampSeconds ?? -1)).ToArray());
     }
 
     [Fact]
