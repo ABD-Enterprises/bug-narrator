@@ -322,22 +322,22 @@ server._serve("127.0.0.1", {port})
             server._transcribe_audio(NeverCalled(), path)
 
     def test_transcription_route_maps_unsupported_audio_to_a_400(self):
-        from fastapi.testclient import TestClient
+        import io
+
+        from fastapi import UploadFile
 
         class NeverCalled:
             def recognize(self, *args, **kwargs):
                 raise AssertionError("inference must not run on undecodable audio")
 
+        upload = UploadFile(io.BytesIO(b"\x00\x00\x00\x18ftypM4A "), filename="clip.m4a")
         with patch.object(server, "get_model", return_value=NeverCalled()):
-            response = TestClient(server.app).post(
-                "/v1/audio/transcriptions",
-                files={"file": ("clip.m4a", b"\x00\x00\x00\x18ftypM4A ", "audio/mp4")},
-                data={"model": "parakeet-tdt-0.6b-v3"},
-            )
+            response = asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
 
+        body = json.loads(response.body)
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["type"], "invalid_request_error")
-        self.assertIn("PCM WAV", response.json()["error"]["message"])
+        self.assertEqual(body["error"]["type"], "invalid_request_error")
+        self.assertIn("PCM WAV", body["error"]["message"])
 
     def test_onnx_reads_stereo_and_8_bit_wav(self):
         stereo = self._write_wav(8000, 1, channels=2)
