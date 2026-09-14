@@ -239,6 +239,11 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
     [Fact]
     public void AuthenticodeVerifier_RejectsAnUnsignedFile()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            return; // WinVerifyTrust only exists on Windows; SignedBy is covered everywhere above
+        }
+
         var unsigned = Path.Combine(root, "unsigned.exe");
         File.WriteAllText(unsigned, "not signed");
 
@@ -247,6 +252,44 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         var failure = Assert.Throws<LocalServerFailure>(() => new AuthenticodeVerifier().Verify(unsigned));
 
         Assert.EndsWith("Remove and reinstall it.", failure.Message);
+    }
+
+    [Fact]
+    public async Task AProcessThatExitsDuringLaunch_IsNeverReportedRunning()
+    {
+        Directory.CreateDirectory(installDirectory);
+        File.WriteAllText(Path.Combine(installDirectory, LocalServerInstaller.ExecutableName), "exe");
+        var manager = CreateManager(new FakeHandler(_ => Json("[]")), (_, _, onExit) =>
+        {
+            var process = new FakeProcess { OnExit = onExit };
+            process.Exit(1, "crashed at startup"); // exits before launch returns
+            return process;
+        });
+
+        await manager.StartAsync();
+
+        Assert.False(manager.State.Running);
+        Assert.Equal("Local server exited (1). crashed at startup", manager.State.Message);
+        await manager.StartAsync(); // a dead process must not block a retry
+    }
+
+    [Fact]
+    public async Task InstallAndStart_WithAnOversizedChecksumResponse_Fails()
+    {
+        var (zip, _, size) = BuildPackage("exe-bytes");
+        var handler = new FakeHandler(request => request.RequestUri!.AbsoluteUri switch
+        {
+            ChecksumUrl => Text(new string('a', 8192)),
+            ImageUrl => Bytes(File.ReadAllBytes(zip)),
+            _ => Json(JsonSerializer.Serialize(new[] { Release(false, false, ImageAsset(size), ChecksumAsset(70)) })),
+        });
+        var manager = CreateManager(handler);
+
+        await manager.DiscoverAsync();
+        await manager.InstallAndStartAsync();
+
+        Assert.Equal("Installation failed: Invalid checksum manifest. You can retry.", manager.State.Message);
+        Assert.False(manager.State.Installed);
     }
 
     [Fact]

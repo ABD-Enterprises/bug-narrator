@@ -131,6 +131,8 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             installCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             token = installCancellation.Token;
             state = state with { Busy = true, Progress = 0, Message = "Downloading the local server…" };
+            // Published before the task exists so a concurrent ShutdownAsync always finds it.
+            installOperation = new TaskCompletionSource().Task;
         }
 
         StateChanged?.Invoke(this, State);
@@ -230,9 +232,17 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
     {
         try
         {
+            // The exit callback and the assignment below are ordered under the gate, so a process
+            // that dies before launch() returns cannot be stored as a live server afterwards.
+            var exited = false;
             var process = launch(ExecutablePath, ModelsDirectory, (status, detail) =>
             {
-                server = null;
+                lock (gate)
+                {
+                    exited = true;
+                    server = null;
+                }
+
                 Update(s => s with
                 {
                     Running = false,
@@ -241,7 +251,17 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                         : $"Local server exited ({status}). {(string.IsNullOrWhiteSpace(detail) ? "Try starting it again." : detail)}",
                 });
             });
-            server = process;
+
+            lock (gate)
+            {
+                if (exited)
+                {
+                    return;
+                }
+
+                server = process;
+            }
+
             Update(s => s with
             {
                 Running = true,
@@ -345,9 +365,23 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     private async Task<string> DownloadTextAsync(string url, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.GetAsync(url, cancellationToken);
+        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         RequireSuccess(response);
-        return await response.Content.ReadAsStringAsync(cancellationToken);
+        // Streamed with a hard bound: release metadata is not trusted to size the manifest.
+        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var buffer = new byte[LocalServerPackageCatalog.MaxChecksumBytes];
+        var total = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer.AsMemory(total, buffer.Length - total), cancellationToken)) > 0)
+        {
+            total += read;
+            if (total >= buffer.Length)
+            {
+                throw new LocalServerFailure("Invalid checksum manifest");
+            }
+        }
+
+        return System.Text.Encoding.UTF8.GetString(buffer, 0, total);
     }
 
     private async Task DownloadFileAsync(string url, string destination, long expectedSize, CancellationToken cancellationToken)
