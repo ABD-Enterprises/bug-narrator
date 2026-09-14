@@ -201,12 +201,20 @@ jobs:
           set -euo pipefail
           files=(assets/bugnarrator-transcription-windows-*.zip assets/bugnarrator-transcription-windows-*.zip.sha256)
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # Re-dispatch on an existing tag replaces its assets (a repaired or re-signed build).
+            # Re-dispatch on an existing tag replaces its assets (a repaired or re-signed build) —
+            # only when the tag still points at the commit these binaries were built from.
+            tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              printf '::error::Tag %s points at %s but this run built %s; refusing to replace its assets.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA"
+              exit 1
+            fi
             gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             exit 0
           fi
+          # The tag is created at the commit that produced the binaries, never at the default branch.
           args=(release create "$RELEASE_TAG" "${files[@]}"
                 --repo "$GITHUB_REPOSITORY"
+                --target "$GITHUB_SHA"
                 --title "BugNarrator local transcription server (Windows) $RELEASE_TAG"
                 --notes "Signed Windows builds of the local Parakeet transcription server. BugNarrator discovers the x64 asset automatically from Settings > Local (Parakeet) Server; the arm64 asset is for Windows on ARM machines. Model weights download on first start.")
           [[ "$RELEASE_DRAFT" == "true" ]] && args+=(--draft)
