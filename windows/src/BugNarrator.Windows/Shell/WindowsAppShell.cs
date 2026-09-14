@@ -45,6 +45,11 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.SettingsRequested += OnSettingsRequested;
         trayShell.AboutRequested += OnAboutRequested;
         trayShell.OpenLinkRequested += OnOpenLinkRequested;
+        trayShell.SampleSessionRequested += OnSampleSessionRequested;
+        // Re-evaluated whenever the menu opens: deleting the last session in the library does not
+        // notify the shell, so a startup-only read would go stale.
+        trayShell.MenuOpening += OnTrayMenuOpening;
+        _ = RefreshSampleSessionOfferAsync();
         trayShell.QuitRequested += OnQuitRequested;
     }
 
@@ -102,6 +107,8 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.SettingsRequested -= OnSettingsRequested;
         trayShell.AboutRequested -= OnAboutRequested;
         trayShell.OpenLinkRequested -= OnOpenLinkRequested;
+        trayShell.SampleSessionRequested -= OnSampleSessionRequested;
+        trayShell.MenuOpening -= OnTrayMenuOpening;
         trayShell.QuitRequested -= OnQuitRequested;
 
         windowCoordinator.CloseAll();
@@ -133,6 +140,38 @@ public sealed class WindowsAppShell : IDisposable
         });
     }
 
+    private void OnTrayMenuOpening(object? sender, EventArgs e)
+    {
+        _ = RefreshSampleSessionOfferAsync();
+    }
+
+    private async void OnSampleSessionRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            await windowCoordinator.AddSampleSessionAndShowLibraryAsync();
+            await RefreshSampleSessionOfferAsync();
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("tray", "adding the sample session failed", exception);
+            trayShell.ShowStatus("Status: Could not add the sample session. See the log for details.");
+        }
+    }
+
+    private async Task RefreshSampleSessionOfferAsync()
+    {
+        try
+        {
+            var count = await windowCoordinator.CountSessionsAsync();
+            trayShell.SetSampleSessionOfferVisible(TrayPresentationState.ShouldOfferSampleSession(count));
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Warning("tray", $"sample session offer refresh failed: {exception.Message}");
+        }
+    }
+
     private void OnOpenLinkRequested(object? sender, string url)
     {
         try
@@ -162,6 +201,11 @@ public sealed class WindowsAppShell : IDisposable
     private void OnRecordingStateChanged(object? sender, RecordingControlState state)
     {
         Application.Current.Dispatcher.BeginInvoke(() => trayShell.ApplyRecordingState(state));
+        if (state.WorkflowState == RecordingWorkflowState.Completed)
+        {
+            // The library just gained a real session; the sample offer is noise from here on.
+            Application.Current.Dispatcher.BeginInvoke(() => _ = RefreshSampleSessionOfferAsync());
+        }
     }
 
     private void OnQuitRequested(object? sender, EventArgs e)

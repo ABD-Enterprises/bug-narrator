@@ -332,6 +332,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
 
     private sealed class FakeCompletedSessionStore : ICompletedSessionStore
     {
+        public string SessionsDirectory => Path.GetTempPath();
         public CompletedSession? LastSavedSession { get; private set; }
 
         public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default)

@@ -61,6 +61,16 @@ public sealed class TrayPresentationStateTests
         Assert.False(presentation.CanCaptureScreenshot);
     }
 
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(12, false)]
+    public void ShouldOfferSampleSession_OnlyWhileTheLibraryIsEmpty(int sessionCount, bool expected)
+    {
+        // FirstRunFunnel.shouldOfferSampleSession(libraryIsEmpty:) on macOS.
+        Assert.Equal(expected, TrayPresentationState.ShouldOfferSampleSession(sessionCount));
+    }
+
     [Fact]
     public void SupportEntries_MatchTheMacProductInfoMenuInOrder()
     {
