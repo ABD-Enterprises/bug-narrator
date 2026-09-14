@@ -99,12 +99,12 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     public async Task DiscoverAsync(CancellationToken cancellationToken = default)
     {
-        if (State is { Package: not null } or { Busy: true } || shuttingDown)
+        // Guard and reservation under one lock, so two callers cannot both pass the guard.
+        if (!TryReserve(current => current.Package is null && !current.Busy && !shuttingDown))
         {
             return;
         }
 
-        Update(current => current with { Busy = true });
         try
         {
             var (package, message) = await catalog.DiscoverAsync(cancellationToken);
@@ -118,16 +118,22 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     public Task InstallAndStartAsync(CancellationToken cancellationToken = default)
     {
-        var current = State;
-        if (current.Package is null || current.Busy || current.Installed || shuttingDown)
+        LocalServerPackage package;
+        CancellationToken token;
+        lock (gate)
         {
-            return Task.CompletedTask;
+            if (state.Package is null || state.Busy || state.Installed || shuttingDown)
+            {
+                return Task.CompletedTask;
+            }
+
+            package = state.Package;
+            installCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            token = installCancellation.Token;
+            state = state with { Busy = true, Progress = 0, Message = "Downloading the local server…" };
         }
 
-        var package = current.Package;
-        installCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var token = installCancellation.Token;
-        Update(s => s with { Busy = true, Progress = 0, Message = "Downloading the local server…" });
+        StateChanged?.Invoke(this, State);
         installOperation = Task.Run(async () =>
         {
             try
@@ -178,15 +184,22 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
-        var current = State;
-        if (!current.Installed || server is not null || startOperation is { IsCompleted: false } || shuttingDown)
+        CancellationToken token;
+        lock (gate)
         {
-            return Task.CompletedTask;
+            if (!state.Installed || server is not null || startOperation is { IsCompleted: false } || shuttingDown)
+            {
+                return Task.CompletedTask;
+            }
+
+            startCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            token = startCancellation.Token;
+            state = state with { Busy = true };
+            // Reserved before the task exists so a concurrent StartAsync sees the operation as live.
+            startOperation = new TaskCompletionSource().Task;
         }
 
-        startCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var token = startCancellation.Token;
-        Update(s => s with { Busy = true });
+        StateChanged?.Invoke(this, State);
         startOperation = Task.Run(() =>
         {
             try
@@ -284,9 +297,15 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     public void Remove()
     {
-        if (State.Busy || server is not null || startOperation is { IsCompleted: false })
+        lock (gate)
         {
-            return;
+            if (state.Busy || server is not null || startOperation is { IsCompleted: false })
+            {
+                return;
+            }
+
+            // Reserved so a Start racing this removal is refused until it finishes.
+            state = state with { Busy = true };
         }
 
         try
@@ -302,6 +321,26 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
         {
             Update(s => s with { Message = $"Could not remove the local server: {exception.Message}" });
         }
+        finally
+        {
+            Update(s => s with { Busy = false });
+        }
+    }
+
+    private bool TryReserve(Func<LocalTranscriptionServerState, bool> guard)
+    {
+        lock (gate)
+        {
+            if (!guard(state))
+            {
+                return false;
+            }
+
+            state = state with { Busy = true };
+        }
+
+        StateChanged?.Invoke(this, State);
+        return true;
     }
 
     private async Task<string> DownloadTextAsync(string url, CancellationToken cancellationToken)

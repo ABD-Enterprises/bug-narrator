@@ -200,6 +200,68 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         Assert.Equal("Invalid server package: the executable is missing", failure.Message);
     }
 
+    [Fact]
+    public void Install_RejectsAnExecutableEntryLargerThanTheBound()
+    {
+        var zip = Path.Combine(root, "huge.zip");
+        using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+        {
+            var entry = archive.CreateEntry(LocalServerInstaller.ExecutableName, CompressionLevel.SmallestSize);
+            using var stream = entry.Open();
+            var zeros = new byte[1 << 20];
+            for (var written = 0L; written <= LocalServerInstaller.MaxExecutableBytes; written += zeros.Length)
+            {
+                stream.Write(zeros);
+            }
+        }
+
+        var size = new FileInfo(zip).Length;
+        var manifest = Sha256(zip) + "  " + LocalServerPackageCatalog.AssetName;
+
+        var failure = Assert.Throws<LocalServerFailure>(() => new LocalServerInstaller(new FakeVerifier()).Install(zip, manifest, size, installDirectory));
+
+        Assert.Equal("Invalid server package: the executable size is out of bounds", failure.Message);
+        Assert.False(File.Exists(Path.Combine(installDirectory, LocalServerInstaller.ExecutableName)));
+    }
+
+    [Theory]
+    [InlineData("CN=ABD Enterprises, O=ABD Enterprises, L=Somewhere, C=US", true)]
+    [InlineData("CN=Evil, O=ABD Enterprises Evil, C=US", false)]
+    [InlineData("CN=ABD Enterprises, C=US", false)]
+    [InlineData("O=abd enterprises", false)]
+    public void AuthenticodeVerifier_RequiresTheExactPublisherOrganization(string subject, bool expected)
+    {
+        var name = new System.Security.Cryptography.X509Certificates.X500DistinguishedName(subject);
+
+        Assert.Equal(expected, AuthenticodeVerifier.SignedBy(name, AuthenticodeVerifier.PublisherOrganization));
+    }
+
+    [Fact]
+    public void AuthenticodeVerifier_RejectsAnUnsignedFile()
+    {
+        var unsigned = Path.Combine(root, "unsigned.exe");
+        File.WriteAllText(unsigned, "not signed");
+
+        // Not a PE at all, so WinVerifyTrust reports a provider error rather than TRUST_E_NOSIGNATURE;
+        // either way the file never runs and the user is told to reinstall.
+        var failure = Assert.Throws<LocalServerFailure>(() => new AuthenticodeVerifier().Verify(unsigned));
+
+        Assert.EndsWith("Remove and reinstall it.", failure.Message);
+    }
+
+    [Fact]
+    public async Task ConcurrentStarts_LaunchOnce()
+    {
+        Directory.CreateDirectory(installDirectory);
+        File.WriteAllText(Path.Combine(installDirectory, LocalServerInstaller.ExecutableName), "exe");
+        var launches = 0;
+        var manager = CreateManager(new FakeHandler(_ => Json("[]")), (_, _, _) => { Interlocked.Increment(ref launches); return new FakeProcess(); });
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() => manager.StartAsync())));
+
+        Assert.Equal(1, launches);
+    }
+
     // ---- manager state guards ----
 
     [Fact]

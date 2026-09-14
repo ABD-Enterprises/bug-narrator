@@ -1,51 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
-
-/// <summary>Verifies that an executable is signed by the BugNarrator publisher; throws <see cref="LocalServerFailure"/> otherwise.</summary>
-public interface IAuthenticodeVerifier
-{
-    void Verify(string executablePath);
-}
-
-/// <summary>
-/// Authenticode check pinned to the publisher subject and its issuer chain — the Windows analogue
-/// of the macOS codesign requirement on the team OU rather than a rotating leaf thumbprint.
-/// </summary>
-public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
-{
-    public const string PublisherSubjectFragment = "O=ABD Enterprises";
-
-    public void Verify(string executablePath)
-    {
-        X509Certificate2 certificate;
-        try
-        {
-            certificate = new X509Certificate2(X509Certificate.CreateFromSignedFile(executablePath));
-        }
-        catch (Exception exception)
-        {
-            throw new LocalServerFailure($"Invalid server executable: {exception.Message}");
-        }
-
-        using (certificate)
-        {
-            if (!certificate.Subject.Contains(PublisherSubjectFragment, StringComparison.Ordinal))
-            {
-                throw new LocalServerFailure("The local server executable is not signed by the BugNarrator publisher. Remove and reinstall it.");
-            }
-
-            using var chain = new X509Chain();
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-            if (!chain.Build(certificate))
-            {
-                throw new LocalServerFailure("The local server executable's signature chain could not be verified. Remove and reinstall it.");
-            }
-        }
-    }
-}
 
 /// <summary>
 /// Download → SHA-256 + size check → extract to staging → publisher verification → atomic move,
@@ -55,6 +11,9 @@ public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
 public sealed class LocalServerInstaller
 {
     public const string ExecutableName = "bugnarrator-transcription.exe";
+
+    /// <summary>The executable is a PyInstaller onefile bundle; anything past this is not ours.</summary>
+    public const long MaxExecutableBytes = 400_000_000;
 
     private readonly IAuthenticodeVerifier verifier;
 
@@ -103,7 +62,27 @@ public sealed class LocalServerInstaller
             {
                 var entry = archive.Entries.FirstOrDefault(candidate => candidate.Name == ExecutableName && candidate.FullName == ExecutableName)
                     ?? throw new LocalServerFailure("Invalid server package: the executable is missing");
-                entry.ExtractToFile(Path.Combine(staging, ExecutableName), overwrite: false);
+                if (entry.Length <= 0 || entry.Length > MaxExecutableBytes)
+                {
+                    throw new LocalServerFailure("Invalid server package: the executable size is out of bounds");
+                }
+
+                // Bounded copy: the declared length is not trusted either.
+                using var source = entry.Open();
+                using var target = new FileStream(Path.Combine(staging, ExecutableName), FileMode.CreateNew, FileAccess.Write);
+                var buffer = new byte[81920];
+                long written = 0;
+                int read;
+                while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    written += read;
+                    if (written > MaxExecutableBytes)
+                    {
+                        throw new LocalServerFailure("Invalid server package: the executable size is out of bounds");
+                    }
+
+                    target.Write(buffer, 0, read);
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
