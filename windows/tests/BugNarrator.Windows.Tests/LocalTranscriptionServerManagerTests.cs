@@ -203,22 +203,20 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
     [Fact]
     public void Install_RejectsAnExecutableEntryLargerThanTheBound()
     {
+        // The bound is injectable so the test does not have to write hundreds of megabytes.
+        const long limit = 4096;
         var zip = Path.Combine(root, "huge.zip");
         using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
         {
             var entry = archive.CreateEntry(LocalServerInstaller.ExecutableName, CompressionLevel.SmallestSize);
             using var stream = entry.Open();
-            var zeros = new byte[1 << 20];
-            for (var written = 0L; written <= LocalServerInstaller.MaxExecutableBytes; written += zeros.Length)
-            {
-                stream.Write(zeros);
-            }
+            stream.Write(new byte[limit + 1]);
         }
 
         var size = new FileInfo(zip).Length;
         var manifest = Sha256(zip) + "  " + LocalServerPackageCatalog.AssetName;
 
-        var failure = Assert.Throws<LocalServerFailure>(() => new LocalServerInstaller(new FakeVerifier()).Install(zip, manifest, size, installDirectory));
+        var failure = Assert.Throws<LocalServerFailure>(() => new LocalServerInstaller(new FakeVerifier(), limit).Install(zip, manifest, size, installDirectory));
 
         Assert.Equal("Invalid server package: the executable size is out of bounds", failure.Message);
         Assert.False(File.Exists(Path.Combine(installDirectory, LocalServerInstaller.ExecutableName)));

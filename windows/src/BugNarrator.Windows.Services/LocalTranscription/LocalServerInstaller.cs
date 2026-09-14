@@ -16,10 +16,12 @@ public sealed class LocalServerInstaller
     public const long MaxExecutableBytes = 400_000_000;
 
     private readonly IAuthenticodeVerifier verifier;
+    private readonly long maxExecutableBytes;
 
-    public LocalServerInstaller(IAuthenticodeVerifier verifier)
+    public LocalServerInstaller(IAuthenticodeVerifier verifier, long maxExecutableBytes = MaxExecutableBytes)
     {
         this.verifier = verifier;
+        this.maxExecutableBytes = maxExecutableBytes;
     }
 
     public static void VerifyChecksum(string file, string manifest, long expectedSize)
@@ -62,7 +64,7 @@ public sealed class LocalServerInstaller
             {
                 var entry = archive.Entries.FirstOrDefault(candidate => candidate.Name == ExecutableName && candidate.FullName == ExecutableName)
                     ?? throw new LocalServerFailure("Invalid server package: the executable is missing");
-                if (entry.Length <= 0 || entry.Length > MaxExecutableBytes)
+                if (entry.Length <= 0 || entry.Length > maxExecutableBytes)
                 {
                     throw new LocalServerFailure("Invalid server package: the executable size is out of bounds");
                 }
@@ -76,7 +78,7 @@ public sealed class LocalServerInstaller
                 while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     written += read;
-                    if (written > MaxExecutableBytes)
+                    if (written > maxExecutableBytes)
                     {
                         throw new LocalServerFailure("Invalid server package: the executable size is out of bounds");
                     }
