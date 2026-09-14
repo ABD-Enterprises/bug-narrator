@@ -265,7 +265,8 @@ public sealed class ReleaseUpdateChecker
     /// </summary>
     public static string CurrentVersion()
     {
-        var assembly = System.Reflection.Assembly.GetEntryAssembly() ?? typeof(ReleaseUpdateChecker).Assembly;
+        // This assembly, not the entry assembly: under a test host the entry assembly is the runner.
+        var assembly = typeof(ReleaseUpdateChecker).Assembly;
         var informational = assembly
             .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
             .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
