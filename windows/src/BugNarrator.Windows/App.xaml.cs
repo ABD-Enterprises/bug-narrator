@@ -84,14 +84,12 @@ public partial class App : Application
             diagnostics);
         var localServerHealthProbe = new BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe();
         var localServerHttpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        // Process launch arrives with WIN-039 (#1181); until then Start reports why it cannot run.
         var localServerManager = new BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager(
             BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager.DefaultInstallDirectory,
             new BugNarrator.Windows.Services.LocalTranscription.LocalServerPackageCatalog(localServerHttpClient),
             localServerHttpClient,
             new BugNarrator.Windows.Services.LocalTranscription.AuthenticodeVerifier(),
-            (_, _, _) => throw new BugNarrator.Windows.Services.LocalTranscription.LocalServerFailure(
-                "starting the local server is not available in this build yet (WIN-039)"));
+            BugNarrator.Windows.Services.LocalTranscription.LocalServerProcess.LaunchServer);
         var recordingLifecycleService = new RecordingLifecycleService(
             audioRecorderService,
             audioInputDeviceCatalog,
@@ -135,7 +133,8 @@ public partial class App : Application
             recordingLifecycleService,
             windowCoordinator,
             trayShell,
-            new ShellExternalLinkLauncher());
+            new ShellExternalLinkLauncher(),
+            localServerManager: localServerManager);
 
         if (!appShell.Initialize())
         {
