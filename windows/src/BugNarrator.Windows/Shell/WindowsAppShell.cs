@@ -46,6 +46,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.AboutRequested += OnAboutRequested;
         trayShell.OpenLinkRequested += OnOpenLinkRequested;
         trayShell.SampleSessionRequested += OnSampleSessionRequested;
+        trayShell.WelcomeTourRequested += OnWelcomeTourRequested;
         // Re-evaluated whenever the menu opens: deleting the last session in the library does not
         // notify the shell, so a startup-only read would go stale.
         trayShell.MenuOpening += OnTrayMenuOpening;
@@ -91,8 +92,35 @@ public sealed class WindowsAppShell : IDisposable
             {
                 diagnostics.Error("hotkeys", "failed to initialize persisted hotkeys", exception);
             }
+
+            await PresentWelcomeIfNeededAsync();
         });
         return true;
+    }
+
+    /// <summary>
+    /// The one window a launch may open unprompted (#1167). Presented once per the FirstRunFunnel
+    /// rule; the window itself makes dismissal durable, so a second launch never re-prompts.
+    /// </summary>
+    private async Task PresentWelcomeIfNeededAsync()
+    {
+        try
+        {
+            if (await windowCoordinator.ShouldPresentWelcomeAsync())
+            {
+                diagnostics.Info("app", "presenting first-run welcome tour");
+                await windowCoordinator.ShowWelcomeAtLaunchAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("app", "failed to evaluate the first-run welcome rule", exception);
+        }
+    }
+
+    private void OnWelcomeTourRequested(object? sender, EventArgs e)
+    {
+        windowCoordinator.ShowWelcome();
     }
 
     public void Dispose()
@@ -108,6 +136,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.AboutRequested -= OnAboutRequested;
         trayShell.OpenLinkRequested -= OnOpenLinkRequested;
         trayShell.SampleSessionRequested -= OnSampleSessionRequested;
+        trayShell.WelcomeTourRequested -= OnWelcomeTourRequested;
         trayShell.MenuOpening -= OnTrayMenuOpening;
         trayShell.QuitRequested -= OnQuitRequested;
 
