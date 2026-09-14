@@ -31,9 +31,14 @@ public static class ScreenshotCaptureGeometry
     /// </summary>
     public static PhysicalRect ToPhysical(LogicalRect logical, double scaleX, double scaleY)
     {
-        if (scaleX <= 0 || scaleY <= 0)
+        if (scaleX <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(scaleX), "Scale factors must be positive.");
+        }
+
+        if (scaleY <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scaleY), "Scale factors must be positive.");
         }
 
         var left = (int)Math.Round(logical.X * scaleX);

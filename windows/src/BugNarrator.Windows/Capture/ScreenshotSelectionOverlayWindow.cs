@@ -16,11 +16,23 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
     private readonly TextBlock hintText;
     private readonly Rectangle selectionRectangle;
 
+    private readonly Func<(double X, double Y)> deviceScale;
+
     private Point dragStartPoint;
     private bool isDragging;
 
     public ScreenshotSelectionOverlayWindow()
+        : this(deviceScale: null)
     {
+    }
+
+    /// <summary>
+    /// <paramref name="deviceScale"/> overrides the window's own DIP → device transform; tests use it
+    /// to emulate a 125 % or 150 % display without a real presentation source.
+    /// </summary>
+    internal ScreenshotSelectionOverlayWindow(Func<(double X, double Y)>? deviceScale)
+    {
+        this.deviceScale = deviceScale ?? DeviceScaleFromPresentationSource;
         Left = SystemParameters.VirtualScreenLeft;
         Top = SystemParameters.VirtualScreenTop;
         Width = SystemParameters.VirtualScreenWidth;
@@ -140,11 +152,19 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
         isDragging = false;
         Mouse.Capture(null);
 
-        var currentPoint = eventArgs.GetPosition(canvas);
-        var left = Math.Min(dragStartPoint.X, currentPoint.X);
-        var top = Math.Min(dragStartPoint.Y, currentPoint.Y);
-        var width = Math.Abs(currentPoint.X - dragStartPoint.X);
-        var height = Math.Abs(currentPoint.Y - dragStartPoint.Y);
+        CompleteDrag(dragStartPoint, eventArgs.GetPosition(canvas));
+    }
+
+    /// <summary>
+    /// The production path from a finished drag (canvas DIPs) to the physical-pixel selection the
+    /// capture service uses; internal so the DPI tests can drive it without synthesizing mouse input.
+    /// </summary>
+    internal void CompleteDrag(Point start, Point end)
+    {
+        var left = Math.Min(start.X, end.X);
+        var top = Math.Min(start.Y, end.Y);
+        var width = Math.Abs(end.X - start.X);
+        var height = Math.Abs(end.Y - start.Y);
 
         if (width < MinimumSelectionSize || height < MinimumSelectionSize)
         {
@@ -153,10 +173,11 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
         }
 
         // The drag is measured in DIPs; CopyFromScreen and the PNG are physical pixels (#1134).
+        var scale = deviceScale();
         var physical = ScreenshotCaptureGeometry.ToPhysical(
             new LogicalRect(Left + left, Top + top, width, height),
-            DeviceScaleX,
-            DeviceScaleY);
+            scale.X,
+            scale.Y);
         SelectionResult = new ScreenshotSelectionResult(
             ScreenshotSelectionStatus.Selected,
             new ScreenshotSelection(physical.X, physical.Y, physical.Width, physical.Height));
@@ -164,8 +185,10 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
         Close();
     }
 
-    /// <summary>DIP → device pixel factor for this window; 1.0 before the window has a presentation source.</summary>
-    private double DeviceScaleX => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
-
-    private double DeviceScaleY => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+    /// <summary>DIP → device pixel factors for this window; 1.0 before the window has a presentation source.</summary>
+    private (double X, double Y) DeviceScaleFromPresentationSource()
+    {
+        var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice;
+        return transform is { } matrix ? (matrix.M11, matrix.M22) : (1.0, 1.0);
+    }
 }

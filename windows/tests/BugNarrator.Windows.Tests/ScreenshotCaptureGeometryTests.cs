@@ -1,4 +1,6 @@
+using System.Windows;
 using BugNarrator.Core.Workflow;
+using BugNarrator.Windows.Capture;
 using BugNarrator.Windows.Services.Capture;
 using Xunit;
 
@@ -36,6 +38,43 @@ public sealed class ScreenshotCaptureGeometryTests
         {
             Assert.NotEqual((int)logicalWidth, selection.Width);
         }
+    }
+
+    [Theory]
+    [InlineData(1.25, 125, 75)]
+    [InlineData(1.5, 150, 90)]
+    public void Overlay_UnderEmulatedScale_ReportsTheDraggedRegionInPhysicalPixels(double scale, int expectedWidth, int expectedHeight)
+    {
+        // The production path: ScreenshotSelectionOverlayWindow.CompleteDrag with the window's
+        // DIP → device transform emulated at the given scale. This is what the capture service
+        // receives, so a miswired conversion in the overlay fails here.
+        var selection = OnStaThread(() =>
+        {
+            var overlay = new ScreenshotSelectionOverlayWindow(() => (scale, scale));
+            overlay.CompleteDrag(new Point(40, 24), new Point(140, 84));
+            return overlay.SelectionResult;
+        });
+
+        Assert.NotNull(selection);
+        Assert.Equal(ScreenshotSelectionStatus.Selected, selection!.Status);
+        var origin = (X: (int)Math.Round((SystemParameters.VirtualScreenLeft + 40) * scale), Y: (int)Math.Round((SystemParameters.VirtualScreenTop + 24) * scale));
+        Assert.Equal(origin.X, selection.Selection!.Value.X);
+        Assert.Equal(origin.Y, selection.Selection.Value.Y);
+        Assert.Equal(expectedWidth, selection.Selection.Value.Width);
+        Assert.Equal(expectedHeight, selection.Selection.Value.Height);
+    }
+
+    [Fact]
+    public void Overlay_WithATinyDrag_CancelsInsteadOfCapturing()
+    {
+        var selection = OnStaThread(() =>
+        {
+            var overlay = new ScreenshotSelectionOverlayWindow(() => (1.5, 1.5));
+            overlay.CompleteDrag(new Point(10, 10), new Point(13, 13));
+            return overlay.SelectionResult;
+        });
+
+        Assert.NotEqual(ScreenshotSelectionStatus.Selected, selection?.Status);
     }
 
     [Fact]
@@ -97,6 +136,36 @@ public sealed class ScreenshotCaptureGeometryTests
     [Fact]
     public void ToPhysical_RejectsANonPositiveScale()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotCaptureGeometry.ToPhysical(new LogicalRect(0, 0, 10, 10), 0, 1));
+        var x = Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotCaptureGeometry.ToPhysical(new LogicalRect(0, 0, 10, 10), 0, 1));
+        var y = Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotCaptureGeometry.ToPhysical(new LogicalRect(0, 0, 10, 10), 1, -1));
+
+        Assert.Equal("scaleX", x.ParamName);
+        Assert.Equal("scaleY", y.ParamName);
+    }
+
+    private static T OnStaThread<T>(Func<T> action)
+    {
+        T result = default!;
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                result = action();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null)
+        {
+            throw failure;
+        }
+
+        return result;
     }
 }
