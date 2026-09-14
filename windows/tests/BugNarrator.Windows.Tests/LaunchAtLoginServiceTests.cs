@@ -8,6 +8,14 @@ public sealed class LaunchAtLoginServiceTests
     private const string Exe = @"C:\Program Files\BugNarrator\BugNarrator.Windows.exe";
 
     [Fact]
+    public void RegistryPaths_AreTheRealStartupKeys()
+    {
+        // A fake registry cannot catch a mistyped path; these are the keys Windows actually reads.
+        Assert.Equal(@"Software\Microsoft\Windows\CurrentVersion\Run", LaunchAtLoginService.RunKeyPathValue);
+        Assert.Equal(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", LaunchAtLoginService.StartupApprovedKeyPath);
+    }
+
+    [Fact]
     public void CurrentStatus_IsDisabledWhenNoRunValueExists()
     {
         var service = new LaunchAtLoginService(new FakeRunKey(), () => Exe);

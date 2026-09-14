@@ -46,6 +46,10 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
 {
     public const string ValueName = "BugNarrator";
 
+    // Exposed so a test can pin the exact keys; a fake registry cannot catch a wrong path.
+    public const string RunKeyPathValue = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    public const string StartupApprovedKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
     private readonly IRunKeyRegistry registry;
     private readonly Func<string?> executablePath;
 
@@ -125,7 +129,7 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
 
     private sealed class CurrentUserRunKeyRegistry : IRunKeyRegistry
     {
-        private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string RunKeyPath = RunKeyPathValue;
 
         public string? GetValue(string name)
         {
@@ -146,7 +150,7 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
             key?.DeleteValue(name, throwOnMissingValue: false);
         }
 
-        private const string StartupApprovedPath = @"SoftwareMicrosoftWindowsCurrentVersionExplorerStartupApprovedRun";
+        private const string StartupApprovedPath = StartupApprovedKeyPath;
 
         public bool? GetStartupApproved(string name)
         {
