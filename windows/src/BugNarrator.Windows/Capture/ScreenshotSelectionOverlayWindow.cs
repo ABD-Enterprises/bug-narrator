@@ -1,3 +1,4 @@
+using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
 using System.Windows;
 using System.Windows.Controls;
@@ -151,14 +152,20 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
             return;
         }
 
+        // The drag is measured in DIPs; CopyFromScreen and the PNG are physical pixels (#1134).
+        var physical = ScreenshotCaptureGeometry.ToPhysical(
+            new LogicalRect(Left + left, Top + top, width, height),
+            DeviceScaleX,
+            DeviceScaleY);
         SelectionResult = new ScreenshotSelectionResult(
             ScreenshotSelectionStatus.Selected,
-            new ScreenshotSelection(
-                X: (int)Math.Round(Left + left),
-                Y: (int)Math.Round(Top + top),
-                Width: (int)Math.Round(width),
-                Height: (int)Math.Round(height)));
+            new ScreenshotSelection(physical.X, physical.Y, physical.Width, physical.Height));
 
         Close();
     }
+
+    /// <summary>DIP → device pixel factor for this window; 1.0 before the window has a presentation source.</summary>
+    private double DeviceScaleX => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+    private double DeviceScaleY => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
 }
