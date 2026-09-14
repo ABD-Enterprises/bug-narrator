@@ -13,6 +13,10 @@ public sealed class WindowsAppShell : IDisposable
     private readonly WindowsDiagnostics diagnostics;
     private readonly IExternalLinkLauncher externalLinkLauncher;
     private readonly ReleaseUpdateChecker releaseUpdateChecker;
+    private readonly BugNarrator.Windows.Services.LocalTranscription.ILocalTranscriptionServerManager? localServerManager;
+
+    /// <summary>How long app exit waits for the local server to stop (graceful 2 s + kill + process teardown).</summary>
+    public static readonly TimeSpan LocalServerShutdownBudget = TimeSpan.FromSeconds(10);
     private bool isCheckingForUpdates;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
     private readonly IRecordingLifecycleService recordingLifecycleService;
@@ -28,9 +32,11 @@ public sealed class WindowsAppShell : IDisposable
         WindowCoordinator windowCoordinator,
         TrayShell trayShell,
         IExternalLinkLauncher externalLinkLauncher,
-        ReleaseUpdateChecker? releaseUpdateChecker = null)
+        ReleaseUpdateChecker? releaseUpdateChecker = null,
+        BugNarrator.Windows.Services.LocalTranscription.ILocalTranscriptionServerManager? localServerManager = null)
     {
         this.releaseUpdateChecker = releaseUpdateChecker ?? new ReleaseUpdateChecker();
+        this.localServerManager = localServerManager;
         this.singleInstanceService = singleInstanceService;
         this.diagnostics = diagnostics;
         this.externalLinkLauncher = externalLinkLauncher;
@@ -204,11 +210,39 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.QuitRequested -= OnQuitRequested;
 
         windowCoordinator.CloseAll();
+        ShutdownLocalServer();
         hotkeyService.Dispose();
         trayShell.Dispose();
         recordingLifecycleService.Dispose();
         singleInstanceService.Dispose();
         diagnostics.Info("app", "app exit");
+    }
+
+    /// <summary>
+    /// macOS AppLifecycleDelegate.shutdown: the app does not finish exiting until the local server
+    /// has been asked to stop and has gone (graceful, then killed). Bounded so a wedged process
+    /// cannot hold the exit; the Job Object takes it down regardless once this process ends.
+    /// </summary>
+    private void ShutdownLocalServer()
+    {
+        if (localServerManager is null)
+        {
+            return;
+        }
+
+        try
+        {
+            localServerManager.ShutdownAsync().WaitAsync(LocalServerShutdownBudget).GetAwaiter().GetResult();
+            diagnostics.Info("local-server", "local transcription server shut down");
+        }
+        catch (TimeoutException)
+        {
+            diagnostics.Warning("local-server", "local transcription server did not stop within the exit budget; the job object will end it");
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("local-server", "local transcription server shutdown failed", exception);
+        }
     }
 
     private void OnCaptureScreenshotRequested(object? sender, EventArgs e)
