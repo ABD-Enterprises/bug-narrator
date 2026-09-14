@@ -15,6 +15,73 @@ namespace BugNarrator.Windows.Tests;
 public sealed class RecordingLifecycleServiceMilestone5Tests
 {
     [Fact]
+    public async Task StopRecordingAsync_WithAutoExtractOff_NeverCallsExtraction()
+    {
+        using var harness = new TestHarness();
+        harness.SecretStore.Value = "sk-test";
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Equal(0, harness.IssueExtractionService.CallCount);
+        Assert.Null(Assert.Single(await harness.CompletedSessionStore.GetAllAsync()).IssueExtraction);
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithAutoExtractOn_ExtractsOnceAndPersistsTheResult()
+    {
+        // macOS PostTranscriptionPipelineController.complete with autoExtractIssues on.
+        using var harness = new TestHarness();
+        harness.SecretStore.Value = "sk-test";
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AutoExtractIssues = true };
+        harness.TranscriptionClient.TranscriptText = "The save button is clipped.";
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Equal(1, harness.IssueExtractionService.CallCount);
+        Assert.Equal("The save button is clipped.", harness.IssueExtractionService.LastSession!.TranscriptText);
+        var saved = Assert.Single(await harness.CompletedSessionStore.GetAllAsync());
+        Assert.NotNull(saved.IssueExtraction);
+        Assert.Single(saved.IssueExtraction!.Issues);
+        Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithAutoExtractOn_AFailedExtractionKeepsTheTranscribedSession()
+    {
+        // macOS postTranscriptionFailure: the transcript is already saved; extraction failing must
+        // not fail the recording or lose the session.
+        using var harness = new TestHarness();
+        harness.SecretStore.Value = "sk-test";
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AutoExtractIssues = true };
+        harness.IssueExtractionService.ExceptionToThrow = new InvalidOperationException("provider rejected the request");
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Equal(1, harness.IssueExtractionService.CallCount);
+        var saved = Assert.Single(await harness.CompletedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.Completed, saved.TranscriptionStatus);
+        Assert.Null(saved.IssueExtraction);
+        Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithAutoExtractOnButNoProvider_DoesNotExtract()
+    {
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AutoExtractIssues = true };
+        // No key: transcription is NotConfigured, and there is nothing to extract from.
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Equal(0, harness.IssueExtractionService.CallCount);
+        Assert.Equal(SessionTranscriptionStatus.NotConfigured, Assert.Single(await harness.CompletedSessionStore.GetAllAsync()).TranscriptionStatus);
+    }
+
+    [Fact]
     public async Task StopRecordingAsync_WithConfiguredApiKey_TranscribesAndPersistsCompletedSession()
     {
         using var harness = new TestHarness();
@@ -149,6 +216,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                 SettingsStore,
                 SecretStore,
                 TranscriptionClient,
+                IssueExtractionService,
                 diagnostics);
         }
 
@@ -164,6 +232,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         public RecordingLifecycleService Service { get; }
         public FakeWindowsAppSettingsStore SettingsStore { get; }
         public FakeTranscriptionClient TranscriptionClient { get; }
+        public TestIssueExtractionService IssueExtractionService { get; } = new();
 
         public void Dispose()
         {
