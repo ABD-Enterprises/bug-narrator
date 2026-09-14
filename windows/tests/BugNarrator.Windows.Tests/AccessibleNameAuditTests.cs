@@ -149,6 +149,38 @@ public sealed class AccessibleNameAuditTests
         Assert.Equal(["TextBox", "Button"], violations.Select(violation => violation.ControlType).ToArray());
     }
 
+    [Fact]
+    public void Audit_ChecksHyperlinksWhichAreContentElementsNotControls()
+    {
+        var violations = OnStaThread(() =>
+        {
+            var textLink = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("View documentation"));
+            var namedIconLink = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.InlineUIContainer(new System.Windows.Shapes.Ellipse()));
+            System.Windows.Automation.AutomationProperties.SetName(namedIconLink, "Open the release page");
+            var emptyLink = new System.Windows.Documents.Hyperlink();
+            var iconOnlyLink = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.InlineUIContainer(new System.Windows.Shapes.Ellipse()));
+
+            var window = new Window
+            {
+                Content = new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock { Inlines = { textLink } },
+                        new TextBlock { Inlines = { namedIconLink } },
+                        new TextBlock { Inlines = { emptyLink } },
+                        new TextBlock { Inlines = { iconOnlyLink } },
+                    },
+                },
+            };
+            return AccessibleNameAudit.Run(window);
+        });
+
+        // Only the empty and the icon-only links are reported.
+        Assert.Equal(2, violations.Count);
+        Assert.All(violations, violation => Assert.Equal("Hyperlink", violation.ControlType));
+    }
+
     private static T OnStaThread<T>(Func<T> body)
     {
         T? result = default;

@@ -59,6 +59,15 @@ public static class AccessibleNameAudit
             violations.Add(new Violation(windowType, control.GetType().Name, path));
         }
 
+        // Hyperlink is a content element, not a Control, so it needs its own gate: named, or its
+        // inlines carry text. An icon-only or empty link is announced as nothing.
+        if (node is Hyperlink hyperlink
+            && string.IsNullOrWhiteSpace(AutomationProperties.GetName(hyperlink))
+            && string.IsNullOrWhiteSpace(TextOf(hyperlink)))
+        {
+            violations.Add(new Violation(windowType, nameof(Hyperlink), path));
+        }
+
         var index = 0;
         foreach (var child in Children(dependencyObject))
         {
@@ -132,9 +141,11 @@ public static class AccessibleNameAudit
         {
             null => null,
             string text => text,
-            TextBlock block => block.Text,
+            TextBlock block => string.IsNullOrEmpty(block.Text) ? string.Concat(block.Inlines.Select(TextOf)) : block.Text,
             Run run => run.Text,
             AccessText accessText => accessText.Text,
+            Span span => string.Concat(span.Inlines.Select(TextOf)),
+            InlineUIContainer container => TextOf(container.Child),
             Panel panel => string.Join(" ", panel.Children.OfType<object>().Select(TextOf).Where(text => !string.IsNullOrWhiteSpace(text))),
             ContentControl content => TextOf(content.Content),
             _ => null,
