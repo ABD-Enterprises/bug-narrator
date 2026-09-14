@@ -121,6 +121,17 @@ public sealed class WindowCoordinator
         ShowRecordingControls();
     }
 
+    public async Task<int> CountSessionsAsync()
+    {
+        return (await completedSessionStore.GetAllAsync()).Count;
+    }
+
+    public async Task AddSampleSessionAndShowLibraryAsync()
+    {
+        await completedSessionStore.SaveAsync(SampleSession.Make(completedSessionStore.SessionsDirectory));
+        ShowSessionLibrary();
+    }
+
     public void ShowSessionLibrary()
     {
         if (sessionLibraryWindow is null || !sessionLibraryWindow.IsLoaded)

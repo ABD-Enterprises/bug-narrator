@@ -15,6 +15,8 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
 
     private readonly string sessionsDirectory;
 
+    public string SessionsDirectory => sessionsDirectory;
+
     public FileCompletedSessionStore(AppStoragePaths storagePaths)
     {
         sessionsDirectory = storagePaths.SessionsDirectory;

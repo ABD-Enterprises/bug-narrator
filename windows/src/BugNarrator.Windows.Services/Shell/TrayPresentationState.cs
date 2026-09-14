@@ -16,6 +16,13 @@ public sealed record TrayPresentationState(
     /// Development in a view whose button opens the donation page; Windows has neither surface, so
     /// both go straight to the web destination macOS ultimately exposes.
     /// </summary>
+    /// <summary>
+    /// Whether the tray offers the bundled sample session — only while the library is empty, the
+    /// rule macOS FirstRunFunnel.shouldOfferSampleSession encodes: once there is real history the
+    /// offer is noise.
+    /// </summary>
+    public static bool ShouldOfferSampleSession(int sessionCount) => sessionCount == 0;
+
     public static IReadOnlyList<TrayMenuEntry> SupportEntries { get; } =
     [
         new TrayMenuEntry("View Documentation", TrayMenuEntryKind.Url, BugNarratorLinks.Documentation),

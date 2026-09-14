@@ -23,6 +23,7 @@ public sealed class SessionLibraryWindow : Window
     private readonly Button deleteSessionButton;
     private readonly WindowsDiagnostics diagnostics;
     private readonly TextBlock emptyStateTextBlock;
+    private readonly Button sampleSessionButton;
     private readonly Button exportBundleButton;
     private readonly Button exportDebugBundleButton;
     private readonly Button exportGitHubButton;
@@ -173,6 +174,18 @@ public sealed class SessionLibraryWindow : Window
             Text = "No completed review sessions yet. Stop a recording to create one.",
             TextWrapping = TextWrapping.Wrap,
         };
+
+        // The macOS empty-library offer (SessionListSidebar.swift): adds the bundled demo as a real,
+        // deletable session. Shown only while the library is empty, matching FirstRunFunnel.
+        sampleSessionButton = new Button
+        {
+            Margin = new Thickness(0, 10, 0, 0),
+            Padding = new Thickness(12, 6, 12, 6),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Content = "See a Sample Session",
+            Visibility = Visibility.Collapsed,
+        };
+        sampleSessionButton.Click += async (_, _) => await AddSampleSessionAsync();
 
         transcriptHeaderTextBlock = new TextBlock
         {
@@ -364,6 +377,7 @@ public sealed class SessionLibraryWindow : Window
                             libraryStatusTextBlock,
                             sessionListBox,
                             emptyStateTextBlock,
+                            sampleSessionButton,
                             new WrapPanel
                             {
                                 Children =
@@ -669,6 +683,23 @@ public sealed class SessionLibraryWindow : Window
         deleteSessionButton.IsEnabled = hasSession && !isRunningReviewAction && !isRefreshing;
     }
 
+    private async Task AddSampleSessionAsync()
+    {
+        try
+        {
+            await completedSessionStore.SaveAsync(SampleSession.Make(completedSessionStore.SessionsDirectory));
+            diagnostics.Info("session-library", "sample session added");
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("session-library", "adding the sample session failed", exception);
+            emptyStateTextBlock.Text = exception.Message;
+            return;
+        }
+
+        await RefreshSessionsAsync();
+    }
+
     private async Task RefreshSessionsAsync()
     {
         if (isRefreshing || isRunningReviewAction)
@@ -730,6 +761,7 @@ public sealed class SessionLibraryWindow : Window
                 : $"{customRangeSessionCount} sessions in the selected date range.";
         emptyStateTextBlock.Visibility = filteredSessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         emptyStateTextBlock.Text = BuildEmptyStateText(query);
+        sampleSessionButton.Visibility = allSessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         libraryStatusTextBlock.Text = BuildLibraryStatusText(filteredSessions.Count, query);
 
         var itemToSelect = sessionListBox.Items
@@ -1513,8 +1545,10 @@ public sealed class SessionLibraryWindow : Window
         public override string ToString()
         {
             var issueCount = Session.IssueExtraction?.Issues.Count ?? 0;
+            // The bundled demo must never read as the user's own recording (macOS metadataSummary).
+            var prefix = Session.IsSampleSession ? "Sample  •  " : string.Empty;
             return
-                $"{Session.Title}{Environment.NewLine}" +
+                $"{Session.Title}{Environment.NewLine}{prefix}" +
                 $"{Session.CreatedAt:yyyy-MM-dd HH:mm}  |  {ToDisplayText(Session.TranscriptionStatus)}  |  {Session.Screenshots.Count} screenshots  |  {issueCount} draft issues";
         }
     }

@@ -39,6 +39,8 @@ public sealed class TrayShell : IDisposable
 
     public event EventHandler? AboutRequested;
     public event EventHandler<string>? OpenLinkRequested;
+    public event EventHandler? SampleSessionRequested;
+    private Forms.ToolStripMenuItem? sampleSessionMenuItem;
     public event EventHandler? CaptureScreenshotRequested;
     public event EventHandler? OpenSessionLibraryRequested;
     public event EventHandler? QuitRequested;
@@ -114,6 +116,10 @@ public sealed class TrayShell : IDisposable
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Show Recording Controls", RaiseShowRecordingControlsRequested));
         contextMenu.Items.Add(CreateMenuItem("Open Session Library", RaiseOpenSessionLibraryRequested));
+        // The macOS menu-bar offer (MenuBarView+SampleOffer.swift); hidden until the shell says the library is empty.
+        sampleSessionMenuItem = CreateMenuItem("See a Sample Session", () => SampleSessionRequested?.Invoke(this, EventArgs.Empty));
+        sampleSessionMenuItem.Visible = false;
+        contextMenu.Items.Add(sampleSessionMenuItem);
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Settings", RaiseSettingsRequested));
         contextMenu.Items.Add(CreateMenuItem("About", RaiseAboutRequested));
@@ -149,6 +155,14 @@ public sealed class TrayShell : IDisposable
     /// </summary>
     public IReadOnlyList<string?> MenuItemTexts =>
         contextMenu.Items.Cast<Forms.ToolStripItem>().Select(item => item is Forms.ToolStripSeparator ? null : item.Text).ToArray();
+
+    public void SetSampleSessionOfferVisible(bool visible)
+    {
+        if (sampleSessionMenuItem is not null)
+        {
+            sampleSessionMenuItem.Visible = visible;
+        }
+    }
 
     /// <summary>Replaces the status line until the next presentation update.</summary>
     public void ShowStatus(string text)

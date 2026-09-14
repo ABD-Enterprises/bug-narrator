@@ -30,4 +30,11 @@ public sealed record CompletedSession(
     /// (<c>pendingTranscription != nil</c>).
     /// </summary>
     public bool RequiresTranscriptionRetry => TranscriptionStatus != SessionTranscriptionStatus.Completed;
+
+    /// <summary>
+    /// The bundled demo (SampleSession). Init-only with a false default so sessions saved before the
+    /// field existed load as real recordings. Every surface labels a sample so it can never read as
+    /// the user's own capture (macOS TranscriptSession.isSampleSession).
+    /// </summary>
+    public bool IsSampleSession { get; init; }
 }
