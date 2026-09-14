@@ -41,8 +41,10 @@ permissions:
   contents: write
 
 concurrency:
-  group: local-transcription-windows-${{ github.ref }}
-  cancel-in-progress: true
+  # PR/push builds supersede each other per ref; a release dispatch is keyed by its tag and
+  # never cancelled, so two releases from one branch cannot interrupt each other.
+  group: local-transcription-windows-${{ github.event_name == 'workflow_dispatch' && format('release-{0}', inputs.tag) || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   release-preflight:
