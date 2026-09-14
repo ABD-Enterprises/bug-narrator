@@ -12,6 +12,8 @@ public sealed class WindowsAppShell : IDisposable
 {
     private readonly WindowsDiagnostics diagnostics;
     private readonly IExternalLinkLauncher externalLinkLauncher;
+    private readonly ReleaseUpdateChecker releaseUpdateChecker;
+    private bool isCheckingForUpdates;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
     private readonly IRecordingLifecycleService recordingLifecycleService;
     private readonly ISingleInstanceService singleInstanceService;
@@ -25,8 +27,10 @@ public sealed class WindowsAppShell : IDisposable
         IRecordingLifecycleService recordingLifecycleService,
         WindowCoordinator windowCoordinator,
         TrayShell trayShell,
-        IExternalLinkLauncher externalLinkLauncher)
+        IExternalLinkLauncher externalLinkLauncher,
+        ReleaseUpdateChecker? releaseUpdateChecker = null)
     {
+        this.releaseUpdateChecker = releaseUpdateChecker ?? new ReleaseUpdateChecker();
         this.singleInstanceService = singleInstanceService;
         this.diagnostics = diagnostics;
         this.externalLinkLauncher = externalLinkLauncher;
@@ -48,6 +52,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.SampleSessionRequested += OnSampleSessionRequested;
         trayShell.WelcomeTourRequested += OnWelcomeTourRequested;
         trayShell.RecoveryRequested += OnRecoveryRequested;
+        trayShell.CheckForUpdatesRequested += OnCheckForUpdatesRequested;
         // Re-evaluated whenever the menu opens: deleting the last session in the library does not
         // notify the shell, so a startup-only read would go stale.
         trayShell.MenuOpening += OnTrayMenuOpening;
@@ -119,6 +124,44 @@ public sealed class WindowsAppShell : IDisposable
         }
     }
 
+    /// <summary>
+    /// macOS Check for Updates (#961): run the check, show the outcome on the status line, and open
+    /// only what the outcome says — that release, the releases page after a failed check, nothing
+    /// when up to date. The status line is restored by the next recording-state update.
+    /// </summary>
+    private void OnCheckForUpdatesRequested(object? sender, EventArgs e)
+    {
+        if (isCheckingForUpdates)
+        {
+            return;
+        }
+
+        isCheckingForUpdates = true;
+        trayShell.ShowStatus("Status: Checking for updates...");
+        Application.Current.Dispatcher.BeginInvoke(async () =>
+        {
+            try
+            {
+                var outcome = await releaseUpdateChecker.CheckAsync(ReleaseUpdateChecker.CurrentVersion());
+                diagnostics.Info("updates", $"release check: {outcome.Kind}");
+                trayShell.ShowStatus(outcome.UserMessage);
+                if (outcome.UrlToOpen(BugNarratorLinks.Releases) is { } url)
+                {
+                    OnOpenLinkRequested(this, url);
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Error("updates", "release check failed unexpectedly", exception);
+                trayShell.ShowStatus($"BugNarrator could not check for updates: {exception.Message}");
+            }
+            finally
+            {
+                isCheckingForUpdates = false;
+            }
+        });
+    }
+
     private void OnRecoveryRequested(object? sender, RecoveryDestination destination)
     {
         diagnostics.Info("app", $"recovery entry chosen: {destination}");
@@ -156,6 +199,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.SampleSessionRequested -= OnSampleSessionRequested;
         trayShell.WelcomeTourRequested -= OnWelcomeTourRequested;
         trayShell.RecoveryRequested -= OnRecoveryRequested;
+        trayShell.CheckForUpdatesRequested -= OnCheckForUpdatesRequested;
         trayShell.MenuOpening -= OnTrayMenuOpening;
         trayShell.QuitRequested -= OnQuitRequested;
 

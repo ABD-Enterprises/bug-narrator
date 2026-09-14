@@ -33,6 +33,12 @@ public sealed record TrayPresentationState(
         new TrayMenuEntry("Support Development", TrayMenuEntryKind.Url, BugNarratorLinks.SupportDevelopment),
     ];
 
+    /// <summary>
+    /// The entry after Support Development that runs the release check (macOS "Check for Updates",
+    /// #961): an Action, not a URL, because the check decides what — if anything — to open.
+    /// </summary>
+    public static TrayMenuEntry CheckForUpdatesEntry { get; } = new("Check for Updates", TrayMenuEntryKind.Action);
+
     public static TrayPresentationState FromRecordingState(RecordingControlState state)
     {
         var statusLabel = state.WorkflowState switch
