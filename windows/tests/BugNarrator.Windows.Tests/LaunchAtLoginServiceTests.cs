@@ -85,7 +85,7 @@ public sealed class LaunchAtLoginServiceTests
 
         // Re-enabling from our Settings must clear that verdict, not just rewrite the value.
         Assert.Equal(LaunchAtLoginStatus.Enabled, service.SetEnabled(true));
-        Assert.True(registry.Approved[LaunchAtLoginService.ValueName]);
+        Assert.DoesNotContain(LaunchAtLoginService.ValueName, registry.Approved.Keys);
     }
 
     [Fact]
@@ -119,6 +119,21 @@ public sealed class LaunchAtLoginServiceTests
     }
 
     [Fact]
+    public void SetEnabled_True_DoesNotRegisterWhenClearingTheDisabledVerdictFails()
+    {
+        // Verdict first, value second: a denied StartupApproved write must not leave a Run value
+        // behind that reports failure yet launches at sign-in.
+        var registry = new FakeRunKey { ThrowOnApprovedWrite = new UnauthorizedAccessException("denied") };
+        registry.Approved[LaunchAtLoginService.ValueName] = false;
+        var service = new LaunchAtLoginService(registry, () => Exe);
+
+        var status = service.SetEnabled(true);
+
+        Assert.False(status.IsAvailable);
+        Assert.Empty(registry.Values);
+    }
+
+    [Fact]
     public void SetEnabled_IsUnavailableWithAMessageWhenTheKeyIsNotWritable()
     {
         var registry = new FakeRunKey { ThrowOnWrite = new UnauthorizedAccessException("denied") };
@@ -134,6 +149,7 @@ public sealed class LaunchAtLoginServiceTests
     {
         public Dictionary<string, string> Values { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Exception? ThrowOnWrite { get; init; }
+        public Exception? ThrowOnApprovedWrite { get; init; }
 
         public string? GetValue(string name) => Values.TryGetValue(name, out var value) ? value : null;
 
@@ -151,7 +167,6 @@ public sealed class LaunchAtLoginServiceTests
 
         public Dictionary<string, bool> Approved { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool? GetStartupApproved(string name) => Approved.TryGetValue(name, out var approved) ? approved : null;
-        public void SetStartupApproved(string name, bool approved) { if (ThrowOnWrite is not null) throw ThrowOnWrite; Approved[name] = approved; }
-        public void DeleteStartupApproved(string name) => Approved.Remove(name);
+        public void DeleteStartupApproved(string name) { if (ThrowOnApprovedWrite is not null) throw ThrowOnApprovedWrite; Approved.Remove(name); }
     }
 }

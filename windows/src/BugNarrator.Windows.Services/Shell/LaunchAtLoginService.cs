@@ -29,11 +29,11 @@ public interface IRunKeyRegistry
 
     /// <summary>
     /// The Windows Settings Startup page (and Task Manager) do not remove Run values; they record a
-    /// verdict in ExplorerStartupApprovedRun — a binary value whose first byte is 0x02 for enabled
-    /// and 0x03 for disabled. Null when no verdict exists, which counts as enabled.
+    /// verdict in Explorer\StartupApproved\Run — a binary value whose first byte is 0x02 for enabled
+    /// and 0x03 for disabled. Null when no verdict exists, which counts as enabled. Deleting the
+    /// verdict is how a disabled entry is re-enabled; this service never writes one.
     /// </summary>
     bool? GetStartupApproved(string name);
-    void SetStartupApproved(string name, bool approved);
     void DeleteStartupApproved(string name);
 }
 
@@ -99,9 +99,15 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
         {
             if (enabled)
             {
+                // Only an existing "disabled" verdict needs clearing; absence already means enabled,
+                // so nothing is written to StartupApproved in the common case. Clear it *before* the
+                // Run value: if the verdict write fails, nothing has been registered yet.
+                if (registry.GetStartupApproved(ValueName) == false)
+                {
+                    registry.DeleteStartupApproved(ValueName);
+                }
+
                 registry.SetValue(ValueName, command);
-                // Clear a Settings-page "disabled" verdict, or the value is present but never runs.
-                registry.SetStartupApproved(ValueName, approved: true);
             }
             else if (string.Equals(registry.GetValue(ValueName), command, StringComparison.OrdinalIgnoreCase))
             {
@@ -156,16 +162,6 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
         {
             using var key = Registry.CurrentUser.OpenSubKey(StartupApprovedPath, writable: false);
             return key?.GetValue(name) is byte[] { Length: > 0 } verdict ? verdict[0] != 0x03 : null;
-        }
-
-        public void SetStartupApproved(string name, bool approved)
-        {
-            using var key = Registry.CurrentUser.CreateSubKey(StartupApprovedPath, writable: true)
-                ?? throw new IOException("The startup-approved registry key could not be opened for writing.");
-            // Explorer's own shape: verdict byte, then eleven bytes it uses for a timestamp; zeros are accepted.
-            var verdict = new byte[12];
-            verdict[0] = approved ? (byte)0x02 : (byte)0x03;
-            key.SetValue(name, verdict, RegistryValueKind.Binary);
         }
 
         public void DeleteStartupApproved(string name)
