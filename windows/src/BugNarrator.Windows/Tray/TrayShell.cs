@@ -45,6 +45,7 @@ public sealed class TrayShell : IDisposable
     public event EventHandler? SampleSessionRequested;
     public event EventHandler? WelcomeTourRequested;
     public event EventHandler<RecoveryDestination>? RecoveryRequested;
+    public event EventHandler? CheckForUpdatesRequested;
     /// <summary>Raised as the context menu opens, so state that depends on the library can be refreshed.</summary>
     public event EventHandler? MenuOpening;
     private Forms.ToolStripMenuItem? sampleSessionMenuItem;
@@ -149,6 +150,10 @@ public sealed class TrayShell : IDisposable
             var url = entry.Url!;
             contextMenu.Items.Add(CreateMenuItem(entry.Label, () => OpenLinkRequested?.Invoke(this, url)));
         }
+
+        contextMenu.Items.Add(CreateMenuItem(
+            TrayPresentationState.CheckForUpdatesEntry.Label,
+            () => CheckForUpdatesRequested?.Invoke(this, EventArgs.Empty)));
 
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Quit", RaiseQuitRequested));
