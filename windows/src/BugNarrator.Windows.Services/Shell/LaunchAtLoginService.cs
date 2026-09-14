@@ -99,15 +99,20 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
         {
             if (enabled)
             {
-                // Only an existing "disabled" verdict needs clearing; absence already means enabled,
-                // so nothing is written to StartupApproved in the common case. Clear it *before* the
-                // Run value: if the verdict write fails, nothing has been registered yet.
+                // Write the Run value first only when it is not already ours; then clear a disabled
+                // verdict. Either order can fail half-way, but this one never *enables* something on
+                // failure: a failed SetValue leaves the old verdict in place (still disabled), and a
+                // failed verdict delete leaves our value present but still disabled — exactly the
+                // state CurrentStatus reports back as Disabled/Unavailable.
+                if (!string.Equals(registry.GetValue(ValueName), command, StringComparison.OrdinalIgnoreCase))
+                {
+                    registry.SetValue(ValueName, command);
+                }
+
                 if (registry.GetStartupApproved(ValueName) == false)
                 {
                     registry.DeleteStartupApproved(ValueName);
                 }
-
-                registry.SetValue(ValueName, command);
             }
             else if (string.Equals(registry.GetValue(ValueName), command, StringComparison.OrdinalIgnoreCase))
             {

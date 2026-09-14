@@ -119,18 +119,27 @@ public sealed class LaunchAtLoginServiceTests
     }
 
     [Fact]
-    public void SetEnabled_True_DoesNotRegisterWhenClearingTheDisabledVerdictFails()
+    public void SetEnabled_True_NeverEnablesOnAHalfFailure()
     {
-        // Verdict first, value second: a denied StartupApproved write must not leave a Run value
-        // behind that reports failure yet launches at sign-in.
+        // The real re-enable shape: our value already present, verdict disabled. If clearing the
+        // verdict fails, the entry must still be disabled — not silently re-armed.
         var registry = new FakeRunKey { ThrowOnApprovedWrite = new UnauthorizedAccessException("denied") };
+        registry.Values[LaunchAtLoginService.ValueName] = $"\"{Exe}\"";
         registry.Approved[LaunchAtLoginService.ValueName] = false;
         var service = new LaunchAtLoginService(registry, () => Exe);
 
-        var status = service.SetEnabled(true);
+        Assert.False(service.SetEnabled(true).IsAvailable);
+        Assert.False(registry.Approved[LaunchAtLoginService.ValueName]);
 
-        Assert.False(status.IsAvailable);
-        Assert.Empty(registry.Values);
+        // And the other half: no value yet, a disabled verdict lingering, SetValue denied — the
+        // verdict must survive so nothing is armed.
+        var registry2 = new FakeRunKey { ThrowOnWrite = new UnauthorizedAccessException("denied") };
+        registry2.Approved[LaunchAtLoginService.ValueName] = false;
+        var service2 = new LaunchAtLoginService(registry2, () => Exe);
+
+        Assert.False(service2.SetEnabled(true).IsAvailable);
+        Assert.Empty(registry2.Values);
+        Assert.False(registry2.Approved[LaunchAtLoginService.ValueName]);
     }
 
     [Fact]
