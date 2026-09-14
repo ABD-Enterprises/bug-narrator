@@ -1,3 +1,4 @@
+using System.Linq;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Core.Workflow;
@@ -141,6 +142,13 @@ public sealed class TrayShell : IDisposable
         menuItem.Click += (_, _) => onClick();
         return menuItem;
     }
+
+    /// <summary>
+    /// The menu as a screen reader will read it: every item's Text (its UIA name) in order, with
+    /// separators as null. Exposed so AccessibleNameAuditTests can audit the tray without WinForms UI.
+    /// </summary>
+    public IReadOnlyList<string?> MenuItemTexts =>
+        contextMenu.Items.Cast<Forms.ToolStripItem>().Select(item => item is Forms.ToolStripSeparator ? null : item.Text).ToArray();
 
     /// <summary>Replaces the status line until the next presentation update.</summary>
     public void ShowStatus(string text)

@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Accessibility;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
@@ -97,6 +98,8 @@ public sealed class SessionLibraryWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             SelectedDate = DateTime.Today.AddDays(-6),
         };
+        // Two pickers share one "Custom Date Range" label, so each names its role explicitly.
+        System.Windows.Automation.AutomationProperties.SetName(customStartDatePicker, "Custom range start date");
         customStartDatePicker.SelectedDateChanged += OnCustomDateRangeChanged;
 
         customEndDatePicker = new DatePicker
@@ -104,6 +107,7 @@ public sealed class SessionLibraryWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             SelectedDate = DateTime.Today,
         };
+        System.Windows.Automation.AutomationProperties.SetName(customEndDatePicker, "Custom range end date");
         customEndDatePicker.SelectedDateChanged += OnCustomDateRangeChanged;
 
         customDateRangeStatusTextBlock = new TextBlock
@@ -151,6 +155,7 @@ public sealed class SessionLibraryWindow : Window
         {
             MinHeight = 320,
         };
+        System.Windows.Automation.AutomationProperties.SetName(sessionListBox, "Sessions");
         sessionListBox.SelectionChanged += OnSessionSelectionChanged;
 
         deleteSessionButton = new Button
@@ -190,6 +195,8 @@ public sealed class SessionLibraryWindow : Window
             MinWidth = 260,
         };
         screenshotListBox.SelectionChanged += OnScreenshotSelectionChanged;
+        // The Screenshots tab has no text label before the list, so the name is explicit.
+        System.Windows.Automation.AutomationProperties.SetName(screenshotListBox, "Session screenshots");
 
         screenshotPreviewTextBlock = new TextBlock
         {
@@ -286,6 +293,9 @@ public sealed class SessionLibraryWindow : Window
         };
 
         Content = BuildWindowContent();
+        // Visible labels double as accessible names (product-spec Accessibility Contract);
+        // AccessibleNameAuditTests fails on any input this leaves unlabeled.
+        AccessibleLabels.LabelInputsFromPrecedingText(this);
         UpdateCustomDateRangeVisibility();
 
         Loaded += async (_, _) => await RefreshSessionsAsync();
@@ -880,6 +890,20 @@ public sealed class SessionLibraryWindow : Window
             issueEditors.Add(editor);
             issueEditorsPanel.Children.Add(editor.Container);
         }
+
+        // Editors are built after the constructor pass, so they get the same label association here.
+        AccessibleLabels.LabelInputsFromPrecedingText(issueEditorsPanel);
+    }
+
+    /// <summary>
+    /// Presents a session in the review workspace without showing the window or touching the
+    /// store — what selecting it in the list does. Internal so AccessibleNameAuditTests can audit the
+    /// dynamically built issue editors.
+    /// </summary>
+    internal void PresentSessionForReview(CompletedSession session)
+    {
+        selectedSession = session;
+        UpdateReviewWorkspace(session);
     }
 
     private IssueEditorRow CreateIssueEditor(ExtractedIssue issue)
