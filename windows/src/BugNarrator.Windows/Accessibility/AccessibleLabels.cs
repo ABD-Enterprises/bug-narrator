@@ -7,7 +7,7 @@ namespace BugNarrator.Windows.Accessibility;
 
 /// <summary>
 /// The views build every input as "label TextBlock, then the input" inside a panel. This associates
-/// each unlabeled input with the nearest preceding TextBlock sibling through
+/// each unlabeled input with the TextBlock immediately before it through
 /// <see cref="AutomationProperties.LabeledByProperty"/>, so the visible label is also what a screen
 /// reader announces — the same thing a sighted user reads. An input that already carries a Name or
 /// LabeledBy is left alone, and an input with no preceding text sibling stays unlabeled for the
@@ -19,22 +19,22 @@ public static class AccessibleLabels
     {
         foreach (var panel in Panels(root))
         {
-            TextBlock? lastText = null;
+            // Strictly the immediately preceding sibling, consumed once: a label names the one input
+            // that follows it. A hint, a button, or a second input in between breaks the pairing, so a
+            // stale label can never be attached to an unrelated input and pass the audit by accident.
+            UIElement? previous = null;
             foreach (UIElement child in panel.Children)
             {
-                switch (child)
+                if (child is TextBox or PasswordBox or ComboBox or ListBox or DatePicker
+                    && previous is TextBlock { Text: var text } label
+                    && !string.IsNullOrWhiteSpace(text)
+                    && string.IsNullOrWhiteSpace(AutomationProperties.GetName(child))
+                    && AutomationProperties.GetLabeledBy(child) is null)
                 {
-                    case TextBlock text when !string.IsNullOrWhiteSpace(text.Text):
-                        lastText = text;
-                        break;
-                    case TextBox or PasswordBox or ComboBox or ListBox or DatePicker when lastText is not null:
-                        if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(child)) && AutomationProperties.GetLabeledBy(child) is null)
-                        {
-                            AutomationProperties.SetLabeledBy(child, lastText);
-                        }
-
-                        break;
+                    AutomationProperties.SetLabeledBy(child, label);
                 }
+
+                previous = child;
             }
         }
     }

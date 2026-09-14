@@ -98,6 +98,8 @@ public sealed class SessionLibraryWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             SelectedDate = DateTime.Today.AddDays(-6),
         };
+        // Two pickers share one "Custom Date Range" label, so each names its role explicitly.
+        System.Windows.Automation.AutomationProperties.SetName(customStartDatePicker, "Custom range start date");
         customStartDatePicker.SelectedDateChanged += OnCustomDateRangeChanged;
 
         customEndDatePicker = new DatePicker
@@ -105,6 +107,7 @@ public sealed class SessionLibraryWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             SelectedDate = DateTime.Today,
         };
+        System.Windows.Automation.AutomationProperties.SetName(customEndDatePicker, "Custom range end date");
         customEndDatePicker.SelectedDateChanged += OnCustomDateRangeChanged;
 
         customDateRangeStatusTextBlock = new TextBlock
@@ -152,6 +155,7 @@ public sealed class SessionLibraryWindow : Window
         {
             MinHeight = 320,
         };
+        System.Windows.Automation.AutomationProperties.SetName(sessionListBox, "Sessions");
         sessionListBox.SelectionChanged += OnSessionSelectionChanged;
 
         deleteSessionButton = new Button
