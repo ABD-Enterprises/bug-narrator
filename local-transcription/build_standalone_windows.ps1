@@ -34,7 +34,8 @@ $repoRoot = Resolve-Path (Join-Path $scriptDir "..")
 $appName = "bugnarrator-transcription"
 $assetName = "$appName-windows-$Arch"
 $buildVenv = Join-Path $scriptDir "build\standalone-venv-windows"
-$lock = Join-Path $scriptDir "requirements-windows.lock"
+# One hash lock per target: resolved with uv for x86_64-pc-windows-msvc and aarch64-pc-windows-msvc.
+$lock = Join-Path $scriptDir $(if ($Arch -eq "arm64") { "requirements-windows-arm64.lock" } else { "requirements-windows.lock" })
 $distDir = Join-Path $scriptDir "dist"
 if (-not $OutputDir) { $OutputDir = Join-Path $repoRoot "dist" }
 $version = (Get-Content (Join-Path $repoRoot "VERSION") -Raw).Trim()

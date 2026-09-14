@@ -38,7 +38,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   # PR/push builds supersede each other per ref; a release dispatch is keyed by its tag and
@@ -85,8 +85,10 @@ jobs:
         include:
           - arch: x64
             runner: windows-latest
+            lock: requirements-windows.lock
           - arch: arm64
             runner: windows-11-arm
+            lock: requirements-windows-arm64.lock
     runs-on: ${{ matrix.runner }}
     env:
       ASSET: bugnarrator-transcription-windows-${{ matrix.arch }}
@@ -106,7 +108,7 @@ jobs:
       - name: Server unit tests
         shell: pwsh
         run: |
-          python -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary=:all: -r local-transcription/requirements-windows.lock
+          python -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary=:all: -r "local-transcription/${{ matrix.lock }}"
           python -m pip install --quiet --disable-pip-version-check pytest
           python -m pytest local-transcription/test_server.py -q
 
@@ -183,6 +185,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [build]
     runs-on: ubuntu-latest
+    # The only job that writes to the repository (the release and its tag).
+    permissions:
+      contents: write
     steps:
       - name: Download signed assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

@@ -61,8 +61,12 @@ $server = Start-Process -FilePath (Resolve-Path $ServerBinary).Path `
     -ArgumentList "--host 127.0.0.1 --port $Port --preload" `
     -WindowStyle Hidden -RedirectStandardError $serverLog -PassThru
 Log "server pid $($server.Id) on port $Port"
+# PyInstaller onefile runs the real interpreter as a child of the bootloader; a stop must take
+# both, so the child is tracked from the start.
+Start-Sleep -Milliseconds 1500
+$children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($server.Id)" | Select-Object -ExpandProperty ProcessId)
+Log "server child process(es): $($children -join ', ')"
 
-$exitCode = $null
 try {
     $health = $null
     $deadline = (Get-Date).AddSeconds($PreloadTimeoutSeconds)
@@ -124,13 +128,19 @@ exit $(if ($sent) { 0 } else { 3 })
         $server.WaitForExit()
         throw "packaged transcription server did not stop within the 2 s grace"
     }
-    $exitCode = $server.ExitCode
-    Log "server stopped in $($stopwatch.ElapsedMilliseconds) ms (exit $exitCode)"
+    Log "server stopped in $($stopwatch.ElapsedMilliseconds) ms"
+    Start-Sleep -Milliseconds 500
+    $survivors = @($children | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+    if ($survivors.Count -gt 0) {
+        foreach ($survivor in $survivors) { Stop-Process -Id $survivor -Force -ErrorAction SilentlyContinue }
+        throw "the bootloader exited but its interpreter child survived: $($survivors -join ', ')"
+    }
     Log "smoke test passed"
 }
 catch {
     Log "FAILED: $($_.Exception.Message)"
     if (-not $server.HasExited) { $server.Kill($true); $server.WaitForExit() }
+    foreach ($child in $children) { Stop-Process -Id $child -Force -ErrorAction SilentlyContinue }
     throw
 }
 finally {

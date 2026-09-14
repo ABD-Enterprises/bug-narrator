@@ -1,5 +1,8 @@
 # Windows (and any non-macOS) server runtime + build tools. Mirrors requirements.txt minus
 # parakeet-mlx (Apple-only); onnx-asr runs the same parakeet-tdt-0.6b-v3 weights on ONNX Runtime.
+# Locks: requirements-windows.lock (x86_64-pc-windows-msvc) and requirements-windows-arm64.lock
+# (aarch64-pc-windows-msvc), both via
+#   uv pip compile requirements-windows.in --python-version 3.12 --python-platform <target> --generate-hashes --only-binary=:all:
 fastapi==0.136.1
 uvicorn==0.47.0  # no [standard]: httptools/uvloop have no Windows arm64 wheels; h11 serves loopback fine
 python-multipart==0.0.31

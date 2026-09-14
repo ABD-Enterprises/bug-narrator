@@ -394,7 +394,11 @@ server._serve("127.0.0.1", {port})
         self.assertGreaterEqual(contents.count("--hash=sha256:"), len(packages))
 
     def test_windows_dependencies_are_hash_locked_and_free_of_apple_only_packages(self):
-        lockfile = Path(__file__).with_name("requirements-windows.lock")
+        for name in ("requirements-windows.lock", "requirements-windows-arm64.lock"):
+            with self.subTest(lock=name):
+                self._assert_windows_lock(Path(__file__).with_name(name))
+
+    def _assert_windows_lock(self, lockfile):
         contents = lockfile.read_text()
         packages = [
             line
