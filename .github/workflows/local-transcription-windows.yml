@@ -1,0 +1,193 @@
+name: Local Transcription Server (Windows)
+
+# The Windows server asset the app's LocalServerPackageCatalog discovers
+# (docs/architecture/windows-local-transcription.md, WIN-036 #1178).
+#
+# Two modes:
+# - pull_request / push on the server files: build, unit-test, and smoke-test the exe (unsigned)
+#   and upload the artifacts as evidence. No release.
+# - workflow_dispatch: the release path — build, sign with the same certificate as the Windows
+#   tester zip, package as bugnarrator-transcription-windows-<arch>.zip + .sha256, and publish on
+#   the server's own release cadence (independent of the app's).
+
+on:
+  pull_request:
+    paths:
+      - "local-transcription/**"
+      - ".github/workflows/local-transcription-windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "local-transcription/**"
+      - ".github/workflows/local-transcription-windows.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update, for example transcription-windows-v1.1.0"
+        required: true
+        type: string
+      draft:
+        description: "Create the GitHub Release as a draft"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: local-transcription-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-preflight:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm signing secrets exist before reserving Windows runners
+        env:
+          CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_PASSWORD }}
+        run: |
+          missing=()
+          [[ -z "$CERT_BASE64" ]] && missing+=("BUGNARRATOR_WINDOWS_CERT_BASE64")
+          [[ -z "$CERT_PASSWORD" ]] && missing+=("BUGNARRATOR_WINDOWS_CERT_PASSWORD")
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            printf '::error::Local transcription release is blocked before runner allocation. Missing repository secret(s): %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+  build:
+    needs: [release-preflight]
+    # The preflight only exists on dispatch; skipped is fine for PR/push builds.
+    if: always() && (needs.release-preflight.result == 'success' || needs.release-preflight.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      ASSET: bugnarrator-transcription-windows-${{ matrix.arch }}
+      OUTPUT_DIR: ${{ github.workspace }}\dist\local-transcription
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Server unit tests
+        shell: pwsh
+        run: |
+          python -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary=:all: -r local-transcription/requirements-windows.lock
+          python -m pip install --quiet --disable-pip-version-check pytest
+          python -m pytest local-transcription/test_server.py -q
+
+      - name: Build standalone server
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File local-transcription/build_standalone_windows.ps1 `
+            -Arch "${{ matrix.arch }}" -OutputDir "$env:OUTPUT_DIR"
+
+      - name: Cache model weights for the smoke test
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}\hf-home
+          key: parakeet-tdt-0.6b-v3-onnx-${{ matrix.arch }}-v1
+
+      - name: Smoke test (unsigned build)
+        shell: pwsh
+        env:
+          HF_HOME: ${{ runner.temp }}\hf-home
+        run: |
+          powershell -ExecutionPolicy Bypass -File local-transcription/smoke_test.ps1 `
+            -ServerBinary "$env:OUTPUT_DIR\bugnarrator-transcription.exe" `
+            -LogDir "$env:OUTPUT_DIR\smoke"
+
+      - name: Decode signing certificate
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "bugnarrator-windows-signing.pfx"
+          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String($env:CERT_BASE64))
+          "BUGNARRATOR_CERT_PATH=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign the server executable
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          BUGNARRATOR_CERT_PASSWORD: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_PASSWORD }}
+        run: |
+          # The same identity as the Windows tester zip: the app pins the signer's O= at install and launch.
+          powershell -ExecutionPolicy Bypass -File windows/scripts/sign-windows.ps1 `
+            -FilePath "$env:OUTPUT_DIR\bugnarrator-transcription.exe"
+          powershell -ExecutionPolicy Bypass -File windows/scripts/verify-windows-signature.ps1 `
+            -FilePath "$env:OUTPUT_DIR\bugnarrator-transcription.exe"
+
+      - name: Package zip and SHA-256 manifest
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File local-transcription/build_standalone_windows.ps1 `
+            -Arch "${{ matrix.arch }}" -OutputDir "$env:OUTPUT_DIR" -PackageOnly
+
+      - name: Upload build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ env.ASSET }}
+          path: |
+            ${{ env.OUTPUT_DIR }}\${{ env.ASSET }}.zip
+            ${{ env.OUTPUT_DIR }}\${{ env.ASSET }}.zip.sha256
+            ${{ env.OUTPUT_DIR }}\${{ env.ASSET }}-build.json
+            ${{ env.OUTPUT_DIR }}\smoke\smoke-test.log
+            ${{ env.OUTPUT_DIR }}\smoke\server.log
+            ${{ env.OUTPUT_DIR }}\smoke\transcription.json
+
+      - name: Remove decoded signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:BUGNARRATOR_CERT_PATH -and (Test-Path $env:BUGNARRATOR_CERT_PATH)) {
+            Remove-Item $env:BUGNARRATOR_CERT_PATH -Force
+          }
+
+  publish:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download signed assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: assets
+          pattern: bugnarrator-transcription-windows-*
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
+          RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          files=(assets/bugnarrator-transcription-windows-*.zip assets/bugnarrator-transcription-windows-*.zip.sha256)
+          args=(release create "$RELEASE_TAG" "${files[@]}"
+                --repo "$GITHUB_REPOSITORY"
+                --title "BugNarrator local transcription server (Windows) $RELEASE_TAG"
+                --notes "Signed Windows builds of the local Parakeet transcription server. BugNarrator discovers the x64 asset automatically from Settings > Local (Parakeet) Server; the arm64 asset is for Windows on ARM machines. Model weights download on first start.")
+          [[ "$RELEASE_DRAFT" == "true" ]] && args+=(--draft)
+          [[ "$RELEASE_PRERELEASE" == "true" ]] && args+=(--prerelease)
+          gh "${args[@]}"

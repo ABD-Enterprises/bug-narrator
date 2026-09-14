@@ -1,9 +1,12 @@
 """
 BugNarrator Local Transcription Server
 
-OpenAI-compatible /v1/audio/transcriptions endpoint powered by parakeet-mlx.
-Designed to be a drop-in replacement for api.openai.com when BugNarrator is
-configured with the Local (Parakeet) provider.
+OpenAI-compatible /v1/audio/transcriptions endpoint powered by parakeet-mlx on
+macOS and by onnx-asr (ONNX Runtime, CPU) everywhere else. Designed to be a
+drop-in replacement for api.openai.com when BugNarrator is configured with the
+Local (Parakeet) provider. The HTTP protocol, model aliases, chunking, and the
+failure message are identical on every platform; only the inference backend
+differs (docs/architecture/windows-local-transcription.md).
 
 Usage:
     python server.py [--port 8422] [--model mlx-community/parakeet-tdt-0.6b-v3]
@@ -19,8 +22,11 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import signal
+import sys
 import tempfile
 import time
+import wave
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -45,6 +51,18 @@ _model_aliases = {
     "whisper-1",
 }
 _default_model_name = _canonical_model_name
+
+# Inference backend: MLX exists only on Apple Silicon; the same NVIDIA weights run through
+# ONNX Runtime elsewhere. The request-facing model id stays the MLX name on every platform
+# so aliases and settings never differ; the ONNX backend maps it at load time.
+_backend = "mlx" if sys.platform == "darwin" else "onnx"
+_onnx_canonical_model_name = "nemo-parakeet-tdt-0.6b-v3"
+_onnx_model_names = {
+    _canonical_model_name: _onnx_canonical_model_name,
+    "nvidia/parakeet-tdt-0.6b-v3": _onnx_canonical_model_name,
+    "parakeet-tdt-0.6b-v3": _onnx_canonical_model_name,
+}
+_onnx_quantization = os.environ.get("BUGNARRATOR_ONNX_QUANTIZATION") or None
 _inference_executor = ThreadPoolExecutor(
     max_workers=1,
     thread_name_prefix="bugnarrator-parakeet",
@@ -81,12 +99,20 @@ def get_model(model_name: Optional[str] = None):
     if _model is not None and _model_name == resolved_model_name:
         return _model
 
-    logger.info(f"Loading model: {resolved_model_name}")
+    logger.info(f"Loading model: {resolved_model_name} ({_backend})")
     start = time.time()
 
-    from parakeet_mlx import from_pretrained
+    if _backend == "mlx":
+        from parakeet_mlx import from_pretrained
 
-    _model = from_pretrained(resolved_model_name)
+        _model = from_pretrained(resolved_model_name)
+    else:
+        import onnx_asr
+
+        _model = onnx_asr.load_model(
+            _onnx_model_for(resolved_model_name),
+            quantization=_onnx_quantization,
+        ).with_timestamps()
     _model_name = resolved_model_name
     elapsed = time.time() - start
     logger.info(f"Model loaded in {elapsed:.1f}s")
@@ -212,12 +238,112 @@ def _resolve_model_id(model: Optional[str]) -> str:
     return value
 
 
+def _onnx_model_for(model_id: str) -> str:
+    """The onnx-asr model name for a request-facing id; anything unknown passes through
+    (a local ONNX directory or a Hugging Face repo onnx-asr can load)."""
+    return _onnx_model_names.get(model_id, model_id)
+
+
+@dataclass
+class _Sentence:
+    start: float
+    end: float
+    text: str
+
+
+@dataclass
+class _Transcription:
+    """The result shape the route reads: the same attributes parakeet-mlx returns."""
+
+    text: str
+    sentences: list = field(default_factory=list)
+
+
+_sentence_terminators = (".", "?", "!")
+
+
+def _read_wav(audio_path: str):
+    """PCM WAV → (float32 mono samples, sample rate). BugNarrator's Windows recorder writes
+    16 kHz 16-bit mono WAV; other PCM widths are converted, anything else is rejected."""
+    import numpy as np
+
+    with wave.open(audio_path, "rb") as handle:
+        channels = handle.getnchannels()
+        width = handle.getsampwidth()
+        rate = handle.getframerate()
+        frames = handle.readframes(handle.getnframes())
+
+    if width == 2:
+        samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+    elif width == 1:
+        samples = (np.frombuffer(frames, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+    elif width == 4:
+        samples = np.frombuffer(frames, dtype=np.int32).astype(np.float32) / 2147483648.0
+    else:
+        raise ValueError(f"unsupported WAV sample width: {width}")
+
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+
+    return samples, rate
+
+
+def _group_sentences(tokens, timestamps, offset: float):
+    """Tokens → sentences on terminal punctuation, timestamps shifted by the chunk offset."""
+    sentences = []
+    words = []
+    start = None
+    for token, stamp in zip(tokens or [], timestamps or []):
+        if start is None:
+            start = stamp
+        words.append(token)
+        if token.rstrip().endswith(_sentence_terminators):
+            sentences.append(_Sentence(start + offset, stamp + offset, "".join(words).strip()))
+            words, start = [], None
+
+    if words:
+        last = (timestamps[-1] if timestamps else 0.0) + offset
+        sentences.append(_Sentence((start or 0.0) + offset, last, "".join(words).strip()))
+
+    return sentences
+
+
+def _transcribe_onnx(model, audio_path: str) -> _Transcription:
+    """Chunk at the same 120 s bound as the MLX path and stitch the results back together."""
+    samples, rate = _read_wav(audio_path)
+    chunk = _chunk_duration_seconds * rate
+    texts = []
+    sentences = []
+    for start in range(0, max(len(samples), 1), chunk):
+        piece = samples[start : start + chunk]
+        if len(piece) == 0:
+            break
+
+        result = model.recognize(piece, sample_rate=rate)
+        offset = start / rate
+        if result.text.strip():
+            texts.append(result.text.strip())
+        sentences.extend(
+            _group_sentences(
+                getattr(result, "tokens", None), getattr(result, "timestamps", None), offset
+            )
+        )
+
+    return _Transcription(" ".join(texts), sentences)
+
+
 def _transcribe_audio(parakeet, audio_path: str):
-    """Bound inference so long recordings do not degrade or exhaust Metal buffers."""
-    return parakeet.transcribe(
-        audio_path,
-        chunk_duration=_chunk_duration_seconds,
-    )
+    """Bound inference so long recordings do not degrade or exhaust Metal buffers.
+
+    Dispatches on the model object rather than the platform so a test double with
+    a transcribe method exercises the MLX contract on any OS."""
+    if hasattr(parakeet, "transcribe"):
+        return parakeet.transcribe(
+            audio_path,
+            chunk_duration=_chunk_duration_seconds,
+        )
+
+    return _transcribe_onnx(parakeet, audio_path)
 
 
 def _run_inference(model_id: str, audio_path: str):
@@ -273,7 +399,8 @@ def main():
     parser.add_argument(
         "--model",
         default="mlx-community/parakeet-tdt-0.6b-v3",
-        help="Parakeet model to load (default: mlx-community/parakeet-tdt-0.6b-v3)",
+        help="Parakeet model to load (default: mlx-community/parakeet-tdt-0.6b-v3; "
+        "mapped to nemo-parakeet-tdt-0.6b-v3 on the ONNX backend)",
     )
     parser.add_argument(
         "--preload",
@@ -285,6 +412,9 @@ def main():
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
+    if hasattr(signal, "SIGBREAK"):
+        # Windows: Ctrl+Break is what a supervisor can send to a process group.
+        signal.signal(signal.SIGBREAK, _shutdown_handler)
 
     if args.preload:
         _inference_executor.submit(get_model, args.model).result()
