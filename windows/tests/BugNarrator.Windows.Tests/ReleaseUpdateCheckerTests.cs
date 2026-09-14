@@ -178,6 +178,17 @@ public sealed class ReleaseUpdateCheckerTests
     }
 
     [Fact]
+    public void CurrentVersion_IsTheRepoVersionFile()
+    {
+        // windows/src/Directory.Build.props stamps VERSION into every Windows assembly (#1184);
+        // the SDK's +sha build metadata is stripped before comparing with the feed.
+        var expected = File.ReadAllText(Path.Combine(RepositoryRoot(), "VERSION")).Trim();
+
+        Assert.Equal(expected, ReleaseUpdateChecker.CurrentVersion());
+        Assert.NotNull(ReleaseVersion.Parse(expected));
+    }
+
+    [Fact]
     public void CheckForUpdatesEntry_IsAnActionAfterSupportDevelopment()
     {
         Assert.Equal(TrayMenuEntryKind.Action, TrayPresentationState.CheckForUpdatesEntry.Kind);

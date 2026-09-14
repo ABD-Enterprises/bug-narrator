@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    Every Windows assembly reports the repo VERSION file, as the macOS build does. The .NET SDK
+    appends the git commit as build metadata (1.1.0+sha) to the informational version, which
+    ReleaseUpdateChecker strips before comparing against the releases feed (#1184).
+  -->
+  <PropertyGroup>
+    <BugNarratorVersionFile>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'VERSION'))</BugNarratorVersionFile>
+    <BugNarratorVersion>$([System.IO.File]::ReadAllText('$(BugNarratorVersionFile)').Trim())</BugNarratorVersion>
+    <Version>$(BugNarratorVersion)</Version>
+    <AssemblyVersion>$(BugNarratorVersion)</AssemblyVersion>
+    <FileVersion>$(BugNarratorVersion)</FileVersion>
+    <InformationalVersion>$(BugNarratorVersion)</InformationalVersion>
+  </PropertyGroup>
+</Project>
