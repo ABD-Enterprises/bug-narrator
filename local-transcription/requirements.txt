@@ -2,3 +2,4 @@ parakeet-mlx==0.5.1
 fastapi==0.136.1
 uvicorn[standard]==0.47.0
 python-multipart==0.0.31
+numpy==2.5.2
