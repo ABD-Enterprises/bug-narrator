@@ -3,12 +3,14 @@ using BugNarrator.Windows.Accessibility;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Hotkeys;
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Transcription;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace BugNarrator.Windows.Views;
 
@@ -18,6 +20,20 @@ public sealed class SettingsWindow : Window
     private readonly TextBox aiProviderBaseUrlTextBox;
     private readonly ComboBox aiProviderComboBox;
     private readonly TextBlock aiProviderCapabilityHintTextBlock;
+    private readonly ILocalTranscriptionServerManager localServerManager;
+    private readonly ILocalServerHealthProbe localServerHealthProbe;
+    private readonly DispatcherTimer localServerPollTimer;
+    private readonly StackPanel localServerPanel;
+    private readonly TextBlock localServerStatusTextBlock;
+    private readonly TextBlock localServerMessageTextBlock;
+    private readonly ProgressBar localServerProgressBar;
+    private readonly Button localServerDownloadButton;
+    private readonly Button localServerCheckDownloadButton;
+    private readonly Button localServerStartStopButton;
+    private readonly Button localServerRemoveButton;
+    private readonly Button localServerCancelButton;
+    private bool localServerReachable;
+    private bool localServerProbeInFlight;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ComboBox audioInputDeviceComboBox;
     private readonly ComboBox audioRecordingSourceComboBox;
@@ -59,8 +75,12 @@ public sealed class SettingsWindow : Window
         IWindowsGlobalHotkeyService hotkeyService,
         WindowsDiagnostics diagnostics,
         IAudioInputDeviceCatalog audioInputDeviceCatalog,
-        ILaunchAtLoginService launchAtLoginService)
+        ILaunchAtLoginService launchAtLoginService,
+        ILocalTranscriptionServerManager localServerManager,
+        ILocalServerHealthProbe localServerHealthProbe)
     {
+        this.localServerManager = localServerManager;
+        this.localServerHealthProbe = localServerHealthProbe;
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
         this.transcriptionClient = transcriptionClient;
@@ -102,6 +122,50 @@ public sealed class SettingsWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(
             aiProviderCapabilityHintTextBlock, "AI provider capability note");
         aiProviderComboBox.SelectionChanged += (_, _) => ApplyAiProviderCapabilityHint();
+
+        // Local (Parakeet) server section: the macOS localServerControls block, with the health
+        // probe as the status line (#1180). Visible only while that provider is selected.
+        localServerStatusTextBlock = BuildHint("Local server: not checked yet.");
+        localServerMessageTextBlock = BuildHint(string.Empty);
+        localServerProgressBar = new ProgressBar { Minimum = 0, Maximum = 1, Height = 8, Margin = new Thickness(0, 0, 0, 8), Visibility = Visibility.Collapsed };
+        System.Windows.Automation.AutomationProperties.SetName(localServerProgressBar, "Local server download progress");
+        localServerDownloadButton = BuildLocalServerButton("Download the local transcription server", async () => await localServerManager.InstallAndStartAsync());
+        localServerCheckDownloadButton = BuildLocalServerButton("Check server download", async () => await localServerManager.DiscoverAsync());
+        localServerStartStopButton = BuildLocalServerButton("Start local server", async () =>
+        {
+            if (localServerManager.State.Running)
+            {
+                localServerManager.Stop();
+            }
+            else
+            {
+                await localServerManager.StartAsync();
+            }
+        });
+        localServerRemoveButton = BuildLocalServerButton("Remove local server and models", () => { localServerManager.Remove(); return Task.CompletedTask; });
+        localServerCancelButton = BuildLocalServerButton("Cancel installation", () => { localServerManager.Stop(); return Task.CompletedTask; });
+        localServerPanel = new StackPanel
+        {
+            Visibility = Visibility.Collapsed,
+            Children =
+            {
+                BuildLabel("Local (Parakeet) Server"),
+                BuildHint("Local server download: about 136 MB. Model weights download on first start and require additional disk space."),
+                localServerStatusTextBlock,
+                new WrapPanel
+                {
+                    Children = { localServerDownloadButton, localServerCheckDownloadButton, localServerStartStopButton, localServerRemoveButton, localServerCancelButton },
+                },
+                localServerProgressBar,
+                BuildHint($"Install location: {localServerManager.InstallDirectory}"),
+                localServerMessageTextBlock,
+            },
+        };
+        System.Windows.Automation.AutomationProperties.SetName(localServerPanel, "Local Parakeet server");
+        localServerManager.StateChanged += OnLocalServerStateChanged;
+        localServerPollTimer = new DispatcherTimer { Interval = LocalServerHealthProbe.PollInterval };
+        localServerPollTimer.Tick += async (_, _) => await RefreshLocalServerReachabilityAsync();
+        aiProviderComboBox.SelectionChanged += (_, _) => ApplyLocalServerSectionVisibility();
 
         modelTextBox = new TextBox
         {
@@ -336,6 +400,7 @@ public sealed class SettingsWindow : Window
                     aiProviderComboBox,
                     BuildHint("Choose OpenAI, an OpenAI-compatible hosted endpoint, a local-compatible endpoint, or Local (Parakeet) for transcription-only offline use."),
                     aiProviderCapabilityHintTextBlock,
+                    localServerPanel,
                     BuildLabel("AI Provider Credential"),
                     apiKeyPasswordBox,
                     BuildHint("Stored locally for the current Windows user with DPAPI. Required for OpenAI and OpenAI-compatible providers; optional for local-compatible providers."),
@@ -571,6 +636,7 @@ public sealed class SettingsWindow : Window
 
             apiKeyPasswordBox.Password = apiKey ?? string.Empty;
             aiProviderComboBox.SelectedItem = settings.EffectiveAiProviderProfile;
+            ApplyLocalServerSectionVisibility();
             aiProviderBaseUrlTextBox.Text = settings.EffectiveAiProviderBaseUrl ?? string.Empty;
             modelTextBox.Text = settings.EffectiveTranscriptionModel;
             languageHintTextBox.Text = settings.EffectiveLanguageHint ?? string.Empty;
@@ -716,6 +782,16 @@ public sealed class SettingsWindow : Window
 
         statusTextBlock.Text = $"Validating the {providerProfile.DisplayName} connection...";
 
+        // Check Server: the health probe, not the OpenAI validate call (macOS uses the same probe).
+        if (validationSettings.UsesLocalTranscriptionServer)
+        {
+            await RefreshLocalServerReachabilityAsync();
+            statusTextBlock.Text = localServerReachable
+                ? providerProfile.SuccessMessage
+                : LocalServerHealthProbe.UnreachableMessage;
+            return;
+        }
+
         try
         {
             // Effective URL so a blank Parakeet base URL checks localhost:8422 rather than api.openai.com.
@@ -831,7 +907,102 @@ public sealed class SettingsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         hotkeyService.StateChanged -= OnHotkeyStateChanged;
+        localServerManager.StateChanged -= OnLocalServerStateChanged;
+        localServerPollTimer.Stop();
     }
+
+    private static Button BuildLocalServerButton(string title, Func<Task> action)
+    {
+        var button = new Button
+        {
+            Content = title,
+            Margin = new Thickness(0, 0, 8, 8),
+            Padding = new Thickness(12, 6, 12, 6),
+        };
+        button.Click += async (_, _) => await action();
+        return button;
+    }
+
+    /// <summary>Polls only while Parakeet is selected, as macOS refreshLocalProviderReachabilityIfNeeded.</summary>
+    private void ApplyLocalServerSectionVisibility()
+    {
+        var uses = GetSelectedAiProviderProfile().Provider == WindowsAiProvider.ParakeetLocal;
+        localServerPanel.Visibility = uses ? Visibility.Visible : Visibility.Collapsed;
+        if (uses)
+        {
+            if (!localServerPollTimer.IsEnabled)
+            {
+                localServerPollTimer.Start();
+                _ = RefreshLocalServerReachabilityAsync();
+            }
+        }
+        else
+        {
+            localServerPollTimer.Stop();
+        }
+
+        ApplyLocalServerState(localServerManager.State);
+    }
+
+    private async Task RefreshLocalServerReachabilityAsync()
+    {
+        if (localServerProbeInFlight)
+        {
+            return;
+        }
+
+        localServerProbeInFlight = true;
+        try
+        {
+            localServerReachable = await localServerHealthProbe.IsReachableAsync(WindowsAiProviderProfile.ParakeetLocalBaseUrl);
+        }
+        finally
+        {
+            localServerProbeInFlight = false;
+        }
+
+        ApplyLocalServerState(localServerManager.State);
+    }
+
+    private void OnLocalServerStateChanged(object? sender, LocalTranscriptionServerState state)
+    {
+        Dispatcher.BeginInvoke(() => ApplyLocalServerState(state));
+    }
+
+    /// <summary>
+    /// The macOS localServerControls rules: download while not installed (needs a package), Start /
+    /// Stop while installed, Remove only when idle, Cancel only during a download. A server that
+    /// answers on 8422 but was not started by this app disables Start and is never stopped.
+    /// </summary>
+    internal void ApplyLocalServerState(LocalTranscriptionServerState state)
+    {
+        var foreignServer = localServerReachable && !state.Running;
+        localServerStatusTextBlock.Text = state.Running
+            ? (localServerReachable ? "Local server: running and responding on port 8422." : "Local server: starting, not responding yet.")
+            : foreignServer
+                ? "A local transcription server is already responding on port 8422."
+                : "Local server: not responding on port 8422.";
+
+        localServerDownloadButton.Visibility = state.Installed ? Visibility.Collapsed : Visibility.Visible;
+        localServerDownloadButton.IsEnabled = !state.Busy && state.Package is not null;
+        localServerCheckDownloadButton.Visibility = state.Installed || state.Package is not null ? Visibility.Collapsed : Visibility.Visible;
+        localServerCheckDownloadButton.IsEnabled = !state.Busy;
+        localServerStartStopButton.Visibility = state.Installed ? Visibility.Visible : Visibility.Collapsed;
+        localServerStartStopButton.Content = state.Running ? "Stop local server" : "Start local server";
+        localServerStartStopButton.IsEnabled = !state.Busy && (state.Running || !foreignServer);
+        localServerRemoveButton.Visibility = state.Installed ? Visibility.Visible : Visibility.Collapsed;
+        localServerRemoveButton.IsEnabled = !state.Busy && !state.Running;
+        localServerProgressBar.Visibility = state.Progress is null ? Visibility.Collapsed : Visibility.Visible;
+        localServerProgressBar.Value = state.Progress ?? 0;
+        localServerCancelButton.Visibility = state.Progress is null ? Visibility.Collapsed : Visibility.Visible;
+        localServerMessageTextBlock.Text = state.Message;
+        localServerMessageTextBlock.Visibility = string.IsNullOrEmpty(state.Message) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    internal void SetLocalServerReachableForTests(bool reachable) => localServerReachable = reachable;
+
+    internal IReadOnlyList<Button> LocalServerButtonsForTests =>
+        [localServerDownloadButton, localServerCheckDownloadButton, localServerStartStopButton, localServerRemoveButton, localServerCancelButton];
 
     private void PopulateAudioInputDevices(string? selectedDeviceName)
     {

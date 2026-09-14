@@ -91,6 +91,47 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task StartRecordingAsync_WithParakeetUnreachable_RefusesBeforeCapturingAudio()
+    {
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AiProvider = "parakeetLocal" };
+        harness.LocalServerHealthProbe.Reachable = false;
+
+        await harness.Service.StartRecordingAsync();
+
+        var state = harness.Service.CurrentState;
+        Assert.Equal(RecordingWorkflowState.Failed, state.WorkflowState);
+        Assert.Equal(BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe.UnreachableMessage, state.StatusMessage);
+        Assert.Equal(RecoveryDestination.Settings, state.Blocker!.Destination);
+        Assert.Equal("http://localhost:8422", harness.LocalServerHealthProbe.LastBaseUrl);
+        Assert.Null(harness.MicrophonePreflightService.LastDeviceNumber); // never got as far as the microphone
+        Assert.Empty(await harness.CompletedSessionStore.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithParakeetReachable_Records()
+    {
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AiProvider = "parakeetLocal" };
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.Equal(1, harness.LocalServerHealthProbe.Calls);
+    }
+
+    [Fact]
+    public async Task StartRecordingAsync_WithOpenAi_NeverProbesTheLocalServer()
+    {
+        using var harness = new TestHarness();
+        harness.SecretStore.Value = "sk-test";
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(0, harness.LocalServerHealthProbe.Calls);
+    }
+
+    [Fact]
     public async Task StartRecordingAsync_WhenMicrophoneAccessIsDenied_PublishesAPermissionBlocker()
     {
         using var harness = new TestHarness();
@@ -282,7 +323,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                 SecretStore,
                 TranscriptionClient,
                 IssueExtractionService,
-                diagnostics);
+                diagnostics,
+                LocalServerHealthProbe);
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
@@ -291,6 +333,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         public FileSessionDraftStore DraftStore { get; }
         public FakeScreenshotImageCaptureService ImageCaptureService { get; }
         public FakeMicrophonePreflightService MicrophonePreflightService { get; }
+        public FakeLocalServerHealthProbe LocalServerHealthProbe { get; } = new();
         public FakeScreenshotSelectionOverlayService OverlayService { get; }
         public FakeScreenCapturePreflightService ScreenCapturePreflightService { get; }
         public FakeSecretStore SecretStore { get; }
@@ -333,6 +376,20 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         {
             IsRecording = false;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeLocalServerHealthProbe : BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe
+    {
+        public bool Reachable { get; set; } = true;
+        public int Calls { get; private set; }
+        public string? LastBaseUrl { get; private set; }
+
+        public Task<bool> IsReachableAsync(string baseUrl, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastBaseUrl = baseUrl;
+            return Task.FromResult(Reachable);
         }
     }
 

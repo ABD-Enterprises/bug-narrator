@@ -3,6 +3,7 @@ using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Hotkeys;
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Windows.Services.Permissions;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
@@ -24,6 +25,8 @@ public sealed class WindowCoordinator
     private readonly ISecretStore secretStore;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
     private readonly IMicrophonePreflightService microphonePreflightService;
+    private readonly ILocalTranscriptionServerManager localServerManager;
+    private readonly ILocalServerHealthProbe localServerHealthProbe;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
     private AboutWindow? aboutWindow;
@@ -43,8 +46,12 @@ public sealed class WindowCoordinator
         ISecretStore secretStore,
         ITranscriptionClient transcriptionClient,
         IAudioInputDeviceCatalog audioInputDeviceCatalog,
-        IMicrophonePreflightService microphonePreflightService)
+        IMicrophonePreflightService microphonePreflightService,
+        ILocalTranscriptionServerManager localServerManager,
+        ILocalServerHealthProbe localServerHealthProbe)
     {
+        this.localServerManager = localServerManager;
+        this.localServerHealthProbe = localServerHealthProbe;
         this.audioInputDeviceCatalog = audioInputDeviceCatalog;
         this.microphonePreflightService = microphonePreflightService;
         this.diagnostics = diagnostics;
@@ -222,7 +229,9 @@ public sealed class WindowCoordinator
                 hotkeyService,
                 diagnostics,
                 audioInputDeviceCatalog,
-                LaunchAtLoginService.ForCurrentUser());
+                LaunchAtLoginService.ForCurrentUser(),
+                localServerManager,
+                localServerHealthProbe);
             settingsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "settings window closed");

@@ -82,6 +82,16 @@ public partial class App : Application
             debugBundleExporter,
             transcriptionClient,
             diagnostics);
+        var localServerHealthProbe = new BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe();
+        var localServerHttpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        // Process launch arrives with WIN-039 (#1181); until then Start reports why it cannot run.
+        var localServerManager = new BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager(
+            BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager.DefaultInstallDirectory,
+            new BugNarrator.Windows.Services.LocalTranscription.LocalServerPackageCatalog(localServerHttpClient),
+            localServerHttpClient,
+            new BugNarrator.Windows.Services.LocalTranscription.AuthenticodeVerifier(),
+            (_, _, _) => throw new BugNarrator.Windows.Services.LocalTranscription.LocalServerFailure(
+                "starting the local server is not available in this build yet (WIN-039)"));
         var recordingLifecycleService = new RecordingLifecycleService(
             audioRecorderService,
             audioInputDeviceCatalog,
@@ -95,7 +105,8 @@ public partial class App : Application
             secretStore,
             transcriptionClient,
             issueExtractionService,
-            diagnostics);
+            diagnostics,
+            localServerHealthProbe);
         var hotkeyPlatform = new Win32GlobalHotkeyPlatform();
         var hotkeyService = new WindowsGlobalHotkeyService(
             settingsStore,
@@ -112,7 +123,9 @@ public partial class App : Application
             secretStore,
             transcriptionClient,
             audioInputDeviceCatalog,
-            microphonePreflightService);
+            microphonePreflightService,
+            localServerManager,
+            localServerHealthProbe);
         var trayShell = new TrayShell(diagnostics);
 
         appShell = new WindowsAppShell(
