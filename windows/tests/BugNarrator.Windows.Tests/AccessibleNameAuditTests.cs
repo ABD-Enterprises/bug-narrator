@@ -340,6 +340,7 @@ public sealed class AccessibleNameAuditTests
 
     private sealed class FakeSessionStore : ICompletedSessionStore
     {
+        public string SessionsDirectory => Path.GetTempPath();
         public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<CompletedSession>>([]);
         public Task SaveAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DeleteAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
