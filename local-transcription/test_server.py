@@ -309,6 +309,36 @@ server._serve("127.0.0.1", {port})
         self.assertEqual([(s.start, s.end) for s in sentences], [(10.0, 10.4), (11.0, 11.4), (12.0, 12.0)])
         self.assertEqual(server._group_sentences(None, None, 0.0), [])
 
+    def test_onnx_refuses_non_wav_uploads_before_inference(self):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        Path(path).write_bytes(b"\x00\x00\x00\x18ftypM4A ")
+
+        class NeverCalled:
+            def recognize(self, *args, **kwargs):
+                raise AssertionError("inference must not run on undecodable audio")
+
+        with self.assertRaises(server.UnsupportedAudioError):
+            server._transcribe_audio(NeverCalled(), path)
+
+    def test_transcription_route_maps_unsupported_audio_to_a_400(self):
+        from fastapi.testclient import TestClient
+
+        class NeverCalled:
+            def recognize(self, *args, **kwargs):
+                raise AssertionError("inference must not run on undecodable audio")
+
+        with patch.object(server, "get_model", return_value=NeverCalled()):
+            response = TestClient(server.app).post(
+                "/v1/audio/transcriptions",
+                files={"file": ("clip.m4a", b"\x00\x00\x00\x18ftypM4A ", "audio/mp4")},
+                data={"model": "parakeet-tdt-0.6b-v3"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["type"], "invalid_request_error")
+        self.assertIn("PCM WAV", response.json()["error"]["message"])
+
     def test_onnx_reads_stereo_and_8_bit_wav(self):
         stereo = self._write_wav(8000, 1, channels=2)
         samples, rate = server._read_wav(stereo)

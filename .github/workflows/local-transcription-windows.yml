@@ -49,6 +49,17 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Confirm the tag is in the server release namespace
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          # Only this workflow's own tags may be created or have assets replaced; an app or
+          # tester release tag must never be touched from here.
+          if [[ ! "$RELEASE_TAG" =~ ^transcription-windows-v[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$ ]]; then
+            printf '::error::Release tag "%s" is not in the transcription-windows-v<semver> namespace.\n' "$RELEASE_TAG"
+            exit 1
+          fi
+
       - name: Confirm signing secrets exist before reserving Windows runners
         env:
           CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}

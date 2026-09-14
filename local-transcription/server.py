@@ -219,6 +219,17 @@ async def transcribe(
         else:
             return JSONResponse(content={"text": full_text})
 
+    except UnsupportedAudioError as error:
+        logger.warning(f"Rejected unsupported audio upload: {error}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "message": _unsupported_audio_message,
+                    "type": "invalid_request_error",
+                }
+            },
+        )
     except Exception:
         logger.exception("Transcription failed")
         return _transcription_failure_response()
@@ -268,16 +279,30 @@ class _Transcription:
 _sentence_terminators = (".", "?", "!")
 
 
+class UnsupportedAudioError(ValueError):
+    """The ONNX backend decodes PCM WAV only (what BugNarrator's Windows recorder writes);
+    anything else is refused up front as a 400 rather than failing inside inference."""
+
+
+_unsupported_audio_message = (
+    "The local transcription server accepts PCM WAV audio on this platform. "
+    "Other formats need the OpenAI or an OpenAI-compatible provider."
+)
+
+
 def _read_wav(audio_path: str):
     """PCM WAV → (float32 mono samples, sample rate). BugNarrator's Windows recorder writes
     16 kHz 16-bit mono WAV; other PCM widths are converted, anything else is rejected."""
     import numpy as np
 
-    with wave.open(audio_path, "rb") as handle:
-        channels = handle.getnchannels()
-        width = handle.getsampwidth()
-        rate = handle.getframerate()
-        frames = handle.readframes(handle.getnframes())
+    try:
+        with wave.open(audio_path, "rb") as handle:
+            channels = handle.getnchannels()
+            width = handle.getsampwidth()
+            rate = handle.getframerate()
+            frames = handle.readframes(handle.getnframes())
+    except (wave.Error, EOFError) as error:
+        raise UnsupportedAudioError(str(error)) from error
 
     if width == 2:
         samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
@@ -286,7 +311,7 @@ def _read_wav(audio_path: str):
     elif width == 4:
         samples = np.frombuffer(frames, dtype=np.int32).astype(np.float32) / 2147483648.0
     else:
-        raise ValueError(f"unsupported WAV sample width: {width}")
+        raise UnsupportedAudioError(f"unsupported WAV sample width: {width}")
 
     if channels > 1:
         samples = samples.reshape(-1, channels).mean(axis=1)
