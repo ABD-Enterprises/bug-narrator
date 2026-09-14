@@ -284,14 +284,17 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                     return;
                 }
 
+                // Assignment and the Running transition are one step under the gate, so an exit
+                // that lands right after cannot be overwritten by a stale "running" publication.
                 server = process;
+                state = state with
+                {
+                    Running = true,
+                    Message = "Server starting. The first start downloads model weights; recording becomes ready when the server responds.",
+                };
             }
 
-            Update(s => s with
-            {
-                Running = true,
-                Message = "Server starting. The first start downloads model weights; recording becomes ready when the server responds.",
-            });
+            Notify();
         }
         catch (Exception exception)
         {
