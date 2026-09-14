@@ -93,9 +93,11 @@ public sealed record WindowsAppSettings(
     }
 
     public string EffectiveTranscriptionModel =>
-        string.IsNullOrWhiteSpace(TranscriptionModel)
-            ? Default.TranscriptionModel
-            : TranscriptionModel.Trim();
+        EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal
+            ? WindowsAiProviderProfile.ParakeetTranscriptionModel
+            : string.IsNullOrWhiteSpace(TranscriptionModel)
+                ? Default.TranscriptionModel
+                : TranscriptionModel.Trim();
 
     public string? EffectiveLanguageHint =>
         string.IsNullOrWhiteSpace(LanguageHint)
@@ -114,8 +116,30 @@ public sealed record WindowsAppSettings(
 
     public string? EffectiveAiProviderBaseUrl =>
         string.IsNullOrWhiteSpace(AiProviderBaseUrl)
-            ? null
+            ? EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal
+                ? WindowsAiProviderProfile.ParakeetLocalBaseUrl
+                : null
             : OpenAiCompatibleEndpoint.NormalizeForStorage(AiProviderBaseUrl);
+
+    /// <summary>
+    /// False for transcription-only providers (Local Parakeet). Mirrors
+    /// SettingsStore.supportsIssueExtraction in the macOS app.
+    /// </summary>
+    public bool SupportsIssueExtraction => EffectiveAiProviderProfile.SupportsIssueExtraction;
+
+    /// <summary>
+    /// The macOS guidance sentence when the selected provider cannot extract issues or
+    /// summarize; null when it can. Transcription is unaffected by this reason.
+    /// </summary>
+    public string? IssueExtractionUnavailableReason =>
+        SupportsIssueExtraction ? null : WindowsAiProviderProfile.TranscriptionOnlyGuidance;
+
+    /// <summary>
+    /// What blocks issue extraction right now: the transcription-only rule first, then any
+    /// provider compatibility issue that also blocks transcription.
+    /// </summary>
+    public string? IssueExtractionCompatibilityIssue =>
+        IssueExtractionUnavailableReason ?? AiProviderCompatibilityIssue;
 
     /// <summary>
     /// Non-blocking warning to surface near the base-URL field when the endpoint
@@ -166,9 +190,20 @@ public sealed record WindowsAppSettings(
                     "Choose a local transcription model instead of whisper-1 for the Local-Compatible provider.",
                 WindowsAiProvider.LocalCompatible when EffectiveIssueExtractionModel == Default.IssueExtractionModel =>
                     "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider.",
+                // Parakeet ignores the typed base URL and model on macOS (SettingsStore+AIProviderReadiness);
+                // the base URL defaults to localhost:8422 and the model is pinned, so nothing to check here.
                 _ => null,
             };
         }
+    }
+
+    /// <summary>
+    /// Like <see cref="AiProviderCredentialForWorkflow"/> but also null for transcription-only
+    /// providers, so extraction is refused before any request is built.
+    /// </summary>
+    public string? AiProviderCredentialForIssueExtraction(string? credential)
+    {
+        return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential) : null;
     }
 
     public string? AiProviderCredentialForWorkflow(string? credential)
