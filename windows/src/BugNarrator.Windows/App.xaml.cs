@@ -94,6 +94,7 @@ public partial class App : Application
             settingsStore,
             secretStore,
             transcriptionClient,
+            issueExtractionService,
             diagnostics);
         var hotkeyPlatform = new Win32GlobalHotkeyPlatform();
         var hotkeyService = new WindowsGlobalHotkeyService(

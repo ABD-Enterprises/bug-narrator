@@ -26,7 +26,10 @@ public sealed record WindowsAppSettings(
     bool HasAcceptedSystemAudioRecordingConsent = false,
     // The experimental "System audio capture modes" toggle macOS has. Defaults false so a
     // settings file written before it existed loads with the feature off, as the spec requires.
-    bool IsExperimentalSystemAudioEnabled = false)
+    bool IsExperimentalSystemAudioEnabled = false,
+    // macOS SettingsStore.autoExtractIssues: off by default because turning it on spends the
+    // user's provider credit on every session; the one-time offer (#1166) is what switches it on.
+    bool AutoExtractIssues = false)
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -47,7 +50,8 @@ public sealed record WindowsAppSettings(
         AiProvider: WindowsAiProviderProfile.Default.StorageValue,
         RecordingAudioSource: AudioRecordingSourceProfile.Default.StorageValue,
         HasAcceptedSystemAudioRecordingConsent: false,
-        IsExperimentalSystemAudioEnabled: false);
+        IsExperimentalSystemAudioEnabled: false,
+        AutoExtractIssues: false);
 
     public WindowsAiProviderProfile EffectiveAiProviderProfile =>
         WindowsAiProviderProfile.FromStorageValue(AiProvider);

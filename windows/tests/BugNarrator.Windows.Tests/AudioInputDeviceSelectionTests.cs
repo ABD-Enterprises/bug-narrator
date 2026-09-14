@@ -271,6 +271,7 @@ public sealed class AudioInputDeviceSelectionTests
                 SettingsStore,
                 SecretStore,
                 TranscriptionClient,
+                IssueExtractionService,
                 diagnostics);
         }
 
@@ -286,6 +287,7 @@ public sealed class AudioInputDeviceSelectionTests
         public FakeWindowsAppSettingsStore SettingsStore { get; }
         public RecordingLifecycleService Service { get; }
         public FakeTranscriptionClient TranscriptionClient { get; }
+        public TestIssueExtractionService IssueExtractionService { get; } = new();
 
         public void Dispose()
         {

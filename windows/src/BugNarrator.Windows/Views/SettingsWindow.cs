@@ -45,6 +45,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox systemAudioConsentCheckBox;
     private readonly CheckBox experimentalSystemAudioCheckBox;
     private readonly CheckBox launchAtLoginCheckBox;
+    private readonly CheckBox autoExtractIssuesCheckBox;
     private readonly TextBlock launchAtLoginStatusTextBlock;
     private readonly ILaunchAtLoginService launchAtLoginService;
     private bool launchAtLoginAsLoaded;
@@ -134,6 +135,12 @@ public sealed class SettingsWindow : Window
         };
 
         this.launchAtLoginService = launchAtLoginService;
+        autoExtractIssuesCheckBox = new CheckBox
+        {
+            Margin = new Thickness(0, -4, 0, 14),
+            Content = "Automatically extract issues after transcription",
+        };
+
         launchAtLoginCheckBox = new CheckBox
         {
             Margin = new Thickness(0, 0, 0, 4),
@@ -340,6 +347,7 @@ public sealed class SettingsWindow : Window
                     BuildLabel("Issue Extraction Model"),
                     issueExtractionModelTextBox,
                     BuildHint("Defaults to gpt-4.1-mini for structured draft issue extraction after transcription."),
+                    autoExtractIssuesCheckBox,
                     launchAtLoginCheckBox,
                     launchAtLoginStatusTextBlock,
                     BuildLabel("Recording Audio Source"),
@@ -564,6 +572,7 @@ public sealed class SettingsWindow : Window
             audioRecordingSourceComboBox.SelectedItem = settings.EffectiveRecordingAudioSourceProfile;
             systemAudioConsentCheckBox.IsChecked = settings.HasAcceptedSystemAudioRecordingConsent;
             experimentalSystemAudioCheckBox.IsChecked = settings.IsExperimentalSystemAudioEnabled;
+            autoExtractIssuesCheckBox.IsChecked = settings.AutoExtractIssues;
             ApplyLaunchAtLoginStatus(launchAtLoginService.CurrentStatus());
             PopulateAudioInputDevices(settings.EffectiveAudioInputDeviceName);
             gitHubTokenPasswordBox.Password = gitHubToken ?? string.Empty;
@@ -627,7 +636,8 @@ public sealed class SettingsWindow : Window
                 AiProvider: GetSelectedAiProviderProfile().StorageValue,
                 RecordingAudioSource: GetSelectedRecordingAudioSourceProfile().StorageValue,
                 HasAcceptedSystemAudioRecordingConsent: systemAudioConsentCheckBox.IsChecked == true,
-                IsExperimentalSystemAudioEnabled: experimentalSystemAudioCheckBox.IsChecked == true);
+                IsExperimentalSystemAudioEnabled: experimentalSystemAudioCheckBox.IsChecked == true,
+                AutoExtractIssues: autoExtractIssuesCheckBox.IsChecked == true);
 
             if (settings.AiProviderCompatibilityIssue is { } aiProviderIssue)
             {
