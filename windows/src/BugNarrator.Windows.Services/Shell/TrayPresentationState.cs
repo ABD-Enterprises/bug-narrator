@@ -7,7 +7,9 @@ public sealed record TrayPresentationState(
     string IconText,
     bool CanStartRecording,
     bool CanStopRecording,
-    bool CanCaptureScreenshot)
+    bool CanCaptureScreenshot,
+    // The Fix entry shown directly under the Status line while a blocker is present (#1160).
+    TrayRecoveryEntry? RecoveryEntry = null)
 {
     /// <summary>
     /// Whether the tray offers the bundled sample session — only while the library is empty, the
@@ -55,6 +57,25 @@ public sealed record TrayPresentationState(
             iconText,
             state.CanStart,
             state.CanStop,
-            state.CanCaptureScreenshot);
+            state.CanCaptureScreenshot,
+            RecoveryEntryFor(state));
+    }
+
+    /// <summary>
+    /// Only a state carrying a blocker gets a recovery entry; Idle and Recording never do, even if a
+    /// caller left a stale blocker on them, so the menu cannot offer a fix for a problem that is over.
+    /// </summary>
+    public static TrayRecoveryEntry? RecoveryEntryFor(RecordingControlState state)
+    {
+        if (state.Blocker is not { } blocker
+            || state.WorkflowState is RecordingWorkflowState.Idle or RecordingWorkflowState.Recording)
+        {
+            return null;
+        }
+
+        return new TrayRecoveryEntry($"Fix: {blocker.Guidance}", blocker.Category, blocker.Destination);
     }
 }
+
+/// <summary>A recovery menu entry as the presentation layer describes it; the tray routes the destination.</summary>
+public sealed record TrayRecoveryEntry(string Label, RecoveryBlockerCategory Category, RecoveryDestination Destination);

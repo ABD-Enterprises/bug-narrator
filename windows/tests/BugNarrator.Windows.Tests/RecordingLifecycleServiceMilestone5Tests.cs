@@ -91,6 +91,48 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task StartRecordingAsync_WhenMicrophoneAccessIsDenied_PublishesAPermissionBlocker()
+    {
+        using var harness = new TestHarness();
+        harness.MicrophonePreflightService.Result = new RecordingPreflightResult(
+            RecordingPreflightStatus.PermissionDenied, CanStart: false, "Microphone access is blocked.");
+
+        await harness.Service.StartRecordingAsync();
+
+        var state = harness.Service.CurrentState;
+        Assert.Equal(RecordingWorkflowState.Failed, state.WorkflowState);
+        Assert.Equal(RecoveryBlockerCategory.Permission, state.Blocker!.Category);
+        Assert.Equal(RecoveryDestination.Settings, state.Blocker.Destination);
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithoutAProvider_PublishesACredentialBlockerOnTheCompletedState()
+    {
+        using var harness = new TestHarness();
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        var state = harness.Service.CurrentState;
+        Assert.Equal(RecordingWorkflowState.Completed, state.WorkflowState);
+        Assert.Equal(RecoveryBlockerCategory.Credential, state.Blocker!.Category);
+        Assert.Equal(RecoveryDestination.Settings, state.Blocker.Destination);
+    }
+
+    [Fact]
+    public async Task StopRecordingAsync_WithATranscript_PublishesNoBlocker()
+    {
+        using var harness = new TestHarness();
+        harness.SecretStore.Value = "sk-test";
+        harness.TranscriptionClient.TranscriptText = "Transcribed.";
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Null(harness.Service.CurrentState.Blocker);
+    }
+
+    [Fact]
     public async Task StopRecordingAsync_WithAutoExtractOnButNoProvider_DoesNotExtract()
     {
         using var harness = new TestHarness();
@@ -297,11 +339,12 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
     {
         public int? LastDeviceNumber { get; private set; }
+        public RecordingPreflightResult? Result { get; set; }
 
         public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber)
         {
             LastDeviceNumber = deviceNumber;
-            return new RecordingPreflightResult(
+            return Result ?? new RecordingPreflightResult(
                 RecordingPreflightStatus.Ready,
                 CanStart: true,
                 "Microphone ready.");

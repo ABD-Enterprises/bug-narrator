@@ -111,7 +111,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 sourceIssue,
-                ActiveSession: null));
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.AudioSourceNeedsSettings));
             return;
         }
 
@@ -130,7 +131,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                     CanStop: false,
                     CanCaptureScreenshot: false,
                     deviceSelection.ErrorMessage ?? "No microphone device is available.",
-                    ActiveSession: null));
+                    ActiveSession: null,
+                    Blocker: RecoveryBlocker.FromPreflight(RecordingPreflightStatus.DeviceUnavailable)));
                 return;
             }
 
@@ -147,7 +149,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                     CanStop: false,
                     CanCaptureScreenshot: false,
                     preflightResult.Message,
-                    ActiveSession: null));
+                    ActiveSession: null,
+                    Blocker: RecoveryBlocker.FromPreflight(preflightResult.Status)));
                 return;
             }
         }
@@ -159,7 +162,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 "A recording session is already active.",
-                ActiveSession: null));
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.FromPreflight(RecordingPreflightStatus.AlreadyRecording)));
             return;
         }
 
@@ -213,7 +217,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 $"Recording failed: {exception.Message}",
-                ActiveSession: null));
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.FromException(exception)));
         }
     }
 
@@ -292,7 +297,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 BuildCompletedStatusMessage(completedSession),
-                ActiveSession: null));
+                ActiveSession: null,
+                Blocker: BuildCompletedBlocker(completedSession)));
         }
         catch (Exception exception)
         {
@@ -317,7 +323,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 $"Recording stop failed: {exception.Message}",
-                ActiveSession: null));
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.FromException(exception)));
         }
     }
 
@@ -593,6 +600,20 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Error("issue-extraction", "automatic issue extraction failed; the transcribed session is kept", exception);
             return completedSession;
         }
+    }
+
+    /// <summary>
+    /// A saved session can still leave the user blocked: transcription refused for a missing
+    /// provider (Credential → Settings) or failed (retry from the library). Completed is otherwise clean.
+    /// </summary>
+    private static RecoveryBlocker? BuildCompletedBlocker(CompletedSession session)
+    {
+        return session.TranscriptionStatus switch
+        {
+            SessionTranscriptionStatus.NotConfigured => RecoveryBlocker.ProviderNotConfigured,
+            SessionTranscriptionStatus.Failed => RecoveryBlocker.TranscriptionFailed,
+            _ => null,
+        };
     }
 
     private static string BuildCompletedStatusMessage(CompletedSession session)
