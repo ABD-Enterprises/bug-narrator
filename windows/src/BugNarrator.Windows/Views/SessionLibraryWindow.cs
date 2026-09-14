@@ -756,8 +756,11 @@ public sealed class SessionLibraryWindow : Window
         }
         catch (Exception exception)
         {
+            // Not persisted, so not answered: the banner stays so the user can try again, and the
+            // status line says why.
             diagnostics.Error("session-library", "saving the issue extraction offer answer failed", exception);
             libraryStatusTextBlock.Text = exception.Message;
+            return;
         }
 
         issueExtractionOfferBanner.Visibility = Visibility.Collapsed;
