@@ -156,7 +156,8 @@ public sealed class RecordingLifecycleServiceScreenshotTests
                 SecretStore,
                 TranscriptionClient,
                 IssueExtractionService,
-                diagnostics);
+                diagnostics,
+                LocalServerHealthProbe);
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
@@ -164,6 +165,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
         public FakeCompletedSessionStore CompletedSessionStore { get; }
         public FakeScreenshotImageCaptureService ImageCaptureService { get; }
         public FakeMicrophonePreflightService MicrophonePreflightService { get; }
+        public BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe LocalServerHealthProbe { get; } = new AlwaysReachableProbe();
         public FakeScreenshotSelectionOverlayService OverlayService { get; }
         public FakeScreenCapturePreflightService ScreenCapturePreflightService { get; }
         public FakeSecretStore SecretStore { get; }
@@ -213,6 +215,11 @@ public sealed class RecordingLifecycleServiceScreenshotTests
             IsRecording = false;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class AlwaysReachableProbe : BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe
+    {
+        public Task<bool> IsReachableAsync(string baseUrl, CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 
     private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
