@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Extraction;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
@@ -25,6 +26,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly object syncRoot = new();
     private readonly ITranscriptionClient transcriptionClient;
+    private readonly IIssueExtractionService issueExtractionService;
 
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
@@ -41,6 +43,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         IWindowsAppSettingsStore settingsStore,
         ISecretStore secretStore,
         ITranscriptionClient transcriptionClient,
+        IIssueExtractionService issueExtractionService,
         WindowsDiagnostics diagnostics)
     {
         this.audioRecorderService = audioRecorderService;
@@ -54,6 +57,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
         this.transcriptionClient = transcriptionClient;
+        this.issueExtractionService = issueExtractionService;
         this.diagnostics = diagnostics;
     }
 
@@ -274,6 +278,11 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
 
             await sessionDraftStore.SaveAsync(finalizedDraft, cancellationToken);
             await completedSessionStore.SaveAsync(completedSession, cancellationToken);
+
+            // macOS PostTranscriptionPipelineController.complete: with autoExtractIssues on, extraction
+            // follows the saved transcript. The transcribed session is already on disk, so a failure
+            // here is logged and leaves it as it is — it never fails the recording.
+            completedSession = await ExtractIssuesAfterTranscriptionAsync(completedSession, stoppedDraft, cancellationToken);
             activeSession = null;
 
             diagnostics.Info("recording", $"recording stopped and review session saved: {completedSession.MetadataFilePath}");
@@ -430,18 +439,26 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         StateChanged?.Invoke(this, nextState);
     }
 
+    /// <summary>The settings and the credential the workflow may use with them — one resolution for transcription and extraction alike.</summary>
+    private async Task<(WindowsAppSettings Settings, string? Credential)> ResolveProviderAsync(CancellationToken cancellationToken)
+    {
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        return (settings, settings.AiProviderCredentialForWorkflow(apiKey));
+    }
+
     private async Task<CompletedSession> BuildCompletedSessionAsync(
         RecordingSessionDraft draft,
         CancellationToken cancellationToken)
     {
-        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var provider = await ResolveProviderAsync(cancellationToken);
+        var settings = provider.Settings;
         var request = new OpenAiTranscriptionRequest(
             settings.EffectiveTranscriptionModel,
             settings.EffectiveLanguageHint,
             settings.EffectiveTranscriptionPrompt,
             settings.EffectiveAiProviderBaseUrl);
-        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        var providerCredential = provider.Credential;
 
         if (providerCredential is null)
         {
@@ -530,6 +547,50 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             IssueExtraction: null,
             Screenshots: draft.Screenshots.ToArray(),
             TimelineMoments: draft.TimelineMoments.OrderBy(moment => moment.ElapsedSeconds).ToArray());
+    }
+
+    private async Task<CompletedSession> ExtractIssuesAfterTranscriptionAsync(
+        CompletedSession completedSession,
+        RecordingSessionDraft draft,
+        CancellationToken cancellationToken)
+    {
+        if (completedSession.TranscriptionStatus != SessionTranscriptionStatus.Completed)
+        {
+            return completedSession;
+        }
+
+        var provider = await ResolveProviderAsync(cancellationToken);
+        if (!provider.Settings.AutoExtractIssues || provider.Credential is null)
+        {
+            return completedSession;
+        }
+
+        try
+        {
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Saving,
+                CanStart: false,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                "Extracting draft issues with the configured AI provider...",
+                draft));
+
+            var extraction = await issueExtractionService.ExtractAsync(
+                completedSession,
+                provider.Credential,
+                provider.Settings.EffectiveIssueExtractionModel,
+                provider.Settings.EffectiveAiProviderBaseUrl,
+                cancellationToken);
+            var extracted = completedSession with { IssueExtraction = extraction };
+            await completedSessionStore.SaveAsync(extracted, cancellationToken);
+            diagnostics.Info("issue-extraction", $"automatic issue extraction saved {extraction.Issues.Count} draft issue(s)");
+            return extracted;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            diagnostics.Error("issue-extraction", "automatic issue extraction failed; the transcribed session is kept", exception);
+            return completedSession;
+        }
     }
 
     private static string BuildCompletedStatusMessage(CompletedSession session)

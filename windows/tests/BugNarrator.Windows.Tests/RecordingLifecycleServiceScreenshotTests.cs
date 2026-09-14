@@ -155,6 +155,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
                 SettingsStore,
                 SecretStore,
                 TranscriptionClient,
+                IssueExtractionService,
                 diagnostics);
         }
 
@@ -170,6 +171,7 @@ public sealed class RecordingLifecycleServiceScreenshotTests
         public FakeWindowsAppSettingsStore SettingsStore { get; }
         public RecordingLifecycleService Service { get; }
         public FakeTranscriptionClient TranscriptionClient { get; }
+        public TestIssueExtractionService IssueExtractionService { get; } = new();
 
         public Task StartRecordingAsync()
         {
