@@ -26,6 +26,15 @@ public interface IRunKeyRegistry
     string? GetValue(string name);
     void SetValue(string name, string command);
     void DeleteValue(string name);
+
+    /// <summary>
+    /// The Windows Settings Startup page (and Task Manager) do not remove Run values; they record a
+    /// verdict in ExplorerStartupApprovedRun — a binary value whose first byte is 0x02 for enabled
+    /// and 0x03 for disabled. Null when no verdict exists, which counts as enabled.
+    /// </summary>
+    bool? GetStartupApproved(string name);
+    void SetStartupApproved(string name, bool approved);
+    void DeleteStartupApproved(string name);
 }
 
 /// <summary>
@@ -61,9 +70,11 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
         try
         {
             var registered = registry.GetValue(ValueName);
-            return string.Equals(registered, command, StringComparison.OrdinalIgnoreCase)
-                ? LaunchAtLoginStatus.Enabled
-                : LaunchAtLoginStatus.Disabled;
+            var isOurs = string.Equals(registered, command, StringComparison.OrdinalIgnoreCase);
+            // A Run value the user disabled on the Windows Settings Startup page is still present but
+            // does not launch; reading it as enabled would contradict what Settings shows.
+            var approved = registry.GetStartupApproved(ValueName) ?? true;
+            return isOurs && approved ? LaunchAtLoginStatus.Enabled : LaunchAtLoginStatus.Disabled;
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
@@ -85,12 +96,15 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
             if (enabled)
             {
                 registry.SetValue(ValueName, command);
+                // Clear a Settings-page "disabled" verdict, or the value is present but never runs.
+                registry.SetStartupApproved(ValueName, approved: true);
             }
             else if (string.Equals(registry.GetValue(ValueName), command, StringComparison.OrdinalIgnoreCase))
             {
                 // Only this copy's registration is ours to remove; a value pointing at another install is
                 // that install's, and CurrentStatus already reports it as disabled here.
                 registry.DeleteValue(ValueName);
+                registry.DeleteStartupApproved(ValueName);
             }
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or System.Security.SecurityException or IOException)
@@ -129,6 +143,30 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
         public void DeleteValue(string name)
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            key?.DeleteValue(name, throwOnMissingValue: false);
+        }
+
+        private const string StartupApprovedPath = @"SoftwareMicrosoftWindowsCurrentVersionExplorerStartupApprovedRun";
+
+        public bool? GetStartupApproved(string name)
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(StartupApprovedPath, writable: false);
+            return key?.GetValue(name) is byte[] { Length: > 0 } verdict ? verdict[0] != 0x03 : null;
+        }
+
+        public void SetStartupApproved(string name, bool approved)
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(StartupApprovedPath, writable: true)
+                ?? throw new IOException("The startup-approved registry key could not be opened for writing.");
+            // Explorer's own shape: verdict byte, then eleven bytes it uses for a timestamp; zeros are accepted.
+            var verdict = new byte[12];
+            verdict[0] = approved ? (byte)0x02 : (byte)0x03;
+            key.SetValue(name, verdict, RegistryValueKind.Binary);
+        }
+
+        public void DeleteStartupApproved(string name)
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(StartupApprovedPath, writable: true);
             key?.DeleteValue(name, throwOnMissingValue: false);
         }
     }

@@ -65,6 +65,36 @@ public sealed class LaunchAtLoginServiceTests
     }
 
     [Fact]
+    public void CurrentStatus_IsDisabledWhenWindowsSettingsDisabledTheEntryButLeftTheValue()
+    {
+        // What the Settings Startup page actually does: the Run value stays, StartupApproved says no.
+        var registry = new FakeRunKey();
+        registry.Values[LaunchAtLoginService.ValueName] = $"\"{Exe}\"";
+        registry.Approved[LaunchAtLoginService.ValueName] = false;
+        var service = new LaunchAtLoginService(registry, () => Exe);
+
+        Assert.Equal(LaunchAtLoginStatus.Disabled, service.CurrentStatus());
+
+        // Re-enabling from our Settings must clear that verdict, not just rewrite the value.
+        Assert.Equal(LaunchAtLoginStatus.Enabled, service.SetEnabled(true));
+        Assert.True(registry.Approved[LaunchAtLoginService.ValueName]);
+    }
+
+    [Fact]
+    public void SetEnabled_False_AlsoRemovesTheStartupApprovedVerdict()
+    {
+        var registry = new FakeRunKey();
+        registry.Values[LaunchAtLoginService.ValueName] = $"\"{Exe}\"";
+        registry.Approved[LaunchAtLoginService.ValueName] = true;
+        var service = new LaunchAtLoginService(registry, () => Exe);
+
+        service.SetEnabled(false);
+
+        Assert.Empty(registry.Values);
+        Assert.Empty(registry.Approved);
+    }
+
+    [Fact]
     public void CurrentStatus_IsUnavailableWithAMessageWhenTheExecutablePathIsUnknown()
     {
         var registry = new FakeRunKey();
@@ -110,5 +140,10 @@ public sealed class LaunchAtLoginServiceTests
             if (ThrowOnWrite is not null) throw ThrowOnWrite;
             Values.Remove(name);
         }
+
+        public Dictionary<string, bool> Approved { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool? GetStartupApproved(string name) => Approved.TryGetValue(name, out var approved) ? approved : null;
+        public void SetStartupApproved(string name, bool approved) { if (ThrowOnWrite is not null) throw ThrowOnWrite; Approved[name] = approved; }
+        public void DeleteStartupApproved(string name) => Approved.Remove(name);
     }
 }
