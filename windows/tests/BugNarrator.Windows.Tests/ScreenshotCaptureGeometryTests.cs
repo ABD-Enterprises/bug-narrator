@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
 using Xunit;
@@ -30,31 +28,28 @@ public sealed class ScreenshotCaptureGeometryTests
         Assert.Equal(expectedWidth, physical.Width);
         Assert.Equal(expectedHeight, physical.Height);
 
-        // The capture allocates the bitmap from the physical selection, exactly as
-        // DesktopScreenshotImageCaptureService does before CopyFromScreen; the PNG on disk has
-        // the physical size, never the logical one.
+        // DesktopScreenshotImageCaptureService allocates the bitmap and CopyFromScreen block from
+        // the selection verbatim, so the PNG has exactly this size — never the logical one.
         var selection = new ScreenshotSelection(physical.X, physical.Y, physical.Width, physical.Height);
-        var path = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", $"{Guid.NewGuid():N}.png");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        try
+        Assert.Equal((expectedWidth, expectedHeight), (selection.Width, selection.Height));
+        if (scale != 1.0)
         {
-            using (var bitmap = new Bitmap(selection.Width, selection.Height))
-            {
-                bitmap.Save(path, ImageFormat.Png);
-            }
+            Assert.NotEqual((int)logicalWidth, selection.Width);
+        }
+    }
 
-            using var saved = Image.FromFile(path);
-            Assert.Equal(expectedWidth, saved.Width);
-            Assert.Equal(expectedHeight, saved.Height);
-            if (scale != 1.0)
-            {
-                Assert.NotEqual((int)logicalWidth, saved.Width);
-            }
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+    [Fact]
+    public void ToPhysical_WithFractionalCoordinates_TilesAdjacentRegionsWithoutGapOrOverlap()
+    {
+        // Mouse positions are fractional DIPs; edges are rounded, not origin and size separately.
+        var upper = new LogicalRect(10.3, 5.7, 100.4, 40.6);
+        var lower = new LogicalRect(10.3, 46.3, 100.4, 30.2);
+
+        var upperPhysical = ScreenshotCaptureGeometry.ToPhysical(upper, 1.25, 1.25);
+        var lowerPhysical = ScreenshotCaptureGeometry.ToPhysical(lower, 1.25, 1.25);
+
+        Assert.Equal(upperPhysical.Y + upperPhysical.Height, lowerPhysical.Y);
+        Assert.Equal((int)Math.Round((10.3 + 100.4) * 1.25) - (int)Math.Round(10.3 * 1.25), upperPhysical.Width);
     }
 
     [Fact]
@@ -62,8 +57,10 @@ public sealed class ScreenshotCaptureGeometryTests
     {
         // Primary at 100 % on the left, secondary at 150 % to its right (logical bounds in DIPs, as
         // SystemParameters reports them for a system-DPI-aware process).
-        var primary = new MonitorGeometry(new LogicalRect(0, 0, 1920, 1080), ScaleFactor: 1.0);
-        var secondary = new MonitorGeometry(new LogicalRect(1920, 0, 1707, 960), ScaleFactor: 1.5);
+        // The secondary runs at 150 % natively, but a system-DPI-aware process sees every monitor
+        // through the one system scale (Windows virtualizes the rest); native secondary pixels are WIN-041 (#1186).
+        var primary = new MonitorGeometry(new LogicalRect(0, 0, 1920, 1080));
+        var secondary = new MonitorGeometry(new LogicalRect(1920, 0, 1707, 960));
         const double systemScale = 1.25;
 
         var virtualScreen = ScreenshotCaptureGeometry.VirtualScreen([primary, secondary]);
@@ -88,8 +85,8 @@ public sealed class ScreenshotCaptureGeometryTests
     public void VirtualScreen_WithANegativeOriginMonitor_KeepsTheOffset()
     {
         // A monitor to the left of the primary has a negative logical X; the overlay's Left must be negative too.
-        var leftMonitor = new MonitorGeometry(new LogicalRect(-1280, 0, 1280, 720), 1.0);
-        var primary = new MonitorGeometry(new LogicalRect(0, 0, 1920, 1080), 1.0);
+        var leftMonitor = new MonitorGeometry(new LogicalRect(-1280, 0, 1280, 720));
+        var primary = new MonitorGeometry(new LogicalRect(0, 0, 1920, 1080));
 
         var virtualScreen = ScreenshotCaptureGeometry.VirtualScreen([leftMonitor, primary]);
 

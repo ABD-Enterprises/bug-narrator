@@ -6,8 +6,8 @@ public readonly record struct LogicalRect(double X, double Y, double Width, doub
 /// <summary>A rectangle in physical screen pixels — what GDI CopyFromScreen and the saved PNG use.</summary>
 public readonly record struct PhysicalRect(int X, int Y, int Width, int Height);
 
-/// <summary>One monitor as the overlay sees it: logical bounds in the virtual-screen DIP space and its scale factor.</summary>
-public readonly record struct MonitorGeometry(LogicalRect LogicalBounds, double ScaleFactor);
+/// <summary>One monitor as the overlay sees it: its logical bounds in the virtual-screen DIP space.</summary>
+public readonly record struct MonitorGeometry(LogicalRect LogicalBounds);
 
 /// <summary>
 /// The pure DIP → physical-pixel mapping behind the screenshot overlay (#1134). The overlay measures
@@ -15,17 +15,19 @@ public readonly record struct MonitorGeometry(LogicalRect LogicalBounds, double 
 /// pixels, so a 100-DIP drag on a 125 % monitor must produce a 125-pixel-wide image, not 100.
 ///
 /// The WPF app is system-DPI-aware (no manifest opts into per-monitor V2), so one scale factor —
-/// the system DPI's — applies to the whole virtual screen and Windows bitmap-scales the overlay on
-/// monitors whose native scale differs. Under that model a region crossing a monitor boundary
-/// maps with the same factor on both sides, which is what <see cref="ToPhysical"/> encodes and
-/// what the tests pin. Switching to per-monitor awareness would change this class, and the tests
-/// with it, deliberately.
+/// the system DPI's — applies to the whole virtual screen: Windows presents every monitor to the
+/// process in that one coordinate space and bitmap-scales the overlay on monitors whose native
+/// scale differs. Under that model a region crossing a monitor boundary maps with the same factor
+/// on both sides, which is what <see cref="ToPhysical"/> encodes and what the tests pin. Native
+/// pixels on a monitor whose scale differs from the system's need per-monitor V2 awareness and a
+/// per-monitor mapping — tracked separately (WIN-041, #1186); that change replaces this class deliberately.
 /// </summary>
 public static class ScreenshotCaptureGeometry
 {
     /// <summary>
-    /// Converts a logical selection to physical pixels. Origin and size are scaled independently
-    /// and rounded to the nearest pixel, so a 100 × 60 DIP region at 1.25 is 125 × 75 pixels.
+    /// Converts a logical selection to physical pixels. Both edges are scaled and rounded, and the
+    /// size is the difference, so adjacent regions tile without a one-pixel gap or overlap even for
+    /// fractional mouse coordinates. A 100 × 60 DIP region at 1.25 is 125 × 75 pixels.
     /// </summary>
     public static PhysicalRect ToPhysical(LogicalRect logical, double scaleX, double scaleY)
     {
@@ -34,11 +36,11 @@ public static class ScreenshotCaptureGeometry
             throw new ArgumentOutOfRangeException(nameof(scaleX), "Scale factors must be positive.");
         }
 
-        return new PhysicalRect(
-            X: (int)Math.Round(logical.X * scaleX),
-            Y: (int)Math.Round(logical.Y * scaleY),
-            Width: (int)Math.Round(logical.Width * scaleX),
-            Height: (int)Math.Round(logical.Height * scaleY));
+        var left = (int)Math.Round(logical.X * scaleX);
+        var top = (int)Math.Round(logical.Y * scaleY);
+        var right = (int)Math.Round((logical.X + logical.Width) * scaleX);
+        var bottom = (int)Math.Round((logical.Y + logical.Height) * scaleY);
+        return new PhysicalRect(left, top, right - left, bottom - top);
     }
 
     /// <summary>The overlay's bounds: the union of every monitor's logical bounds (SystemParameters.VirtualScreen*).</summary>
