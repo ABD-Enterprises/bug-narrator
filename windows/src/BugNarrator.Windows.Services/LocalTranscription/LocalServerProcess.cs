@@ -43,6 +43,19 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
 
     public bool IsInJob => job.Contains(process.Handle);
 
+    /// <summary>True when the given process belongs to this server's job — the tests use it to follow the tree.</summary>
+    public bool JobContains(Process candidate)
+    {
+        try
+        {
+            return job.Contains(candidate.Handle);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
     /// <summary>The server's command line: loopback only, fixed port, pinned model (design note §3.3).</summary>
     public static string ServerArguments =>
         $"--host 127.0.0.1 --port 8422 --model {Settings.WindowsAiProviderProfile.ParakeetTranscriptionModel}";
@@ -232,6 +245,12 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
         try
         {
             onExit(code, ReadStderrTail(stderrLogPath));
+        }
+        catch (Exception exception)
+        {
+            // Runs on a Process.Exited thread-pool callback: a subscriber failure must not take the
+            // app down, and must not stop waiters from being released.
+            LastSignalOutcome += $"; exit callback failed ({exception.GetType().Name})";
         }
         finally
         {

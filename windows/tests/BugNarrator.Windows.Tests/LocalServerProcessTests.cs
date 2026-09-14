@@ -112,36 +112,32 @@ public sealed class LocalServerProcessTests : IDisposable
         if (!OperatingSystem.IsWindows()) return;
         // cmd runs a chain of pings: Ctrl+C ends the current ping and cmd moves on to the next, so
         // the process outlives the grace and the kill must take the whole tree.
-        var started = DateTime.Now;
         var exit = new TaskCompletionSource<int>();
         using var process = LocalServerProcess.Launch(cmd, "/c \"ping -n 60 127.0.0.1 > nul & ping -n 60 127.0.0.1 > nul & ping -n 60 127.0.0.1 > nul\"", models, (status, _) => exit.TrySetResult(status), TimeSpan.FromMilliseconds(500));
         await Task.Delay(500);
-        Assert.NotEmpty(PingsStartedAfter(started));
+        // Children are identified by job membership, not by name or time, so concurrent tests cannot interfere.
+        Assert.NotEmpty(PingsInJob(process));
 
         process.Terminate();
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         await exit.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Task.Delay(500);
 
-        Assert.Empty(PingsStartedAfter(started));
+        Assert.Empty(PingsInJob(process));
     }
 
-    /// <summary>Only pings this test started, so parallel tests cannot skew the count.</summary>
-    private static List<int> PingsStartedAfter(DateTime started)
+    /// <summary>Live ping processes inside this server's job — the launched tree and nothing else.</summary>
+    private static List<int> PingsInJob(LocalServerProcess process)
     {
         var found = new List<int>();
         foreach (var ping in System.Diagnostics.Process.GetProcessesByName("ping"))
         {
-            try
+            using (ping)
             {
-                if (ping.StartTime >= started && !ping.HasExited)
+                if (process.JobContains(ping) && !ping.HasExited)
                 {
                     found.Add(ping.Id);
                 }
-            }
-            catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-                // Exited or inaccessible while we looked: not ours to count.
             }
         }
 
