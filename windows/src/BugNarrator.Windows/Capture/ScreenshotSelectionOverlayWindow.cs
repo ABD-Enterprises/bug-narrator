@@ -1,3 +1,4 @@
+using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,15 +16,34 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
     private readonly TextBlock hintText;
     private readonly Rectangle selectionRectangle;
 
+    private readonly Func<(double X, double Y)> deviceScale;
+
     private Point dragStartPoint;
     private bool isDragging;
 
     public ScreenshotSelectionOverlayWindow()
+        : this(deviceScale: null, virtualScreen: null)
     {
-        Left = SystemParameters.VirtualScreenLeft;
-        Top = SystemParameters.VirtualScreenTop;
-        Width = SystemParameters.VirtualScreenWidth;
-        Height = SystemParameters.VirtualScreenHeight;
+    }
+
+    /// <summary>
+    /// <paramref name="deviceScale"/> overrides the window's own DIP → device transform and
+    /// <paramref name="virtualScreen"/> the SystemParameters virtual-screen bounds; tests use them
+    /// to emulate a 125 % or 150 % display and a multi-monitor desktop without real hardware.
+    /// </summary>
+    internal ScreenshotSelectionOverlayWindow(Func<(double X, double Y)>? deviceScale, LogicalRect? virtualScreen)
+    {
+        this.deviceScale = deviceScale ?? DeviceScaleFromPresentationSource;
+        // The overlay spans every monitor at once: the virtual screen, in DIPs.
+        var bounds = virtualScreen ?? new LogicalRect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        Left = bounds.X;
+        Top = bounds.Y;
+        Width = bounds.Width;
+        Height = bounds.Height;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;
@@ -139,11 +159,19 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
         isDragging = false;
         Mouse.Capture(null);
 
-        var currentPoint = eventArgs.GetPosition(canvas);
-        var left = Math.Min(dragStartPoint.X, currentPoint.X);
-        var top = Math.Min(dragStartPoint.Y, currentPoint.Y);
-        var width = Math.Abs(currentPoint.X - dragStartPoint.X);
-        var height = Math.Abs(currentPoint.Y - dragStartPoint.Y);
+        CompleteDrag(dragStartPoint, eventArgs.GetPosition(canvas));
+    }
+
+    /// <summary>
+    /// The production path from a finished drag (canvas DIPs) to the physical-pixel selection the
+    /// capture service uses; internal so the DPI tests can drive it without synthesizing mouse input.
+    /// </summary>
+    internal void CompleteDrag(Point start, Point end)
+    {
+        var left = Math.Min(start.X, end.X);
+        var top = Math.Min(start.Y, end.Y);
+        var width = Math.Abs(end.X - start.X);
+        var height = Math.Abs(end.Y - start.Y);
 
         if (width < MinimumSelectionSize || height < MinimumSelectionSize)
         {
@@ -151,14 +179,23 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
             return;
         }
 
+        // The drag is measured in DIPs; CopyFromScreen and the PNG are physical pixels (#1134).
+        var scale = deviceScale();
+        var physical = ScreenshotCaptureGeometry.ToPhysical(
+            new LogicalRect(Left + left, Top + top, width, height),
+            scale.X,
+            scale.Y);
         SelectionResult = new ScreenshotSelectionResult(
             ScreenshotSelectionStatus.Selected,
-            new ScreenshotSelection(
-                X: (int)Math.Round(Left + left),
-                Y: (int)Math.Round(Top + top),
-                Width: (int)Math.Round(width),
-                Height: (int)Math.Round(height)));
+            new ScreenshotSelection(physical.X, physical.Y, physical.Width, physical.Height));
 
         Close();
+    }
+
+    /// <summary>DIP → device pixel factors for this window; 1.0 before the window has a presentation source.</summary>
+    private (double X, double Y) DeviceScaleFromPresentationSource()
+    {
+        var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice;
+        return transform is { } matrix ? (matrix.M11, matrix.M22) : (1.0, 1.0);
     }
 }
