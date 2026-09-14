@@ -140,7 +140,6 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
         }
 
         var completion = installCompletion;
-        StateChanged?.Invoke(this, State);
         _ = Task.Run(async () =>
         {
             try
@@ -191,6 +190,7 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                 completion.SetResult();
             }
         }, CancellationToken.None);
+        Notify();
         return completion.Task;
     }
 
@@ -213,7 +213,6 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
         }
 
         var completion = startCompletion;
-        StateChanged?.Invoke(this, State);
         _ = Task.Run(() =>
         {
             try
@@ -221,7 +220,7 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                 // Re-verified immediately before every launch, as macOS re-runs verifyBinary.
                 verifier.Verify(ExecutablePath);
                 token.ThrowIfCancellationRequested();
-                LaunchVerifiedServer();
+                LaunchVerifiedServer(token);
             }
             catch (OperationCanceledException)
             {
@@ -242,10 +241,11 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                 completion.SetResult();
             }
         }, CancellationToken.None);
+        Notify();
         return completion.Task;
     }
 
-    private void LaunchVerifiedServer()
+    private void LaunchVerifiedServer(CancellationToken token)
     {
         try
         {
@@ -276,6 +276,14 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
                     return;
                 }
 
+                // Stop() cancels under this same gate: a stop that landed between the cancellation
+                // check and here terminates the just-launched process instead of orphaning it.
+                if (token.IsCancellationRequested)
+                {
+                    process.Terminate();
+                    return;
+                }
+
                 server = process;
             }
 
@@ -293,9 +301,15 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     public void Stop()
     {
-        installCancellation?.Cancel();
-        startCancellation?.Cancel();
-        server?.Terminate();
+        ILocalServerProcess? process;
+        lock (gate)
+        {
+            installCancellation?.Cancel();
+            startCancellation?.Cancel();
+            process = server;
+        }
+
+        process?.Terminate();
     }
 
     /// <summary>
@@ -401,8 +415,24 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
             state = state with { Busy = true };
         }
 
-        StateChanged?.Invoke(this, State);
+        Notify();
         return true;
+    }
+
+    /// <summary>
+    /// Subscriber failures are isolated: a throwing handler must not leave an operation reserved
+    /// or a state transition half-applied.
+    /// </summary>
+    private void Notify()
+    {
+        try
+        {
+            StateChanged?.Invoke(this, State);
+        }
+        catch
+        {
+            // The state is already committed; a subscriber's failure is its own problem.
+        }
     }
 
     private async Task<string> DownloadTextAsync(string url, CancellationToken cancellationToken)
@@ -459,13 +489,11 @@ public sealed class LocalTranscriptionServerManager : ILocalTranscriptionServerM
 
     private void Update(Func<LocalTranscriptionServerState, LocalTranscriptionServerState> change)
     {
-        LocalTranscriptionServerState next;
         lock (gate)
         {
-            next = change(state);
-            state = next;
+            state = change(state);
         }
 
-        StateChanged?.Invoke(this, next);
+        Notify();
     }
 }
