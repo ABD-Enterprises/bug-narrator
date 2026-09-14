@@ -249,6 +249,14 @@ server._serve("127.0.0.1", {port})
 
     # ---- ONNX backend (every platform but macOS) ----
 
+    def test_backend_is_mlx_only_on_apple_silicon(self):
+        with patch.object(server.sys, "platform", "darwin"), patch.object(server.platform, "machine", return_value="arm64"):
+            self.assertEqual(server._select_backend(), "mlx")
+        with patch.object(server.sys, "platform", "darwin"), patch.object(server.platform, "machine", return_value="x86_64"):
+            self.assertEqual(server._select_backend(), "onnx")
+        with patch.object(server.sys, "platform", "win32"), patch.object(server.platform, "machine", return_value="AMD64"):
+            self.assertEqual(server._select_backend(), "onnx")
+
     def test_onnx_model_mapping_keeps_the_request_facing_ids_and_passes_unknowns_through(self):
         self.assertEqual(
             server._onnx_model_for("mlx-community/parakeet-tdt-0.6b-v3"),
