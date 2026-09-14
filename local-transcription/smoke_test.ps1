@@ -30,6 +30,11 @@ $responsePath = Join-Path $LogDir "transcription.json"
 $audioPath = Join-Path $smokeRoot "fixture.wav"
 $phrase = "Bug Narrator local transcription is ready."
 
+function Stop-ServerTree {
+    # Windows PowerShell 5.1 has no Process.Kill(entireProcessTree); taskkill /T takes the bootloader and its interpreter child.
+    if (-not $server.HasExited) { & taskkill.exe /PID $server.Id /T /F 2>&1 | Out-Null }
+}
+
 function Log($message) {
     $line = "$((Get-Date).ToUniversalTime().ToString('o')) $message"
     Write-Host $line
@@ -124,7 +129,7 @@ exit $(if ($sent) { 0 } else { 3 })
     $signalled = ($signaller.ExitCode -eq 0)
     if (-not $server.WaitForExit(2000)) {
         Log "server ignored the graceful stop (signalled=$signalled); killing"
-        $server.Kill($true)
+        Stop-ServerTree
         $server.WaitForExit()
         throw "packaged transcription server did not stop within the 2 s grace"
     }
@@ -139,7 +144,7 @@ exit $(if ($sent) { 0 } else { 3 })
 }
 catch {
     Log "FAILED: $($_.Exception.Message)"
-    if (-not $server.HasExited) { $server.Kill($true); $server.WaitForExit() }
+    if (-not $server.HasExited) { Stop-ServerTree; $server.WaitForExit() }
     foreach ($child in $children) { Stop-Process -Id $child -Force -ErrorAction SilentlyContinue }
     throw
 }
