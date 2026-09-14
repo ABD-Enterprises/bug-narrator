@@ -383,9 +383,17 @@ public sealed class WelcomeWindow : Window
                 return;
             }
 
+            // Register first, persist second: a registration failure leaves nothing saved, so the
+            // tour never reports a shortcut as assigned that was not actually applied.
+            var snapshot = await hotkeyService.ApplySettingsAsync(updated);
             await settingsStore.SaveAsync(updated);
-            await hotkeyService.ApplySettingsAsync(updated);
             diagnostics.Info("welcome", "suggested capture hotkeys applied");
+            if (snapshot.HasProblems)
+            {
+                await RefreshAsync(advanceToFirstIncomplete: false);
+                bodyPanel.Children.Add(BuildWarning("Some suggested shortcuts could not be registered. Open Settings to review them."));
+                return;
+            }
         }
         catch (Exception exception)
         {
