@@ -560,7 +560,9 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         }
 
         var provider = await ResolveProviderAsync(cancellationToken);
-        if (!provider.Settings.AutoExtractIssues || provider.Credential is null)
+        if (!provider.Settings.AutoExtractIssues
+            || !provider.Settings.SupportsIssueExtraction
+            || provider.Credential is null)
         {
             return completedSession;
         }

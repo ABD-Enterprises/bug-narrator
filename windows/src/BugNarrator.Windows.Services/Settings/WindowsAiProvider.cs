@@ -5,6 +5,7 @@ public enum WindowsAiProvider
     OpenAI,
     OpenAICompatible,
     LocalCompatible,
+    ParakeetLocal,
 }
 
 public sealed record WindowsAiProviderProfile(
@@ -17,8 +18,27 @@ public sealed record WindowsAiProviderProfile(
     string CredentialFieldTitle,
     string ValidationActionTitle,
     string SuccessMessage,
-    bool RequiresCredential)
+    bool RequiresCredential,
+    bool SupportsIssueExtraction = true)
 {
+    /// <summary>
+    /// Default base URL of the local Parakeet transcription server; mirrors
+    /// AIProvider.baseURLPlaceholder for .parakeetLocal in the macOS app.
+    /// </summary>
+    public const string ParakeetLocalBaseUrl = "http://localhost:8422";
+
+    /// <summary>
+    /// Mirrors SettingsStore.parakeetTranscriptionModel in the macOS app.
+    /// </summary>
+    public const string ParakeetTranscriptionModel = "parakeet-tdt-0.6b-v3";
+
+    /// <summary>
+    /// Shown wherever issue extraction is refused for a transcription-only provider.
+    /// Copy verbatim from AISetupSectionsView.swift in the macOS app.
+    /// </summary>
+    public const string TranscriptionOnlyGuidance =
+        "Local Parakeet handles transcription only. Choose OpenAI or a compatible provider when you want automatic issue extraction.";
+
     public static IReadOnlyList<WindowsAiProviderProfile> All { get; } =
     [
         new(
@@ -54,6 +74,18 @@ public sealed record WindowsAiProviderProfile(
             "Validate Connection",
             "The local-compatible provider accepted this configuration.",
             RequiresCredential: false),
+        new(
+            WindowsAiProvider.ParakeetLocal,
+            "parakeetLocal",
+            "Local (Parakeet)",
+            "Transcribe locally on this PC using Parakeet. No API key, no upload, fully offline after setup.",
+            ParakeetLocalBaseUrl,
+            "BugNarrator connects to the local Parakeet transcription server on this port.",
+            string.Empty,
+            "Check Server",
+            "The local Parakeet transcription server is running.",
+            RequiresCredential: false,
+            SupportsIssueExtraction: false),
     ];
 
     public static WindowsAiProviderProfile Default => All[0];

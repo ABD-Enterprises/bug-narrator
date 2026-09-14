@@ -143,11 +143,13 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
 
         var settings = await settingsStore.LoadAsync(cancellationToken);
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        // Transcription-only providers (Local Parakeet) are refused here, before any request is
+        // built, with the same guidance the macOS app shows (#1168).
+        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey);
         if (providerCredential is null)
         {
             throw new InvalidOperationException(
-                settings.AiProviderCompatibilityIssue
+                settings.IssueExtractionCompatibilityIssue
                 ?? "Finish AI provider setup in Settings before running issue extraction.");
         }
 

@@ -68,6 +68,29 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task StopRecordingAsync_WithAutoExtractOnAndTranscriptionOnlyProvider_TranscribesWithoutExtracting()
+    {
+        // macOS supportsIssueExtraction is false for Local Parakeet: the transcript is saved and
+        // the pipeline stops there, without an extraction request (#1168).
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            AiProvider = "parakeetLocal",
+            AutoExtractIssues = true,
+        };
+        harness.TranscriptionClient.TranscriptText = "The save button is clipped.";
+
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+
+        Assert.Equal(0, harness.IssueExtractionService.CallCount);
+        var saved = Assert.Single(await harness.CompletedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.Completed, saved.TranscriptionStatus);
+        Assert.Equal("parakeet-tdt-0.6b-v3", saved.TranscriptionModel);
+        Assert.Null(saved.IssueExtraction);
+    }
+
+    [Fact]
     public async Task StopRecordingAsync_WithAutoExtractOnButNoProvider_DoesNotExtract()
     {
         using var harness = new TestHarness();

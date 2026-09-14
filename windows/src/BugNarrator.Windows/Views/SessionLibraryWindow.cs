@@ -32,6 +32,8 @@ public sealed class SessionLibraryWindow : Window
     private readonly Button exportGitHubButton;
     private readonly Button exportJiraButton;
     private readonly Button extractIssuesButton;
+    private readonly TextBlock issueExtractionUnavailableTextBlock;
+    private string? issueExtractionUnavailableReason;
     private readonly Button retryTranscriptionButton;
     private readonly StackPanel issueEditorsPanel;
     private readonly TextBlock issuesEmptyStateTextBlock;
@@ -238,6 +240,15 @@ public sealed class SessionLibraryWindow : Window
             RetryTranscriptionAsync);
 
         extractIssuesButton = BuildActionButton("Extract Issues");
+        issueExtractionUnavailableTextBlock = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.DimGray,
+            Margin = new Thickness(0, 6, 0, 0),
+            Visibility = Visibility.Collapsed,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(
+            issueExtractionUnavailableTextBlock, "Issue extraction unavailable");
         extractIssuesButton.Click += async (_, _) => await RunReviewActionAsync(
             "Extracting draft issues with the configured AI provider...",
             ExtractIssuesAsync);
@@ -524,6 +535,7 @@ public sealed class SessionLibraryWindow : Window
                             exportJiraButton,
                         },
                     },
+                    issueExtractionUnavailableTextBlock,
                     issuesStatusTextBlock,
                     issuesEmptyStateTextBlock,
                     issueEditorsPanel,
@@ -668,6 +680,20 @@ public sealed class SessionLibraryWindow : Window
         ApplyCurrentQuery();
     }
 
+    /// <summary>
+    /// Disables Extract Issues and shows the macOS guidance beneath the action row when the
+    /// configured provider is transcription-only (#1168). Null re-enables it.
+    /// </summary>
+    internal void ApplyIssueExtractionAvailability(string? unavailableReason)
+    {
+        issueExtractionUnavailableReason = unavailableReason;
+        issueExtractionUnavailableTextBlock.Text = unavailableReason ?? string.Empty;
+        issueExtractionUnavailableTextBlock.Visibility =
+            unavailableReason is null ? Visibility.Collapsed : Visibility.Visible;
+        extractIssuesButton.ToolTip = unavailableReason;
+        ApplyActionButtonState();
+    }
+
     private void ApplyActionButtonState()
     {
         var hasSession = selectedSession is not null;
@@ -682,7 +708,8 @@ public sealed class SessionLibraryWindow : Window
         var needsRetry = selectedSession?.RequiresTranscriptionRetry == true;
         retryTranscriptionButton.Visibility = needsRetry ? Visibility.Visible : Visibility.Collapsed;
         retryTranscriptionButton.IsEnabled = needsRetry && !isRunningReviewAction;
-        extractIssuesButton.IsEnabled = hasSession && hasTranscript && !isRunningReviewAction;
+        extractIssuesButton.IsEnabled = hasSession && hasTranscript && !isRunningReviewAction
+            && issueExtractionUnavailableReason is null;
         saveReviewButton.IsEnabled = hasExtraction && !isRunningReviewAction;
         exportBundleButton.IsEnabled = hasSession && !isRunningReviewAction;
         exportDebugBundleButton.IsEnabled = hasSession && !isRunningReviewAction;
@@ -732,14 +759,13 @@ public sealed class SessionLibraryWindow : Window
     private async Task RefreshIssueExtractionOfferAsync()
     {
         var settings = await settingsStore.LoadAsync();
-        // Provider capability: until #1168 lands every Windows provider profile can extract, so the
-        // capability term is true here; #1168 replaces it with the profile's SupportsIssueExtraction.
         var show = IssueExtractionOfferPolicy.ShouldShow(
             hasAnySession: allSessions.Count > 0,
             autoExtractIssues: settings.AutoExtractIssues,
             hasOffered: settings.HasOfferedIssueExtraction,
-            providerCanExtract: true);
+            providerCanExtract: settings.SupportsIssueExtraction);
         issueExtractionOfferBanner.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        ApplyIssueExtractionAvailability(settings.IssueExtractionUnavailableReason);
     }
 
     private async Task AnswerIssueExtractionOfferAsync(bool turnOn)

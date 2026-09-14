@@ -19,6 +19,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private readonly FakeIssueExtractionService issueExtractionService;
     private readonly FakeSecretStore secretStore;
     private readonly FakeTranscriptionClient transcriptionClient;
+    private readonly FakeWindowsAppSettingsStore settingsStore;
     private readonly ReviewSessionActionService service;
 
     public ReviewSessionActionServiceTests()
@@ -39,10 +40,11 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         issueExportService = new FakeIssueExportService();
         secretStore = new FakeSecretStore();
         transcriptionClient = new FakeTranscriptionClient();
+        settingsStore = new FakeWindowsAppSettingsStore();
 
         service = new ReviewSessionActionService(
             completedSessionStore,
-            new FakeWindowsAppSettingsStore(),
+            settingsStore,
             secretStore,
             issueExtractionService,
             issueExportService,
@@ -175,6 +177,20 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ExtractIssuesAsync_WithTranscriptionOnlyProvider_RefusesBeforeAnyRequest()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        settingsStore.AiProvider = "parakeetLocal";
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ExtractIssuesAsync(session));
+
+        Assert.Equal(WindowsAiProviderProfile.TranscriptionOnlyGuidance, exception.Message);
+        Assert.Equal(0, issueExtractionService.CallCount);
+        Assert.Empty(await completedSessionStore.GetAllAsync());
+    }
+
+    [Fact]
     public async Task ExportSelectedIssuesToGitHubAsync_UsesSelectedIssuesAndConfiguredRepository()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(
@@ -215,6 +231,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     {
         public string LastApiKey { get; private set; } = string.Empty;
         public string LastModel { get; private set; } = string.Empty;
+        public int CallCount { get; private set; }
 
         public Task<IssueExtractionResult> ExtractAsync(
             CompletedSession session,
@@ -225,6 +242,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         {
             LastApiKey = apiKey;
             LastModel = model;
+            CallCount++;
             return Task.FromResult(ReviewSessionTestData.CreateIssueExtractionResult());
         }
     }
@@ -337,9 +355,12 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
 
     private sealed class FakeWindowsAppSettingsStore : IWindowsAppSettingsStore
     {
+        public string AiProvider { get; set; } = WindowsAiProviderProfile.Default.StorageValue;
+
         public ValueTask<WindowsAppSettings> LoadAsync(CancellationToken cancellationToken = default)
         {
             return ValueTask.FromResult(new WindowsAppSettings(
+                AiProvider: AiProvider,
                 TranscriptionModel: "whisper-1",
                 LanguageHint: string.Empty,
                 TranscriptionPrompt: string.Empty,

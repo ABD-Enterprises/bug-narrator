@@ -17,6 +17,7 @@ public sealed class SettingsWindow : Window
     private readonly PasswordBox apiKeyPasswordBox;
     private readonly TextBox aiProviderBaseUrlTextBox;
     private readonly ComboBox aiProviderComboBox;
+    private readonly TextBlock aiProviderCapabilityHintTextBlock;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
     private readonly ComboBox audioInputDeviceComboBox;
     private readonly ComboBox audioRecordingSourceComboBox;
@@ -96,6 +97,11 @@ public sealed class SettingsWindow : Window
             DisplayMemberPath = nameof(WindowsAiProviderProfile.DisplayName),
             ItemsSource = WindowsAiProviderProfile.All,
         };
+        aiProviderCapabilityHintTextBlock = BuildHint(WindowsAiProviderProfile.TranscriptionOnlyGuidance);
+        aiProviderCapabilityHintTextBlock.Visibility = Visibility.Collapsed;
+        System.Windows.Automation.AutomationProperties.SetName(
+            aiProviderCapabilityHintTextBlock, "AI provider capability note");
+        aiProviderComboBox.SelectionChanged += (_, _) => ApplyAiProviderCapabilityHint();
 
         modelTextBox = new TextBox
         {
@@ -328,7 +334,8 @@ public sealed class SettingsWindow : Window
                 {
                     BuildLabel("AI Provider"),
                     aiProviderComboBox,
-                    BuildHint("Choose OpenAI, an OpenAI-compatible hosted endpoint, or a local-compatible endpoint."),
+                    BuildHint("Choose OpenAI, an OpenAI-compatible hosted endpoint, a local-compatible endpoint, or Local (Parakeet) for transcription-only offline use."),
+                    aiProviderCapabilityHintTextBlock,
                     BuildLabel("AI Provider Credential"),
                     apiKeyPasswordBox,
                     BuildHint("Stored locally for the current Windows user with DPAPI. Required for OpenAI and OpenAI-compatible providers; optional for local-compatible providers."),
@@ -711,7 +718,10 @@ public sealed class SettingsWindow : Window
 
         try
         {
-            await transcriptionClient.ValidateApiKeyAsync(apiKey, aiProviderBaseUrlTextBox.Text);
+            // Effective URL so a blank Parakeet base URL checks localhost:8422 rather than api.openai.com.
+            await transcriptionClient.ValidateApiKeyAsync(
+                apiKey,
+                validationSettings.EffectiveAiProviderBaseUrl ?? aiProviderBaseUrlTextBox.Text);
             statusTextBlock.Text = providerProfile.SuccessMessage;
         }
         catch (Exception exception)
@@ -898,6 +908,17 @@ public sealed class SettingsWindow : Window
             FontWeight = FontWeights.SemiBold,
             Text = text,
         };
+    }
+
+    /// <summary>
+    /// Shows the macOS transcription-only note beside the provider choice for providers that
+    /// cannot extract issues (#1168); hidden otherwise.
+    /// </summary>
+    private void ApplyAiProviderCapabilityHint()
+    {
+        aiProviderCapabilityHintTextBlock.Visibility = GetSelectedAiProviderProfile().SupportsIssueExtraction
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     private WindowsAiProviderProfile GetSelectedAiProviderProfile()
