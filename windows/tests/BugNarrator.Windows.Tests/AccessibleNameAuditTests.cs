@@ -10,6 +10,7 @@ using BugNarrator.Windows.Services.Hotkeys;
 using BugNarrator.Windows.Services.Review;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
+using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Windows.Services.Storage;
 using BugNarrator.Windows.Services.Transcription;
 using BugNarrator.Windows.Views;
@@ -270,7 +271,7 @@ public sealed class AccessibleNameAuditTests
             {
                 "SettingsWindow" => new SettingsWindow(
                     new FakeSettingsStore(), new FakeSecretStore(), new FakeTranscriptionClient(),
-                    new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog()),
+                    new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog(), new FakeLaunchAtLogin()),
                 "RecordingControlsWindow" => new RecordingControlsWindow(new FakeLifecycleService(), diagnostics, () => { }),
                 "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), diagnostics),
                 "AboutWindow" => new AboutWindow(),
@@ -314,6 +315,12 @@ public sealed class AccessibleNameAuditTests
         public Task<WindowsHotkeyRuntimeSnapshot> InitializeAsync(CancellationToken cancellationToken = default) => Task.FromResult(WindowsHotkeyRuntimeSnapshot.Empty);
         public Task<WindowsHotkeyRuntimeSnapshot> ApplySettingsAsync(WindowsAppSettings settings, CancellationToken cancellationToken = default) => Task.FromResult(WindowsHotkeyRuntimeSnapshot.Empty);
         public void Dispose() { }
+    }
+
+    private sealed class FakeLaunchAtLogin : ILaunchAtLoginService
+    {
+        public LaunchAtLoginStatus CurrentStatus() => LaunchAtLoginStatus.Disabled;
+        public LaunchAtLoginStatus SetEnabled(bool enabled) => enabled ? LaunchAtLoginStatus.Enabled : LaunchAtLoginStatus.Disabled;
     }
 
     private sealed class FakeDeviceCatalog : IAudioInputDeviceCatalog

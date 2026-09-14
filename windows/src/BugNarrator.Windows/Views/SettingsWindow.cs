@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Windows.Accessibility;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
@@ -43,6 +44,9 @@ public sealed class SettingsWindow : Window
     private readonly TextBlock statusTextBlock;
     private readonly CheckBox systemAudioConsentCheckBox;
     private readonly CheckBox experimentalSystemAudioCheckBox;
+    private readonly CheckBox launchAtLoginCheckBox;
+    private readonly TextBlock launchAtLoginStatusTextBlock;
+    private readonly ILaunchAtLoginService launchAtLoginService;
     private readonly ITranscriptionClient transcriptionClient;
 
     public SettingsWindow(
@@ -51,7 +55,8 @@ public sealed class SettingsWindow : Window
         ITranscriptionClient transcriptionClient,
         IWindowsGlobalHotkeyService hotkeyService,
         WindowsDiagnostics diagnostics,
-        IAudioInputDeviceCatalog audioInputDeviceCatalog)
+        IAudioInputDeviceCatalog audioInputDeviceCatalog,
+        ILaunchAtLoginService launchAtLoginService)
     {
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
@@ -125,6 +130,20 @@ public sealed class SettingsWindow : Window
             Margin = new Thickness(0, 0, 0, 14),
             DisplayMemberPath = nameof(AudioRecordingSourceProfile.DisplayName),
             ItemsSource = AudioRecordingSourceProfile.All,
+        };
+
+        this.launchAtLoginService = launchAtLoginService;
+        launchAtLoginCheckBox = new CheckBox
+        {
+            Margin = new Thickness(0, 0, 0, 4),
+            // The macOS label (SettingsGeneralPanes.swift).
+            Content = "Open BugNarrator at startup",
+        };
+        launchAtLoginStatusTextBlock = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 14),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
         };
 
         experimentalSystemAudioCheckBox = new CheckBox
@@ -320,6 +339,8 @@ public sealed class SettingsWindow : Window
                     BuildLabel("Issue Extraction Model"),
                     issueExtractionModelTextBox,
                     BuildHint("Defaults to gpt-4.1-mini for structured draft issue extraction after transcription."),
+                    launchAtLoginCheckBox,
+                    launchAtLoginStatusTextBlock,
                     BuildLabel("Recording Audio Source"),
                     audioRecordingSourceComboBox,
                     BuildHint("Choose Microphone for normal narration, System Audio for app/computer playback, or Microphone + System Audio to see the currently tracked mixed-capture limitation."),
@@ -542,6 +563,7 @@ public sealed class SettingsWindow : Window
             audioRecordingSourceComboBox.SelectedItem = settings.EffectiveRecordingAudioSourceProfile;
             systemAudioConsentCheckBox.IsChecked = settings.HasAcceptedSystemAudioRecordingConsent;
             experimentalSystemAudioCheckBox.IsChecked = settings.IsExperimentalSystemAudioEnabled;
+            ApplyLaunchAtLoginStatus(launchAtLoginService.CurrentStatus());
             PopulateAudioInputDevices(settings.EffectiveAudioInputDeviceName);
             gitHubTokenPasswordBox.Password = gitHubToken ?? string.Empty;
             gitHubOwnerTextBox.Text = settings.NormalizedGitHubRepositoryOwner;
@@ -570,6 +592,14 @@ public sealed class SettingsWindow : Window
             diagnostics.Error("settings", "failed to load settings", exception);
             statusTextBlock.Text = $"Unable to load settings: {exception.Message}";
         }
+    }
+
+    private void ApplyLaunchAtLoginStatus(LaunchAtLoginStatus status)
+    {
+        launchAtLoginCheckBox.IsChecked = status.IsEnabled;
+        launchAtLoginCheckBox.IsEnabled = status.IsAvailable;
+        launchAtLoginStatusTextBlock.Text = status.Message ?? string.Empty;
+        launchAtLoginStatusTextBlock.Visibility = status.Message is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async Task SaveSettingsAsync()
@@ -612,6 +642,12 @@ public sealed class SettingsWindow : Window
             }
 
             await settingsStore.SaveAsync(settings);
+            // Registry-backed, not a settings field: the Run key is the single source of truth, and the
+            // Windows Settings Startup page can change it behind our back.
+            if (launchAtLoginCheckBox.IsEnabled)
+            {
+                ApplyLaunchAtLoginStatus(launchAtLoginService.SetEnabled(launchAtLoginCheckBox.IsChecked == true));
+            }
             await secretStore.SetAsync(SecretKeys.OpenAiApiKey, apiKeyPasswordBox.Password);
             await secretStore.SetAsync(SecretKeys.GitHubToken, gitHubTokenPasswordBox.Password);
             await secretStore.SetAsync(SecretKeys.JiraEmail, jiraEmailTextBox.Text);
