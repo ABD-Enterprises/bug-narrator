@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Accessibility;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Hotkeys;
@@ -191,6 +192,9 @@ public sealed class SettingsWindow : Window
         };
 
         Content = BuildWindowContent();
+        // Visible labels double as accessible names (product-spec Accessibility Contract);
+        // AccessibleNameAuditTests fails on any input this leaves unlabeled.
+        AccessibleLabels.LabelInputsFromPrecedingText(this);
         Loaded += async (_, _) => await LoadSettingsAsync();
         Closed += OnClosed;
         hotkeyService.StateChanged += OnHotkeyStateChanged;

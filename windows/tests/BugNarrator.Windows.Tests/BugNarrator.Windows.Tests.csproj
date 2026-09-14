@@ -22,5 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BugNarrator.Core\BugNarrator.Core.csproj" />
     <ProjectReference Include="..\..\src\BugNarrator.Windows.Services\BugNarrator.Windows.Services.csproj" />
+    <ProjectReference Include="..\..\src\BugNarrator.Windows\BugNarrator.Windows.csproj" />
   </ItemGroup>
 </Project>
