@@ -29,7 +29,9 @@ public sealed record WindowsAppSettings(
     bool IsExperimentalSystemAudioEnabled = false,
     // macOS SettingsStore.autoExtractIssues: off by default because turning it on spends the
     // user's provider credit on every session; the one-time offer (#1166) is what switches it on.
-    bool AutoExtractIssues = false)
+    bool AutoExtractIssues = false,
+    // macOS SettingsStore.hasOfferedIssueExtraction: the one-time offer was made (accepted or declined).
+    bool HasOfferedIssueExtraction = false)
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -51,7 +53,8 @@ public sealed record WindowsAppSettings(
         RecordingAudioSource: AudioRecordingSourceProfile.Default.StorageValue,
         HasAcceptedSystemAudioRecordingConsent: false,
         IsExperimentalSystemAudioEnabled: false,
-        AutoExtractIssues: false);
+        AutoExtractIssues: false,
+        HasOfferedIssueExtraction: false);
 
     public WindowsAiProviderProfile EffectiveAiProviderProfile =>
         WindowsAiProviderProfile.FromStorageValue(AiProvider);

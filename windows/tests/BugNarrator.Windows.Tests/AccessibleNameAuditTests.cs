@@ -273,7 +273,7 @@ public sealed class AccessibleNameAuditTests
                     new FakeSettingsStore(), new FakeSecretStore(), new FakeTranscriptionClient(),
                     new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog(), new FakeLaunchAtLogin()),
                 "RecordingControlsWindow" => new RecordingControlsWindow(new FakeLifecycleService(), diagnostics, () => { }),
-                "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), diagnostics),
+                "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), new FakeSettingsStore(), diagnostics),
                 "AboutWindow" => new AboutWindow(),
                 "HotkeyCaptureWindow" => new HotkeyCaptureWindow(WindowsHotkeyAction.StartRecording),
                 _ => throw new ArgumentOutOfRangeException(nameof(windowName), windowName, "unknown window"),

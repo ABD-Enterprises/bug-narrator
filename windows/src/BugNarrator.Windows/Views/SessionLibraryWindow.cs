@@ -3,6 +3,7 @@ using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Review;
+using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
 using System.IO;
 using System.Windows;
@@ -24,6 +25,8 @@ public sealed class SessionLibraryWindow : Window
     private readonly WindowsDiagnostics diagnostics;
     private readonly TextBlock emptyStateTextBlock;
     private readonly Button sampleSessionButton;
+    private readonly Border issueExtractionOfferBanner;
+    private readonly IWindowsAppSettingsStore settingsStore;
     private readonly Button exportBundleButton;
     private readonly Button exportDebugBundleButton;
     private readonly Button exportGitHubButton;
@@ -62,6 +65,7 @@ public sealed class SessionLibraryWindow : Window
     public SessionLibraryWindow(
         ICompletedSessionStore completedSessionStore,
         IReviewSessionActionService reviewSessionActionService,
+        IWindowsAppSettingsStore settingsStore,
         WindowsDiagnostics diagnostics)
     {
         this.completedSessionStore = completedSessionStore;
@@ -186,6 +190,9 @@ public sealed class SessionLibraryWindow : Window
             Visibility = Visibility.Collapsed,
         };
         sampleSessionButton.Click += async (_, _) => await AddSampleSessionAsync();
+
+        this.settingsStore = settingsStore;
+        issueExtractionOfferBanner = BuildIssueExtractionOfferBanner();
 
         transcriptHeaderTextBlock = new TextBlock
         {
@@ -375,6 +382,7 @@ public sealed class SessionLibraryWindow : Window
                             BuildLabel("Search"),
                             searchTextBox,
                             libraryStatusTextBlock,
+                            issueExtractionOfferBanner,
                             sessionListBox,
                             emptyStateTextBlock,
                             sampleSessionButton,
@@ -683,6 +691,81 @@ public sealed class SessionLibraryWindow : Window
         deleteSessionButton.IsEnabled = hasSession && !isRunningReviewAction && !isRefreshing;
     }
 
+    /// <summary>
+    /// The macOS IssueExtractionOfferBanner, copy verbatim. Turn On switches automatic extraction on
+    /// (it does not extract the current session); both buttons mark the offer made, for good.
+    /// </summary>
+    private Border BuildIssueExtractionOfferBanner()
+    {
+        var turnOn = new Button { Content = "Turn On", Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 8, 0) };
+        var notNow = new Button { Content = "Not Now", Padding = new Thickness(12, 4, 12, 4) };
+        turnOn.Click += async (_, _) => await AnswerIssueExtractionOfferAsync(turnOn: true);
+        notNow.Click += async (_, _) => await AnswerIssueExtractionOfferAsync(turnOn: false);
+
+        var banner = new Border
+        {
+            Margin = new Thickness(0, 0, 0, 10),
+            Padding = new Thickness(12),
+            BorderThickness = new Thickness(1),
+            BorderBrush = Brushes.LightGray,
+            CornerRadius = new CornerRadius(8),
+            Visibility = Visibility.Collapsed,
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock { Text = "Extract issues from your sessions?", FontWeight = FontWeights.SemiBold },
+                    new TextBlock
+                    {
+                        Margin = new Thickness(0, 4, 0, 8),
+                        TextWrapping = TextWrapping.Wrap,
+                        Text = "BugNarrator can turn a transcript into draft bugs, UX issues, and follow-up questions. It sends the transcript to your AI provider, which may incur charges on your account.",
+                    },
+                    new StackPanel { Orientation = Orientation.Horizontal, Children = { turnOn, notNow } },
+                },
+            },
+        };
+        System.Windows.Automation.AutomationProperties.SetName(banner, "Issue extraction offer");
+        return banner;
+    }
+
+    private async Task RefreshIssueExtractionOfferAsync()
+    {
+        var settings = await settingsStore.LoadAsync();
+        // Provider capability: until #1168 lands every Windows provider profile can extract, so the
+        // capability term is true here; #1168 replaces it with the profile's SupportsIssueExtraction.
+        var show = IssueExtractionOfferPolicy.ShouldShow(
+            hasAnySession: allSessions.Count > 0,
+            autoExtractIssues: settings.AutoExtractIssues,
+            hasOffered: settings.HasOfferedIssueExtraction,
+            providerCanExtract: true);
+        issueExtractionOfferBanner.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task AnswerIssueExtractionOfferAsync(bool turnOn)
+    {
+        try
+        {
+            var settings = await settingsStore.LoadAsync();
+            await settingsStore.SaveAsync(settings with
+            {
+                AutoExtractIssues = turnOn || settings.AutoExtractIssues,
+                HasOfferedIssueExtraction = true,
+            });
+            diagnostics.Info("session-library", turnOn ? "issue extraction offer accepted" : "issue extraction offer declined");
+        }
+        catch (Exception exception)
+        {
+            // Not persisted, so not answered: the banner stays so the user can try again, and the
+            // status line says why.
+            diagnostics.Error("session-library", "saving the issue extraction offer answer failed", exception);
+            libraryStatusTextBlock.Text = exception.Message;
+            return;
+        }
+
+        issueExtractionOfferBanner.Visibility = Visibility.Collapsed;
+    }
+
     private async Task AddSampleSessionAsync()
     {
         try
@@ -715,6 +798,7 @@ public sealed class SessionLibraryWindow : Window
             allSessions = await completedSessionStore.GetAllAsync();
             ResolveInitialDateRangeIfNeeded();
             ApplyCurrentQuery();
+            await RefreshIssueExtractionOfferAsync();
         }
         catch (Exception exception)
         {

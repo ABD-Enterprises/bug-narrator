@@ -139,6 +139,7 @@ public sealed class WindowCoordinator
             sessionLibraryWindow = new SessionLibraryWindow(
                 completedSessionStore,
                 reviewSessionActionService,
+                settingsStore,
                 diagnostics);
             sessionLibraryWindow.Closed += (_, _) =>
             {
