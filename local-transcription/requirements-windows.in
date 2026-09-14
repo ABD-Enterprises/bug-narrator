@@ -7,6 +7,6 @@ fastapi==0.136.1
 uvicorn==0.47.0  # no [standard]: httptools/uvloop have no Windows arm64 wheels; h11 serves loopback fine
 python-multipart==0.0.31
 onnx-asr[cpu,hub]==0.12.0
-numpy==2.5.3
+numpy==2.5.2
 pip==26.2.1
 pyinstaller==6.20.0
