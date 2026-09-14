@@ -254,17 +254,19 @@ server._serve("127.0.0.1", {port})
             else:
                 self.fail("transcription server did not start within 10 seconds")
 
+            started = time.monotonic()
             if sys.platform == "win32":
-                # The ONNX handler lets uvicorn drain, then hard-exits inside the app's 2 s grace
-                # even though the inference worker is still busy.
-                started = time.monotonic()
                 process.send_signal(signal.CTRL_BREAK_EVENT)
-                process.wait(timeout=2)
-                self.assertLess(time.monotonic() - started, 2)
-                self.assertEqual(process.returncode, 0)
             else:
                 process.terminate()
-                process.wait(timeout=2)
+            process.wait(timeout=2)
+            self.assertLess(time.monotonic() - started, 2)
+            if server._backend == "onnx":
+                # ONNX (Windows, Linux, Intel macOS): uvicorn drains, then a bounded hard exit
+                # inside the app's 2 s grace even though the inference worker is still busy.
+                self.assertEqual(process.returncode, 0)
+            else:
+                # MLX: the signal is re-raised with the default disposition.
                 self.assertEqual(process.returncode, -signal.SIGTERM)
         finally:
             if process.poll() is None:
