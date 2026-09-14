@@ -65,7 +65,7 @@ Windows captures a *dragged region*, not a whole monitor: `ScreenshotSelectionOv
 - `[human]` On a machine with two monitors where the secondary runs at a non-100 % scale (125 % or 150 %), drag a region entirely on the secondary monitor during recording. The saved PNG's pixel dimensions equal the dragged region in *physical* pixels — the logical size the overlay showed multiplied by the scale factor — and the content is what was under the region, not a blurred or offset capture. Evidence: the PNG's dimensions (Explorer properties or `magick identify`), the overlay's reported region size if it shows one, the display settings screenshot showing the scale factor, and the capture itself.
 - `[human]` The same on the primary monitor at 100 %: PNG dimensions equal the dragged region exactly. Evidence: as above.
 - `[human]` The overlay covers every monitor at once, and a region dragged *across* the boundary between two monitors of different scale captures both halves correctly aligned. Evidence: the capture and a screenshot of the overlay spanning both displays.
-- `[automation]` The overlay and capture plumbing under emulated DPI. Verified missing; tracked as #1134 (WIN-015). Do not close this item on the human evidence alone.
+- `[automation]` The overlay and capture plumbing under emulated DPI — **partially closed** by #1134 (WIN-015). Covered: `ScreenshotCaptureGeometryTests.Overlay_UnderEmulatedScale_ReportsTheDraggedRegionInPhysicalPixels` drives the production overlay with its DIP → device transform emulated at 1.25 and 1.5 and asserts the physical-pixel selection the capture service receives (the overlay previously passed DIPs straight to `CopyFromScreen`); `OverlaySpansTheFullVirtualScreen_AndARegionAcrossTheBoundaryMapsConsistentlyOnBothSides` constructs the overlay over an emulated two-monitor virtual screen and drags across the boundary under the app's single system scale. **Still open:** a secondary monitor whose native scale differs from the primary — the app is system-DPI-aware, so that case is virtualized rather than captured in native pixels; automation for it lands with per-monitor V2 awareness in #1186 (WIN-041). Do not close this item on the human evidence alone.
 
 ### 6. Session Library archive
 
@@ -157,7 +157,7 @@ Checked on the commit this file landed in, by searching `windows/tests` for the 
 - **Row 4** — was a gap; closed by #1136, see the row.
 - **Row 6** — no `Retry Needed` filter. Filed as #1144 (WIN-023).
 - **Row 7** — no fallback to `Summary` after an empty extraction. Filed as #1145 (WIN-024).
-- **Row 5** — no test in `windows/tests` mentions DPI, scale factor, or a non-100 % geometry. Capture geometry under emulated DPI is unpinned. Filed as #1134 (WIN-015).
+- **Row 5** — #1134 (WIN-015) pinned the DIP → physical mapping through the production overlay at 1.25 / 1.5 and across a two-monitor boundary under one system scale. The mixed-scale secondary-monitor case stays an automation gap until per-monitor V2 awareness (#1186, WIN-041). Real-hardware evidence still required.
 - **Row 8** — Windows writes no `manifest.json` and no Windows test binds `contract-fixtures/session-bundle-layout.json`, which macOS both writes and tests. This one is a defect, not just a coverage gap: the bundle is below the shared floor. Filed as #1137 (WIN-018).
 - **Row 14** — was a gap (28 unlabeled inputs); closed by #1141, see the row.
 - **Row 9** — was a gap (no Jira canary, two files checked); closed by #1148, which also found and fixed a real bare-token leak.
