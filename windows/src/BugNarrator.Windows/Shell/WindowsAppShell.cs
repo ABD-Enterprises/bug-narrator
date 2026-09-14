@@ -109,7 +109,7 @@ public sealed class WindowsAppShell : IDisposable
             if (await windowCoordinator.ShouldPresentWelcomeAsync())
             {
                 diagnostics.Info("app", "presenting first-run welcome tour");
-                windowCoordinator.ShowWelcome();
+                await windowCoordinator.ShowWelcomeAtLaunchAsync();
             }
         }
         catch (Exception exception)

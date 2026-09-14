@@ -178,6 +178,16 @@ public sealed class WindowCoordinator
                 HasAnyCaptureHotkeyAssigned: settings.HasAnyCaptureHotkeyAssigned));
     }
 
+    /// <summary>Startup presentation: shows the tour and immediately makes the dismissal durable.</summary>
+    public async Task ShowWelcomeAtLaunchAsync()
+    {
+        ShowWelcome();
+        if (welcomeWindow is not null)
+        {
+            await welcomeWindow.MarkPresentedAtLaunchAsync();
+        }
+    }
+
     public void ShowWelcome()
     {
         if (welcomeWindow is null || !welcomeWindow.IsLoaded)

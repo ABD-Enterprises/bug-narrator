@@ -139,13 +139,22 @@ public sealed class WelcomeWindow : Window
                 await RefreshAsync(advanceToFirstIncomplete: false);
             }
         };
-        Closed += async (_, _) =>
+        Closing += async (_, args) =>
         {
             // The close box is a skip, as on macOS: dismissal must be durable or an unconfigured
-            // user is re-prompted on every launch. Readiness itself is never fabricated.
-            if (!finished)
+            // user is re-prompted on every launch. Persist before the window is allowed to go, so
+            // the flag is written rather than started; readiness itself is never fabricated.
+            if (finished)
             {
-                await MarkCompletedAsync();
+                return;
+            }
+
+            args.Cancel = true;
+            await MarkCompletedAsync();
+            // Application shutdown ignores the cancel and closes anyway; only re-close a live window.
+            if (IsLoaded)
+            {
+                Close();
             }
         };
     }
@@ -383,17 +392,21 @@ public sealed class WelcomeWindow : Window
                 return;
             }
 
-            // Register first, persist second: a registration failure leaves nothing saved, so the
-            // tour never reports a shortcut as assigned that was not actually applied.
+            // Register first, persist second, and persist only a clean registration: the tour must
+            // never report a shortcut as assigned that is not actually active.
+            var previous = await settingsStore.LoadAsync();
             var snapshot = await hotkeyService.ApplySettingsAsync(updated);
-            await settingsStore.SaveAsync(updated);
-            diagnostics.Info("welcome", "suggested capture hotkeys applied");
             if (snapshot.HasProblems)
             {
-                await RefreshAsync(advanceToFirstIncomplete: false);
-                bodyPanel.Children.Add(BuildWarning("Some suggested shortcuts could not be registered. Open Settings to review them."));
+                await hotkeyService.ApplySettingsAsync(previous);
+                diagnostics.Warning("welcome", "suggested capture hotkeys were not all registered; nothing saved");
+                Render();
+                bodyPanel.Children.Add(BuildWarning("Some suggested shortcuts could not be registered, so none were saved. Assign shortcuts by hand in Settings."));
                 return;
             }
+
+            await settingsStore.SaveAsync(updated);
+            diagnostics.Info("welcome", "suggested capture hotkeys applied");
         }
         catch (Exception exception)
         {
@@ -443,6 +456,12 @@ public sealed class WelcomeWindow : Window
         await MarkCompletedAsync();
         Close();
     }
+
+    /// <summary>
+    /// The launch path stamps the flag when it presents the tour (macOS does the same), so a
+    /// shutdown that closes this window before the user touches it still counts as a dismissal.
+    /// </summary>
+    internal Task MarkPresentedAtLaunchAsync() => MarkCompletedAsync();
 
     private async Task MarkCompletedAsync()
     {
