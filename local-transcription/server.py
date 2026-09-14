@@ -25,8 +25,9 @@ import platform
 import signal
 import sys
 import tempfile
+import struct
+import threading
 import time
-import wave
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -290,33 +291,80 @@ _unsupported_audio_message = (
 )
 
 
+_WAVE_FORMAT_PCM = 1
+_WAVE_FORMAT_IEEE_FLOAT = 3
+_WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+
+
+def _parse_wav(data: bytes):
+    """RIFF/WAVE → (format tag, channels, rate, bits per sample, raw sample bytes).
+
+    Python's wave module only accepts integer PCM; BugNarrator's system-audio recorder writes
+    WASAPI loopback captures as IEEE float (often wrapped in WAVE_FORMAT_EXTENSIBLE), so the
+    container is parsed here and the subformat of an extensible header is honoured."""
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise UnsupportedAudioError("not a RIFF/WAVE file")
+
+    fmt = None
+    samples = None
+    offset = 12
+    while offset + 8 <= len(data):
+        chunk_id = data[offset : offset + 4]
+        (size,) = struct.unpack_from("<I", data, offset + 4)
+        body = data[offset + 8 : offset + 8 + size]
+        if chunk_id == b"fmt ":
+            if len(body) < 16:
+                raise UnsupportedAudioError("truncated fmt chunk")
+            tag, channels, rate, _, _, bits = struct.unpack_from("<HHIIHH", body, 0)
+            if tag == _WAVE_FORMAT_EXTENSIBLE:
+                if len(body) < 26:
+                    raise UnsupportedAudioError("truncated extensible fmt chunk")
+                (tag,) = struct.unpack_from("<H", body, 24)  # first bytes of the SubFormat GUID
+            fmt = (tag, channels, rate, bits)
+        elif chunk_id == b"data":
+            samples = body
+        offset += 8 + size + (size & 1)
+
+    if fmt is None or samples is None:
+        raise UnsupportedAudioError("missing fmt or data chunk")
+
+    return (*fmt, samples)
+
+
 def _read_wav(audio_path: str):
-    """PCM WAV → (float32 mono samples, sample rate). BugNarrator's Windows recorder writes
-    16 kHz 16-bit mono WAV; other PCM widths are converted, anything else is rejected."""
+    """WAV → (float32 mono samples, sample rate). Integer PCM (8/16/24/32-bit) and IEEE float
+    (32/64-bit) are decoded — the microphone and system-audio recorders' formats — and anything
+    else is refused before inference."""
     import numpy as np
 
-    try:
-        with wave.open(audio_path, "rb") as handle:
-            channels = handle.getnchannels()
-            width = handle.getsampwidth()
-            rate = handle.getframerate()
-            frames = handle.readframes(handle.getnframes())
-    except (wave.Error, EOFError) as error:
-        raise UnsupportedAudioError(str(error)) from error
+    with open(audio_path, "rb") as handle:
+        data = handle.read()
+    tag, channels, rate, bits, frames = _parse_wav(data)
+    if channels < 1 or rate < 1:
+        raise UnsupportedAudioError("invalid WAV header")
 
-    if width == 2:
-        samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
-    elif width == 1:
+    if tag == _WAVE_FORMAT_PCM and bits == 16:
+        samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+    elif tag == _WAVE_FORMAT_PCM and bits == 8:
         samples = (np.frombuffer(frames, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
-    elif width == 4:
-        samples = np.frombuffer(frames, dtype=np.int32).astype(np.float32) / 2147483648.0
+    elif tag == _WAVE_FORMAT_PCM and bits == 24:
+        raw = np.frombuffer(frames[: len(frames) - len(frames) % 3], dtype=np.uint8).reshape(-1, 3)
+        as_int = (raw[:, 0].astype(np.int32) | (raw[:, 1].astype(np.int32) << 8) | (raw[:, 2].astype(np.int32) << 16))
+        as_int = np.where(as_int >= 1 << 23, as_int - (1 << 24), as_int)
+        samples = as_int.astype(np.float32) / float(1 << 23)
+    elif tag == _WAVE_FORMAT_PCM and bits == 32:
+        samples = np.frombuffer(frames, dtype="<i4").astype(np.float32) / 2147483648.0
+    elif tag == _WAVE_FORMAT_IEEE_FLOAT and bits == 32:
+        samples = np.frombuffer(frames, dtype="<f4").astype(np.float32)
+    elif tag == _WAVE_FORMAT_IEEE_FLOAT and bits == 64:
+        samples = np.frombuffer(frames, dtype="<f8").astype(np.float32)
     else:
-        raise UnsupportedAudioError(f"unsupported WAV sample width: {width}")
+        raise UnsupportedAudioError(f"unsupported WAV format tag {tag} with {bits} bits per sample")
 
     if channels > 1:
-        samples = samples.reshape(-1, channels).mean(axis=1)
+        samples = samples[: len(samples) - len(samples) % channels].reshape(-1, channels).mean(axis=1)
 
-    return samples, rate
+    return np.ascontiguousarray(samples), rate
 
 
 def _group_sentences(tokens, timestamps, offset: float):
@@ -397,8 +445,20 @@ def _transcription_failure_response() -> JSONResponse:
     )
 
 
+_server = None
+_drain_grace_seconds = 1.5
+
+
 def _shutdown_handler(signum, frame):
     logger.info("Stopping transcription server...")
+    if _backend == "onnx" and _server is not None:
+        # Windows/ONNX: let uvicorn finish an in-flight request first. The supervisor
+        # (LocalServerProcess) kills after its 2 s grace, and a bounded hard exit here keeps
+        # a non-daemon inference thread from holding the process open past that.
+        _server.should_exit = True
+        threading.Timer(_drain_grace_seconds, os._exit, args=(0,)).start()
+        return
+
     # MLX inference cannot be cancelled safely from another Python thread. Restore
     # the default handler and re-send the signal so the entire process exits.
     signal.signal(signum, signal.SIG_DFL)
@@ -412,7 +472,9 @@ def _serve(host: str, port: int):
         port=port,
         log_level="info",
     )
-    _SignalPreservingServer(config).run()
+    global _server
+    _server = _SignalPreservingServer(config)
+    _server.run()
 
 
 def main():

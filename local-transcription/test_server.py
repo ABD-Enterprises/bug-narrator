@@ -21,6 +21,7 @@ class ServerModelConfigurationTests(unittest.TestCase):
     def tearDown(self):
         server._model = None
         server._model_name = None
+        server._server = None
         server.configure_default_model("mlx-community/parakeet-tdt-0.6b-v3")
 
     def test_configured_default_model_is_used_for_lazy_requests(self):
@@ -153,7 +154,9 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertEqual(second[2], {"chunk_duration": 120})
 
     def test_shutdown_terminates_process_even_during_active_inference(self):
+        # The MLX contract: no drain, re-raise the signal with the default disposition.
         with (
+            patch.object(server, "_backend", "mlx"),
             patch.object(server.os, "getpid", return_value=2468),
             patch.object(server.os, "kill") as kill,
             patch.object(server.signal, "signal") as restore_signal,
@@ -165,6 +168,25 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server.signal.SIG_DFL,
         )
         kill.assert_called_once_with(2468, server.signal.SIGTERM)
+
+    def test_onnx_shutdown_lets_uvicorn_drain_then_hard_exits_within_the_grace(self):
+        class FakeServer:
+            should_exit = False
+
+        fake = FakeServer()
+        with (
+            patch.object(server, "_backend", "onnx"),
+            patch.object(server, "_server", fake),
+            patch.object(server.threading, "Timer") as timer,
+            patch.object(server.os, "kill") as kill,
+        ):
+            server._shutdown_handler(server.signal.SIGTERM, None)
+
+        self.assertTrue(fake.should_exit)
+        kill.assert_not_called()
+        timer.assert_called_once_with(server._drain_grace_seconds, server.os._exit, args=(0,))
+        timer.return_value.start.assert_called_once_with()
+        self.assertLess(server._drain_grace_seconds, 2.0)  # inside LocalServerProcess's grace
 
     def test_uvicorn_does_not_replace_process_signal_handlers(self):
         uvicorn_server = server._SignalPreservingServer(
@@ -233,11 +255,13 @@ server._serve("127.0.0.1", {port})
                 self.fail("transcription server did not start within 10 seconds")
 
             if sys.platform == "win32":
+                # The ONNX handler lets uvicorn drain, then hard-exits inside the app's 2 s grace
+                # even though the inference worker is still busy.
+                started = time.monotonic()
                 process.send_signal(signal.CTRL_BREAK_EVENT)
                 process.wait(timeout=2)
-                # The handler re-raises with the default disposition; on Windows that is
-                # TerminateProcess with the signal number as the exit code.
-                self.assertEqual(process.returncode, signal.SIGBREAK)
+                self.assertLess(time.monotonic() - started, 2)
+                self.assertEqual(process.returncode, 0)
             else:
                 process.terminate()
                 process.wait(timeout=2)
@@ -349,6 +373,40 @@ server._serve("127.0.0.1", {port})
         samples, _ = server._read_wav(eight_bit)
         self.assertEqual(len(samples), 16000)
         self.assertTrue(float(abs(samples).max()) <= 1.0)
+
+    def test_onnx_reads_the_loopback_recorders_float_wav(self):
+        # WASAPI loopback capture (System Audio mode) is 32-bit IEEE float, usually wrapped in
+        # WAVE_FORMAT_EXTENSIBLE; Python's wave module refuses it, this reader must not.
+        for extensible in (False, True):
+            with self.subTest(extensible=extensible):
+                path = self._write_float_wav(48000, 2, seconds=1, extensible=extensible)
+                samples, rate = server._read_wav(path)
+                self.assertEqual(rate, 48000)
+                self.assertEqual(len(samples), 48000)
+                self.assertAlmostEqual(float(samples[0]), 0.25, places=5)
+
+    def test_onnx_refuses_unknown_wav_encodings(self):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        Path(path).write_bytes(self._riff(fmt_tag=0x0055, channels=1, rate=16000, bits=0, frames=b""))  # MP3-in-WAV
+
+        with self.assertRaises(server.UnsupportedAudioError):
+            server._read_wav(path)
+
+    def _riff(self, fmt_tag, channels, rate, bits, frames, extensible=False):
+        block_align = max(1, channels * bits // 8)
+        fmt = struct.pack("<HHIIHH", 0xFFFE if extensible else fmt_tag, channels, rate, rate * block_align, block_align, bits)
+        if extensible:
+            fmt += struct.pack("<HHI", 22, bits, 0) + struct.pack("<H", fmt_tag) + b"\x00\x00\x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71"
+        body = b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt + b"data" + struct.pack("<I", len(frames)) + frames
+        return b"RIFF" + struct.pack("<I", len(body)) + body
+
+    def _write_float_wav(self, rate, channels, seconds, extensible):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        frames = struct.pack(f"<{rate * seconds * channels}f", *([0.25] * (rate * seconds * channels)))
+        Path(path).write_bytes(self._riff(fmt_tag=3, channels=channels, rate=rate, bits=32, frames=frames, extensible=extensible))
+        return path
 
     def test_transcription_route_reads_the_onnx_result_shape(self):
         # The route reads .text and .sentences (start/end/text) — the MLX result shape — so the
