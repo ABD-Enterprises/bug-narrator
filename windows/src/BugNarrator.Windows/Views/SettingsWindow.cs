@@ -47,6 +47,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox launchAtLoginCheckBox;
     private readonly TextBlock launchAtLoginStatusTextBlock;
     private readonly ILaunchAtLoginService launchAtLoginService;
+    private bool launchAtLoginAsLoaded;
     private readonly ITranscriptionClient transcriptionClient;
 
     public SettingsWindow(
@@ -597,6 +598,7 @@ public sealed class SettingsWindow : Window
     private void ApplyLaunchAtLoginStatus(LaunchAtLoginStatus status)
     {
         launchAtLoginCheckBox.IsChecked = status.IsEnabled;
+        launchAtLoginAsLoaded = status.IsEnabled;
         launchAtLoginCheckBox.IsEnabled = status.IsAvailable;
         launchAtLoginStatusTextBlock.Text = status.Message ?? string.Empty;
         launchAtLoginStatusTextBlock.Visibility = status.Message is null ? Visibility.Collapsed : Visibility.Visible;
@@ -644,9 +646,12 @@ public sealed class SettingsWindow : Window
             await settingsStore.SaveAsync(settings);
             // Registry-backed, not a settings field: the Run key is the single source of truth, and the
             // Windows Settings Startup page can change it behind our back.
-            if (launchAtLoginCheckBox.IsEnabled)
+            // Only on an explicit toggle: saving an unrelated setting must not touch the Run key,
+            // and a change made in Windows Settings while this dialog was open must not be undone.
+            var launchAtLoginWanted = launchAtLoginCheckBox.IsChecked == true;
+            if (launchAtLoginCheckBox.IsEnabled && launchAtLoginWanted != launchAtLoginAsLoaded)
             {
-                ApplyLaunchAtLoginStatus(launchAtLoginService.SetEnabled(launchAtLoginCheckBox.IsChecked == true));
+                ApplyLaunchAtLoginStatus(launchAtLoginService.SetEnabled(launchAtLoginWanted));
             }
             await secretStore.SetAsync(SecretKeys.OpenAiApiKey, apiKeyPasswordBox.Password);
             await secretStore.SetAsync(SecretKeys.GitHubToken, gitHubTokenPasswordBox.Password);

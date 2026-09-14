@@ -86,8 +86,10 @@ public sealed class LaunchAtLoginService : ILaunchAtLoginService
             {
                 registry.SetValue(ValueName, command);
             }
-            else
+            else if (string.Equals(registry.GetValue(ValueName), command, StringComparison.OrdinalIgnoreCase))
             {
+                // Only this copy's registration is ours to remove; a value pointing at another install is
+                // that install's, and CurrentStatus already reports it as disabled here.
                 registry.DeleteValue(ValueName);
             }
         }

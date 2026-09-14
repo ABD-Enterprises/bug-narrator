@@ -53,6 +53,18 @@ public sealed class LaunchAtLoginServiceTests
     }
 
     [Fact]
+    public void SetEnabled_False_LeavesAnotherCopysRegistrationAlone()
+    {
+        var registry = new FakeRunKey();
+        registry.Values[LaunchAtLoginService.ValueName] = "\"D:\\Old\\BugNarrator.Windows.exe\"";
+        var service = new LaunchAtLoginService(registry, () => Exe);
+
+        service.SetEnabled(false);
+
+        Assert.Equal("\"D:\\Old\\BugNarrator.Windows.exe\"", registry.Values[LaunchAtLoginService.ValueName]);
+    }
+
+    [Fact]
     public void CurrentStatus_IsUnavailableWithAMessageWhenTheExecutablePathIsUnknown()
     {
         var registry = new FakeRunKey();
