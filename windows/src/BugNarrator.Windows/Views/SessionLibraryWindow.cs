@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Accessibility;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
@@ -190,6 +191,8 @@ public sealed class SessionLibraryWindow : Window
             MinWidth = 260,
         };
         screenshotListBox.SelectionChanged += OnScreenshotSelectionChanged;
+        // The Screenshots tab has no text label before the list, so the name is explicit.
+        System.Windows.Automation.AutomationProperties.SetName(screenshotListBox, "Session screenshots");
 
         screenshotPreviewTextBlock = new TextBlock
         {
@@ -286,6 +289,9 @@ public sealed class SessionLibraryWindow : Window
         };
 
         Content = BuildWindowContent();
+        // Visible labels double as accessible names (product-spec Accessibility Contract);
+        // AccessibleNameAuditTests fails on any input this leaves unlabeled.
+        AccessibleLabels.LabelInputsFromPrecedingText(this);
         UpdateCustomDateRangeVisibility();
 
         Loaded += async (_, _) => await RefreshSessionsAsync();
