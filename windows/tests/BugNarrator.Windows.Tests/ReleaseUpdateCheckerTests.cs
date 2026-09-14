@@ -89,6 +89,27 @@ public sealed class ReleaseUpdateCheckerTests
         Assert.Contains("could not check", outcome.UserMessage);
     }
 
+    [Fact]
+    public async Task ClientTimeout_IsUndeterminedAndStillOffersTheReleasesPage()
+    {
+        // HttpClient.Timeout surfaces as a TaskCanceledException; that is a network failure, not a caller cancel.
+        var outcome = await CheckAsync("1.0.41", new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout"));
+
+        Assert.Equal(ReleaseUpdateOutcomeKind.Undetermined, outcome.Kind);
+        Assert.Contains("timed out", outcome.Reason);
+        Assert.Equal(Fallback, outcome.UrlToOpen(Fallback));
+    }
+
+    [Fact]
+    public async Task CallerCancellation_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var handler = new FakeHandler(_ => { cancellation.Cancel(); throw new OperationCanceledException(cancellation.Token); });
+        var checker = new ReleaseUpdateChecker(new GitHubLatestReleaseFeed(new HttpClient(handler)));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => checker.CheckAsync("1.0.41", cancellation.Token));
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.NotFound, "answered 404")]
     [InlineData(HttpStatusCode.Forbidden, "answered 403")]

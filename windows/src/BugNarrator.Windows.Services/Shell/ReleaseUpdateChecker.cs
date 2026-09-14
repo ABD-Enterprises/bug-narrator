@@ -219,9 +219,15 @@ public sealed class ReleaseUpdateChecker
         {
             latest = await feed.GetLatestReleaseAsync(cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller gave up; only that propagates. An HttpClient timeout is also an
+            // OperationCanceledException and must become Undetermined so the fallback still opens.
+            throw;
+        }
         catch (OperationCanceledException)
         {
-            throw;
+            return ReleaseUpdateOutcome.Undetermined("the releases feed timed out (network failure)");
         }
         catch (ReleaseFeedException exception)
         {
@@ -231,11 +237,9 @@ public sealed class ReleaseUpdateChecker
         {
             return ReleaseUpdateOutcome.Undetermined("the releases feed is unreachable (network failure)");
         }
-        catch (Exception exception) when (exception is JsonException or TaskCanceledException)
+        catch (JsonException)
         {
-            return ReleaseUpdateOutcome.Undetermined(exception is JsonException
-                ? "the releases feed returned an unreadable response"
-                : "the releases feed timed out (network failure)");
+            return ReleaseUpdateOutcome.Undetermined("the releases feed returned an unreadable response");
         }
 
         var latestVersion = ReleaseVersion.Parse(latest.Tag);
