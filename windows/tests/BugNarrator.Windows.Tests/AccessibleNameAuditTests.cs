@@ -32,6 +32,7 @@ public sealed class AccessibleNameAuditTests
         yield return ["SessionLibraryWindow"];
         yield return ["AboutWindow"];
         yield return ["HotkeyCaptureWindow"];
+        yield return ["WelcomeWindow"];
     }
 
     [Theory]
@@ -276,8 +277,31 @@ public sealed class AccessibleNameAuditTests
                 "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), new FakeSettingsStore(), diagnostics),
                 "AboutWindow" => new AboutWindow(),
                 "HotkeyCaptureWindow" => new HotkeyCaptureWindow(WindowsHotkeyAction.StartRecording),
+                "WelcomeWindow" => BuildWelcomeWindowWithEveryStepRendered(diagnostics),
                 _ => throw new ArgumentOutOfRangeException(nameof(windowName), windowName, "unknown window"),
             };
+        }
+
+        /// <summary>
+        /// The tour renders one step at a time, so a single audit would only see the provider
+        /// step. Walk all three (with nothing configured, so every action button is present) and
+        /// return the window on the last one; the audit of the earlier steps runs here.
+        /// </summary>
+        private static Window BuildWelcomeWindowWithEveryStepRendered(WindowsDiagnostics diagnostics)
+        {
+            var window = new WelcomeWindow(
+                new FakeSettingsStore(), new FakeSecretStore(), new FakeHotkeyService(),
+                new FakeMicrophonePreflight(), new FakeDeviceCatalog(), diagnostics, () => { });
+            var earlierViolations = new List<AccessibleNameAudit.Violation>();
+            for (var step = 0; step < FirstRunFunnel.Steps.Count - 1; step++)
+            {
+                window.RenderStepForAudit(step);
+                earlierViolations.AddRange(AccessibleNameAudit.Run(window));
+            }
+
+            window.RenderStepForAudit(FirstRunFunnel.Steps.Count - 1);
+            Assert.True(earlierViolations.Count == 0, string.Join("\n", earlierViolations));
+            return window;
         }
 
         public void Dispose()
@@ -321,6 +345,12 @@ public sealed class AccessibleNameAuditTests
     {
         public LaunchAtLoginStatus CurrentStatus() => LaunchAtLoginStatus.Disabled;
         public LaunchAtLoginStatus SetEnabled(bool enabled) => enabled ? LaunchAtLoginStatus.Enabled : LaunchAtLoginStatus.Disabled;
+    }
+
+    private sealed class FakeMicrophonePreflight : BugNarrator.Windows.Services.Permissions.IMicrophonePreflightService
+    {
+        public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording, int deviceNumber) =>
+            new(RecordingPreflightStatus.Ready, CanStart: true, "Microphone ready.");
     }
 
     private sealed class FakeDeviceCatalog : IAudioInputDeviceCatalog

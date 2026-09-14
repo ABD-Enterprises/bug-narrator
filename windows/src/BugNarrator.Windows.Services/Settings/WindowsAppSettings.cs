@@ -31,7 +31,10 @@ public sealed record WindowsAppSettings(
     // user's provider credit on every session; the one-time offer (#1166) is what switches it on.
     bool AutoExtractIssues = false,
     // macOS SettingsStore.hasOfferedIssueExtraction: the one-time offer was made (accepted or declined).
-    bool HasOfferedIssueExtraction = false)
+    bool HasOfferedIssueExtraction = false,
+    // macOS SettingsStore.hasCompletedFirstRunOnboarding: the welcome tour was finished or skipped.
+    // Durable on purpose, so an unconfigured user is not re-prompted on every launch (#1167).
+    bool HasCompletedWelcome = false)
 {
     public static WindowsAppSettings Default { get; } = new(
         TranscriptionModel: "whisper-1",
@@ -54,7 +57,8 @@ public sealed record WindowsAppSettings(
         HasAcceptedSystemAudioRecordingConsent: false,
         IsExperimentalSystemAudioEnabled: false,
         AutoExtractIssues: false,
-        HasOfferedIssueExtraction: false);
+        HasOfferedIssueExtraction: false,
+        HasCompletedWelcome: false);
 
     public WindowsAiProviderProfile EffectiveAiProviderProfile =>
         WindowsAiProviderProfile.FromStorageValue(AiProvider);
@@ -268,6 +272,19 @@ public sealed record WindowsAppSettings(
 
     public WindowsHotkeyShortcut EffectiveScreenshotHotkey =>
         ScreenshotHotkey.Normalize();
+
+    /// <summary>Mirrors macOS SettingsStore.hasAnyCaptureHotkeyAssigned.</summary>
+    public bool HasAnyCaptureHotkeyAssigned =>
+        EffectiveStartRecordingHotkey.IsConfigured
+        || EffectiveStopRecordingHotkey.IsConfigured
+        || EffectiveScreenshotHotkey.IsConfigured;
+
+    /// <summary>
+    /// Mirrors macOS SettingsStore.hasUsableAIProviderCredential: true when the provider needs no
+    /// key, otherwise when a non-blank credential is saved. Compatibility is checked separately.
+    /// </summary>
+    public bool HasUsableAiProviderCredential(string? credential) =>
+        !EffectiveAiProviderProfile.RequiresCredential || !string.IsNullOrWhiteSpace(credential);
 
     public IReadOnlyDictionary<WindowsHotkeyAction, WindowsHotkeyShortcut> GetHotkeyAssignments()
     {

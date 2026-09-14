@@ -41,6 +41,7 @@ public sealed class TrayShell : IDisposable
     public event EventHandler? AboutRequested;
     public event EventHandler<string>? OpenLinkRequested;
     public event EventHandler? SampleSessionRequested;
+    public event EventHandler? WelcomeTourRequested;
     /// <summary>Raised as the context menu opens, so state that depends on the library can be refreshed.</summary>
     public event EventHandler? MenuOpening;
     private Forms.ToolStripMenuItem? sampleSessionMenuItem;
@@ -127,6 +128,8 @@ public sealed class TrayShell : IDisposable
         contextMenu.Items.Add(CreateMenuItem("Settings", RaiseSettingsRequested));
         contextMenu.Items.Add(CreateMenuItem("About", RaiseAboutRequested));
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
+        // macOS Help > Show Welcome Tour: the first-run tour is reopenable from here at any time.
+        contextMenu.Items.Add(CreateMenuItem("Show Welcome Tour", () => WelcomeTourRequested?.Invoke(this, EventArgs.Empty)));
         foreach (var entry in TrayPresentationState.SupportEntries)
         {
             var url = entry.Url!;

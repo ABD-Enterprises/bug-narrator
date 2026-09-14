@@ -111,7 +111,8 @@ public partial class App : Application
             hotkeyService,
             secretStore,
             transcriptionClient,
-            audioInputDeviceCatalog);
+            audioInputDeviceCatalog,
+            microphonePreflightService);
         var trayShell = new TrayShell(diagnostics);
 
         appShell = new WindowsAppShell(

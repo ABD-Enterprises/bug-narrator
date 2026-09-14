@@ -68,7 +68,8 @@ public sealed class FileWindowsAppSettingsStore : IWindowsAppSettingsStore
             settings.HasAcceptedSystemAudioRecordingConsent,
             settings.IsExperimentalSystemAudioEnabled,
             settings.AutoExtractIssues,
-            settings.HasOfferedIssueExtraction);
+            settings.HasOfferedIssueExtraction,
+            settings.HasCompletedWelcome);
 
         var json = JsonSerializer.Serialize(normalizedSettings, JsonOptions);
         await AtomicFileOperations.WriteAllTextAsync(settingsFilePath, json, cancellationToken);

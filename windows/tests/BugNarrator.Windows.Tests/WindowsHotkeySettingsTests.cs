@@ -98,6 +98,42 @@ public sealed class WindowsHotkeySettingsTests : IDisposable
     }
 
     [Fact]
+    public async Task FileWindowsAppSettingsStore_RoundTripsHasCompletedWelcome()
+    {
+        var store = new FileWindowsAppSettingsStore(storagePaths);
+
+        Assert.False((await store.LoadAsync()).HasCompletedWelcome);
+        await store.SaveAsync(WindowsAppSettings.Default with { HasCompletedWelcome = true });
+
+        Assert.True((await store.LoadAsync()).HasCompletedWelcome);
+    }
+
+    [Fact]
+    public void HasAnyCaptureHotkeyAssigned_IsFalseByDefaultAndTrueWithOneShortcut()
+    {
+        Assert.False(WindowsAppSettings.Default.HasAnyCaptureHotkeyAssigned);
+        Assert.True((WindowsAppSettings.Default with
+        {
+            ScreenshotHotkey = WindowsHotkeyAction.CaptureScreenshot.SuggestedShortcut(),
+        }).HasAnyCaptureHotkeyAssigned);
+    }
+
+    [Fact]
+    public void SuggestedShortcuts_AreValidAndDistinct()
+    {
+        var suggestions = WindowsHotkeyActionExtensions.All.Select(action => action.SuggestedShortcut()).ToList();
+
+        Assert.All(suggestions, suggestion => Assert.True(suggestion.IsValid));
+        Assert.Equal(suggestions.Count, suggestions.Distinct().Count());
+        Assert.Empty(WindowsHotkeySettingsValidator.Validate(WindowsAppSettings.Default with
+        {
+            StartRecordingHotkey = suggestions[0],
+            StopRecordingHotkey = suggestions[1],
+            ScreenshotHotkey = suggestions[2],
+        }));
+    }
+
+    [Fact]
     public async Task FileWindowsAppSettingsStore_LoadsASettingsFileWrittenBeforeTheFlagExistedWithItOff()
     {
         // A settings.json from a build that predates IsExperimentalSystemAudioEnabled: consent and a
