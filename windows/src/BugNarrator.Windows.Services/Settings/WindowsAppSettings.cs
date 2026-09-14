@@ -134,6 +134,12 @@ public sealed record WindowsAppSettings(
     public bool SupportsIssueExtraction => EffectiveAiProviderProfile.SupportsIssueExtraction;
 
     /// <summary>
+    /// True for Local (Parakeet): readiness is the health probe on the local server, not a
+    /// credential (macOS aiProviderConfigurationIsReady for .parakeetLocal).
+    /// </summary>
+    public bool UsesLocalTranscriptionServer => EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal;
+
+    /// <summary>
     /// The macOS guidance sentence when the selected provider cannot extract issues or
     /// summarize; null when it can. Transcription is unaffected by this reason.
     /// </summary>

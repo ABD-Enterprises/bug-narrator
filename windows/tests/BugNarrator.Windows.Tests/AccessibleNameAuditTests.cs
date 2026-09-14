@@ -35,6 +35,58 @@ public sealed class AccessibleNameAuditTests
         yield return ["WelcomeWindow"];
     }
 
+    /// <summary>
+    /// WIN-038 (#1180): the Local (Parakeet) section follows the macOS localServerControls rules, and a
+    /// server answering on 8422 that this app did not start disables Start and is never stopped.
+    /// </summary>
+    [Fact]
+    public void SettingsWindow_LocalServerSection_FollowsTheMacControlRules()
+    {
+        var (texts, enabled) = OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var manager = new FakeLocalServerManager();
+            var window = new SettingsWindow(
+                new FakeSettingsStore(), new FakeSecretStore(), new FakeTranscriptionClient(),
+                new FakeHotkeyService(), harness.Diagnostics(), new FakeDeviceCatalog(), new FakeLaunchAtLogin(),
+                manager, new FakeLocalServerProbe());
+            try
+            {
+                var buttons = window.LocalServerButtonsForTests.ToDictionary(button => (string)button.Content, button => button);
+
+                // Not installed, no package yet: only Download (disabled) and Check server download.
+                window.ApplyLocalServerState(manager.State);
+                var initial = (buttons["Download the local transcription server"].IsEnabled, buttons["Check server download"].Visibility);
+
+                // Installed and idle, but something else answers on 8422: Start disabled.
+                window.SetLocalServerReachableForTests(true);
+                window.ApplyLocalServerState(manager.State with { Installed = true });
+                var foreign = (buttons["Start local server"].IsEnabled, buttons["Remove local server and models"].IsEnabled);
+
+                // Installed, running and reachable: Stop enabled, Remove disabled.
+                window.ApplyLocalServerState(manager.State with { Installed = true, Running = true });
+                var startStop = buttons["Start local server"];
+                var running = ((string)startStop.Content, startStop.IsEnabled, buttons["Remove local server and models"].IsEnabled);
+
+                // Downloading: progress + Cancel visible.
+                window.ApplyLocalServerState(manager.State with { Busy = true, Progress = 0.4 });
+                var downloading = buttons["Cancel installation"].Visibility;
+
+                return ((initial, foreign, running, downloading), manager.Stops);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        Assert.Equal((false, Visibility.Visible), texts.initial);
+        Assert.Equal((false, true), texts.foreign);
+        Assert.Equal(("Stop local server", true, false), texts.running);
+        Assert.Equal(Visibility.Visible, texts.downloading);
+        Assert.Equal(0, enabled);
+    }
+
     [Theory]
     [MemberData(nameof(Windows))]
     public void EveryInteractiveControlHasAnAccessibleName(string windowName)
@@ -272,7 +324,8 @@ public sealed class AccessibleNameAuditTests
             {
                 "SettingsWindow" => new SettingsWindow(
                     new FakeSettingsStore(), new FakeSecretStore(), new FakeTranscriptionClient(),
-                    new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog(), new FakeLaunchAtLogin()),
+                    new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog(), new FakeLaunchAtLogin(),
+                    new FakeLocalServerManager(), new FakeLocalServerProbe()),
                 "RecordingControlsWindow" => new RecordingControlsWindow(new FakeLifecycleService(), diagnostics, () => { }),
                 "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), new FakeSettingsStore(), diagnostics),
                 "AboutWindow" => new AboutWindow(),
@@ -339,6 +392,28 @@ public sealed class AccessibleNameAuditTests
         public Task<WindowsHotkeyRuntimeSnapshot> InitializeAsync(CancellationToken cancellationToken = default) => Task.FromResult(WindowsHotkeyRuntimeSnapshot.Empty);
         public Task<WindowsHotkeyRuntimeSnapshot> ApplySettingsAsync(WindowsAppSettings settings, CancellationToken cancellationToken = default) => Task.FromResult(WindowsHotkeyRuntimeSnapshot.Empty);
         public void Dispose() { }
+    }
+
+    internal sealed class FakeLocalServerManager : BugNarrator.Windows.Services.LocalTranscription.ILocalTranscriptionServerManager
+    {
+        public BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerState State { get; set; } =
+            new(Package: null, Progress: null, Busy: false, Installed: false, Running: false, Message: string.Empty);
+        public event EventHandler<BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerState>? StateChanged { add { } remove { } }
+        public string InstallDirectory => @"C:\Users\tester\AppData\Local\BugNarrator\LocalTranscription";
+        public int Stops { get; private set; }
+        public int Starts { get; private set; }
+        public Task DiscoverAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task InstallAndStartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StartAsync(CancellationToken cancellationToken = default) { Starts++; return Task.CompletedTask; }
+        public void Stop() => Stops++;
+        public Task ShutdownAsync() => Task.CompletedTask;
+        public void Remove() { }
+    }
+
+    internal sealed class FakeLocalServerProbe : BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe
+    {
+        public bool Reachable { get; set; }
+        public Task<bool> IsReachableAsync(string baseUrl, CancellationToken cancellationToken = default) => Task.FromResult(Reachable);
     }
 
     private sealed class FakeLaunchAtLogin : ILaunchAtLoginService

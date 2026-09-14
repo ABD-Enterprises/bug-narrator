@@ -77,6 +77,11 @@ public sealed record RecoveryBlocker(
         "Review the recording audio source and its consent in Settings.",
         RecoveryDestination.Settings);
 
+    public static RecoveryBlocker LocalServerUnreachable { get; } = new(
+        RecoveryBlockerCategory.Other,
+        "Start the local Parakeet transcription server in Settings, or choose another AI provider.",
+        RecoveryDestination.Settings);
+
     public static RecoveryBlocker TranscriptionFailed { get; } = new(
         RecoveryBlockerCategory.Other,
         "The recording is saved. Retry transcription from the session library.",

@@ -1,4 +1,5 @@
 using BugNarrator.Windows.Services.Extraction;
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Capture;
@@ -27,6 +28,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
     private readonly object syncRoot = new();
     private readonly ITranscriptionClient transcriptionClient;
     private readonly IIssueExtractionService issueExtractionService;
+    private readonly ILocalServerHealthProbe localServerHealthProbe;
 
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
@@ -44,8 +46,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         ISecretStore secretStore,
         ITranscriptionClient transcriptionClient,
         IIssueExtractionService issueExtractionService,
-        WindowsDiagnostics diagnostics)
+        WindowsDiagnostics diagnostics,
+        ILocalServerHealthProbe? localServerHealthProbe = null)
     {
+        this.localServerHealthProbe = localServerHealthProbe ?? new LocalServerHealthProbe();
         this.audioRecorderService = audioRecorderService;
         this.audioInputDeviceCatalog = audioInputDeviceCatalog;
         this.microphonePreflightService = microphonePreflightService;
@@ -103,6 +107,24 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
 
         var settings = await settingsStore.LoadAsync(cancellationToken);
         var recordingSource = settings.EffectiveRecordingAudioSourceProfile;
+
+        // Product-spec "fail before transcription": with Local (Parakeet) the server must answer
+        // before any audio is captured, or the session could never be transcribed (#1180).
+        if (settings.UsesLocalTranscriptionServer
+            && !await localServerHealthProbe.IsReachableAsync(settings.EffectiveAiProviderBaseUrl!, cancellationToken))
+        {
+            diagnostics.Warning("recording", "local transcription server unreachable; recording refused");
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Failed,
+                CanStart: true,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                LocalServerHealthProbe.UnreachableMessage,
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.LocalServerUnreachable));
+            return;
+        }
+
         if (settings.RecordingAudioSourceCompatibilityIssue is { } sourceIssue)
         {
             PublishState(new RecordingControlState(
