@@ -46,6 +46,9 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.AboutRequested += OnAboutRequested;
         trayShell.OpenLinkRequested += OnOpenLinkRequested;
         trayShell.SampleSessionRequested += OnSampleSessionRequested;
+        // Re-evaluated whenever the menu opens: deleting the last session in the library does not
+        // notify the shell, so a startup-only read would go stale.
+        trayShell.MenuOpening += OnTrayMenuOpening;
         _ = RefreshSampleSessionOfferAsync();
         trayShell.QuitRequested += OnQuitRequested;
     }
@@ -105,6 +108,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.AboutRequested -= OnAboutRequested;
         trayShell.OpenLinkRequested -= OnOpenLinkRequested;
         trayShell.SampleSessionRequested -= OnSampleSessionRequested;
+        trayShell.MenuOpening -= OnTrayMenuOpening;
         trayShell.QuitRequested -= OnQuitRequested;
 
         windowCoordinator.CloseAll();
@@ -134,6 +138,11 @@ public sealed class WindowsAppShell : IDisposable
                 trayShell.ShowWarning("BugNarrator Screenshot", exception.Message);
             }
         });
+    }
+
+    private void OnTrayMenuOpening(object? sender, EventArgs e)
+    {
+        _ = RefreshSampleSessionOfferAsync();
     }
 
     private async void OnSampleSessionRequested(object? sender, EventArgs e)

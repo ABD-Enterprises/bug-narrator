@@ -22,6 +22,7 @@ public sealed class TrayShell : IDisposable
         this.diagnostics = diagnostics;
 
         contextMenu = new Forms.ContextMenuStrip();
+        contextMenu.Opening += (_, _) => MenuOpening?.Invoke(this, EventArgs.Empty);
         notifyIcon = new Forms.NotifyIcon
         {
             ContextMenuStrip = contextMenu,
@@ -40,6 +41,8 @@ public sealed class TrayShell : IDisposable
     public event EventHandler? AboutRequested;
     public event EventHandler<string>? OpenLinkRequested;
     public event EventHandler? SampleSessionRequested;
+    /// <summary>Raised as the context menu opens, so state that depends on the library can be refreshed.</summary>
+    public event EventHandler? MenuOpening;
     private Forms.ToolStripMenuItem? sampleSessionMenuItem;
     public event EventHandler? CaptureScreenshotRequested;
     public event EventHandler? OpenSessionLibraryRequested;

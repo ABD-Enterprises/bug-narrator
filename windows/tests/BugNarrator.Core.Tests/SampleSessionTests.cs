@@ -33,7 +33,8 @@ public sealed class SampleSessionTests
     [Fact]
     public void Make_IsTextOnlyCompletedAndFlaggedAsTheSample()
     {
-        var session = SampleSession.Make(@"C:\sessions");
+        var root = Path.Combine(Path.GetTempPath(), "sessions");
+        var session = SampleSession.Make(root);
 
         Assert.True(session.IsSampleSession);
         Assert.Equal(SessionTranscriptionStatus.Completed, session.TranscriptionStatus);
@@ -41,9 +42,9 @@ public sealed class SampleSessionTests
         Assert.Equal(4, session.TimelineMoments.Count);
         Assert.Equal(3, session.IssueExtraction!.Issues.Count);
         Assert.Equal(96, (int)session.Duration.TotalSeconds);
-        Assert.StartsWith(@"C:\sessions\sample-", session.SessionDirectory);
+        Assert.Equal(Path.Combine(root, $"sample-{SampleSession.Id:N}"), session.SessionDirectory);
         // Deterministic, so a second Make is the same session (macOS: stable id, fixed createdAt).
-        var again = SampleSession.Make(@"C:\sessions");
+        var again = SampleSession.Make(root);
         Assert.Equal(session.SessionId, again.SessionId);
         Assert.Equal(session.CreatedAt, again.CreatedAt);
         Assert.Equal(session.TranscriptText, again.TranscriptText);
