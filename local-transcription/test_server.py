@@ -4,11 +4,14 @@ import json
 from pathlib import Path
 import signal
 import socket
+import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unittest
+import wave
 from unittest.mock import patch
 
 import server
@@ -18,6 +21,7 @@ class ServerModelConfigurationTests(unittest.TestCase):
     def tearDown(self):
         server._model = None
         server._model_name = None
+        server._server = None
         server.configure_default_model("mlx-community/parakeet-tdt-0.6b-v3")
 
     def test_configured_default_model_is_used_for_lazy_requests(self):
@@ -150,7 +154,9 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertEqual(second[2], {"chunk_duration": 120})
 
     def test_shutdown_terminates_process_even_during_active_inference(self):
+        # The MLX contract: no drain, re-raise the signal with the default disposition.
         with (
+            patch.object(server, "_backend", "mlx"),
             patch.object(server.os, "getpid", return_value=2468),
             patch.object(server.os, "kill") as kill,
             patch.object(server.signal, "signal") as restore_signal,
@@ -162,6 +168,25 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server.signal.SIG_DFL,
         )
         kill.assert_called_once_with(2468, server.signal.SIGTERM)
+
+    def test_onnx_shutdown_lets_uvicorn_drain_then_hard_exits_within_the_grace(self):
+        class FakeServer:
+            should_exit = False
+
+        fake = FakeServer()
+        with (
+            patch.object(server, "_backend", "onnx"),
+            patch.object(server, "_server", fake),
+            patch.object(server.threading, "Timer") as timer,
+            patch.object(server.os, "kill") as kill,
+        ):
+            server._shutdown_handler(server.signal.SIGTERM, None)
+
+        self.assertTrue(fake.should_exit)
+        kill.assert_not_called()
+        timer.assert_called_once_with(server._drain_grace_seconds, server.os._exit, args=(0,))
+        timer.return_value.start.assert_called_once_with()
+        self.assertLess(server._drain_grace_seconds, 2.0)  # inside LocalServerProcess's grace
 
     def test_uvicorn_does_not_replace_process_signal_handlers(self):
         uvicorn_server = server._SignalPreservingServer(
@@ -196,20 +221,25 @@ class ServerModelConfigurationTests(unittest.TestCase):
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
 
+        # POSIX: SIGTERM. Windows has no SIGTERM delivery; Ctrl+Break to the process group is the
+        # supervisor's stop signal, handled by the same _shutdown_handler.
+        stop_signal = "SIGBREAK" if sys.platform == "win32" else "SIGTERM"
         script = f"""
 import signal
 import time
 import server
 
-signal.signal(signal.SIGTERM, server._shutdown_handler)
+signal.signal(signal.{stop_signal}, server._shutdown_handler)
 server._inference_executor.submit(time.sleep, 30)
 server._serve("127.0.0.1", {port})
 """
+        creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
         )
         try:
             deadline = time.monotonic() + 10
@@ -224,13 +254,182 @@ server._serve("127.0.0.1", {port})
             else:
                 self.fail("transcription server did not start within 10 seconds")
 
-            process.terminate()
+            started = time.monotonic()
+            if sys.platform == "win32":
+                process.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                process.terminate()
             process.wait(timeout=2)
-            self.assertEqual(process.returncode, -signal.SIGTERM)
+            self.assertLess(time.monotonic() - started, 2)
+            if server._backend == "onnx":
+                # ONNX (Windows, Linux, Intel macOS): uvicorn drains, then a bounded hard exit
+                # inside the app's 2 s grace even though the inference worker is still busy.
+                self.assertEqual(process.returncode, 0)
+            else:
+                # MLX: the signal is re-raised with the default disposition.
+                self.assertEqual(process.returncode, -signal.SIGTERM)
         finally:
             if process.poll() is None:
                 process.kill()
                 process.wait()
+
+    # ---- ONNX backend (every platform but macOS) ----
+
+    def test_backend_is_mlx_only_on_apple_silicon(self):
+        with patch.object(server.sys, "platform", "darwin"), patch.object(server.platform, "machine", return_value="arm64"):
+            self.assertEqual(server._select_backend(), "mlx")
+        with patch.object(server.sys, "platform", "darwin"), patch.object(server.platform, "machine", return_value="x86_64"):
+            self.assertEqual(server._select_backend(), "onnx")
+        with patch.object(server.sys, "platform", "win32"), patch.object(server.platform, "machine", return_value="AMD64"):
+            self.assertEqual(server._select_backend(), "onnx")
+
+    def test_onnx_model_mapping_keeps_the_request_facing_ids_and_passes_unknowns_through(self):
+        self.assertEqual(
+            server._onnx_model_for("mlx-community/parakeet-tdt-0.6b-v3"),
+            "nemo-parakeet-tdt-0.6b-v3",
+        )
+        self.assertEqual(server._onnx_model_for("nvidia/parakeet-tdt-0.6b-v3"), "nemo-parakeet-tdt-0.6b-v3")
+        self.assertEqual(server._onnx_model_for("C:/models/custom"), "C:/models/custom")
+        # The alias table the client relies on is unchanged by the backend split.
+        self.assertEqual(server._resolve_model_id("whisper-1"), server._default_model_name)
+
+    def test_onnx_transcription_chunks_at_the_shared_bound_and_offsets_timestamps(self):
+        class Result:
+            def __init__(self, text, tokens, timestamps):
+                self.text, self.tokens, self.timestamps = text, tokens, timestamps
+
+        class RecordingOnnxModel:
+            def __init__(self):
+                self.calls = []
+
+            def recognize(self, waveform, *, sample_rate):
+                self.calls.append((len(waveform), sample_rate))
+                index = len(self.calls)
+                return Result(f"chunk {index}.", [f"chunk {index}", "."], [0.5, 1.0])
+
+        rate = 16000
+        seconds = server._chunk_duration_seconds * 2 + 5  # two full chunks and a tail
+        path = self._write_wav(rate, seconds)
+        model = RecordingOnnxModel()
+
+        result = server._transcribe_audio(model, path)
+
+        self.assertEqual(
+            [c[0] for c in model.calls],
+            [server._chunk_duration_seconds * rate, server._chunk_duration_seconds * rate, 5 * rate],
+        )
+        self.assertTrue(all(c[1] == rate for c in model.calls))
+        self.assertEqual(result.text, "chunk 1. chunk 2. chunk 3.")
+        self.assertEqual([round(s.start, 1) for s in result.sentences], [0.5, 120.5, 240.5])
+        self.assertEqual([round(s.end, 1) for s in result.sentences], [1.0, 121.0, 241.0])
+        self.assertEqual([s.text for s in result.sentences], ["chunk 1.", "chunk 2.", "chunk 3."])
+
+    def test_onnx_sentences_group_tokens_on_terminal_punctuation(self):
+        sentences = server._group_sentences(
+            ["Hello", " there", ".", " Second", " one", "?", " trailing"],
+            [0.0, 0.2, 0.4, 1.0, 1.2, 1.4, 2.0],
+            offset=10.0,
+        )
+
+        self.assertEqual([s.text for s in sentences], ["Hello there.", "Second one?", "trailing"])
+        self.assertEqual([(s.start, s.end) for s in sentences], [(10.0, 10.4), (11.0, 11.4), (12.0, 12.0)])
+        self.assertEqual(server._group_sentences(None, None, 0.0), [])
+
+    def test_onnx_refuses_non_wav_uploads_before_inference(self):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        Path(path).write_bytes(b"\x00\x00\x00\x18ftypM4A ")
+
+        class NeverCalled:
+            def recognize(self, *args, **kwargs):
+                raise AssertionError("inference must not run on undecodable audio")
+
+        with self.assertRaises(server.UnsupportedAudioError):
+            server._transcribe_audio(NeverCalled(), path)
+
+    def test_transcription_route_maps_unsupported_audio_to_a_400(self):
+        import io
+
+        from fastapi import UploadFile
+
+        class NeverCalled:
+            def recognize(self, *args, **kwargs):
+                raise AssertionError("inference must not run on undecodable audio")
+
+        upload = UploadFile(io.BytesIO(b"\x00\x00\x00\x18ftypM4A "), filename="clip.m4a")
+        with patch.object(server, "get_model", return_value=NeverCalled()):
+            response = asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
+
+        body = json.loads(response.body)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body["error"]["type"], "invalid_request_error")
+        self.assertIn("PCM WAV", body["error"]["message"])
+
+    def test_onnx_reads_stereo_and_8_bit_wav(self):
+        stereo = self._write_wav(8000, 1, channels=2)
+        samples, rate = server._read_wav(stereo)
+        self.assertEqual(rate, 8000)
+        self.assertEqual(len(samples), 8000)
+
+        eight_bit = self._write_wav(16000, 1, width=1)
+        samples, _ = server._read_wav(eight_bit)
+        self.assertEqual(len(samples), 16000)
+        self.assertTrue(float(abs(samples).max()) <= 1.0)
+
+    def test_onnx_reads_the_loopback_recorders_float_wav(self):
+        # WASAPI loopback capture (System Audio mode) is 32-bit IEEE float, usually wrapped in
+        # WAVE_FORMAT_EXTENSIBLE; Python's wave module refuses it, this reader must not.
+        for extensible in (False, True):
+            with self.subTest(extensible=extensible):
+                path = self._write_float_wav(48000, 2, seconds=1, extensible=extensible)
+                samples, rate = server._read_wav(path)
+                self.assertEqual(rate, 48000)
+                self.assertEqual(len(samples), 48000)
+                self.assertAlmostEqual(float(samples[0]), 0.25, places=5)
+
+    def test_onnx_refuses_unknown_wav_encodings(self):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        Path(path).write_bytes(self._riff(fmt_tag=0x0055, channels=1, rate=16000, bits=0, frames=b""))  # MP3-in-WAV
+
+        with self.assertRaises(server.UnsupportedAudioError):
+            server._read_wav(path)
+
+    def _riff(self, fmt_tag, channels, rate, bits, frames, extensible=False):
+        block_align = max(1, channels * bits // 8)
+        fmt = struct.pack("<HHIIHH", 0xFFFE if extensible else fmt_tag, channels, rate, rate * block_align, block_align, bits)
+        if extensible:
+            fmt += struct.pack("<HHI", 22, bits, 0) + struct.pack("<H", fmt_tag) + b"\x00\x00\x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71"
+        body = b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt + b"data" + struct.pack("<I", len(frames)) + frames
+        return b"RIFF" + struct.pack("<I", len(body)) + body
+
+    def _write_float_wav(self, rate, channels, seconds, extensible):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        frames = struct.pack(f"<{rate * seconds * channels}f", *([0.25] * (rate * seconds * channels)))
+        Path(path).write_bytes(self._riff(fmt_tag=3, channels=channels, rate=rate, bits=32, frames=frames, extensible=extensible))
+        return path
+
+    def test_transcription_route_reads_the_onnx_result_shape(self):
+        # The route reads .text and .sentences (start/end/text) — the MLX result shape — so the
+        # ONNX result must expose the same attributes.
+        result = server._Transcription("hi.", [server._Sentence(0.0, 0.5, "hi.")])
+        self.assertTrue(hasattr(result, "text") and hasattr(result, "sentences"))
+        self.assertEqual(result.sentences[0].end, 0.5)
+
+    def _write_wav(self, rate, seconds, channels=1, width=2):
+        path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        with wave.open(path, "wb") as handle:
+            handle.setnchannels(channels)
+            handle.setsampwidth(width)
+            handle.setframerate(rate)
+            frames = rate * seconds * channels
+            if width == 2:
+                handle.writeframes(struct.pack(f"<{frames}h", *([0] * frames)))
+            else:
+                handle.writeframes(bytes([128] * frames))
+        return path
 
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
@@ -253,6 +452,35 @@ server._serve("127.0.0.1", {port})
         self.assertTrue(packages)
         self.assertTrue(all("==" in package for package in packages))
         self.assertGreaterEqual(contents.count("--hash=sha256:"), len(packages))
+
+    def test_windows_dependencies_are_hash_locked_and_free_of_apple_only_packages(self):
+        for name in ("requirements-windows.lock", "requirements-windows-arm64.lock"):
+            with self.subTest(lock=name):
+                self._assert_windows_lock(Path(__file__).with_name(name))
+
+    def _assert_windows_lock(self, lockfile):
+        contents = lockfile.read_text()
+        packages = [
+            line
+            for line in contents.splitlines()
+            if line and not line.startswith(("#", " ", "--"))
+        ]
+
+        self.assertTrue(packages)
+        self.assertTrue(all("==" in package for package in packages))
+        self.assertGreaterEqual(contents.count("--hash=sha256:"), len(packages))
+        names = {package.split("==")[0].lower() for package in packages}
+        self.assertIn("onnx-asr", names)
+        self.assertIn("onnxruntime", names)
+        self.assertIn("pyinstaller", names)
+        self.assertNotIn("parakeet-mlx", names)
+        self.assertNotIn("mlx", names)
+        # The two runtimes pin the same web stack so the protocol cannot drift by dependency.
+        runtime = Path(__file__).with_name("requirements.txt").read_text().splitlines()
+        for pin in ("fastapi==", "uvicorn", "python-multipart=="):
+            shared = next(line for line in runtime if line.startswith(pin))
+            version = shared.split("==")[1]
+            self.assertIn(f"{pin.split('[')[0].rstrip('=')}=={version}", contents)
 
 
 if __name__ == "__main__":
