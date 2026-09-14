@@ -3,6 +3,7 @@ using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Hotkeys;
+using BugNarrator.Windows.Services.Permissions;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
@@ -22,6 +23,7 @@ public sealed class WindowCoordinator
     private readonly IReviewSessionActionService reviewSessionActionService;
     private readonly ISecretStore secretStore;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
+    private readonly IMicrophonePreflightService microphonePreflightService;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
     private AboutWindow? aboutWindow;
@@ -29,6 +31,7 @@ public sealed class WindowCoordinator
     private RecordingControlsWindow? recordingControlsWindow;
     private SessionLibraryWindow? sessionLibraryWindow;
     private SettingsWindow? settingsWindow;
+    private WelcomeWindow? welcomeWindow;
 
     public WindowCoordinator(
         WindowsDiagnostics diagnostics,
@@ -39,9 +42,11 @@ public sealed class WindowCoordinator
         IWindowsGlobalHotkeyService hotkeyService,
         ISecretStore secretStore,
         ITranscriptionClient transcriptionClient,
-        IAudioInputDeviceCatalog audioInputDeviceCatalog)
+        IAudioInputDeviceCatalog audioInputDeviceCatalog,
+        IMicrophonePreflightService microphonePreflightService)
     {
         this.audioInputDeviceCatalog = audioInputDeviceCatalog;
+        this.microphonePreflightService = microphonePreflightService;
         this.diagnostics = diagnostics;
         this.recordingLifecycleService = recordingLifecycleService;
         this.completedSessionStore = completedSessionStore;
@@ -57,6 +62,7 @@ public sealed class WindowCoordinator
 
     public void CloseAll()
     {
+        CloseWindow(welcomeWindow);
         CloseWindow(recordingControlsWindow);
         CloseWindow(sessionLibraryWindow);
         CloseWindow(settingsWindow);
@@ -150,6 +156,49 @@ public sealed class WindowCoordinator
         }
 
         ShowAndActivate(sessionLibraryWindow);
+    }
+
+    /// <summary>
+    /// Whether the first-run tour should open unprompted now (macOS BugNarratorApp.shouldPresentWelcome):
+    /// the FirstRunFunnel rule over persisted settings, the saved credential, and the session count.
+    /// Microphone state is "not yet checked" (false) at startup, as macOS maps notDetermined.
+    /// </summary>
+    public async Task<bool> ShouldPresentWelcomeAsync()
+    {
+        var settings = await settingsStore.LoadAsync();
+        var credential = await secretStore.GetAsync(SecretKeys.OpenAiApiKey);
+        var sessionCount = await CountSessionsAsync();
+        return FirstRunFunnel.ShouldPresentWelcome(
+            settings.HasCompletedWelcome,
+            sessionCount,
+            new OnboardingSnapshot(
+                HasUsableAiProviderCredential: settings.HasUsableAiProviderCredential(credential),
+                ProviderConfigurationIsCompatible: settings.AiProviderCompatibilityIssue is null,
+                MicrophoneAuthorized: false,
+                HasAnyCaptureHotkeyAssigned: settings.HasAnyCaptureHotkeyAssigned));
+    }
+
+    public void ShowWelcome()
+    {
+        if (welcomeWindow is null || !welcomeWindow.IsLoaded)
+        {
+            welcomeWindow = new WelcomeWindow(
+                settingsStore,
+                secretStore,
+                hotkeyService,
+                microphonePreflightService,
+                audioInputDeviceCatalog,
+                diagnostics,
+                ShowSettings);
+            welcomeWindow.Closed += (_, _) =>
+            {
+                diagnostics.Info("windows", "welcome window closed");
+                welcomeWindow = null;
+            };
+            diagnostics.Info("windows", "welcome window created");
+        }
+
+        ShowAndActivate(welcomeWindow);
     }
 
     public void ShowSettings()
