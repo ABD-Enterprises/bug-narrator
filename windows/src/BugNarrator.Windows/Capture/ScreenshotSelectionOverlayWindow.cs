@@ -22,21 +22,28 @@ internal sealed class ScreenshotSelectionOverlayWindow : Window
     private bool isDragging;
 
     public ScreenshotSelectionOverlayWindow()
-        : this(deviceScale: null)
+        : this(deviceScale: null, virtualScreen: null)
     {
     }
 
     /// <summary>
-    /// <paramref name="deviceScale"/> overrides the window's own DIP → device transform; tests use it
-    /// to emulate a 125 % or 150 % display without a real presentation source.
+    /// <paramref name="deviceScale"/> overrides the window's own DIP → device transform and
+    /// <paramref name="virtualScreen"/> the SystemParameters virtual-screen bounds; tests use them
+    /// to emulate a 125 % or 150 % display and a multi-monitor desktop without real hardware.
     /// </summary>
-    internal ScreenshotSelectionOverlayWindow(Func<(double X, double Y)>? deviceScale)
+    internal ScreenshotSelectionOverlayWindow(Func<(double X, double Y)>? deviceScale, LogicalRect? virtualScreen)
     {
         this.deviceScale = deviceScale ?? DeviceScaleFromPresentationSource;
-        Left = SystemParameters.VirtualScreenLeft;
-        Top = SystemParameters.VirtualScreenTop;
-        Width = SystemParameters.VirtualScreenWidth;
-        Height = SystemParameters.VirtualScreenHeight;
+        // The overlay spans every monitor at once: the virtual screen, in DIPs.
+        var bounds = virtualScreen ?? new LogicalRect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        Left = bounds.X;
+        Top = bounds.Y;
+        Width = bounds.Width;
+        Height = bounds.Height;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;

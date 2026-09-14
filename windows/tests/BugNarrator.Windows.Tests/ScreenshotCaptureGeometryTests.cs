@@ -50,7 +50,7 @@ public sealed class ScreenshotCaptureGeometryTests
         // receives, so a miswired conversion in the overlay fails here.
         var selection = OnStaThread(() =>
         {
-            var overlay = new ScreenshotSelectionOverlayWindow(() => (scale, scale));
+            var overlay = new ScreenshotSelectionOverlayWindow(() => (scale, scale), virtualScreen: null);
             overlay.CompleteDrag(new Point(40, 24), new Point(140, 84));
             return overlay.SelectionResult;
         });
@@ -69,7 +69,7 @@ public sealed class ScreenshotCaptureGeometryTests
     {
         var selection = OnStaThread(() =>
         {
-            var overlay = new ScreenshotSelectionOverlayWindow(() => (1.5, 1.5));
+            var overlay = new ScreenshotSelectionOverlayWindow(() => (1.5, 1.5), virtualScreen: null);
             overlay.CompleteDrag(new Point(10, 10), new Point(13, 13));
             return overlay.SelectionResult;
         });
@@ -118,6 +118,20 @@ public sealed class ScreenshotCaptureGeometryTests
         Assert.Equal(whole.X, left.X);
         Assert.Equal(left.X + left.Width, right.X);
         Assert.Equal(whole.Width, left.Width + right.Width);
+
+        // The production overlay, given that virtual screen: it spans both monitors, and a drag
+        // across the boundary (canvas coordinates are overlay-relative) reports exactly `whole`.
+        var (bounds, reported) = OnStaThread(() =>
+        {
+            var overlay = new ScreenshotSelectionOverlayWindow(() => (systemScale, systemScale), virtualScreen);
+            overlay.CompleteDrag(
+                new Point(selection.X - virtualScreen.X, selection.Y - virtualScreen.Y),
+                new Point(selection.X - virtualScreen.X + selection.Width, selection.Y - virtualScreen.Y + selection.Height));
+            return (new LogicalRect(overlay.Left, overlay.Top, overlay.Width, overlay.Height), overlay.SelectionResult.Selection);
+        });
+
+        Assert.Equal(virtualScreen, bounds);
+        Assert.Equal(new ScreenshotSelection(whole.X, whole.Y, whole.Width, whole.Height), reported);
     }
 
     [Fact]
