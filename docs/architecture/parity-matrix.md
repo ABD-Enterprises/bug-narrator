@@ -29,6 +29,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 | Experimental GitHub and Jira export | Shipped as experimental | In Progress | Experimental on both platforms | Windows implementation exists; the remaining real-credential validation is tracked in #1133. |
 | Keyboard-first accessibility | Shipped baseline, validated in RR-005 | In Progress | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. The remaining real-desktop keyboard and Narrator validation is tracked in #1133. |
 | Public release packaging | Shipped as signed, notarized DMG | Repo-side signed tester zip path ready; certificate provisioning required | Platform-native packaging allowed | Windows first tester format is a zip containing signed `BugNarrator.Windows.exe` plus signature and package validation evidence. Installer/MSIX can follow if tester distribution requires it. |
+| Launch at login | Shipped (`LaunchAtLoginService`, SMAppService) | In Progress (#1164) | Platform-native mechanism allowed | Windows registers a per-user `Run` value through an injectable registry seam; the same toggle label as macOS. Windows has no approval state. Real-desktop check: the app appears on the Windows Settings Startup page and launches at the next sign-in; tracked in #1133. |
 
 ## Current Deliberate Differences
 

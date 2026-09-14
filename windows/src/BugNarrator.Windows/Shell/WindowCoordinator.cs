@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Audio;
@@ -149,7 +150,8 @@ public sealed class WindowCoordinator
                 transcriptionClient,
                 hotkeyService,
                 diagnostics,
-                audioInputDeviceCatalog);
+                audioInputDeviceCatalog,
+                LaunchAtLoginService.ForCurrentUser());
             settingsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "settings window closed");
