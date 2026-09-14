@@ -47,6 +47,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.OpenLinkRequested += OnOpenLinkRequested;
         trayShell.SampleSessionRequested += OnSampleSessionRequested;
         trayShell.WelcomeTourRequested += OnWelcomeTourRequested;
+        trayShell.RecoveryRequested += OnRecoveryRequested;
         // Re-evaluated whenever the menu opens: deleting the last session in the library does not
         // notify the shell, so a startup-only read would go stale.
         trayShell.MenuOpening += OnTrayMenuOpening;
@@ -118,6 +119,23 @@ public sealed class WindowsAppShell : IDisposable
         }
     }
 
+    private void OnRecoveryRequested(object? sender, RecoveryDestination destination)
+    {
+        diagnostics.Info("app", $"recovery entry chosen: {destination}");
+        switch (destination)
+        {
+            case RecoveryDestination.Settings:
+                windowCoordinator.ShowSettings();
+                break;
+            case RecoveryDestination.RecordingControls:
+                windowCoordinator.ShowRecordingControls();
+                break;
+            case RecoveryDestination.SessionLibrary:
+                windowCoordinator.ShowSessionLibrary();
+                break;
+        }
+    }
+
     private void OnWelcomeTourRequested(object? sender, EventArgs e)
     {
         windowCoordinator.ShowWelcome();
@@ -137,6 +155,7 @@ public sealed class WindowsAppShell : IDisposable
         trayShell.OpenLinkRequested -= OnOpenLinkRequested;
         trayShell.SampleSessionRequested -= OnSampleSessionRequested;
         trayShell.WelcomeTourRequested -= OnWelcomeTourRequested;
+        trayShell.RecoveryRequested -= OnRecoveryRequested;
         trayShell.MenuOpening -= OnTrayMenuOpening;
         trayShell.QuitRequested -= OnQuitRequested;
 

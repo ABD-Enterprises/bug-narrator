@@ -15,6 +15,8 @@ public sealed class TrayShell : IDisposable
     private Forms.ToolStripMenuItem? captureScreenshotMenuItem;
     private Forms.ToolStripMenuItem? startRecordingMenuItem;
     private Forms.ToolStripMenuItem? statusMenuItem;
+    private Forms.ToolStripMenuItem? recoveryMenuItem;
+    private RecoveryDestination recoveryDestination = RecoveryDestination.None;
     private Forms.ToolStripMenuItem? stopRecordingMenuItem;
 
     public TrayShell(WindowsDiagnostics diagnostics)
@@ -42,6 +44,7 @@ public sealed class TrayShell : IDisposable
     public event EventHandler<string>? OpenLinkRequested;
     public event EventHandler? SampleSessionRequested;
     public event EventHandler? WelcomeTourRequested;
+    public event EventHandler<RecoveryDestination>? RecoveryRequested;
     /// <summary>Raised as the context menu opens, so state that depends on the library can be refreshed.</summary>
     public event EventHandler? MenuOpening;
     private Forms.ToolStripMenuItem? sampleSessionMenuItem;
@@ -78,6 +81,14 @@ public sealed class TrayShell : IDisposable
             statusMenuItem.Text = presentation.StatusLabel;
         }
 
+        if (recoveryMenuItem is not null)
+        {
+            recoveryDestination = presentation.RecoveryEntry?.Destination ?? RecoveryDestination.None;
+            recoveryMenuItem.Text = presentation.RecoveryEntry?.Label ?? "Fix";
+            recoveryMenuItem.Visible = presentation.RecoveryEntry is not null;
+            recoveryMenuItem.Enabled = recoveryDestination != RecoveryDestination.None;
+        }
+
         if (startRecordingMenuItem is not null)
         {
             startRecordingMenuItem.Enabled = presentation.CanStartRecording;
@@ -107,12 +118,15 @@ public sealed class TrayShell : IDisposable
     {
         statusMenuItem = CreateMenuItem("Status: Ready", () => { });
         statusMenuItem.Enabled = false;
+        recoveryMenuItem = CreateMenuItem("Fix", () => RecoveryRequested?.Invoke(this, recoveryDestination));
+        recoveryMenuItem.Visible = false;
 
         startRecordingMenuItem = CreateMenuItem("Start Recording", RaiseStartRecordingRequested);
         stopRecordingMenuItem = CreateMenuItem("Stop Recording", RaiseStopRecordingRequested);
         captureScreenshotMenuItem = CreateMenuItem("Capture Screenshot", RaiseCaptureScreenshotRequested);
 
         contextMenu.Items.Add(statusMenuItem);
+        contextMenu.Items.Add(recoveryMenuItem);
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(startRecordingMenuItem);
         contextMenu.Items.Add(stopRecordingMenuItem);

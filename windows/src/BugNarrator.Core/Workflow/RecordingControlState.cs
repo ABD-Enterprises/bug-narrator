@@ -8,7 +8,10 @@ public sealed record RecordingControlState(
     bool CanStop,
     bool CanCaptureScreenshot,
     string StatusMessage,
-    RecordingSessionDraft? ActiveSession
+    RecordingSessionDraft? ActiveSession,
+    // Present only when a permission, credential, storage, or other blocker stopped progress;
+    // the tray turns it into a Fix entry that opens the right place (#1160).
+    RecoveryBlocker? Blocker = null
 )
 {
     public static RecordingControlState Idle(string statusMessage = "Ready to record.")

@@ -62,6 +62,94 @@ public sealed class TrayPresentationStateTests
     }
 
     [Theory]
+    [InlineData(RecoveryBlockerCategory.Permission, RecoveryDestination.Settings)]
+    [InlineData(RecoveryBlockerCategory.Credential, RecoveryDestination.Settings)]
+    [InlineData(RecoveryBlockerCategory.Storage, RecoveryDestination.RecordingControls)]
+    [InlineData(RecoveryBlockerCategory.Other, RecoveryDestination.SessionLibrary)]
+    public void FromRecordingState_OffersARecoveryEntryForEachBlockerCategory(
+        RecoveryBlockerCategory category, RecoveryDestination destination)
+    {
+        var state = new RecordingControlState(
+            RecordingWorkflowState.Failed,
+            CanStart: true,
+            CanStop: false,
+            CanCaptureScreenshot: false,
+            "Something is blocking progress.",
+            ActiveSession: null,
+            Blocker: new RecoveryBlocker(category, "Do the thing in the right place.", destination));
+
+        var entry = TrayPresentationState.FromRecordingState(state).RecoveryEntry;
+
+        Assert.NotNull(entry);
+        Assert.Equal("Fix: Do the thing in the right place.", entry!.Label);
+        Assert.Equal(category, entry.Category);
+        Assert.Equal(destination, entry.Destination);
+    }
+
+    [Fact]
+    public void FromRecordingState_OffersRecoveryForACompletedSessionThatStillNeedsAProvider()
+    {
+        // Completed is not Failed, but a NotConfigured transcript is a refused step (#1160).
+        var state = new RecordingControlState(
+            RecordingWorkflowState.Completed,
+            CanStart: true,
+            CanStop: false,
+            CanCaptureScreenshot: false,
+            "Recording saved. Finish AI provider setup in Settings to enable transcription.",
+            ActiveSession: null,
+            Blocker: RecoveryBlocker.ProviderNotConfigured);
+
+        var entry = TrayPresentationState.FromRecordingState(state).RecoveryEntry;
+
+        Assert.Equal(RecoveryBlockerCategory.Credential, entry!.Category);
+        Assert.Equal(RecoveryDestination.Settings, entry.Destination);
+    }
+
+    [Theory]
+    [InlineData(RecordingWorkflowState.Idle)]
+    [InlineData(RecordingWorkflowState.Recording)]
+    public void FromRecordingState_NeverOffersRecoveryWhileIdleOrRecording(RecordingWorkflowState workflowState)
+    {
+        var clean = new RecordingControlState(workflowState, CanStart: true, CanStop: true, CanCaptureScreenshot: true, "ok", ActiveSession: null);
+        var stale = clean with { Blocker = RecoveryBlocker.ProviderNotConfigured };
+
+        Assert.Null(TrayPresentationState.FromRecordingState(clean).RecoveryEntry);
+        Assert.Null(TrayPresentationState.FromRecordingState(stale).RecoveryEntry);
+        Assert.Null(TrayPresentationState.FromRecordingState(RecordingControlState.Idle()).RecoveryEntry);
+    }
+
+    [Fact]
+    public void FromRecordingState_WithoutABlocker_HasNoRecoveryEntryEvenWhenFailed()
+    {
+        var state = new RecordingControlState(RecordingWorkflowState.Failed, CanStart: true, CanStop: false, CanCaptureScreenshot: false, "Microphone is unavailable.", ActiveSession: null);
+
+        Assert.Null(TrayPresentationState.FromRecordingState(state).RecoveryEntry);
+    }
+
+    [Theory]
+    [InlineData(RecordingPreflightStatus.PermissionDenied, RecoveryBlockerCategory.Permission, RecoveryDestination.Settings)]
+    [InlineData(RecordingPreflightStatus.DeviceUnavailable, RecoveryBlockerCategory.Other, RecoveryDestination.Settings)]
+    [InlineData(RecordingPreflightStatus.CaptureSetupFailed, RecoveryBlockerCategory.Other, RecoveryDestination.Settings)]
+    [InlineData(RecordingPreflightStatus.AlreadyRecording, RecoveryBlockerCategory.Other, RecoveryDestination.RecordingControls)]
+    public void RecoveryBlocker_ClassifiesPreflightFailures(RecordingPreflightStatus status, RecoveryBlockerCategory category, RecoveryDestination destination)
+    {
+        var blocker = RecoveryBlocker.FromPreflight(status);
+
+        Assert.NotNull(blocker);
+        Assert.Equal(category, blocker!.Category);
+        Assert.Equal(destination, blocker.Destination);
+        Assert.Null(RecoveryBlocker.FromPreflight(RecordingPreflightStatus.Ready));
+    }
+
+    [Fact]
+    public void RecoveryBlocker_ClassifiesFileSystemFailuresAsStorage()
+    {
+        Assert.Equal(RecoveryBlockerCategory.Storage, RecoveryBlocker.FromException(new IOException("disk full")).Category);
+        Assert.Equal(RecoveryBlockerCategory.Storage, RecoveryBlocker.FromException(new UnauthorizedAccessException()).Category);
+        Assert.Equal(RecoveryBlockerCategory.Other, RecoveryBlocker.FromException(new InvalidOperationException()).Category);
+    }
+
+    [Theory]
     [InlineData(0, true)]
     [InlineData(1, false)]
     [InlineData(12, false)]
