@@ -115,18 +115,17 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
 
             // Contained before it runs: assignment failure terminates a process that never executed.
             job.Assign(information.hProcess);
-            if (ResumeThread(information.hThread) == unchecked((uint)-1))
-            {
-                throw new LocalServerFailure($"The local server process could not be resumed (error {Marshal.GetLastWin32Error()})");
-            }
 
+            // Exit observation is established while the process is still suspended, so a server that
+            // dies on its first instruction still reports its exit code and stderr through onExit.
             var process = Process.GetProcessById(information.dwProcessId);
             process.EnableRaisingEvents = true;
             var wrapper = new LocalServerProcess(process, job, grace, stderrLogPath);
             process.Exited += (_, _) => wrapper.OnExited(onExit);
-            if (process.HasExited)
+
+            if (ResumeThread(information.hThread) == unchecked((uint)-1))
             {
-                wrapper.OnExited(onExit);
+                throw new LocalServerFailure($"The local server process could not be resumed (error {Marshal.GetLastWin32Error()})");
             }
 
             return wrapper;
@@ -199,9 +198,11 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
         process.Dispose();
     }
 
+    private int exitHandled;
+
     private void OnExited(Action<int, string> onExit)
     {
-        if (!exited.TrySetResult())
+        if (Interlocked.Exchange(ref exitHandled, 1) == 1)
         {
             return;
         }
@@ -217,7 +218,16 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
             code = -1;
         }
 
-        onExit(code, ReadStderrTail(stderrLogPath));
+        try
+        {
+            onExit(code, ReadStderrTail(stderrLogPath));
+        }
+        finally
+        {
+            // Waiters are released only after the callback has run, so a caller that disposes on
+            // WaitForExitAsync never races the exit handling.
+            exited.TrySetResult();
+        }
     }
 
     /// <summary>The last <see cref="StderrTailBytes"/> bytes of the log, decoded as UTF-8 — a byte cap, as documented.</summary>

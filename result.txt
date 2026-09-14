@@ -1,3 +1,0 @@
-shell: attach=True(187) send=True(0) exited=True
-direct: attach=True(187) send=True(0) exited=True
-direct-newconsole-thread: attach=True(187) send=True(0) exited=True
