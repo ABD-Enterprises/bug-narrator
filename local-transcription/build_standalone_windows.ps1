@@ -9,9 +9,10 @@ and a zip + SHA-256 manifest the app's LocalServerPackageCatalog / LocalServerIn
 downloads them on first request into the Models directory beside the executable (HF_HOME, which
 the app sets when it launches the server).
 
-Output: <OutputDir>\bugnarrator-transcription-windows-<arch>.zip and .sha256, plus
-<OutputDir>\bugnarrator-transcription.exe for local smoke tests. Signing is a separate step
-(windows/scripts/sign-windows*.ps1) that the release workflow runs on the exe before zipping.
+Output: <OutputDir>\bugnarrator-transcription.exe, a <asset>-build.json provenance record, and —
+unless -NoPackage — <OutputDir>\bugnarrator-transcription-windows-<arch>.zip with its .sha256
+manifest. The release workflow builds with -NoPackage, signs the exe (windows/scripts/sign-windows*.ps1),
+then runs -PackageOnly so the zip carries the signed binary.
 
 .PARAMETER Arch
 x64 (the shipped asset) or arm64 (for running on an ARM64 Windows machine). The build always
@@ -25,7 +26,9 @@ param(
     [string]$OutputDir = "",
     [switch]$SkipPipCheck,
     # Package only: zip the (already signed) exe in OutputDir and write the .sha256 manifest.
-    [switch]$PackageOnly
+    [switch]$PackageOnly,
+    # Build without packaging (the release workflow signs first, then packages with -PackageOnly).
+    [switch]$NoPackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -121,3 +124,7 @@ Copy-Item $exe (Join-Path $OutputDir "$appName.exe") -Force
 } | ConvertTo-Json | Set-Content -Path (Join-Path $OutputDir "$assetName-build.json") -Encoding utf8
 
 Write-Host "Built $exe (PyInstaller $pyinstallerVersion, version $version)"
+
+if (-not $NoPackage) {
+    Write-Package
+}
