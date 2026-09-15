@@ -77,6 +77,36 @@ public sealed class ScreenshotCaptureGeometryPerMonitorTests
     }
 
     [Fact]
+    public void VerticalStack_AddsTheLowerMonitorsPhysicalYOrigin()
+    {
+        var lower = new MonitorGeometry(new LogicalRect(0, 1080, 1280, 720), new PhysicalRect(0, 1080, 1600, 900), 1.25);
+        var selection = new LogicalRect(100, 1000, 50, 160);
+
+        var parts = ScreenshotCaptureGeometry.ToPhysicalPerMonitor(selection, [Primary, lower]);
+
+        Assert.Equal(2, parts.Count);
+        Assert.Equal(new PhysicalRect(100, 1000, 50, 80), parts[0].Physical);
+        // 80 DIPs into the lower monitor at 125 %: 100 pixels below its physical top (1080).
+        Assert.Equal(new PhysicalRect(125, 1080, 63, 100), parts[1].Physical);
+    }
+
+    [Fact]
+    public void SingleScaleEquivalence_HoldsOnlyForIntegerOriginTimesScale()
+    {
+        // Documented divergence: with a monitor origin whose product with the scale is fractional,
+        // PhysicalPartOn rounds in the global frame and the per-monitor mapping in the local one.
+        const double scale = 1.25;
+        var monitor = MonitorGeometry.FromLogical(new LogicalRect(1707, 0, 1707, 960), scale); // 1707 × 1.25 = 2133.75
+        var selection = new LogicalRect(1707.5, 0, 10, 10);
+
+        var global = ScreenshotCaptureGeometry.PhysicalPartOn(selection, monitor, scale);
+        var perMonitor = Assert.Single(ScreenshotCaptureGeometry.ToPhysicalPerMonitor(selection, [monitor])).Physical;
+
+        Assert.Equal(2134, global.X);
+        Assert.Equal(2135, perMonitor.X);
+    }
+
+    [Fact]
     public void FractionalBoundaries_RoundEdgesNotSizes()
     {
         var parts = ScreenshotCaptureGeometry.ToPhysicalPerMonitor(new LogicalRect(1930.3, 5.7, 100.4, 40.6), [Primary, Secondary]);

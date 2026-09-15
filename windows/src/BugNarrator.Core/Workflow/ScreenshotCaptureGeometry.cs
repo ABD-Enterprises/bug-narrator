@@ -40,7 +40,8 @@ public readonly record struct MonitorPart(MonitorGeometry Monitor, PhysicalRect 
 /// scale differs. Under that model a region crossing a monitor boundary maps with the same factor
 /// on both sides, which is what <see cref="ToPhysical"/> encodes and what the tests pin. Native
 /// pixels on a monitor whose scale differs from the system's need per-monitor V2 awareness and a
-/// per-monitor mapping — tracked separately (WIN-041, #1186); that change replaces this class deliberately.
+/// per-monitor mapping — <see cref="ToPhysicalPerMonitor"/> is that mapping (#1186); the PerMonitorV2 switch and
+/// per-monitor overlay windows are #1192.
 /// </summary>
 public static class ScreenshotCaptureGeometry
 {
@@ -88,8 +89,11 @@ public static class ScreenshotCaptureGeometry
     /// expressed relative to the monitor's logical origin, scaled by the monitor's own scale, and
     /// placed at the monitor's physical origin — so each part is in that monitor's native pixels
     /// whatever the neighbours' scales are. Parts come back in monitor order; monitors the
-    /// selection does not touch are omitted. When every monitor is at one scale with physical
-    /// bounds derived from the logical ones, this equals <see cref="PhysicalPartOn"/> per monitor.
+    /// selection does not touch are omitted. When every monitor is at one scale and each
+    /// monitor's physical origin is an exact multiple of that scale (which is how Windows reports
+    /// logical origins under system-DPI awareness), this equals <see cref="PhysicalPartOn"/> per
+    /// monitor; with a fractional origin × scale the two round in different frames and can differ
+    /// by one pixel at the seam.
     /// </summary>
     public static IReadOnlyList<MonitorPart> ToPhysicalPerMonitor(LogicalRect selection, IReadOnlyList<MonitorGeometry> monitors)
     {
