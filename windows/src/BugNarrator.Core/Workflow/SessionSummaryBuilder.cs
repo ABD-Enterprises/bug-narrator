@@ -35,7 +35,7 @@ public static class SessionSummaryBuilder
 
     private static string ExtractLeadSentence(string transcriptText)
     {
-        var sentenceBreak = transcriptText.IndexOfAny(['.', '!', '?']);
+        var sentenceBreak = FirstSentenceBreak(transcriptText);
         if (sentenceBreak >= 0 && sentenceBreak < 220)
         {
             return transcriptText[..(sentenceBreak + 1)].Trim();
@@ -45,4 +45,24 @@ public static class SessionSummaryBuilder
             ? transcriptText
             : $"{transcriptText[..220].Trim()}...";
     }
+
+    /// <summary>
+    /// The index of the '.', '!' or '?' that ends the first sentence: one followed by whitespace or
+    /// the end of the text. A terminator followed by anything else is inside a token — "1.2",
+    /// "Mr.", "Wait...what" — and used to end the summary at "Version 1." (#1194).
+    /// </summary>
+    private static int FirstSentenceBreak(string text)
+    {
+        for (var index = text.IndexOfAny(SentenceTerminators); index >= 0; index = text.IndexOfAny(SentenceTerminators, index + 1))
+        {
+            if (index + 1 == text.Length || char.IsWhiteSpace(text[index + 1]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static readonly char[] SentenceTerminators = ['.', '!', '?'];
 }
