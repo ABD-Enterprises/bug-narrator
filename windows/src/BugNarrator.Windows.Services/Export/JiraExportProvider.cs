@@ -105,7 +105,7 @@ public sealed class JiraExportProvider
         var payload = new JiraIssueRequest(
             new JiraIssueFields(
                 new JiraProjectField(configuration.ProjectKey),
-                issue.Title,
+                TrackerExportPayloadBudget.TrackerTitle(issue.Title, TrackerExportPayloadBudget.JiraSummaryLimit),
                 new JiraIssueTypeField(configuration.IssueType),
                 BuildDescription(issue, session)));
 
