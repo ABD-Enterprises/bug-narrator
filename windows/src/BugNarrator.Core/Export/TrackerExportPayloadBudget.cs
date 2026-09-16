@@ -57,6 +57,13 @@ public static class TrackerExportPayloadBudget
         }
 
         var keep = Math.Max(0, maxCharacters - 1);
+        // Length counts UTF-16 units, so an odd cut can land between the halves of an astral
+        // character (emoji) and leave a lone surrogate the JSON encoder turns into U+FFFD.
+        if (keep > 0 && char.IsHighSurrogate(collapsed[keep - 1]))
+        {
+            keep--;
+        }
+
         return collapsed[..keep].TrimEnd() + "…";
     }
 

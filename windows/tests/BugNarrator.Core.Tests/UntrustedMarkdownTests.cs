@@ -91,6 +91,8 @@ public sealed class UntrustedMarkdownTests
     [InlineData("  2) forged", "  2\\) forged")]
     [InlineData("3.5 seconds", "3.5 seconds")]
     [InlineData("v1.2", "v1.2")]
+    [InlineData("+ plus list", "\\+ plus list")]
+    [InlineData("1234567890. too long to be a list marker", "1234567890. too long to be a list marker")]
     public void Neutralize_HandlesIndentedBlockSyntaxAndOrderedLists(string input, string expected)
     {
         Assert.Equal(expected, UntrustedMarkdown.Neutralize(input));

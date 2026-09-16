@@ -53,6 +53,17 @@ public sealed class TrackerExportPayloadBudgetTests
     }
 
     [Fact]
+    public void TrackerTitle_NeverCutsInsideASurrogatePair()
+    {
+        var title = "a" + string.Concat(Enumerable.Repeat("😀", 128)); // 257 UTF-16 units; unit 254 is a high surrogate
+        var result = TrackerExportPayloadBudget.TrackerTitle(title, 255);
+
+        Assert.False(char.IsHighSurrogate(result[^2]), "the cut must not leave a lone high surrogate before the ellipsis");
+        Assert.EndsWith("😀…", result, System.StringComparison.Ordinal);
+        Assert.True(result.Length <= 255);
+    }
+
+    [Fact]
     public void TrackerTitle_CollapsingHappensBeforeMeasuring()
     {
         Assert.Equal("short title", TrackerExportPayloadBudget.TrackerTitle("short" + new string(' ', 290) + "title", 255));
