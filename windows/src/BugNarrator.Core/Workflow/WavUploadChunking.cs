@@ -89,6 +89,14 @@ public static class WavUploadChunking
             var size = BitConverter.ToUInt32(chunkHeader, 4);
             if (id == "fmt ")
             {
+                // 16 for plain PCM, 18 with cbSize (what NAudio's WaveFileWriter emits), 40 for
+                // WAVE_FORMAT_EXTENSIBLE; anything else is not a fmt chunk we understand, and
+                // must not become a multi-gigabyte allocation from a hand-crafted header.
+                if (size < 16 || size > 64)
+                {
+                    throw new InvalidDataException("The recorded audio file has an unexpected fmt chunk.");
+                }
+
                 var fmt = new byte[size];
                 ReadExactly(wav, fmt, "fmt chunk");
                 var format = BitConverter.ToInt16(fmt, 0);
@@ -132,6 +140,13 @@ public static class WavUploadChunking
     {
         var bytesPerFrame = layout.BytesPerFrame;
         var byteCount = span.FrameCount * bytesPerFrame;
+        // The plan is by duration, sized for the recorder's 16 kHz mono format. A denser layout
+        // (this class does not know the recorder) could plan an 8-minute chunk far over the
+        // endpoint limit; fail loudly rather than upload it.
+        if (byteCount + 44 > MaximumSingleUploadBytes)
+        {
+            throw new InvalidDataException("A planned chunk exceeds the upload limit; the recording is not in the expected 16 kHz mono format.");
+        }
         var byteRate = layout.SampleRate * bytesPerFrame;
 
         void Write(ReadOnlySpan<byte> bytes) => destination.Write(bytes);

@@ -143,6 +143,51 @@ public sealed class WavUploadChunkingTests
         var bytes = chunk.ToArray();
         Assert.Equal(300, BitConverter.ToInt16(bytes, 44));            // first frame is frame 300
         Assert.Equal(499, BitConverter.ToInt16(bytes, 44 + 398));      // last frame is frame 499
+        // The exact 44-byte header a strict decoder reads: RIFF size, byte rate, block align.
+        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+        Assert.Equal(36u + 400, BitConverter.ToUInt32(bytes, 4));
+        Assert.Equal("WAVEfmt ", System.Text.Encoding.ASCII.GetString(bytes, 8, 8));
+        Assert.Equal(16u, BitConverter.ToUInt32(bytes, 16));
+        Assert.Equal(1, BitConverter.ToUInt16(bytes, 20));
+        Assert.Equal(1, BitConverter.ToUInt16(bytes, 22));
+        Assert.Equal((uint)Rate, BitConverter.ToUInt32(bytes, 24));
+        Assert.Equal((uint)(Rate * 2), BitConverter.ToUInt32(bytes, 28));
+        Assert.Equal(2, BitConverter.ToUInt16(bytes, 32));
+        Assert.Equal(16, BitConverter.ToUInt16(bytes, 34));
+        Assert.Equal("data", System.Text.Encoding.ASCII.GetString(bytes, 36, 4));
+        Assert.Equal(400u, BitConverter.ToUInt32(bytes, 40));
+    }
+
+    [Fact]
+    public void ReadLayout_AcceptsTheEighteenByteFmtNAudioWrites()
+    {
+        // NAudio's WaveFileWriter emits WAVEFORMATEX with cbSize (fmt size 18), not the 16-byte form.
+        var canonical = MakeWav(10);
+        var bytes = new List<byte>(canonical[..16]);
+        bytes.AddRange(BitConverter.GetBytes(18u)); bytes.AddRange(canonical[20..36]); bytes.AddRange(new byte[] { 0, 0 });
+        bytes.AddRange(canonical[36..]);
+        using var wav = new MemoryStream(bytes.ToArray());
+        var layout = WavUploadChunking.ReadLayout(wav);
+        Assert.Equal(46, layout.DataOffset);
+        Assert.Equal(10, layout.FrameCount);
+    }
+
+    [Theory]
+    [InlineData(8u)]
+    [InlineData(0x7FFFFFFFu)]
+    public void ReadLayout_RejectsAnImplausibleFmtSizeInsteadOfAllocatingIt(uint size)
+    {
+        var bytes = MakeWav(10); BitConverter.GetBytes(size).CopyTo(bytes, 16);
+        Assert.Throws<InvalidDataException>(() => WavUploadChunking.ReadLayout(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void WriteChunk_RefusesAChunkThatWouldExceedTheUploadLimit()
+    {
+        // A denser layout than the recorder's: 96 kHz stereo 24-bit, 8 minutes = 276 MB.
+        var layout = new WavUploadChunking.PcmLayout(96_000, 2, 24, 44, 0);
+        var span = new WavUploadChunking.Span(0, 8 * 60 * 96_000L);
+        Assert.Throws<InvalidDataException>(() => WavUploadChunking.WriteChunk(new MemoryStream(new byte[44]), layout, span, new MemoryStream()));
     }
 
     [Fact]
