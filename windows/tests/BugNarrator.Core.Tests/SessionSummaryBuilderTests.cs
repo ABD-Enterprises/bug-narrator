@@ -39,6 +39,33 @@ public sealed class SessionSummaryBuilderTests
         Assert.StartsWith("The button is dead. Session length", Build("  The button is dead.  "));
     }
 
+    [Theory]
+    [InlineData("The button is dead.\nThen it recovered.")]
+    [InlineData("The button is dead.\tThen it recovered.")]
+    public void LeadSentence_AnyWhitespaceAfterTheTerminatorCounts(string transcript)
+    {
+        // Transcripts carry newlines; a terminator before one ends the sentence.
+        Assert.StartsWith("The button is dead. Session length", Build(transcript));
+    }
+
+    [Fact]
+    public void TerminatorAtExactlyIndex220_FallsToTheCapPath()
+    {
+        // The gate is strictly < 220: index 219 is the last that yields a sentence.
+        var atNineteen = new string('c', 219) + ". Tail";
+        Assert.StartsWith(new string('c', 219) + ". Session length", Build(atNineteen));
+        var atTwenty = new string('c', 220) + ". Tail";
+        Assert.StartsWith(new string('c', 220) + "... Session length", Build(atTwenty));
+    }
+
+    [Fact]
+    public void ExactlyTwoHundredTwentyCharsWithoutTerminator_IsKeptWhole()
+    {
+        var transcript = new string('d', 220);
+        Assert.StartsWith(transcript + " Session length", Build(transcript));
+        Assert.StartsWith(new string('d', 220) + "... Session length", Build(transcript + "d"));
+    }
+
     [Fact]
     public void NoTerminator_UnderTheCap_UsesTheWholeText()
     {
