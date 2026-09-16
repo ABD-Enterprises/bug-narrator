@@ -346,7 +346,7 @@ public static class IssueExtractionResponseParser
 
         if (element.Value.ValueKind == JsonValueKind.Number && element.Value.TryGetDouble(out var numericValue))
         {
-            return numericValue;
+            return FiniteOrNull(numericValue);
         }
 
         if (element.Value.ValueKind != JsonValueKind.String)
@@ -360,26 +360,29 @@ public static class IssueExtractionResponseParser
             return null;
         }
 
+        // double.TryParse accepts "NaN" and overflows "1e999" to infinity; TimeSpan.FromSeconds then
+        // throws from TimestampLabel when the session library renders (#1196). Non-finite is absent.
         if (double.TryParse(rawValue, out var seconds))
         {
-            return seconds;
+            return FiniteOrNull(seconds);
         }
 
         var parts = rawValue.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(part => double.TryParse(part, out var value) ? value : double.NaN)
             .ToArray();
 
-        if (parts.Any(double.IsNaN))
+        if (parts.Any(part => !double.IsFinite(part)))
         {
             return null;
         }
 
-        return parts.Length switch
+        double? total = parts.Length switch
         {
             2 => (parts[0] * 60) + parts[1],
             3 => (parts[0] * 3600) + (parts[1] * 60) + parts[2],
             _ => null,
         };
+        return total is null ? null : FiniteOrNull(total.Value);
     }
 
     private static IEnumerable<string> GetJsonCandidates(string content)
@@ -468,11 +471,14 @@ public static class IssueExtractionResponseParser
 
         return value.Value.ValueKind switch
         {
-            JsonValueKind.Number when value.Value.TryGetDouble(out var number) => number,
-            JsonValueKind.String when double.TryParse(value.Value.GetString(), out var number) => number,
+            JsonValueKind.Number when value.Value.TryGetDouble(out var number) => FiniteOrNull(number),
+            JsonValueKind.String when double.TryParse(value.Value.GetString(), out var number) => FiniteOrNull(number),
             _ => null,
         };
     }
+
+    /// <summary>Every model-sourced number passes through here: NaN and ±infinity are treated as absent (#1196).</summary>
+    private static double? FiniteOrNull(double value) => double.IsFinite(value) ? value : null;
 
     private static bool? GetFirstBool(JsonElement element, params string[] propertyNames)
     {
