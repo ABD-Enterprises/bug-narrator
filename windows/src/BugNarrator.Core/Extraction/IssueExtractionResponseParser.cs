@@ -114,7 +114,7 @@ public static class IssueExtractionResponseParser
             Category: ParseCategory(category),
             Summary: summary.Trim(),
             EvidenceExcerpt: evidenceExcerpt.Trim(),
-            TimestampSeconds: ParseTimestamp(GetFirstValue(issueElement, "timestamp", "time", "timecode")),
+            TimestampSeconds: ParseTimestamp(GetFirstValue(issueElement, candidate => ParseTimestamp(candidate) is not null, "timestamp", "time", "timecode")),
             RelatedScreenshotIds: relatedScreenshotIds,
             Confidence: GetFirstDouble(issueElement, "confidence", "score"),
             RequiresReview: GetFirstBool(issueElement, "requiresReview", "requires_review", "needsReview") ?? true,
@@ -281,7 +281,7 @@ public static class IssueExtractionResponseParser
                     element, "expectedResult", "expected_result", "expected")),
                 ActualResult: NullIfBlank(GetFirstString(
                     element, "actualResult", "actual_result", "actual")),
-                TimestampSeconds: ParseTimestamp(GetFirstValue(element, "timestamp", "time", "timecode")),
+                TimestampSeconds: ParseTimestamp(GetFirstValue(element, candidate => ParseTimestamp(candidate) is not null, "timestamp", "time", "timecode")),
                 ScreenshotId: ResolveScreenshotId(element, screenshotIndex)));
         }
 
@@ -440,11 +440,17 @@ public static class IssueExtractionResponseParser
         return null;
     }
 
-    private static JsonElement? GetFirstValue(JsonElement element, params string[] propertyNames)
+    /// <summary>
+    /// The first alias whose value satisfies <paramref name="usable"/>. macOS's firstString /
+    /// firstDouble / firstBool try each key with `as?` and keep going, so `"title": null,
+    /// "issueTitle": "…"` reads the alias; stopping at the first PRESENT key made the same reply
+    /// fail the whole extraction on Windows (#1198).
+    /// </summary>
+    private static JsonElement? GetFirstValue(JsonElement element, Func<JsonElement, bool> usable, params string[] propertyNames)
     {
         foreach (var propertyName in propertyNames)
         {
-            if (element.TryGetProperty(propertyName, out var value))
+            if (element.TryGetProperty(propertyName, out var value) && usable(value))
             {
                 return value;
             }
@@ -455,40 +461,30 @@ public static class IssueExtractionResponseParser
 
     private static string? GetFirstString(JsonElement element, params string[] propertyNames)
     {
-        var value = GetFirstValue(element, propertyNames);
-        return value is { ValueKind: JsonValueKind.String }
-            ? value.Value.GetString()
-            : null;
+        return GetFirstValue(element, value => value.ValueKind == JsonValueKind.String, propertyNames)?.GetString();
     }
 
     private static double? GetFirstDouble(JsonElement element, params string[] propertyNames)
     {
-        var value = GetFirstValue(element, propertyNames);
-        if (value is null)
-        {
-            return null;
-        }
-
-        return value.Value.ValueKind switch
-        {
-            JsonValueKind.Number when value.Value.TryGetDouble(out var number) => FiniteOrNull(number),
-            JsonValueKind.String when double.TryParse(value.Value.GetString(), out var number) => FiniteOrNull(number),
-            _ => null,
-        };
+        // A key whose value is not a finite number (including "NaN", #1196) falls through to the next alias.
+        var value = GetFirstValue(element, candidate => AsFiniteDouble(candidate) is not null, propertyNames);
+        return value is null ? null : AsFiniteDouble(value.Value);
     }
+
+    private static double? AsFiniteDouble(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number when value.TryGetDouble(out var number) => FiniteOrNull(number),
+        JsonValueKind.String when double.TryParse(value.GetString(), out var number) => FiniteOrNull(number),
+        _ => null,
+    };
 
     /// <summary>Every model-sourced number passes through here: NaN and ±infinity are treated as absent (#1196).</summary>
     private static double? FiniteOrNull(double value) => double.IsFinite(value) ? value : null;
 
     private static bool? GetFirstBool(JsonElement element, params string[] propertyNames)
     {
-        var value = GetFirstValue(element, propertyNames);
-        if (value is null)
-        {
-            return null;
-        }
-
-        return value.Value.ValueKind switch
+        var value = GetFirstValue(element, candidate => candidate.ValueKind is JsonValueKind.True or JsonValueKind.False, propertyNames);
+        return value?.ValueKind switch
         {
             JsonValueKind.True => true,
             JsonValueKind.False => false,
@@ -498,8 +494,8 @@ public static class IssueExtractionResponseParser
 
     private static IReadOnlyList<string> GetFirstStringArray(JsonElement element, params string[] propertyNames)
     {
-        var value = GetFirstValue(element, propertyNames);
-        if (value is null || value.Value.ValueKind != JsonValueKind.Array)
+        var value = GetFirstValue(element, candidate => candidate.ValueKind == JsonValueKind.Array, propertyNames);
+        if (value is null)
         {
             return Array.Empty<string>();
         }

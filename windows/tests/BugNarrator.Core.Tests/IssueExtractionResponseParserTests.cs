@@ -366,3 +366,58 @@ public sealed class IssueExtractionResponseParserNonFiniteTests
         Assert.Null(issue.ConfidenceLabel);
     }
 }
+
+/// <summary>Alias keys fall through past unusable values, as on macOS (#1198).</summary>
+public sealed class IssueExtractionResponseParserAliasFallthroughTests
+{
+    private const string Base = "\"category\":\"Bug\",\"summary\":\"s\",\"evidenceExcerpt\":\"e\"";
+
+    private static IssueExtractionResult Parse(string issueJson) =>
+        IssueExtractionResponseParser.Parse("{\"summary\":\"s\",\"issues\":[{" + issueJson + "}]}", new Dictionary<string, Guid>());
+
+    [Fact]
+    public void NullTitle_FallsThroughToTheAliasInsteadOfFailingTheExtraction()
+    {
+        // Used to throw InvalidOperationException ("none matched the expected structure").
+        var issue = Assert.Single(Parse("\"title\":null,\"issueTitle\":\"Alias title\"," + Base).Issues);
+        Assert.Equal("Alias title", issue.Title);
+    }
+
+    [Fact]
+    public void UsablePrimaryKey_StillWinsOverAnAlias()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"Primary\",\"issueTitle\":\"Alias\"," + Base).Issues);
+        Assert.Equal("Primary", issue.Title);
+    }
+
+    [Fact]
+    public void NullTimestamp_FallsThroughToTimecode()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":null,\"timecode\":\"00:08\"").Issues);
+        Assert.Equal(8, issue.TimestampSeconds);
+    }
+
+    [Fact]
+    public void NonNumericConfidence_FallsThroughToScore()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"confidence\":\"high\",\"score\":0.7").Issues);
+        Assert.Equal(0.7, issue.Confidence);
+        var nan = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"confidence\":\"NaN\",\"score\":0.7").Issues);
+        Assert.Equal(0.7, nan.Confidence);
+    }
+
+    [Fact]
+    public void WrongKindBool_FallsThroughToTheAlias()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"requiresReview\":\"yes\",\"needsReview\":true").Issues);
+        Assert.True(issue.RequiresReview);
+    }
+
+    [Fact]
+    public void AllAliasesUnusable_IsAbsentNotAnError()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":null,\"timecode\":\"bogus\",\"confidence\":\"high\",\"score\":\"NaN\"").Issues);
+        Assert.Null(issue.TimestampSeconds);
+        Assert.Null(issue.Confidence);
+    }
+}
