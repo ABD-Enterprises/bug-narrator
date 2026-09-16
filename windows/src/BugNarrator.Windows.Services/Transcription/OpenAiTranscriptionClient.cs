@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Http;
 
 namespace BugNarrator.Windows.Services.Transcription;
@@ -33,6 +34,81 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             throw new InvalidOperationException("The recorded audio file was empty.");
         }
 
+        // The endpoint rejects uploads over 25 MB and a 16 kHz mono WAV crosses that at ~13
+        // minutes. Cut an over-limit PCM WAV into ≤8-minute WAV chunks and join the texts, as
+        // macOS joins its chunk transcripts (#1202). Anything else over the limit is refused
+        // before the upload rather than after it.
+        if (fileInfo.Length > WavUploadChunking.MaximumSingleUploadBytes)
+        {
+            return await TranscribeInChunksAsync(audioFilePath, fileInfo, apiKey, request, cancellationToken);
+        }
+
+        return await TranscribeSingleFileAsync(audioFilePath, fileInfo, apiKey, request, cancellationToken);
+    }
+
+    private async Task<string> TranscribeInChunksAsync(
+        string audioFilePath,
+        FileInfo fileInfo,
+        string apiKey,
+        OpenAiTranscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(fileInfo.Extension, ".wav", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(OversizedMessage(fileInfo.Length));
+        }
+
+        using var source = File.OpenRead(audioFilePath);
+        var layout = WavUploadChunking.ReadLayout(source);
+        var spans = WavUploadChunking.Plan(layout.FrameCount, layout.SampleRate);
+        if (spans.Count == 0)
+        {
+            // Within one chunk's duration yet over the byte limit: not the recorder's format.
+            throw new InvalidOperationException(OversizedMessage(fileInfo.Length));
+        }
+
+        var chunkDirectory = Path.Combine(Path.GetTempPath(), "BugNarrator-Chunks-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(chunkDirectory);
+        try
+        {
+            var parts = new List<string>(spans.Count);
+            for (var index = 0; index < spans.Count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var chunkPath = Path.Combine(chunkDirectory, $"chunk-{index + 1:D3}.wav");
+                using (var chunk = File.Create(chunkPath))
+                {
+                    WavUploadChunking.WriteChunk(source, layout, spans[index], chunk);
+                }
+
+                var text = await TranscribeSingleFileAsync(chunkPath, new FileInfo(chunkPath), apiKey, request, cancellationToken);
+                parts.Add(text.Trim());
+            }
+
+            var transcript = string.Join("\n\n", parts.Where(part => part.Length > 0)).Trim();
+            if (string.IsNullOrWhiteSpace(transcript))
+            {
+                throw new InvalidOperationException("The AI provider returned an empty transcript.");
+            }
+
+            return transcript;
+        }
+        finally
+        {
+            try { Directory.Delete(chunkDirectory, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    private static string OversizedMessage(long bytes) =>
+        $"The recorded audio is {bytes / (1024.0 * 1024.0):0.#} MB, which is larger than BugNarrator's 24 MB safe upload limit. Shorten the recording or use a lower-bitrate source.";
+
+    private async Task<string> TranscribeSingleFileAsync(
+        string audioFilePath,
+        FileInfo fileInfo,
+        string apiKey,
+        OpenAiTranscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
         using var fileStream = File.OpenRead(audioFilePath);
         using var content = new MultipartFormDataContent();
         using var audioContent = new StreamContent(fileStream);
