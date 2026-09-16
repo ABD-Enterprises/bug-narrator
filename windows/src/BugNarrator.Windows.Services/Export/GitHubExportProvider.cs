@@ -102,7 +102,7 @@ public sealed class GitHubExportProvider
         request.Headers.UserAgent.Add(new ProductInfoHeaderValue("BugNarrator", "1.0"));
 
         var payload = new GitHubIssueRequest(
-            Title: issue.Title,
+            Title: TrackerExportPayloadBudget.TrackerTitle(issue.Title, TrackerExportPayloadBudget.GitHubTitleLimit),
             Body: BuildIssueBody(issue, session),
             Labels: configuration.Labels.Count == 0 ? null : configuration.Labels);
 
