@@ -304,3 +304,47 @@ public sealed class IssueExtractionResponseParserTests
         Assert.Contains("unexpected format", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 }
+
+/// <summary>Non-finite numbers from the model (#1196), the Windows twin of macOS #1126.</summary>
+public sealed class IssueExtractionResponseParserNonFiniteTests
+{
+    private const string Base = "\"title\":\"Clipped\",\"category\":\"Bug\",\"summary\":\"s\",\"evidenceExcerpt\":\"e\"";
+
+    private static ExtractedIssue ParseIssue(string extraFields) =>
+        Assert.Single(IssueExtractionResponseParser.Parse(
+            "{\"summary\":\"s\",\"issues\":[{" + Base + "," + extraFields + "}]}",
+            new Dictionary<string, Guid>()).Issues);
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("1e999")]
+    [InlineData("-1e999")]
+    [InlineData("NaN:00")]
+    [InlineData("01:1e999")]
+    public void NonFiniteTimestamp_IsAbsentAndTheLabelDoesNotThrow(string value)
+    {
+        var issue = ParseIssue("\"timestamp\":\"" + value + "\"");
+
+        Assert.Null(issue.TimestampSeconds);
+        Assert.Null(issue.TimestampLabel);
+    }
+
+    [Fact]
+    public void FiniteTimestamps_StillParse()
+    {
+        Assert.Equal(65, ParseIssue("\"timestamp\":\"01:05\"").TimestampSeconds);
+        Assert.Equal(12.5, ParseIssue("\"timestamp\":\"12.5\"").TimestampSeconds);
+        Assert.Equal(7, ParseIssue("\"timestamp\":7").TimestampSeconds);
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("1e999")]
+    public void NonFiniteConfidence_IsAbsent(string value)
+    {
+        var issue = ParseIssue("\"confidence\":\"" + value + "\"");
+
+        Assert.Null(issue.Confidence);
+        Assert.Null(issue.ConfidenceLabel);
+    }
+}

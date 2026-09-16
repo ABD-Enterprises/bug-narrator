@@ -41,6 +41,8 @@ public static class SessionTimeFormatter
 
     public static string FormatElapsedSeconds(double seconds)
     {
-        return FormatDuration(TimeSpan.FromSeconds(Math.Max(0, seconds)));
+        // Math.Max(0, NaN) is NaN and TimeSpan.FromSeconds throws on NaN or infinity; a session
+        // persisted before #1196 could still carry one, so the formatter is total.
+        return FormatDuration(TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Max(0, seconds) : 0));
     }
 }
