@@ -366,3 +366,86 @@ public sealed class IssueExtractionResponseParserNonFiniteTests
         Assert.Null(issue.ConfidenceLabel);
     }
 }
+
+/// <summary>Alias keys fall through past unusable values, as on macOS (#1198).</summary>
+public sealed class IssueExtractionResponseParserAliasFallthroughTests
+{
+    private const string Base = "\"category\":\"Bug\",\"summary\":\"s\",\"evidenceExcerpt\":\"e\"";
+
+    private static IssueExtractionResult Parse(string issueJson) =>
+        IssueExtractionResponseParser.Parse("{\"summary\":\"s\",\"issues\":[{" + issueJson + "}]}", new Dictionary<string, Guid>());
+
+    [Fact]
+    public void NullTitle_FallsThroughToTheAliasInsteadOfFailingTheExtraction()
+    {
+        // Used to throw InvalidOperationException ("none matched the expected structure").
+        var issue = Assert.Single(Parse("\"title\":null,\"issueTitle\":\"Alias title\"," + Base).Issues);
+        Assert.Equal("Alias title", issue.Title);
+    }
+
+    [Fact]
+    public void UsablePrimaryKey_StillWinsOverAnAlias()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"Primary\",\"issueTitle\":\"Alias\"," + Base).Issues);
+        Assert.Equal("Primary", issue.Title);
+    }
+
+    [Fact]
+    public void NullTimestamp_FallsThroughToTimecode()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":null,\"timecode\":\"00:08\"").Issues);
+        Assert.Equal(8, issue.TimestampSeconds);
+    }
+
+    [Fact]
+    public void NonNumericConfidence_FallsThroughToScore()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"confidence\":\"high\",\"score\":0.7").Issues);
+        Assert.Equal(0.7, issue.Confidence);
+        var nan = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"confidence\":\"NaN\",\"score\":0.7").Issues);
+        Assert.Equal(0.7, nan.Confidence);
+    }
+
+    [Fact]
+    public void WrongKindBool_FallsThroughToTheAlias()
+    {
+        // The alias is false so the assertion cannot be satisfied by the `?? true` default.
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"requiresReview\":\"yes\",\"needsReview\":false").Issues);
+        Assert.False(issue.RequiresReview);
+    }
+
+    [Fact]
+    public void ReproductionStepTimestamp_FallsThroughToTimecodeToo()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"reproductionSteps\":[{\"instruction\":\"Open\",\"timestamp\":null,\"timecode\":\"00:09\"}]").Issues);
+        Assert.Equal(9, Assert.Single(issue.ReproductionSteps).TimestampSeconds);
+    }
+
+    [Fact]
+    public void NonArrayScreenshotList_FallsThroughToTheAlias()
+    {
+        var shotId = Guid.NewGuid();
+        var result = IssueExtractionResponseParser.Parse(
+            "{\"summary\":\"s\",\"issues\":[{\"title\":\"T\"," + Base + ",\"relatedScreenshotFileNames\":\"not-a-list\",\"screenshots\":[\"shot-1.png\"]}]}",
+            new Dictionary<string, Guid> { ["shot-1.png"] = shotId });
+
+        Assert.Equal([shotId], Assert.Single(result.Issues).RelatedScreenshotIds);
+    }
+
+    [Fact]
+    public void UnparseableTimestamp_FallsThroughToAParseableAlias()
+    {
+        // Deliberately more lenient than macOS, whose firstString stops at "bogus": recovering a
+        // timestamp the model also supplied under an alias is the better outcome.
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":\"bogus\",\"timecode\":\"00:08\"").Issues);
+        Assert.Equal(8, issue.TimestampSeconds);
+    }
+
+    [Fact]
+    public void AllAliasesUnusable_IsAbsentNotAnError()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":null,\"timecode\":\"bogus\",\"confidence\":\"high\",\"score\":\"NaN\"").Issues);
+        Assert.Null(issue.TimestampSeconds);
+        Assert.Null(issue.Confidence);
+    }
+}
