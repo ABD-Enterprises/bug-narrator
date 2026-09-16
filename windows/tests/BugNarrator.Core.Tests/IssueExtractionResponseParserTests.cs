@@ -409,8 +409,36 @@ public sealed class IssueExtractionResponseParserAliasFallthroughTests
     [Fact]
     public void WrongKindBool_FallsThroughToTheAlias()
     {
-        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"requiresReview\":\"yes\",\"needsReview\":true").Issues);
-        Assert.True(issue.RequiresReview);
+        // The alias is false so the assertion cannot be satisfied by the `?? true` default.
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"requiresReview\":\"yes\",\"needsReview\":false").Issues);
+        Assert.False(issue.RequiresReview);
+    }
+
+    [Fact]
+    public void ReproductionStepTimestamp_FallsThroughToTimecodeToo()
+    {
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"reproductionSteps\":[{\"instruction\":\"Open\",\"timestamp\":null,\"timecode\":\"00:09\"}]").Issues);
+        Assert.Equal(9, Assert.Single(issue.ReproductionSteps).TimestampSeconds);
+    }
+
+    [Fact]
+    public void NonArrayScreenshotList_FallsThroughToTheAlias()
+    {
+        var shotId = Guid.NewGuid();
+        var result = IssueExtractionResponseParser.Parse(
+            "{\"summary\":\"s\",\"issues\":[{\"title\":\"T\"," + Base + ",\"relatedScreenshotFileNames\":\"not-a-list\",\"screenshots\":[\"shot-1.png\"]}]}",
+            new Dictionary<string, Guid> { ["shot-1.png"] = shotId });
+
+        Assert.Equal([shotId], Assert.Single(result.Issues).RelatedScreenshotIds);
+    }
+
+    [Fact]
+    public void UnparseableTimestamp_FallsThroughToAParseableAlias()
+    {
+        // Deliberately more lenient than macOS, whose firstString stops at "bogus": recovering a
+        // timestamp the model also supplied under an alias is the better outcome.
+        var issue = Assert.Single(Parse("\"title\":\"T\"," + Base + ",\"timestamp\":\"bogus\",\"timecode\":\"00:08\"").Issues);
+        Assert.Equal(8, issue.TimestampSeconds);
     }
 
     [Fact]

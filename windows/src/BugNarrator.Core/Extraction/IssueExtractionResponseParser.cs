@@ -114,6 +114,8 @@ public static class IssueExtractionResponseParser
             Category: ParseCategory(category),
             Summary: summary.Trim(),
             EvidenceExcerpt: evidenceExcerpt.Trim(),
+            // Parse-usable, not just kind-usable: deliberately more lenient than macOS, whose
+            // firstString stops at an unparseable "timestamp" even when "timecode" would parse.
             TimestampSeconds: ParseTimestamp(GetFirstValue(issueElement, candidate => ParseTimestamp(candidate) is not null, "timestamp", "time", "timecode")),
             RelatedScreenshotIds: relatedScreenshotIds,
             Confidence: GetFirstDouble(issueElement, "confidence", "score"),
