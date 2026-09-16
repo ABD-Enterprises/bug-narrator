@@ -330,6 +330,24 @@ public sealed class IssueExtractionResponseParserNonFiniteTests
     }
 
     [Fact]
+    public void NonFiniteJsonNumberTokens_AreAbsentToo()
+    {
+        // System.Text.Json reads the literal 1e999 as a Number token whose TryGetDouble yields infinity.
+        var issue = ParseIssue("\"timestamp\":1e999,\"confidence\":1e999");
+
+        Assert.Null(issue.TimestampSeconds);
+        Assert.Null(issue.TimestampLabel);
+        Assert.Null(issue.Confidence);
+        Assert.Null(issue.ConfidenceLabel);
+    }
+
+    [Fact]
+    public void FinitePartsWhoseSumOverflows_AreAbsent()
+    {
+        Assert.Null(ParseIssue("\"timestamp\":\"1e308:00:00\"").TimestampSeconds);
+    }
+
+    [Fact]
     public void FiniteTimestamps_StillParse()
     {
         Assert.Equal(65, ParseIssue("\"timestamp\":\"01:05\"").TimestampSeconds);

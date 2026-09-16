@@ -41,8 +41,10 @@ public static class SessionTimeFormatter
 
     public static string FormatElapsedSeconds(double seconds)
     {
-        // Math.Max(0, NaN) is NaN and TimeSpan.FromSeconds throws on NaN or infinity; a session
-        // persisted before #1196 could still carry one, so the formatter is total.
+        // Math.Max(0, NaN) is NaN and TimeSpan.FromSeconds throws on NaN or infinity. The store
+        // cannot write either (Serialize throws), but a hand-edited or externally produced session
+        // file can carry a 1e999 literal, and Services pass persisted seconds here — so the
+        // formatter is total rather than trusting every producer (#1196).
         return FormatDuration(TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Max(0, seconds) : 0));
     }
 }
