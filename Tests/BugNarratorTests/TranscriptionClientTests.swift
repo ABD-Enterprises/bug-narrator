@@ -469,13 +469,17 @@ final class TranscriptionClientTests: XCTestCase {
 
     // MARK: - a silent chunk must not fail the whole recording (#1204)
 
-    private func makeChunkClient(payloads: [String], requestCount: UnsafeMutablePointer<Int>) throws -> (TranscriptionClient, URL, [URL]) {
+    private final class RequestCounter { var value = 0 }
+
+    /// Each payload is `(status, body)` for the Nth chunk upload, in order.
+    private func makeChunkClient(payloads: [(status: Int, body: String)], counter: RequestCounter) throws -> (TranscriptionClient, URL, [URL]) {
         let originalFileURL = try makeAudioFile(named: "three-chunk-original", contents: "audio-data")
         let chunkURLs = try (1...payloads.count).map { try makeAudioFile(named: "three-chunk-\($0)", contents: "chunk-\($0)") }
         MockURLProtocol.requestHandler = { request in
-            requestCount.pointee += 1
-            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Data(payloads[requestCount.pointee - 1].utf8))
+            counter.value += 1
+            let payload = payloads[counter.value - 1]
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: payload.status, httpVersion: nil, headerFields: nil)!
+            return (response, Data(payload.body.utf8))
         }
         let client = TranscriptionClient(
             session: makeMockURLSession(),
@@ -488,12 +492,12 @@ final class TranscriptionClientTests: XCTestCase {
 
     func testTranscribeSkipsAnEmptyChunkAndKeepsTheRest() async throws {
         // Reproduction of the 2026-09-17 session: 18 chunks, one quiet stretch, every retry failed.
-        var requestCount = 0
+        let counter = RequestCounter()
         let (client, originalFileURL, _) = try makeChunkClient(payloads: [
-            #"{"text":"Opening remarks","segments":[{"start":0,"end":3,"text":"Opening remarks"}]}"#,
-            #"{"text":"","segments":[]}"#,
-            #"{"text":"Closing remarks","segments":[{"start":1,"end":4,"text":"Closing remarks"}]}"#,
-        ], requestCount: &requestCount)
+            (200, #"{"text":"Opening remarks","segments":[{"start":0,"end":3,"text":"Opening remarks"}]}"#),
+            (200, #"{"text":"","segments":[]}"#),
+            (200, #"{"text":"Closing remarks","segments":[{"start":1,"end":4,"text":"Closing remarks"}]}"#),
+        ], counter: counter)
         defer { try? FileManager.default.removeItem(at: originalFileURL) }
 
         let result = try await client.transcribe(
@@ -502,24 +506,45 @@ final class TranscriptionClientTests: XCTestCase {
             request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
         )
 
-        XCTAssertEqual(requestCount, 3, "the empty chunk must not stop the remaining uploads")
+        XCTAssertEqual(counter.value, 3, "the empty chunk must not stop the remaining uploads")
         XCTAssertEqual(result.text, "Opening remarks\n\nClosing remarks")
         XCTAssertEqual(result.segments.map(\.start), [0, 961], "segments after the skipped chunk keep their absolute offset")
     }
 
     func testTranscribeStillFailsWhenEveryChunkIsEmpty() async throws {
-        var requestCount = 0
+        let counter = RequestCounter()
         let (client, originalFileURL, _) = try makeChunkClient(payloads: [
-            #"{"text":"","segments":[]}"#,
-            #"{"text":"   ","segments":[]}"#,
-        ], requestCount: &requestCount)
+            (200, #"{"text":"","segments":[]}"#),
+            (200, #"{"text":"   ","segments":[]}"#),
+        ], counter: counter)
         defer { try? FileManager.default.removeItem(at: originalFileURL) }
 
         do {
             _ = try await client.transcribe(fileURL: originalFileURL, apiKey: "fixture-openai-key", request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil))
             XCTFail("Expected emptyTranscript")
         } catch AppError.emptyTranscript {
-            XCTAssertEqual(requestCount, 2)
+            XCTAssertEqual(counter.value, 2)
+        }
+    }
+
+    func testTranscribeDoesNotSwallowARealErrorInChunkedMode() async throws {
+        // Only emptyTranscript is skippable: a provider error on chunk 2 must abort the job
+        // and chunk 3 must never be requested (a broadened catch would silently drop chunks).
+        let counter = RequestCounter()
+        let (client, originalFileURL, _) = try makeChunkClient(payloads: [
+            (200, #"{"text":"Opening remarks","segments":[]}"#),
+            (500, #"{"error":{"message":"upstream exploded"}}"#),
+            (200, #"{"text":"Closing remarks","segments":[]}"#),
+        ], counter: counter)
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        do {
+            _ = try await client.transcribe(fileURL: originalFileURL, apiKey: "fixture-openai-key", request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil))
+            XCTFail("Expected the chunk-2 provider error to propagate")
+        } catch AppError.emptyTranscript {
+            XCTFail("a provider error must not be reported as an empty transcript")
+        } catch {
+            XCTAssertEqual(counter.value, 2, "chunk 3 must not be requested after chunk 2 failed")
         }
     }
 
