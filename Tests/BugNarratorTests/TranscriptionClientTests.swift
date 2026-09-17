@@ -467,6 +467,77 @@ final class TranscriptionClientTests: XCTestCase {
         }
     }
 
+    // MARK: - a silent chunk must not fail the whole recording (#1204)
+
+    private func makeChunkClient(payloads: [String], requestCount: UnsafeMutablePointer<Int>) throws -> (TranscriptionClient, URL, [URL]) {
+        let originalFileURL = try makeAudioFile(named: "three-chunk-original", contents: "audio-data")
+        let chunkURLs = try (1...payloads.count).map { try makeAudioFile(named: "three-chunk-\($0)", contents: "chunk-\($0)") }
+        MockURLProtocol.requestHandler = { request in
+            requestCount.pointee += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(payloads[requestCount.pointee - 1].utf8))
+        }
+        let client = TranscriptionClient(
+            session: makeMockURLSession(),
+            transcriptionChunker: MockTranscriptionChunker(
+                chunks: chunkURLs.enumerated().map { TranscriptionAudioChunk(fileURL: $1, startTime: Double($0) * 480, isTemporary: true) }
+            )
+        )
+        return (client, originalFileURL, chunkURLs)
+    }
+
+    func testTranscribeSkipsAnEmptyChunkAndKeepsTheRest() async throws {
+        // Reproduction of the 2026-09-17 session: 18 chunks, one quiet stretch, every retry failed.
+        var requestCount = 0
+        let (client, originalFileURL, _) = try makeChunkClient(payloads: [
+            #"{"text":"Opening remarks","segments":[{"start":0,"end":3,"text":"Opening remarks"}]}"#,
+            #"{"text":"","segments":[]}"#,
+            #"{"text":"Closing remarks","segments":[{"start":1,"end":4,"text":"Closing remarks"}]}"#,
+        ], requestCount: &requestCount)
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        let result = try await client.transcribe(
+            fileURL: originalFileURL,
+            apiKey: "fixture-openai-key",
+            request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil)
+        )
+
+        XCTAssertEqual(requestCount, 3, "the empty chunk must not stop the remaining uploads")
+        XCTAssertEqual(result.text, "Opening remarks\n\nClosing remarks")
+        XCTAssertEqual(result.segments.map(\.start), [0, 961], "segments after the skipped chunk keep their absolute offset")
+    }
+
+    func testTranscribeStillFailsWhenEveryChunkIsEmpty() async throws {
+        var requestCount = 0
+        let (client, originalFileURL, _) = try makeChunkClient(payloads: [
+            #"{"text":"","segments":[]}"#,
+            #"{"text":"   ","segments":[]}"#,
+        ], requestCount: &requestCount)
+        defer { try? FileManager.default.removeItem(at: originalFileURL) }
+
+        do {
+            _ = try await client.transcribe(fileURL: originalFileURL, apiKey: "fixture-openai-key", request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil))
+            XCTFail("Expected emptyTranscript")
+        } catch AppError.emptyTranscript {
+            XCTAssertEqual(requestCount, 2)
+        }
+    }
+
+    func testTranscribeSingleFileStillFailsOnEmptyText() async throws {
+        let fileURL = try makeAudioFile(named: "single-empty", contents: "audio-data")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"text":"","segments":[]}"#.utf8))
+        }
+        let client = TranscriptionClient(session: makeMockURLSession())
+
+        do {
+            _ = try await client.transcribe(fileURL: fileURL, apiKey: "fixture-openai-key", request: TranscriptionRequest(model: "whisper-1", languageHint: nil, prompt: nil))
+            XCTFail("Expected emptyTranscript")
+        } catch AppError.emptyTranscript {}
+    }
+
     func testTranscribeMergesChunkedResultsAndAdjustsSegmentTimes() async throws {
         let originalFileURL = try makeAudioFile(named: "chunked-original", contents: "audio-data")
         let firstChunkURL = try makeAudioFile(named: "chunk-1", contents: "chunk-one")
