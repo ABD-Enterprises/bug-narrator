@@ -86,7 +86,25 @@ actor TranscriptionClient: TranscriptionServing {
                 ]
             )
 
-            let result = try await transcribeSingleFile(fileURL: chunk.fileURL, apiKey: apiKey, request: request)
+            // A chunk with nothing to transcribe — a quiet stretch of a long recording — is not
+            // a failure of the recording. It used to abort the whole job (the per-file parser
+            // throws emptyTranscript), which made a 2 h recording with one silent 8-minute span
+            // untranscribable on every retry (#1204). Only an empty joined transcript fails.
+            let result: TranscriptionResult
+            do {
+                result = try await transcribeSingleFile(fileURL: chunk.fileURL, apiKey: apiKey, request: request)
+            } catch AppError.emptyTranscript {
+                logger.warning(
+                    "transcription_chunk_empty",
+                    "A transcription chunk returned no text and was skipped.",
+                    metadata: [
+                        "chunk_index": "\(index + 1)",
+                        "chunk_count": "\(chunks.count)",
+                        "chunk_start_seconds": String(format: "%.2f", chunk.startTime)
+                    ]
+                )
+                continue
+            }
             transcriptParts.append(result.text.trimmingCharacters(in: .whitespacesAndNewlines))
             adjustedSegments.append(
                 contentsOf: result.segments.map { segment in
