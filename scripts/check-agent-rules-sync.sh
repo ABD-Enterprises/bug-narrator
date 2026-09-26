@@ -3,7 +3,8 @@
 # body. The first line of each is allowed (and expected) to differ — it names
 # the agent the file is addressed to, e.g. "# Local AI Adapter (Claude)".
 # Every line after the first must match across all three, so updates to the
-# ORC adapter contract are never lost on one tool while another stays current.
+# shared repository guardrails are never lost on one tool while another stays
+# current.
 #
 # Exits 0 with a one-line PASS message when in sync; exits 1 with a diff
 # preview when any pair drifts.
