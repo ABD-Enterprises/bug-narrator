@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Merge-queue verification entry point (#920).
-#
-# `.github/workflows/orc-merge-queue.yml` runs this file "if present". It was
-# never present, so the "ORC Merge Queue / call" check printed a placeholder
-# message and passed unconditionally — a gate that validated nothing.
+# Repository verification entry point (#920).
 #
 # This chains the checks the repo already trusts rather than inventing new
-# ones, so the merge-queue result means the same thing as local validation:
+# ones, so its result means the same thing as local validation:
 #
 #   scripts/validate.sh          semgrep (changed files) + swift parse +
 #                                effort-leak audit + docs audit
