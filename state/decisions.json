@@ -38,8 +38,63 @@
     },
     {
       "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Adjusted the RR-002 Windows handoff, package, and validation scripts for Windows PowerShell 5.1 compatibility and self-contained publish output because the real-machine baseline could not be executed honestly until the scripts stopped relying on PowerShell 7-only features and a preinstalled desktop runtime."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Closed RISK-WIN-001 using real Windows evidence instead of CI-only inference: the tray icon appeared in the system-tray overflow, duplicate launches focused the primary instance, recording ran against a Ready microphone, screenshot overlay region capture wrote deterministic artifacts, and hotkeys worked from another focused desktop app."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "RR-002",
+      "summary": "Kept alternate keyboard layout coverage and signed public-release proof explicitly unresolved after the April 4, 2026 Windows pass because this machine exposed only one installed input layout and the RR-002 runtime work did not exercise signed installer or release automation."
+    },
+    {
+      "date": "2026-04-04",
       "phase": "OPS-011",
       "summary": "Captured the GitHub Actions Node 20 deprecation warnings from the successful phase-branch run as a separate follow-up risk instead of expanding RR-002 into workflow-runtime maintenance."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-007",
+      "summary": "Implemented retry-needed preserved-session recovery and generated review summary support on the RR-002 branch immediately because both features were already local, testable, and blocking obvious macOS parity inside the review loop."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-008",
+      "summary": "Used a lightweight Help And Support window plus native shell-launch actions for docs, changelog, releases, issues, repository, support, and debug bundles instead of turning the Windows tray app into a larger always-open shell."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-009",
+      "summary": "Kept the Windows accessibility and permission-guidance work incremental and evidence-backed by adding labels, live status announcements, default or cancel behavior, and Windows settings links, while leaving assistive-technology runtime proof for later validation instead of overclaiming it."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-010",
+      "summary": "Stopped runtime and provider parity at the honest machine boundary: this Windows host could prove the no-key recovery and debug-bundle paths, but it had no provider credentials, only one installed keyboard layout, and only one detected display adapter."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-011",
+      "summary": "Chose Inno Setup for the Windows public-release scaffold and made the Phase B script emit a blocked status artifact whenever installer or signing prerequisites are missing, rather than pretending the app has public release parity."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-010",
+      "summary": "Validated the Windows GitHub export path against a disposable private GitHub repository created under the maintainer account, then closed the created issue after proof so the validation did not touch the main product repo."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-010",
+      "summary": "Used a small Windows-only validation harness against the production storage and export services to prove session deletion and corrupted-local-state bundle safety on this machine without adding more permanent repo surface area."
+    },
+    {
+      "date": "2026-04-04",
+      "phase": "WIN-011",
+      "summary": "Reran the Phase B public-release script after the WIN-010 follow-up validation and confirmed the public path is still honestly blocked only on installer and signing prerequisites, not on build or test failures."
     }
   ]
 }

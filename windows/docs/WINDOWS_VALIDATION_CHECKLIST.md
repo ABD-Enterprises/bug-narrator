@@ -48,11 +48,38 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 ```
 
 ## Automated Coverage Notes
-- `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, and structured issue-extraction parsing.
-- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
+- `BugNarrator.Core.Tests` currently covers deterministic screenshot artifact naming, screenshot-linked timeline moment shaping, completed-session markdown output, session-library query behavior across `Yesterday`, `Last 30 Days`, and `Custom Date Range`, generated review summary formatting, retry metadata formatting, and structured issue-extraction parsing.
+- `BugNarrator.Windows.Tests` currently covers screenshot lifecycle orchestration, Milestone 5 stop-recording orchestration, retry transcription behavior, OpenAI issue extraction behavior, GitHub/Jira export provider behavior, session bundle export, debug bundle export, Milestone 6 review-action orchestration, completed-session deletion, corrupted secret handling, session-path hardening, debug-log redaction, Windows product-link validation, Windows hotkey validation, hotkey settings persistence, hotkey registration status, and hotkey-to-recording action routing.
 - CI now restores, builds, runs both Windows test projects, packages a `Release` zip, validates the packaged artifact contents on `windows-latest`, launches the packaged executable in a headless smoke mode, generates `windows-codex-handoff.json`, and uploads package, validation, and handoff artifacts from the Windows runner.
-- Current passing automated coverage on this branch is `9` core tests and `29` Windows tests when run on Windows.
-- Manual validation is still required for overlay rendering, region selection behavior, desktop capture fidelity, live OpenAI transcription, live OpenAI issue extraction, real GitHub/Jira credentials, DPI scaling, multi-monitor behavior, reserved Windows shortcuts, alternate keyboard layouts, and out-of-focus hotkey behavior against real desktop apps.
+- Current passing automated coverage on this branch is `11` core tests and `34` Windows tests when run on Windows.
+- Manual validation is still required for live OpenAI transcription, live OpenAI issue extraction, real Jira credentials, DPI scaling, multi-monitor behavior, alternate keyboard layouts on a machine with more than one installed layout, and signed installer validation on a clean Windows machine or VM.
+
+## RR-002 Real Windows Evidence (2026-04-04)
+- Ran `powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline` successfully on `phase/RR-002-windows-runtime-hardening`.
+- Confirmed the expected artifacts exist after the baseline run:
+  - `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
+  - `windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json`
+  - `windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json`
+  - `windows/artifacts/handoff/windows-codex-handoff.json`
+- Launched the app with `dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj -c Debug`.
+- Confirmed the `BugNarrator` tray icon appears in the live system-tray overflow and observed the tray context menu surfacing `Show Recording Controls`.
+- Confirmed duplicate launch behavior on Windows: a second launch exited, the original instance remained active, and the log recorded duplicate-instance detection plus focus handoff to the primary shell.
+- Confirmed recording lifecycle against a real microphone state: the log recorded `microphone preflight result: Ready`, the controls window entered the recording state, and stop persisted a completed review session under `%LocalAppData%\\BugNarrator\\Sessions\\`.
+- Confirmed screenshot overlay region capture on Windows: drag-select capture wrote `screenshots/screenshot-001.png`, persisted screenshot metadata into `session-draft.json`, and linked the screenshot to a timeline moment without stopping the active recording.
+- Confirmed out-of-focus hotkeys from a real desktop app by triggering start, screenshot, and stop from Notepad focus after saving `Ctrl+Alt+F9`, `Ctrl+Alt+F10`, and `Ctrl+Alt+F11`.
+- Confirmed reserved-shortcut rejection by saving `Shift+Win+S` for screenshot capture and observing the runtime warning that Windows could not register the shortcut because another app already owned it.
+- Alternate keyboard layout validation was not feasible on this machine because only one input layout was installed.
+
+## WIN-010 Additional Runtime Evidence (2026-04-04)
+- Opened the session library after a real stop-recording flow with no OpenAI API key configured and confirmed the saved sessions surfaced `Not Configured | Retry Needed`.
+- Confirmed the `Retry Transcription` action was enabled for those retryable sessions.
+- Confirmed the transcript fallback text instructed the user to restore Settings and retry transcription from the session library instead of implying the session was lost.
+- Triggered `Export Debug Bundle` from the live session library and confirmed a directory was written under `%LocalAppData%\\BugNarrator\\Exports\\DebugBundles\\`.
+- Confirmed the local Windows settings and secrets directories did not initially contain OpenAI, GitHub, or Jira credentials on this machine.
+- Pulled a real GitHub token from the maintainer's authenticated GitHub CLI session, created a disposable private repository, and validated that the Windows GitHub export service path created issue `#1` successfully.
+- Closed the temporary validation issue after proof. The disposable private repository remains because the current GitHub token does not have the `delete_repo` scope required to remove it automatically.
+- Ran the production storage and session-bundle export services against a tampered screenshot path and a malformed `session.json`, then confirmed the corrupted screenshot path was excluded from the loaded session and from the exported bundle while malformed metadata was skipped safely.
+- Confirmed this machine exposed only one display adapter and one installed input layout, so mixed-display and alternate keyboard-layout validation remained blocked by local machine capability instead of app behavior.
 
 ## Milestone 2: Tray Shell And Single Instance
 - Launch BugNarrator.
@@ -61,7 +88,7 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
   - `Show Recording Controls`
   - `Open Session Library`
   - `Settings`
-  - `About`
+  - `Help And Support`
   - `Quit`
 - Confirm the tray icon appears only once.
 - Launch the app a second time.
@@ -112,6 +139,9 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Choose `Custom Date Range`, adjust both dates, and confirm the list updates as the date range changes.
 - Repeat stop-recording with no API key configured.
 - Confirm the session is still saved and the transcript tab shows a clear fallback message instead of crashing.
+- Confirm the saved session surfaces a retry-needed state and the `Retry Transcription` action becomes available from the review workspace.
+- If you restore a valid key after saving the retry-needed session, click `Retry Transcription`.
+- Confirm retry success updates the transcript, summary, retry metadata, and saved session state without creating a second session.
 - If possible, force a transcription failure with an invalid key or blocked network.
 - Confirm the failed session is still saved and the summary/transcript views explain what happened.
 
@@ -183,6 +213,13 @@ dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj 
 - Run `powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1`.
 - Confirm `windows/artifacts/handoff/windows-codex-handoff.json` is created and references the current branch, phase, blocking task, and Windows validation artifacts.
 
+## WIN-011 Public Release Parity
+- Run `powershell -ExecutionPolicy Bypass -File windows/scripts/release-windows-phase-b.ps1 -ReleaseLabel <label>`.
+- Confirm `windows/artifacts/releases/public/<label>/public-release-status.json` is created.
+- If the status is `blocked`, confirm the blockers honestly describe missing installer or signing prerequisites and do not claim the app is public-release ready.
+- If the status is `ready`, confirm the signed installer exists, checksums exist, and the trusted-tester zip still exists for internal use.
+- On a clean Windows machine or VM, validate fresh install, relaunch, uninstall, reinstall, and upgrade behavior for the signed installer before calling Windows publicly release-ready.
+
 ## Artifact Validation
 Inspect:
 
@@ -223,6 +260,8 @@ For Milestone 6 completion paths, confirm:
 - the package script outputs `windows/artifacts/packages/BugNarrator-windows-win-x64.zip`
 - the package validation script outputs `windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json`
 - the Codex handoff script outputs `windows/artifacts/handoff/windows-codex-handoff.json`
+- the public release script outputs `windows/artifacts/releases/public/<label>/public-release-status.json`
+- the public release staging folder includes `checksums.txt`
 
 For the hardening milestone, confirm:
 - corrupted or tampered session metadata does not cause the app to leave the BugNarrator session root when loading screenshots or exporting bundles
@@ -282,6 +321,7 @@ Confirm the log file includes useful entries for:
 - saved hotkey unavailable because Windows or another app already owns it
 - exporting with no extracted issues selected
 - second app launch while first is already running
+- running the public release script without Inno Setup, `signtool.exe`, or certificate inputs
 
 ## Pass Criteria
 The current Windows milestones are in good shape if:

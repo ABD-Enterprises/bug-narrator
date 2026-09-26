@@ -75,7 +75,7 @@ public static class SessionLibraryQueryEvaluator
 
         return Contains(session.Title, needle)
                || Contains(session.TranscriptText, needle)
-               || Contains(session.ReviewSummary, needle)
+               || Contains(session.EffectiveReviewSummary, needle)
                || (session.IssueExtraction is not null
                    && (Contains(session.IssueExtraction.Summary, needle)
                        || session.IssueExtraction.Issues.Any(issue =>

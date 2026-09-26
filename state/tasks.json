@@ -2,14 +2,79 @@
   "updated_on": "2026-04-04",
   "active": [
     {
-      "id": "RR-002-T4",
-      "phase": "RR-002",
-      "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
-      "status": "pending",
-      "blocking_for_phase_completion": true
+      "id": "WIN-010-T1",
+      "phase": "WIN-010",
+      "title": "Validate live OpenAI transcription, summary, issue extraction, and Jira export on Windows with real credentials",
+      "status": "active"
+    },
+    {
+      "id": "WIN-010-T2",
+      "phase": "WIN-010",
+      "title": "Validate alternate keyboard layouts and multi-monitor or mixed-DPI behavior on a suitable Windows machine",
+      "status": "active"
+    },
+    {
+      "id": "WIN-011-T1",
+      "phase": "WIN-011",
+      "title": "Provision Inno Setup, signtool, and signing certificate inputs, then rerun the public Windows release script to a ready status",
+      "status": "active"
+    },
+    {
+      "id": "WIN-011-T2",
+      "phase": "WIN-011",
+      "title": "Validate signed installer install, relaunch, reinstall, upgrade, and uninstall behavior on a clean Windows machine or VM",
+      "status": "active"
     }
   ],
   "completed": [
+    {
+      "id": "WIN-007-T1",
+      "phase": "WIN-007",
+      "title": "Implement retry-needed preserved-session recovery and generated review summary support on Windows",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-008-T1",
+      "phase": "WIN-008",
+      "title": "Replace the placeholder support surface and add native Windows docs, support, reporting, and debug-bundle entry points",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-009-T1",
+      "phase": "WIN-009",
+      "title": "Harden the Windows surfaces for keyboard-first use and permission-recovery guidance",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-010-T0",
+      "phase": "WIN-010",
+      "title": "Run the honest machine-bound slice of Windows runtime proof and record the remaining provider and hardware blockers with evidence",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-010-T3",
+      "phase": "WIN-010",
+      "title": "Validate live GitHub export on Windows with a real token and a disposable repository",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-010-T4",
+      "phase": "WIN-010",
+      "title": "Validate session deletion and corrupted-local-state bundle safety on Windows using the production storage and export services",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-011-T0",
+      "phase": "WIN-011",
+      "title": "Add the public-release scaffold and blocker-aware status reporting for the Windows installer path",
+      "status": "completed"
+    },
+    {
+      "id": "WIN-011-T3",
+      "phase": "WIN-011",
+      "title": "Rerun the public Windows release script after the latest WIN-010 follow-up validation and capture the refreshed blocker artifact",
+      "status": "completed"
+    },
     {
       "id": "RR-002-T1",
       "phase": "RR-002",
@@ -26,6 +91,12 @@
       "id": "RR-002-T3",
       "phase": "RR-002",
       "title": "Package and validate the Windows zip artifact in CI",
+      "status": "completed"
+    },
+    {
+      "id": "RR-002-T4",
+      "phase": "RR-002",
+      "title": "Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM",
       "status": "completed"
     },
     {

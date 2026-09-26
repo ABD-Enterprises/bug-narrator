@@ -44,6 +44,8 @@ public sealed class RecordingLifecycleServiceScreenshotTests
         Assert.Equal(0, harness.OverlayService.CallCount);
         Assert.Equal(0, harness.ImageCaptureService.CallCount);
         Assert.Equal(RecordingWorkflowState.Recording, harness.Service.CurrentState.WorkflowState);
+        Assert.Contains("interactive desktop session", harness.Service.CurrentState.RecoveryGuidance);
+        Assert.Equal(RecordingRecoveryAction.None, harness.Service.CurrentState.RecoveryAction);
     }
 
     [Fact]

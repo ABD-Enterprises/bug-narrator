@@ -509,11 +509,149 @@ Current implementation findings:
 
 ## Current macOS Parity Review
 
-As of March 18, 2026, the current Windows branch is in strong parity with the current macOS app for the core `record -> review -> refine -> export` workflow:
+As of April 4, 2026, the current Windows branch has the core `record -> review -> refine -> export` workflow implemented and locally validated on a real Windows desktop for tray startup, single-instance behavior, microphone-backed recording, screenshot overlay capture, out-of-focus hotkeys, retry-needed sessions, and debug-bundle export.
 
-- tray shell, recording controls, optional global hotkeys, microphone recording, screenshot capture, transcription, session review, issue extraction, bundle export, debug bundle export, and experimental GitHub/Jira export are all implemented on Windows
-- the post-MVP hardening and hotkey milestones improved the reliability and reach of the existing workflow without reopening already-complete review surfaces
-- the remaining work is mostly real-desktop validation and Windows-specific polish around reserved shortcuts, keyboard layouts, DPI, multi-monitor behavior, and third-party integration credentials rather than a missing core workflow phase
+Windows is still not in full parity with the shipped macOS app.
+
+The remaining parity gaps are now narrower and more concrete:
+
+- provider-runtime parity: Windows still needs live OpenAI and Jira credential-backed validation on a Windows machine with those credentials configured
+- broader runtime proof parity: Windows still needs alternate keyboard layout and mixed-display validation on suitable Windows setups
+- public release parity: Windows still needs a signed installer plus clean-machine install, relaunch, reinstall, upgrade, and uninstall proof
+
+## Phased Windows Parity Cycles
+
+Execute the remaining Windows parity work as bounded cycles instead of reopening the whole app at once. The first three cycles are now implemented on the current RR-002 branch; the last two remain evidence-gated by local machine capabilities and release prerequisites.
+
+| Cycle | Phase | Status | Focus | Why it comes here | Exit signal |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `WIN-007` | Implemented on current branch | Recovery and summary parity | Closed the biggest remaining workflow gaps inside the core review loop before polishing secondary surfaces | Windows can retry preserved sessions and generate the same kind of review summary that macOS users already expect |
+| 2 | `WIN-008` | Implemented on current branch | Launch surface and support parity | Gave Windows a real equivalent to the macOS launch/help surface once the review loop itself was functionally aligned | Windows no longer relies on a placeholder About window and exposes docs, support, report, update, and debug-bundle paths cleanly |
+| 3 | `WIN-009` | Implemented on current branch | Accessibility and permission-guidance parity | Hardened usability and recovery once the main surfaces were settled enough to audit | Keyboard-first navigation, status feedback, and permission guidance are documented and validated |
+| 4 | `WIN-010` | Partially executed, still blocked on machine capabilities and credentials | Runtime proof and provider validation | Proves the parity work on real Windows setups before public release investment | Live provider flows, mixed-DPI displays, alternate keyboard layouts, deletion, and corrupted-state scenarios have evidence-backed results |
+| 5 | `WIN-011` | Partially executed, still blocked on installer and signing prerequisites | Public release parity | Makes Windows distributable at the same seriousness level as the shipped macOS app | Signed installer, clean-machine validation, and public release docs are complete |
+
+### Cycle 1: WIN-007 Windows Recovery And Summary Parity
+
+Goal:
+
+- close the two most important workflow gaps still separating Windows from the shipped macOS app
+
+Deliverables:
+
+- preserved-session retry flow for missing, invalid, or revoked OpenAI credentials
+- retry-needed session states in the session library and review workspace
+- generated review summary support on Windows
+- clear fallback behavior when retry or summary generation fails
+
+Exit criteria:
+
+- a finished recording can be retried after the user fixes credentials or network state
+- the retry state is visible and understandable in the Windows review surfaces
+- the summary tab contains real generated review content instead of only placeholder or fallback text
+
+Current implementation findings:
+
+- the Windows review flow now preserves retry-needed sessions and exposes `Retry Transcription` from the review workspace
+- retry success and failure both persist retry metadata and keep the completed session usable instead of losing the recording
+- completed sessions now shape generated review summary content and surface it through the existing summary tab
+- automated coverage now includes core and Windows regression tests for retry success, retry failure, summary formatting, and effective-summary query behavior
+
+### Cycle 2: WIN-008 Windows Launch Surface And Support Parity
+
+Goal:
+
+- make the Windows tray and support surfaces feel like a real product surface instead of a mostly functional shell
+
+Deliverables:
+
+- replace the placeholder About window
+- add documentation, changelog, issue-reporting, support, and release/update entry points
+- surface support-oriented actions such as debug-bundle export from a deliberate support surface
+- tighten the recording-controls surface so it aligns with the intended product controls contract
+
+Exit criteria:
+
+- Windows has a native equivalent to the macOS launch/help surface
+- support, docs, changelog, and issue-reporting paths no longer require repo knowledge or placeholder windows
+
+Current implementation findings:
+
+- the placeholder About window was replaced with a `Help And Support` surface that exposes docs, changelog, releases, issue reporting, repository, support-development, and debug-bundle actions
+- Windows shell launching now routes through a dedicated launcher service with explicit diagnostics and error handling
+- the recording-controls window now includes the explicit close behavior required by the product contract
+
+### Cycle 3: WIN-009 Windows Accessibility And Permission Guidance Parity
+
+Goal:
+
+- harden the Windows product surfaces for keyboard-first use and permission recovery
+
+Deliverables:
+
+- accessibility labeling and focus-order review across tray-driven surfaces, recording controls, session library, review workspace, and settings
+- clearer status feedback for important workflow changes
+- permission-guidance and recovery affordances for microphone and screenshot flows where Windows can support them directly
+- updated Windows accessibility and permission validation guidance
+
+Exit criteria:
+
+- Windows has a documented keyboard-first baseline comparable to the current macOS app
+- permission failures point the user toward recovery instead of leaving them in a dead end
+
+Current implementation findings:
+
+- the code-built WPF surfaces now include accessibility names, live-status semantics, and default or cancel behavior for the main actions
+- recording state now carries recovery guidance plus Windows settings actions for microphone-related failures
+- screenshot failures now surface clear recovery guidance instead of a dead-end error message
+
+### Cycle 4: WIN-010 Windows Runtime Proof And Provider Validation
+
+Goal:
+
+- prove parity claims on real Windows hardware before public release work
+
+Deliverables:
+
+- live OpenAI transcription validation
+- live summary and issue-extraction validation
+- real GitHub and Jira export validation with credentials
+- mixed-DPI, multi-monitor, alternate keyboard-layout, deletion, and corrupted-state validation plus fixes
+
+Exit criteria:
+
+- the remaining Windows parity claims are backed by real runtime evidence instead of only local feature implementation or CI
+- unresolved Windows risks narrow to release/distribution concerns rather than core workflow uncertainty
+
+Current execution findings:
+
+- the April 4, 2026 Windows runtime passes proved tray icon presence, duplicate-instance focus handoff, microphone-backed recording, screenshot overlay region capture, out-of-focus hotkeys, reserved-shortcut rejection, retry-needed sessions with no OpenAI key, debug-bundle export, live GitHub export through the production Windows service path using a disposable private repository, and production-path proof for session deletion and corrupted-local-state bundle safety
+- the same pass could not honestly validate live OpenAI or Jira provider flows because the local Windows settings and secrets directories still lacked those test credentials
+- this machine exposed only one installed keyboard layout and one detected display adapter, so alternate-layout and mixed-display proof remain blocked by hardware or configuration rather than code compilation
+
+### Cycle 5: WIN-011 Windows Public Release Parity
+
+Goal:
+
+- take Windows from internal/trusted-tester quality to the same public-release seriousness as the shipped macOS app
+
+Deliverables:
+
+- signed installer pipeline
+- clean-machine install, upgrade, relaunch, and uninstall validation
+- public release notes and download guidance
+- release documentation that keeps experimental areas honest
+
+Exit criteria:
+
+- a normal Windows user can install BugNarrator from a signed installer without extra runtime setup
+- the repo contains a repeatable release path that matches the quality bar of the current macOS distribution
+
+Current execution findings:
+
+- the repo now contains an Inno Setup installer template, an installer-build script, a public Phase B release script, and a release checklist
+- the public-release script writes `public-release-status.json` and stops at an explicit `blocked` status if Inno Setup, `signtool.exe`, or certificate inputs are missing
+- on this machine, the public path remains blocked because Inno Setup, `signtool.exe`, `BUGNARRATOR_CERT_PATH`, and `BUGNARRATOR_CERT_PASSWORD` were all missing during validation
 
 ## Suggested Repo Skeleton
 
@@ -1181,12 +1319,299 @@ Return:
 - docs updated and why
 ```
 
+### Prompt 8: Windows Recovery And Summary Parity
+
+```md
+Use the current Windows branch plus these repo documents as the source of truth:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/UserGuide.md`
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
+- `docs/CROSS_PLATFORM_GUIDELINES.md`
+- `windows/README.md`
+- `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Execute the next Windows parity cycle for BugNarrator: `WIN-007 Windows Recovery And Summary Parity`.
+
+Objective:
+Close the two largest remaining workflow gaps with the shipped macOS app by adding preserved-session retry and real generated review summary behavior to the Windows review flow.
+
+Required outcomes:
+1. expose a clear retry-needed state for sessions that finished recording but could not complete transcription
+2. allow the user to retry transcription after fixing credentials or network state
+3. preserve retry history and the last known failure reason without losing the recorded session
+4. generate and persist the Windows review summary in the completed session model
+5. keep the `Summary` tab useful when issue extraction returns no draft issues
+6. keep retry and summary failures non-destructive and user-explainable
+
+Constraints:
+- do not regress the current stop-recording preservation behavior
+- do not require a backend
+- do not leak credentials in logs, summary text, or exported bundles
+- keep platform-neutral retry and summary shaping in `BugNarrator.Core`
+
+Validation:
+- `dotnet restore windows/BugNarrator.Windows.sln`
+- `dotnet build windows/BugNarrator.Windows.sln -c Debug`
+- `dotnet test windows/BugNarrator.Windows.sln -c Debug`
+- manually validate:
+  - stop recording with no OpenAI key and confirm the session remains retryable
+  - restore or add the key and retry transcription from the saved session
+  - confirm retry success updates the session state and transcript artifacts
+  - confirm the `Summary` tab shows generated review content for a completed session
+  - confirm failures still preserve the session cleanly
+
+Documentation updates required:
+1. update `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+2. update `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+3. update `windows/README.md`
+4. update `docs/UserGuide.md` if the Windows review flow changes materially
+
+Return:
+- files changed
+- what was implemented versus deferred
+- retry state model used
+- summary generation model used
+- validation performed and the exact results
+- remaining recovery or summary risks
+```
+
+### Prompt 9: Windows Launch Surface And Support Parity
+
+```md
+Use the current Windows branch plus these repo documents as the source of truth:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/UserGuide.md`
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
+- `docs/CROSS_PLATFORM_GUIDELINES.md`
+- `windows/README.md`
+- `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Execute the next Windows parity cycle for BugNarrator: `WIN-008 Windows Launch Surface And Support Parity`.
+
+Objective:
+Give Windows a real native equivalent to the macOS launch/help surface by replacing placeholder support UI and exposing the product-information, support, and recovery entry points that macOS users already have.
+
+Required outcomes:
+1. replace the placeholder `About` window with a real product-information surface
+2. expose docs, changelog, issue-reporting, support-development, and release/update entry points from the Windows tray flow
+3. make the Windows support path surface the debug-bundle action deliberately instead of leaving it buried only inside the session library
+4. surface current product identity and experimental-feature guidance clearly
+5. review the recording-controls surface against the product spec and close any remaining obvious contract gaps such as explicit close behavior if still missing
+
+Constraints:
+- keep the tray shell native to Windows
+- do not turn the app into a large always-open shell unless the product clearly benefits
+- do not weaken any hardening or hotkey behavior already completed
+- keep support and update claims honest
+
+Validation:
+- `dotnet restore windows/BugNarrator.Windows.sln`
+- `dotnet build windows/BugNarrator.Windows.sln -c Debug`
+- `dotnet test windows/BugNarrator.Windows.sln -c Debug`
+- manually validate:
+  - tray menu or equivalent launch surface exposes the new support/info paths
+  - the new About/support surface is no longer placeholder-only
+  - docs/report/update/support actions open the expected destinations
+  - support-oriented debug-bundle access is discoverable and safe
+
+Documentation updates required:
+1. update `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+2. update `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+3. update `windows/README.md`
+4. update `docs/UserGuide.md` if the Windows launch/help flow changes
+
+Return:
+- files changed
+- launch-surface approach chosen and why
+- which support/info actions were added
+- validation performed and the exact results
+- remaining support-surface gaps
+```
+
+### Prompt 10: Windows Accessibility And Permission Guidance Parity
+
+```md
+Use the current Windows branch plus these repo documents as the source of truth:
+
+- `README.md`
+- `docs/UserGuide.md`
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
+- `docs/CROSS_PLATFORM_GUIDELINES.md`
+- `windows/README.md`
+- `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Execute the next Windows parity cycle for BugNarrator: `WIN-009 Windows Accessibility And Permission Guidance Parity`.
+
+Objective:
+Bring the Windows app closer to the current macOS keyboard-first and recovery-guidance baseline without redesigning the product.
+
+Required outcomes:
+1. audit keyboard navigation, focus order, and visible focus behavior across recording controls, session library, review workspace, settings, and the launch/support surface
+2. add missing accessibility labels, selected-state semantics, and status feedback where the Windows UI is still weak
+3. add clearer permission and recovery guidance for microphone and screenshot flows where Windows can support those links or instructions directly
+4. update the Windows validation checklist so accessibility and permission guidance are part of the explicit parity bar
+
+Constraints:
+- preserve established Windows layout patterns unless a change is directly needed for accessibility
+- do not claim assistive-tech parity that you did not validate
+- keep the work incremental and testable
+
+Validation:
+- `dotnet restore windows/BugNarrator.Windows.sln`
+- `dotnet build windows/BugNarrator.Windows.sln -c Debug`
+- `dotnet test windows/BugNarrator.Windows.sln -c Debug`
+- manually validate keyboard-only navigation and permission-failure recovery flows on Windows
+
+Documentation updates required:
+1. update `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+2. update `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+3. update `windows/README.md`
+4. update `docs/UserGuide.md` if permission guidance or keyboard flow changes materially
+
+Return:
+- files changed
+- accessibility issues fixed
+- permission-guidance actions added
+- validation performed and the exact results
+- remaining accessibility or assistive-tech gaps
+```
+
+### Prompt 11: Windows Runtime Proof And Provider Validation
+
+```md
+Use the current Windows branch plus these repo documents as the source of truth:
+
+- `README.md`
+- `docs/UserGuide.md`
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
+- `docs/CROSS_PLATFORM_GUIDELINES.md`
+- `docs/roadmap/state.json`
+- `state/session.json`
+- `state/tasks.json`
+- `state/risks.json`
+- `state/decisions.json`
+- `windows/README.md`
+- `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+
+Execute the next Windows parity cycle for BugNarrator: `WIN-010 Windows Runtime Proof And Provider Validation`.
+
+Objective:
+Prove the remaining Windows parity claims on real hardware with real provider flows, real display conditions, and real keyboard conditions, then fix what breaks.
+
+Required outcomes:
+1. validate live OpenAI transcription, summary generation, and issue extraction on Windows
+2. validate real GitHub and Jira export with credentials
+3. validate mixed-DPI and multi-monitor screenshot and review behavior
+4. validate alternate keyboard layouts if available on the machine or VM
+5. validate session deletion, corrupted-local-state recovery, and support-bundle safety on Windows
+6. update risks and state only with evidence-backed results
+
+Constraints:
+- do not close risks without actual runtime evidence
+- keep `OPS-011 / RISK-CI-002` separate unless the work truly touches it
+- fix discovered runtime issues on the same branch before updating the parity record
+
+Validation:
+- rerun the Windows baseline scripts
+- rerun the real runtime checklist on Windows
+- inspect `%LocalAppData%\\BugNarrator\\Sessions\\`, `%LocalAppData%\\BugNarrator\\Exports\\`, and `%LocalAppData%\\BugNarrator\\Logs\\windows-shell.log`
+
+Documentation updates required:
+1. update `docs/roadmap/state.json`
+2. update `state/session.json`
+3. update `state/tasks.json`
+4. update `state/risks.json`
+5. update `state/decisions.json`
+6. update `windows/README.md`
+7. update `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+8. update `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+
+Return:
+- exact commands run
+- what failed and what was fixed
+- exact pass/fail evidence
+- remaining blockers
+```
+
+### Prompt 12: Windows Public Release Parity
+
+```md
+Use the current Windows branch plus these repo documents as the source of truth:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/UserGuide.md`
+- `docs/architecture/product-spec.md`
+- `docs/architecture/parity-matrix.md`
+- `docs/CROSS_PLATFORM_GUIDELINES.md`
+- `windows/README.md`
+- `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+- `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+- `windows/docs/WINDOWS_SIGNING_AND_RELEASE.md`
+- `windows/docs/WINDOWS_RELEASE_CHECKLIST.md`
+
+Execute the final Windows parity cycle for BugNarrator: `WIN-011 Windows Public Release Parity`.
+
+Objective:
+Take Windows from locally implemented workflow parity to public distribution parity with the seriousness of the current macOS release process.
+
+Required outcomes:
+1. add or finalize the signed installer path
+2. keep the internal/trusted-tester zip path available when useful, but make the public path installer-first
+3. validate clean-machine install, relaunch, uninstall, reinstall, and upgrade behavior
+4. ensure settings and local sessions survive where the installer is intended to preserve them
+5. publish honest release guidance that keeps experimental integrations clearly marked
+
+Constraints:
+- do not ship an unsigned public artifact and call it parity
+- do not store certificate material in the repo
+- stop at the honest blocker if the certificate or signing prerequisites are unavailable
+
+Validation:
+- `dotnet restore windows/BugNarrator.Windows.sln`
+- `dotnet build windows/BugNarrator.Windows.sln -c Release`
+- `dotnet test windows/BugNarrator.Windows.sln -c Release`
+- run the Windows packaging, signing, and release scripts
+- validate install and uninstall on a clean Windows machine or VM
+
+Documentation updates required:
+1. update `docs/roadmap/state.json`
+2. update `windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md`
+3. update `windows/docs/WINDOWS_SIGNING_AND_RELEASE.md`
+4. update `windows/docs/WINDOWS_RELEASE_CHECKLIST.md`
+5. update `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`
+6. update `windows/README.md`
+7. update `docs/UserGuide.md`
+8. update `README.md` if Windows public install guidance is ready
+9. update `CHANGELOG.md` if the public Windows release path changed materially
+
+Return:
+- files changed
+- installer technology used
+- whether public release parity is complete or still blocked
+- exact validation performed and the exact results
+- artifact paths
+- remaining launch risks
+```
+
 ## Recommended Immediate Next Steps
 
-1. accept the canonical product spec and this Windows roadmap
-2. create the Windows solution skeleton
-3. validate the tray app and single-instance spike on a real Windows machine or VM
-4. only then begin feature implementation
+1. rerun `Prompt 11: Windows Runtime Proof And Provider Validation` on a Windows machine with a real OpenAI API key, real Jira credentials, and more than one input layout if possible
+2. validate multi-monitor or mixed-DPI screenshot and review behavior on a suitable Windows desktop or VM
+3. provision Inno Setup, `signtool.exe`, and real code-signing certificate inputs, then rerun `Prompt 12: Windows Public Release Parity`
+4. validate the signed installer on a clean Windows machine or VM before calling Windows publicly release-ready
 
 ## MVP Acceptance Criteria
 

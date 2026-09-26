@@ -6,5 +6,5 @@
     "status": "in_progress"
   },
   "branch": "phase/RR-002-windows-runtime-hardening",
-  "execution_summary": "Continued RR-002 on the dedicated phase branch by adding Windows validation and Codex handoff artifacts, documenting the Windows takeover path, and keeping real Windows desktop validation as the remaining phase blocker."
+  "execution_summary": "Continued RR-002 on the dedicated phase branch by fixing the Windows baseline scripts for real-machine execution, implementing WIN-007 through WIN-009 on the same branch, rerunning the scripted baseline and artifact checks on Windows, and executing the honest machine-bound slices of WIN-010 and WIN-011. Real Windows evidence now covers tray, recording, screenshot, hotkeys, no-key retryable sessions, debug-bundle export, live GitHub export, session deletion, and corrupted-state bundle safety. The remaining gaps are live OpenAI and Jira provider validation, alternate keyboard layout or mixed-display coverage, and signed public-release proof."
 }

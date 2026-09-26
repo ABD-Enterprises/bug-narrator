@@ -12,6 +12,10 @@ public interface IReviewSessionActionService
         CompletedSession session,
         CancellationToken cancellationToken = default);
 
+    Task<CompletedSession> RetryTranscriptionAsync(
+        CompletedSession session,
+        CancellationToken cancellationToken = default);
+
     Task<CompletedSession> ExtractIssuesAsync(
         CompletedSession session,
         CancellationToken cancellationToken = default);

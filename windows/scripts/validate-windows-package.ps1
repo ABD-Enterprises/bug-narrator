@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Runtime = "win-x64",
-    [string]$OutputRoot = "windows/artifacts"
+    [string]$OutputRoot = "windows/artifacts",
+    [int]$SmokeTimeoutSeconds = 30
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +24,14 @@ function Get-RelativeArtifactPath {
         [string]$Path
     )
 
-    return [System.IO.Path]::GetRelativePath($repoRoot, $Path).Replace('\', '/')
+    $basePath = [System.IO.Path]::GetFullPath($repoRoot)
+    if (-not $basePath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $basePath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $baseUri = New-Object System.Uri($basePath)
+    $targetUri = New-Object System.Uri([System.IO.Path]::GetFullPath($Path))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
 }
 
 function Get-ZipEntrySha256 {
@@ -112,8 +120,20 @@ $smokeProcess = Start-Process `
     -ArgumentList @("--smoke-output", $smokeOutputPath) `
     -WorkingDirectory $publishDirectory `
     -WindowStyle Hidden `
-    -PassThru `
-    -Wait
+    -PassThru
+
+try {
+    Wait-Process -Id $smokeProcess.Id -Timeout $SmokeTimeoutSeconds -ErrorAction Stop
+}
+catch {
+    if (-not $smokeProcess.HasExited) {
+        Stop-Process -Id $smokeProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    throw "Packaged smoke executable did not exit within $SmokeTimeoutSeconds seconds."
+}
+
+$smokeProcess.Refresh()
 
 if ($smokeProcess.ExitCode -ne 0) {
     throw "Packaged smoke executable exited with code $($smokeProcess.ExitCode)."

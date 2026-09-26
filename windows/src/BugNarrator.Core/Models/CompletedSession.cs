@@ -19,7 +19,20 @@ public sealed record CompletedSession(
     string? TranscriptionFailureMessage,
     IssueExtractionResult? IssueExtraction,
     IReadOnlyList<ScreenshotArtifact> Screenshots,
-    IReadOnlyList<SessionTimelineMoment> TimelineMoments)
+    IReadOnlyList<SessionTimelineMoment> TimelineMoments,
+    int TranscriptionRetryCount = 0,
+    DateTimeOffset? LastTranscriptionRetryAt = null)
 {
     public TimeSpan Duration => RecordingStoppedAt - RecordingStartedAt;
+
+    public bool RequiresTranscriptionRetry =>
+        TranscriptionStatus is SessionTranscriptionStatus.NotConfigured or SessionTranscriptionStatus.Failed;
+
+    public bool HasGeneratedReviewSummary =>
+        !string.IsNullOrWhiteSpace(IssueExtraction?.Summary);
+
+    public string EffectiveReviewSummary =>
+        HasGeneratedReviewSummary
+            ? IssueExtraction!.Summary.Trim()
+            : ReviewSummary;
 }

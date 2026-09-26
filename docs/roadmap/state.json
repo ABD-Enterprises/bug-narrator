@@ -53,36 +53,52 @@
       "name": "Release Summary Automation Seed",
       "completed_on": "2026-03-23",
       "summary": "Added an internal release-summary generator based on the changelog and roadmap state, surfaced it in the release workflow as a run artifact and step summary, and documented it as a maintainer aid rather than a public release-note replacement."
+    },
+    {
+      "id": "WIN-007",
+      "name": "Windows Recovery And Summary Parity",
+      "completed_on": "2026-04-04",
+      "summary": "Added retryable preserved-session recovery on Windows, surfaced retry-needed state in the session library and review workspace, and persisted generated review summary content for completed sessions."
+    },
+    {
+      "id": "WIN-008",
+      "name": "Windows Launch Surface And Support Parity",
+      "completed_on": "2026-04-04",
+      "summary": "Replaced the placeholder About window with a real Help And Support surface, added product and support links plus debug-bundle access, and aligned the recording controls surface with the product contract."
+    },
+    {
+      "id": "WIN-009",
+      "name": "Windows Accessibility And Permission Guidance Parity",
+      "completed_on": "2026-04-04",
+      "summary": "Hardened the Windows surfaces for keyboard-first use, accessibility metadata, live status feedback, and microphone or screenshot recovery guidance without overclaiming assistive-technology runtime proof."
     }
   ],
   "upcoming_phases": [
     {
-      "id": "WIN-005",
-      "name": "Windows Transcription And Session Library",
+      "id": "WIN-010",
+      "name": "Windows Runtime Proof And Provider Validation",
       "priority": "medium",
       "depends_on": [
-        "RR-002"
+        "WIN-009"
       ],
       "scope": [
-        "OpenAI key storage",
-        "transcription client",
-        "completed-session persistence",
-        "session library",
-        "review workspace"
+        "live OpenAI transcription, summary, and issue-extraction validation with real Windows credentials",
+        "real Jira export validation with credentials",
+        "DPI, multi-monitor, and alternate keyboard-layout validation on a suitable Windows machine"
       ]
     },
     {
-      "id": "WIN-006",
-      "name": "Windows Review, Extraction, And Export",
+      "id": "WIN-011",
+      "name": "Windows Public Release Parity",
       "priority": "medium",
       "depends_on": [
-        "WIN-005"
+        "WIN-010"
       ],
       "scope": [
-        "summary generation",
-        "issue extraction",
-        "session bundle export",
-        "experimental GitHub/Jira export"
+        "finish the signed installer pipeline after provisioning installer and signing prerequisites",
+        "clean-machine install, relaunch, reinstall, upgrade, and uninstall validation",
+        "public release notes and download guidance",
+        "release-candidate proof comparable to the shipped macOS distribution"
       ]
     },
     {
@@ -134,7 +150,7 @@
         "RISK-WIN-001",
         "RISK-WIN-002"
       ],
-      "scope": "Validate Milestones 2-4 on real Windows hardware and fix tray, recording, and screenshot runtime issues discovered there."
+      "scope": "Validate tray, recording, screenshot, and hotkey behavior on real Windows hardware and fix runtime issues discovered there."
     },
     {
       "id": "RR-005",
@@ -244,21 +260,21 @@
       "description": "Windows tray shell, recording, and screenshot workflows have been scaffolded but not yet validated on real Windows hardware.",
       "severity": "high",
       "impact": "The Windows workspace may compile conceptually while failing in real tray, permission, or capture behavior.",
-      "mitigation": "Track and fix in RR-002. This phase now improves CI and packaged artifact validation, but real Windows desktop validation is still required before the risk can be closed.",
+      "mitigation": "Resolved in RR-002 by the April 4, 2026 real Windows validation pass, which confirmed live tray-icon presence in the system-tray overflow, duplicate-instance focus handoff, microphone-backed recording, screenshot overlay region capture, and out-of-focus hotkey behavior on Windows.",
       "affected_components": [
         "windows",
         "BugNarrator.Windows",
         "BugNarrator.Windows.Services"
       ],
       "phase_association": "RR-002",
-      "status": "unresolved"
+      "status": "resolved"
     },
     {
       "id": "RISK-WIN-002",
       "description": "CI does not yet prove full Windows runtime behavior or fully prove signed release automation.",
       "severity": "medium",
       "impact": "Build confidence is improving, but key Windows and release-time behaviors can still regress outside local maintainer workflows.",
-      "mitigation": "Track and improve in RR-002 and OPS-002. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, packaged zip validation, packaged-app smoke execution, packaged-file hash parity checks, and uploaded validation evidence, but signed release proof and real runtime behavior are still unresolved.",
+      "mitigation": "Track and improve in RR-002 and the later Windows release-readiness work. RR-002 now adds phase-branch CI coverage, explicit Windows test-project execution, packaged zip validation, packaged-app smoke execution, packaged-file hash parity checks, uploaded validation evidence, a Windows Codex handoff artifact, WIN-007 through WIN-009 implementation on the phase branch, and the April 4, 2026 real Windows runtime passes for tray, recording, screenshot, out-of-focus hotkeys, reserved-shortcut rejection, retry-needed sessions, debug-bundle export, live GitHub export, session deletion, and corrupted-local-state bundle safety. Remaining gaps are live provider validation with real OpenAI and Jira credentials, alternate keyboard layout and multi-display coverage on a suitable machine, and signed public-release proof.",
       "affected_components": [
         "github-workflows",
         "windows",
@@ -433,7 +449,7 @@
     "name": "Windows Runtime Validation And Hardening",
     "status": "in_progress",
     "started_on": "2026-03-24",
-    "summary": "Continuing RR-002 on the dedicated phase branch by hardening Windows package validation, uploading machine-readable validation and Codex handoff artifacts from CI, and keeping real Windows desktop runtime validation as the remaining blocker."
+    "summary": "Continuing RR-002 on the dedicated phase branch after fixing Windows PowerShell 5.1/package baseline issues, implementing WIN-007 through WIN-009 on the same branch, and executing the honest machine-bound slice of WIN-010 and WIN-011 on April 4, 2026. Real Windows evidence now covers tray, single-instance, microphone-backed recording, screenshot overlay region capture, out-of-focus hotkeys, reserved-shortcut rejection, no-key retryable sessions, debug-bundle export, live GitHub export, session deletion, and corrupted-state bundle safety; remaining gaps are live OpenAI and Jira validation, multi-layout or multi-display proof, and signed public-release proof."
   },
   "current_phase_branch": "phase/RR-002-windows-runtime-hardening",
   "decisions": [
@@ -519,11 +535,59 @@
     },
     {
       "date": "2026-04-04",
+      "summary": "Adjusted the RR-002 Windows handoff, package, and validation scripts for Windows PowerShell 5.1 compatibility and self-contained publish output because the real-machine baseline could not be executed honestly until those assumptions were fixed."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Closed RISK-WIN-001 with real Windows evidence: the tray icon appeared in the system-tray overflow, duplicate launches focused the primary instance, recording ran against a Ready microphone, screenshot overlay region capture wrote deterministic artifacts, and hotkeys worked from another focused desktop app."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Kept alternate keyboard layout coverage and signed public-release proof explicitly unresolved after the April 4, 2026 Windows pass because this machine exposed only one installed input layout and RR-002 did not exercise signed installer or release automation."
+    },
+    {
+      "date": "2026-04-04",
       "summary": "Tracked the new GitHub Actions Node 20 deprecation warning as RISK-CI-002 in OPS-011 instead of folding that maintenance work into RR-002."
     },
     {
       "date": "2026-04-04",
       "summary": "Added a repo-native Windows Codex handoff document and script that summarize the active RR-002 state, can run the scripted Windows baseline on a real Windows machine, and emit a machine-readable handoff report for takeover work."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Replaced the stale upcoming Windows milestone placeholders with phased parity cycles WIN-007 through WIN-011 so the next Windows work reflects the real remaining gaps: retry and summary parity, launch/support surface parity, accessibility and permission guidance parity, runtime/provider proof, and public release parity."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Executed WIN-007 on the RR-002 branch instead of leaving it as future-only planning because preserved-session retry, retry-needed review surfacing, and generated review summary support were already actionable in the current Windows codebase."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Executed WIN-008 by keeping the Windows shell native and lightweight: a dedicated Help And Support window backed by shell-launch actions and debug-bundle export instead of a larger always-open shell surface."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Executed WIN-009 as an incremental accessibility and recovery-guidance pass on the code-built WPF surfaces, adding labels, live status semantics, default or cancel behavior, and Windows settings links without overclaiming assistive-technology runtime proof."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Stopped WIN-010 at the honest machine boundary: this Windows host proved the no-key recovery and debug-bundle paths, but it had no provider credentials, only one installed keyboard layout, and only one detected display adapter, so provider, alternate-layout, and mixed-display parity remain open."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Chose Inno Setup for the initial WIN-011 public-release scaffold because it is the smallest maintainable Windows installer path for this app, and made the Phase B release script emit an explicit blocked status instead of pretending public parity exists without installer and signing prerequisites."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Validated the Windows GitHub export path against a disposable private GitHub repository created under the maintainer account, then closed the created issue after proof so the validation did not touch the main product repo."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Used a small Windows-only validation harness against the production storage and export services to prove session deletion and corrupted-local-state bundle safety on this machine without adding more permanent repo surface area."
+    },
+    {
+      "date": "2026-04-04",
+      "summary": "Reran the Phase B public-release script after the WIN-010 follow-up validation and confirmed the public path is still honestly blocked only on installer and signing prerequisites, not on build or test failures."
     }
   ],
   "version": "1.0.22",

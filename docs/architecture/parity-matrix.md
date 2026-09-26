@@ -7,6 +7,7 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 ## Status Vocabulary
 
 - `Shipped`: production behavior exists today
+- `Implemented On Current Branch`: behavior exists on the active branch, but broader parity or release proof is still incomplete
 - `In Progress`: active implementation work exists, but parity is not yet proven
 - `Planned`: the contract is accepted, but implementation has not started yet
 
@@ -14,25 +15,33 @@ Use [product-spec.md](product-spec.md) as the source of truth for the contracts 
 
 | Contract / Spec Item | macOS | Windows | Parity Decision | Notes / Rationale |
 | --- | --- | --- | --- | --- |
-| Durable workflow: `record -> review -> refine -> export` | Shipped | In Progress | Must remain identical | The UI can differ by platform, but the workflow contract stays stable. |
-| Compact launch surface | Shipped as a menu bar window | In Progress as a tray shell | Native surfaces allowed | Menu bar and tray are platform-native equivalents. |
-| Recording Controls surface | Shipped | In Progress | Must remain functionally aligned | Start, stop, screenshot, and close actions should exist on both platforms. |
-| Single active recording session | Shipped | In Progress | Must remain identical | Duplicate starts and overlapping sessions are disallowed everywhere. |
-| Screenshot evidence during recording | Shipped | In Progress | Native capture implementation allowed | macOS uses ScreenCaptureKit-backed capture; Windows can use a native overlay plus selected-region capture. |
-| Session Library archive | Shipped | Planned in `WIN-005` | Must remain identical | Date filters, search, sorting, and deletion remain part of the durable archive contract. |
-| Review Workspace tabs | Shipped | Planned in `WIN-005` / `WIN-006` | Must remain identical | Canonical tabs remain `Transcript`, `Screenshots`, `Extracted Issues`, and `Summary`. |
-| Session Bundle export | Shipped | Planned in `WIN-006` | Must remain identical | Exported bundle stays `transcript.md` plus `screenshots/`. |
-| Debug Bundle support export | Shipped | Planned in `WIN-006` | Must remain aligned | Diagnostics may differ, but secrets must stay excluded on both platforms. |
-| Missing or invalid OpenAI key recovery | Shipped | Planned in `WIN-005` | Must remain identical | Finished recordings must stay recoverable and retryable instead of being lost. |
-| Experimental GitHub and Jira export | Shipped as experimental | Planned in `WIN-006` | Experimental on both platforms | Integration maturity stays explicit until it is hardened and validated. |
-| Keyboard-first accessibility | Shipped baseline, still under ongoing validation | Planned | Native implementation allowed | The contract is clear keyboard and assistive-tech support, not identical widgets. |
-| Public release packaging | Shipped as signed, notarized DMG | Planned | Platform-native packaging allowed | macOS uses DMG/notarization; Windows will use signed installer packaging. |
+| Durable workflow: `record -> review -> refine -> export` | Shipped | Implemented On Current Branch | Must remain identical | The core Windows workflow exists today; the remaining work is around recovery polish, support surfaces, validation depth, and release parity. |
+| Compact launch surface | Shipped as a menu bar window | Implemented On Current Branch as a tray shell | Native surfaces allowed | Windows now exposes a real `Help And Support` surface plus docs, changelog, reporting, release, and support links; remaining work is runtime proof on more Windows setups. |
+| Recording Controls surface | Shipped | Implemented On Current Branch | Must remain functionally aligned | Windows now has start, stop, screenshot, session-library, close, and recovery guidance behavior aligned to the current product contract. |
+| Single active recording session | Shipped | Implemented On Current Branch | Must remain identical | Duplicate starts and overlapping sessions are disallowed on both platforms. |
+| Screenshot evidence during recording | Shipped | Implemented On Current Branch | Native capture implementation allowed | macOS uses ScreenCaptureKit-backed capture; Windows uses a native overlay plus selected-region capture. |
+| Session Library archive | Shipped | Implemented On Current Branch | Must remain identical | Windows now has date filters, search, sorting, deletion, retry-needed surfacing, and retry-transcription actions on the current branch. |
+| Review Workspace tabs | Shipped | Implemented On Current Branch | Must remain identical | Windows now has the canonical tabs plus retry guidance, generated review summary display, and debug-bundle access; remaining gaps are mostly runtime/provider proof. |
+| Generated review summary | Shipped | Implemented On Current Branch | Must remain aligned | Windows now persists and displays generated review summary content, but provider-backed proof on a credentialed Windows machine remains part of `WIN-010`. |
+| Session Bundle export | Shipped | Implemented On Current Branch | Must remain identical | Exported bundle stays `transcript.md` plus `screenshots/`. |
+| Debug Bundle support export | Shipped | Implemented On Current Branch | Must remain aligned | Diagnostics export exists on Windows, but support-surface discoverability is still a parity gap. |
+| Missing or invalid OpenAI key recovery | Shipped | Implemented On Current Branch | Must remain identical | Windows now preserves retry-needed sessions, shows retry guidance in the review surfaces, and allows retrying transcription after settings are fixed. |
+| Experimental GitHub and Jira export | Shipped as experimental | Implemented On Current Branch | Experimental on both platforms | Windows export flows exist and the GitHub path now has live Windows proof; Jira export and OpenAI-backed extraction still remain part of `WIN-010`. |
+| Support and information surfaces | Shipped | Implemented On Current Branch | Native implementation allowed | Windows now ships a non-placeholder `Help And Support` surface with docs, changelog, repository, issue-reporting, update, support, and debug-bundle actions. |
+| Keyboard-first accessibility | Shipped baseline, still under ongoing validation | Implemented On Current Branch | Native implementation allowed | Windows now has the baseline accessibility hardening, labels, status announcements, and keyboard/default-button work, while live assistive-tech and broader runtime proof still need more validation. |
+| Permission guidance and recovery affordances | Shipped | Implemented On Current Branch | Native implementation allowed | Windows now surfaces recovery guidance and settings links for microphone and screenshot failures where the platform can help directly. |
+| Public release packaging | Shipped as signed, notarized DMG | In Progress in `WIN-011` | Platform-native packaging allowed | Windows now has a public-release scaffold with an Inno Setup installer template and blocker-aware release script, but signed installer and clean-machine public release proof are still missing. |
 
 ## Current Deliberate Differences
 
 - macOS is the only production platform today.
-- Windows milestone work through tray shell, recording lifecycle, and screenshot scaffolding is present in the repo but still blocked on real Windows runtime validation in `RR-002`.
-- macOS currently has the stronger recovery story because preserved-session retry has already shipped there.
+- Windows now has the full core workflow plus recovery or retry parity, generated review summary, support surfaces, and baseline accessibility and permission guidance implemented on the active branch.
+- The April 4, 2026 RR-002 pass closed the basic tray, recording, screenshot, hotkey, no-key recovery, and debug-bundle runtime proof on Windows, but alternate keyboard layouts, mixed-display proof, live provider credentials, deletion or corrupted-state validation, and signed public release behavior still require later parity cycles.
+
+## Planned Windows Parity Cycle Order
+
+1. `WIN-010 Windows Runtime Proof And Provider Validation`
+2. `WIN-011 Windows Public Release Parity`
 
 ## Update Rules
 

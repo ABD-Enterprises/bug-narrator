@@ -38,8 +38,20 @@ public static class CompletedSessionMarkdownBuilder
         builder.AppendLine();
         builder.AppendLine("## Review Summary");
         builder.AppendLine();
-        builder.AppendLine(session.ReviewSummary);
+        builder.AppendLine(session.EffectiveReviewSummary);
         builder.AppendLine();
+
+        if (session.TranscriptionRetryCount > 0)
+        {
+            builder.AppendLine($"- Retry Attempts: {session.TranscriptionRetryCount}");
+
+            if (session.LastTranscriptionRetryAt is not null)
+            {
+                builder.AppendLine($"- Last Retry Attempt: {session.LastTranscriptionRetryAt:yyyy-MM-dd HH:mm:ss zzz}");
+            }
+
+            builder.AppendLine();
+        }
 
         if (session.IssueExtraction is not null)
         {
