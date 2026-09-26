@@ -17,6 +17,7 @@ using BugNarrator.Windows.Tray;
 using BugNarrator.Windows.Capture;
 using BugNarrator.Windows.Hotkeys;
 using System.Windows;
+using System.Linq;
 
 namespace BugNarrator.Windows;
 
@@ -27,28 +28,33 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
         try
         {
-            if (WindowsSmokeProbe.TryWriteReport(e.Args, out var smokeExitCode))
+            var startupArgs = e.Args.Length > 0
+                ? e.Args
+                : Environment.GetCommandLineArgs().Skip(1).ToArray();
+
+            if (WindowsSmokeProbe.TryWriteReport(startupArgs, out var smokeExitCode))
             {
-                Shutdown(smokeExitCode);
+                Environment.Exit(smokeExitCode);
                 return;
             }
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"BugNarrator Windows smoke probe failed: {exception.Message}");
-            Shutdown(1);
+            Environment.Exit(1);
             return;
         }
+
+        base.OnStartup(e);
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         var storagePaths = AppStoragePathProvider.CreateDefault();
         diagnostics = new WindowsDiagnostics(storagePaths);
         diagnostics.Info("app", "starting Windows shell bootstrap");
+        var shellLauncher = new WindowsShellLauncher(diagnostics);
 
         var singleInstanceService = new SingleInstanceService("ABDEnterprises.BugNarrator.Windows");
         var microphonePreflightService = new MicrophonePreflightService();
@@ -71,6 +77,7 @@ public partial class App : Application
             completedSessionStore,
             settingsStore,
             secretStore,
+            transcriptionClient,
             issueExtractionService,
             issueExportService,
             sessionBundleExporter,
@@ -102,7 +109,8 @@ public partial class App : Application
             settingsStore,
             hotkeyService,
             secretStore,
-            transcriptionClient);
+            transcriptionClient,
+            shellLauncher);
         var trayShell = new TrayShell(diagnostics);
 
         appShell = new WindowsAppShell(

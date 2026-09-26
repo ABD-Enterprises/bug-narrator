@@ -6,6 +6,7 @@ using BugNarrator.Windows.Services.Review;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
+using BugNarrator.Windows.Services.Transcription;
 using Xunit;
 
 namespace BugNarrator.Windows.Tests;
@@ -17,6 +18,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private readonly FakeIssueExportService issueExportService;
     private readonly FakeIssueExtractionService issueExtractionService;
     private readonly FakeSecretStore secretStore;
+    private readonly FakeTranscriptionClient transcriptionClient;
     private readonly ReviewSessionActionService service;
 
     public ReviewSessionActionServiceTests()
@@ -36,11 +38,13 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         issueExtractionService = new FakeIssueExtractionService();
         issueExportService = new FakeIssueExportService();
         secretStore = new FakeSecretStore();
+        transcriptionClient = new FakeTranscriptionClient();
 
         service = new ReviewSessionActionService(
             completedSessionStore,
             new FakeWindowsAppSettingsStore(),
             secretStore,
+            transcriptionClient,
             issueExtractionService,
             issueExportService,
             new FakeSessionBundleExporter(),
@@ -62,8 +66,58 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         Assert.NotNull(updatedSession.IssueExtraction);
         Assert.Equal(updatedSession.SessionId, savedSession.SessionId);
         Assert.Equal("Save button clips in the modal", extractedIssue.Title);
+        Assert.Equal("One draft issue was extracted.", updatedSession.ReviewSummary);
         Assert.Equal("gpt-4.1-mini", issueExtractionService.LastModel);
         Assert.Equal("sk-test", issueExtractionService.LastApiKey);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_WithConfiguredApiKey_UpdatesTranscriptSummaryAndRetryMetadata()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory, transcriptText: string.Empty) with
+        {
+            ReviewSummary = "Recording saved locally without a transcript.",
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+            TranscriptionFailureMessage = null,
+        };
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        transcriptionClient.TranscriptText = "Tester reopens the saved session and successfully retries transcription.";
+
+        var updatedSession = await service.RetryTranscriptionAsync(session);
+        var savedSession = Assert.Single(await completedSessionStore.GetAllAsync());
+
+        Assert.Equal(SessionTranscriptionStatus.Completed, updatedSession.TranscriptionStatus);
+        Assert.Equal("Tester reopens the saved session and successfully retries transcription.", updatedSession.TranscriptText);
+        Assert.Equal("Tester reopens the saved session and successfully retries transcription", updatedSession.Title);
+        Assert.Contains("Session length", updatedSession.ReviewSummary);
+        Assert.Null(updatedSession.TranscriptionFailureMessage);
+        Assert.Equal(1, updatedSession.TranscriptionRetryCount);
+        Assert.NotNull(updatedSession.LastTranscriptionRetryAt);
+        Assert.Equal(updatedSession.SessionId, savedSession.SessionId);
+        Assert.Equal("whisper-1", transcriptionClient.LastRequest!.Model);
+    }
+
+    [Fact]
+    public async Task RetryTranscriptionAsync_WhenTranscriptionFails_PersistsFailureAndRetryMetadata()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory, transcriptText: string.Empty) with
+        {
+            ReviewSummary = "Recording saved locally without a transcript.",
+            TranscriptionStatus = SessionTranscriptionStatus.Failed,
+            TranscriptionFailureMessage = "old failure",
+        };
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        transcriptionClient.ExceptionToThrow = new InvalidOperationException("network timeout");
+
+        var updatedSession = await service.RetryTranscriptionAsync(session);
+        var savedSession = Assert.Single(await completedSessionStore.GetAllAsync());
+
+        Assert.Equal(SessionTranscriptionStatus.Failed, updatedSession.TranscriptionStatus);
+        Assert.Equal("network timeout", updatedSession.TranscriptionFailureMessage);
+        Assert.Equal(1, updatedSession.TranscriptionRetryCount);
+        Assert.NotNull(updatedSession.LastTranscriptionRetryAt);
+        Assert.Contains("transcription failed", updatedSession.ReviewSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(updatedSession.SessionId, savedSession.SessionId);
     }
 
     [Fact]
@@ -117,6 +171,34 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             LastApiKey = apiKey;
             LastModel = model;
             return Task.FromResult(ReviewSessionTestData.CreateIssueExtractionResult());
+        }
+    }
+
+    private sealed class FakeTranscriptionClient : ITranscriptionClient
+    {
+        public Exception? ExceptionToThrow { get; set; }
+        public OpenAiTranscriptionRequest? LastRequest { get; private set; }
+        public string TranscriptText { get; set; } = "Transcript.";
+
+        public Task<string> TranscribeToTextAsync(
+            string audioFilePath,
+            string apiKey,
+            OpenAiTranscriptionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
+            return Task.FromResult(TranscriptText);
+        }
+
+        public Task ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 

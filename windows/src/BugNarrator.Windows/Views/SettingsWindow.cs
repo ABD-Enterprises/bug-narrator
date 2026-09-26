@@ -4,6 +4,7 @@ using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Transcription;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -142,6 +143,10 @@ public sealed class SettingsWindow : Window
             Foreground = Brushes.DimGray,
             TextWrapping = TextWrapping.Wrap,
         };
+        AutomationProperties.SetName(statusTextBlock, "Settings status");
+        AutomationProperties.SetLiveSetting(statusTextBlock, AutomationLiveSetting.Polite);
+
+        ApplyInputAccessibilityNames();
 
         Content = BuildWindowContent();
         Loaded += async (_, _) => await LoadSettingsAsync();
@@ -171,6 +176,7 @@ public sealed class SettingsWindow : Window
             Width = 100,
             Height = 34,
             Margin = new Thickness(0, 0, 10, 0),
+            IsDefault = true,
         };
         saveButton.Click += async (_, _) => await SaveSettingsAsync();
 
@@ -179,8 +185,13 @@ public sealed class SettingsWindow : Window
             Content = "Close",
             Width = 100,
             Height = 34,
+            IsCancel = true,
         };
         closeButton.Click += (_, _) => Close();
+
+        AutomationProperties.SetName(validateButton, "Validate OpenAI API key");
+        AutomationProperties.SetName(saveButton, "Save settings");
+        AutomationProperties.SetName(closeButton, "Close settings");
 
         var buttonBar = new StackPanel
         {
@@ -352,7 +363,7 @@ public sealed class SettingsWindow : Window
                         FontWeight = FontWeights.SemiBold,
                         Text = "Jira Export (Experimental)",
                     },
-                    BuildHint("These settings stay local. Export creates Jira issues from selected extracted issues."),
+                    BuildHint("These settings stay local. Jira export is experimental and creates Jira issues from selected extracted issues."),
                     BuildLabel("Jira Base URL"),
                     jiraBaseUrlTextBox,
                     BuildHint("Example: https://your-company.atlassian.net"),
@@ -396,7 +407,8 @@ public sealed class SettingsWindow : Window
             Height = 30,
             Margin = new Thickness(10, 0, 8, 0),
         };
-        assignButton.Click += async (_, _) => await AssignHotkeyAsync(action);
+        assignButton.Click += (_, _) => AssignHotkey(action);
+        AutomationProperties.SetName(assignButton, $"Assign hotkey for {action.DisplayName()}");
 
         var clearButton = new Button
         {
@@ -405,6 +417,7 @@ public sealed class SettingsWindow : Window
             Height = 30,
         };
         clearButton.Click += (_, _) => ClearHotkey(action);
+        AutomationProperties.SetName(clearButton, $"Clear hotkey for {action.DisplayName()}");
 
         var valueBorder = new Border
         {
@@ -572,7 +585,7 @@ public sealed class SettingsWindow : Window
         }
     }
 
-    private async Task AssignHotkeyAsync(WindowsHotkeyAction action)
+    private void AssignHotkey(WindowsHotkeyAction action)
     {
         var captureWindow = new HotkeyCaptureWindow(action)
         {
@@ -720,5 +733,23 @@ public sealed class SettingsWindow : Window
             FontWeight = FontWeights.SemiBold,
             Text = text,
         };
+    }
+
+    private void ApplyInputAccessibilityNames()
+    {
+        AutomationProperties.SetName(apiKeyPasswordBox, "OpenAI API key");
+        AutomationProperties.SetName(modelTextBox, "Transcription model");
+        AutomationProperties.SetName(languageHintTextBox, "Language hint");
+        AutomationProperties.SetName(promptTextBox, "Transcription prompt");
+        AutomationProperties.SetName(issueExtractionModelTextBox, "Issue extraction model");
+        AutomationProperties.SetName(gitHubTokenPasswordBox, "GitHub token");
+        AutomationProperties.SetName(gitHubOwnerTextBox, "GitHub repository owner");
+        AutomationProperties.SetName(gitHubRepositoryTextBox, "GitHub repository name");
+        AutomationProperties.SetName(gitHubDefaultLabelsTextBox, "GitHub default labels");
+        AutomationProperties.SetName(jiraBaseUrlTextBox, "Jira base URL");
+        AutomationProperties.SetName(jiraEmailTextBox, "Jira email");
+        AutomationProperties.SetName(jiraApiTokenPasswordBox, "Jira API token");
+        AutomationProperties.SetName(jiraProjectKeyTextBox, "Jira project key");
+        AutomationProperties.SetName(jiraIssueTypeTextBox, "Jira issue type");
     }
 }

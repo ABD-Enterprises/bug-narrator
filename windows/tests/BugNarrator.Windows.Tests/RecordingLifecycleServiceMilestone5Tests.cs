@@ -82,6 +82,22 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Contains("Transcription Note: boom", transcriptMarkdown);
     }
 
+    [Fact]
+    public async Task StartRecordingAsync_WhenMicrophonePermissionIsBlocked_SurfacesRecoveryGuidance()
+    {
+        using var harness = new TestHarness();
+        harness.MicrophonePreflightService.Result = new RecordingPreflightResult(
+            RecordingPreflightStatus.PermissionDenied,
+            CanStart: false,
+            "Microphone access is blocked.");
+
+        await harness.Service.StartRecordingAsync();
+
+        Assert.Equal(RecordingWorkflowState.Failed, harness.Service.CurrentState.WorkflowState);
+        Assert.Equal(RecordingRecoveryAction.OpenMicrophonePrivacySettings, harness.Service.CurrentState.RecoveryAction);
+        Assert.Contains("Microphone", harness.Service.CurrentState.RecoveryGuidance);
+    }
+
     private sealed class TestHarness : IDisposable
     {
         private readonly string rootDirectory;
@@ -172,12 +188,14 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
 
     private sealed class FakeMicrophonePreflightService : IMicrophonePreflightService
     {
+        public RecordingPreflightResult Result { get; set; } = new(
+            RecordingPreflightStatus.Ready,
+            CanStart: true,
+            "Microphone ready.");
+
         public RecordingPreflightResult CheckReadyToRecord(bool isAlreadyRecording)
         {
-            return new RecordingPreflightResult(
-                RecordingPreflightStatus.Ready,
-                CanStart: true,
-                "Microphone ready.");
+            return Result;
         }
     }
 

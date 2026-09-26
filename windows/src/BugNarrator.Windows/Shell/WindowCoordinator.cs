@@ -7,6 +7,7 @@ using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
 using BugNarrator.Windows.Services.Transcription;
 using BugNarrator.Windows.Services.Review;
+using BugNarrator.Windows.Services.Shell;
 using BugNarrator.Windows.Views;
 using System.Windows;
 
@@ -21,6 +22,7 @@ public sealed class WindowCoordinator
     private readonly ISecretStore secretStore;
     private readonly IWindowsGlobalHotkeyService hotkeyService;
     private readonly IWindowsAppSettingsStore settingsStore;
+    private readonly IWindowsShellLauncher shellLauncher;
     private readonly ITranscriptionClient transcriptionClient;
     private AboutWindow? aboutWindow;
     private RecordingWorkflowState lastObservedWorkflowState;
@@ -36,7 +38,8 @@ public sealed class WindowCoordinator
         IWindowsAppSettingsStore settingsStore,
         IWindowsGlobalHotkeyService hotkeyService,
         ISecretStore secretStore,
-        ITranscriptionClient transcriptionClient)
+        ITranscriptionClient transcriptionClient,
+        IWindowsShellLauncher shellLauncher)
     {
         this.diagnostics = diagnostics;
         this.recordingLifecycleService = recordingLifecycleService;
@@ -46,6 +49,7 @@ public sealed class WindowCoordinator
         this.hotkeyService = hotkeyService;
         this.secretStore = secretStore;
         this.transcriptionClient = transcriptionClient;
+        this.shellLauncher = shellLauncher;
 
         lastObservedWorkflowState = recordingLifecycleService.CurrentState.WorkflowState;
         recordingLifecycleService.StateChanged += OnRecordingStateChanged;
@@ -74,7 +78,10 @@ public sealed class WindowCoordinator
     {
         if (aboutWindow is null || !aboutWindow.IsLoaded)
         {
-            aboutWindow = new AboutWindow();
+            aboutWindow = new AboutWindow(
+                reviewSessionActionService,
+                shellLauncher,
+                diagnostics);
             aboutWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "about window closed");
@@ -93,7 +100,8 @@ public sealed class WindowCoordinator
             recordingControlsWindow = new RecordingControlsWindow(
                 recordingLifecycleService,
                 diagnostics,
-                ShowSessionLibrary);
+                ShowSessionLibrary,
+                shellLauncher);
             recordingControlsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "recording controls window closed");

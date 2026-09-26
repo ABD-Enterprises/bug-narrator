@@ -61,6 +61,33 @@ public sealed class CompletedSessionFormattingTests
     }
 
     [Fact]
+    public void CompletedSessionMarkdownBuilder_PrefersGeneratedSummaryAndIncludesRetryMetadata()
+    {
+        var createdAt = new DateTimeOffset(2026, 3, 17, 15, 0, 0, TimeSpan.Zero);
+        var session = CreateSession(
+            Guid.Parse("56565656-5656-5656-5656-565656565656"),
+            createdAt,
+            "Retry session",
+            "Transcript text.") with
+        {
+            ReviewSummary = "Fallback summary.",
+            IssueExtraction = new IssueExtractionResult(
+                GeneratedAt: createdAt.AddMinutes(1),
+                Summary: "Generated review summary.",
+                GuidanceNote: "Review before export.",
+                Issues: Array.Empty<ExtractedIssue>()),
+            TranscriptionRetryCount = 2,
+            LastTranscriptionRetryAt = createdAt.AddMinutes(3),
+        };
+
+        var markdown = CompletedSessionMarkdownBuilder.Build(session);
+
+        Assert.Contains("Generated review summary.", markdown);
+        Assert.Contains("Retry Attempts: 2", markdown);
+        Assert.DoesNotContain("Fallback summary.", markdown);
+    }
+
+    [Fact]
     public void SessionLibraryQueryEvaluator_FiltersAndSearchesCompletedSessions()
     {
         var now = new DateTimeOffset(2026, 3, 17, 12, 0, 0, TimeSpan.Zero);
@@ -123,6 +150,35 @@ public sealed class CompletedSessionFormattingTests
             [session],
             new SessionLibraryQuery(
                 SearchText: "clipped",
+                DateRange: SessionLibraryDateRange.All,
+                SortOrder: SessionLibrarySortOrder.NewestFirst),
+            now);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void SessionLibraryQueryEvaluator_SearchesGeneratedSummaryThroughEffectiveSummary()
+    {
+        var now = new DateTimeOffset(2026, 3, 17, 12, 0, 0, TimeSpan.Zero);
+        var session = CreateSession(
+            Guid.Parse("78787878-7878-7878-7878-787878787878"),
+            now.AddHours(-1),
+            "Review pass",
+            "Transcript text.") with
+        {
+            ReviewSummary = "Fallback summary.",
+            IssueExtraction = new IssueExtractionResult(
+                GeneratedAt: now,
+                Summary: "Generated summary about retry success.",
+                GuidanceNote: "Review before export.",
+                Issues: Array.Empty<ExtractedIssue>()),
+        };
+
+        var result = SessionLibraryQueryEvaluator.Apply(
+            [session],
+            new SessionLibraryQuery(
+                SearchText: "retry success",
                 DateRange: SessionLibraryDateRange.All,
                 SortOrder: SessionLibrarySortOrder.NewestFirst),
             now);

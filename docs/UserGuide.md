@@ -13,6 +13,8 @@ BugNarrator intentionally runs as a single-instance app. If you open it again wh
 - [Request a Feature](https://github.com/deffenda/bugnarrator/issues/new)
 - [Support Development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
+On Windows, the same documentation, reporting, release, repository, and support links are surfaced from the tray app under `Help And Support`, along with `Export Debug Bundle`.
+
 ## What BugNarrator Is
 
 BugNarrator is built for software walkthroughs and testing passes where you want to keep reviewing the target app instead of stopping to type notes.
@@ -78,7 +80,7 @@ If the key is missing, invalid, or revoked at stop time, the session still stays
 
 ### Review The Session
 
-After transcription completes, BugNarrator opens the session library so you can inspect the transcript timeline, screenshots, review summary, and extracted issues in one place.
+After transcription completes, BugNarrator opens the session library so you can inspect the transcript timeline, screenshots, review summary, and extracted issues in one place. If transcription was skipped or failed because your key was missing or invalid, the session still stays retryable in the library and you can use `Retry Transcription` after fixing Settings.
 
 The intended mental model is:
 

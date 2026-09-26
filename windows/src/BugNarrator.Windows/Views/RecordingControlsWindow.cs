@@ -1,6 +1,8 @@
 using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Diagnostics;
+using BugNarrator.Windows.Services.Shell;
+using System.Windows.Automation;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -11,20 +13,26 @@ public sealed class RecordingControlsWindow : Window
     private readonly WindowsDiagnostics diagnostics;
     private readonly Action openSessionLibrary;
     private readonly IRecordingLifecycleService recordingLifecycleService;
+    private readonly IWindowsShellLauncher shellLauncher;
+    private readonly Button recoveryActionButton;
+    private readonly TextBlock recoveryGuidanceTextBlock;
     private readonly Button startButton;
     private readonly Button stopButton;
     private readonly Button screenshotButton;
+    private readonly Button closeButton;
     private readonly TextBlock stateTextBlock;
     private readonly TextBlock statusTextBlock;
 
     public RecordingControlsWindow(
         IRecordingLifecycleService recordingLifecycleService,
         WindowsDiagnostics diagnostics,
-        Action openSessionLibrary)
+        Action openSessionLibrary,
+        IWindowsShellLauncher shellLauncher)
     {
         this.recordingLifecycleService = recordingLifecycleService;
         this.diagnostics = diagnostics;
         this.openSessionLibrary = openSessionLibrary;
+        this.shellLauncher = shellLauncher;
 
         Title = "BugNarrator Controls";
         Width = 460;
@@ -71,6 +79,22 @@ public sealed class RecordingControlsWindow : Window
             TextWrapping = TextWrapping.Wrap,
         };
 
+        recoveryGuidanceTextBlock = new TextBlock
+        {
+            Margin = new Thickness(0, 10, 0, 0),
+            Foreground = System.Windows.Media.Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+
+        recoveryActionButton = new Button
+        {
+            Height = 34,
+            Margin = new Thickness(0, 10, 0, 0),
+            Visibility = Visibility.Collapsed,
+        };
+        recoveryActionButton.Click += OnRecoveryActionClicked;
+
         var openLibraryButton = new Button
         {
             Content = "Open Session Library",
@@ -79,10 +103,23 @@ public sealed class RecordingControlsWindow : Window
         };
         openLibraryButton.Click += OnOpenSessionLibraryClicked;
 
+        closeButton = new Button
+        {
+            Content = "Close",
+            Height = 38,
+            Margin = new Thickness(0, 10, 0, 0),
+            IsCancel = true,
+        };
+        closeButton.Click += (_, _) => Close();
+
         var contentGrid = new Grid
         {
             RowDefinitions =
             {
+                new RowDefinition
+                {
+                    Height = GridLength.Auto,
+                },
                 new RowDefinition
                 {
                     Height = GridLength.Auto,
@@ -135,6 +172,8 @@ public sealed class RecordingControlsWindow : Window
                 {
                     stateTextBlock,
                     statusTextBlock,
+                    recoveryGuidanceTextBlock,
+                    recoveryActionButton,
                 },
             },
         };
@@ -171,10 +210,12 @@ public sealed class RecordingControlsWindow : Window
         Grid.SetRow(statusPanel, 1);
         Grid.SetRow(actionGrid, 2);
         Grid.SetRow(secondaryActionGrid, 3);
+        Grid.SetRow(closeButton, 4);
         contentGrid.Children.Add(headerPanel);
         contentGrid.Children.Add(statusPanel);
         contentGrid.Children.Add(actionGrid);
         contentGrid.Children.Add(secondaryActionGrid);
+        contentGrid.Children.Add(closeButton);
 
         Content = new Border
         {
@@ -182,6 +223,7 @@ public sealed class RecordingControlsWindow : Window
             Child = contentGrid,
         };
 
+        ApplyAccessibilityMetadata();
         recordingLifecycleService.StateChanged += OnStateChanged;
         Closed += OnClosed;
         ApplyState(recordingLifecycleService.CurrentState);
@@ -194,6 +236,34 @@ public sealed class RecordingControlsWindow : Window
         startButton.IsEnabled = state.CanStart;
         stopButton.IsEnabled = state.CanStop;
         screenshotButton.IsEnabled = state.CanCaptureScreenshot;
+        startButton.IsDefault = state.CanStart;
+        stopButton.IsDefault = state.CanStop;
+
+        if (string.IsNullOrWhiteSpace(state.RecoveryGuidance))
+        {
+            recoveryGuidanceTextBlock.Text = string.Empty;
+            recoveryGuidanceTextBlock.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            recoveryGuidanceTextBlock.Text = state.RecoveryGuidance;
+            recoveryGuidanceTextBlock.Visibility = Visibility.Visible;
+        }
+
+        switch (state.RecoveryAction)
+        {
+            case RecordingRecoveryAction.OpenMicrophonePrivacySettings:
+                recoveryActionButton.Content = "Open Microphone Settings";
+                recoveryActionButton.Visibility = Visibility.Visible;
+                break;
+            case RecordingRecoveryAction.OpenSoundSettings:
+                recoveryActionButton.Content = "Open Sound Settings";
+                recoveryActionButton.Visibility = Visibility.Visible;
+                break;
+            default:
+                recoveryActionButton.Visibility = Visibility.Collapsed;
+                break;
+        }
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -216,6 +286,31 @@ public sealed class RecordingControlsWindow : Window
     private void OnStateChanged(object? sender, RecordingControlState state)
     {
         Dispatcher.Invoke(() => ApplyState(state));
+    }
+
+    private void OnRecoveryActionClicked(object? sender, RoutedEventArgs e)
+    {
+        var state = recordingLifecycleService.CurrentState;
+        var target = state.RecoveryAction switch
+        {
+            RecordingRecoveryAction.OpenMicrophonePrivacySettings => WindowsSettingsLinks.MicrophonePrivacy,
+            RecordingRecoveryAction.OpenSoundSettings => WindowsSettingsLinks.Sound,
+            _ => null,
+        };
+
+        if (target is null)
+        {
+            return;
+        }
+
+        try
+        {
+            shellLauncher.OpenUri(target, recoveryActionButton.Content?.ToString() ?? "Windows settings");
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("ui", "failed to open recording recovery action", exception);
+        }
     }
 
     private void OnOpenSessionLibraryClicked(object? sender, RoutedEventArgs e)
@@ -252,5 +347,22 @@ public sealed class RecordingControlsWindow : Window
         {
             diagnostics.Error("ui", "capture screenshot click failed", exception);
         }
+    }
+
+    private void ApplyAccessibilityMetadata()
+    {
+        AutomationProperties.SetName(startButton, "Start recording");
+        AutomationProperties.SetHelpText(startButton, "Start a narrated testing session.");
+        AutomationProperties.SetName(stopButton, "Stop recording");
+        AutomationProperties.SetHelpText(stopButton, "Stop the active recording session.");
+        AutomationProperties.SetName(screenshotButton, "Capture screenshot");
+        AutomationProperties.SetHelpText(screenshotButton, "Capture a screenshot while a recording is active.");
+        AutomationProperties.SetName(closeButton, "Close recording controls");
+        AutomationProperties.SetName(stateTextBlock, "Recording state");
+        AutomationProperties.SetName(statusTextBlock, "Recording status");
+        AutomationProperties.SetLiveSetting(statusTextBlock, AutomationLiveSetting.Polite);
+        AutomationProperties.SetName(recoveryGuidanceTextBlock, "Recording recovery guidance");
+        AutomationProperties.SetLiveSetting(recoveryGuidanceTextBlock, AutomationLiveSetting.Polite);
+        AutomationProperties.SetName(recoveryActionButton, "Open recording recovery settings");
     }
 }

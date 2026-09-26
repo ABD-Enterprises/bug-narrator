@@ -89,6 +89,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Warning("recording", "duplicate start request ignored");
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = null,
                 StatusMessage = "A recording session is already active.",
             });
             return;
@@ -105,7 +107,9 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanStop: false,
                 CanCaptureScreenshot: false,
                 preflightResult.Message,
-                ActiveSession: null));
+                ActiveSession: null,
+                RecoveryGuidance: BuildMicrophoneRecoveryGuidance(preflightResult.Status),
+                RecoveryAction: BuildMicrophoneRecoveryAction(preflightResult.Status)));
             return;
         }
 
@@ -175,6 +179,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Warning("recording", "stop requested without an active session");
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = null,
                 StatusMessage = "No active recording to stop.",
             });
             return;
@@ -275,6 +281,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Warning("screenshot", "capture requested without an active session");
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = null,
                 StatusMessage = "Start a recording before capturing a screenshot.",
             });
             return new ScreenshotCaptureResult(
@@ -290,6 +298,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         {
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = BuildScreenCaptureRecoveryGuidance(preflightResult.Status),
                 StatusMessage = preflightResult.Message,
             });
             return new ScreenshotCaptureResult(
@@ -304,6 +314,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Info("screenshot", "screenshot selection cancelled");
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = null,
                 StatusMessage = "Screenshot capture cancelled.",
             });
             return new ScreenshotCaptureResult(
@@ -344,6 +356,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             PublishState(CurrentState with
             {
                 ActiveSession = updatedDraft,
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = null,
                 StatusMessage = $"Screenshot captured: {plan.Screenshot.RelativePath}",
             });
 
@@ -357,6 +371,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             diagnostics.Error("screenshot", "screenshot capture failed", exception);
             PublishState(CurrentState with
             {
+                RecoveryAction = RecordingRecoveryAction.None,
+                RecoveryGuidance = BuildScreenCaptureRecoveryGuidance(ScreenCapturePreflightStatus.Unavailable),
                 StatusMessage = $"Screenshot capture failed: {exception.Message}",
             });
 
@@ -455,7 +471,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
 
         return new CompletedSession(
             SessionId: draft.SessionId,
-            Title: BuildSessionTitle(draft.Title, transcriptText),
+            Title: SessionTitleBuilder.Build(draft.Title, transcriptText),
             CreatedAt: draft.CreatedAt,
             RecordingStartedAt: draft.RecordingStartedAt,
             RecordingStoppedAt: stoppedAt,
@@ -482,34 +498,45 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
             SessionTranscriptionStatus.Completed =>
                 $"Recording transcribed and saved to {session.SessionDirectory}",
             SessionTranscriptionStatus.NotConfigured =>
-                $"Recording saved to {session.SessionDirectory}. Add an OpenAI API key in Settings to enable transcription.",
+                $"Recording saved to {session.SessionDirectory}. Add an OpenAI API key in Settings, then retry transcription from Session Library.",
             SessionTranscriptionStatus.Failed =>
-                $"Recording saved to {session.SessionDirectory}, but transcription failed: {session.TranscriptionFailureMessage}",
+                $"Recording saved to {session.SessionDirectory}, but transcription failed: {session.TranscriptionFailureMessage}. Retry transcription from Session Library after fixing the issue.",
             _ => $"Recording saved to {session.SessionDirectory}",
         };
     }
 
-    private static string BuildSessionTitle(string fallbackTitle, string transcriptText)
+    private static RecordingRecoveryAction BuildMicrophoneRecoveryAction(RecordingPreflightStatus status)
     {
-        if (string.IsNullOrWhiteSpace(transcriptText))
+        return status switch
         {
-            return fallbackTitle;
-        }
+            RecordingPreflightStatus.PermissionDenied => RecordingRecoveryAction.OpenMicrophonePrivacySettings,
+            RecordingPreflightStatus.DeviceUnavailable or RecordingPreflightStatus.CaptureSetupFailed =>
+                RecordingRecoveryAction.OpenSoundSettings,
+            _ => RecordingRecoveryAction.None,
+        };
+    }
 
-        var trimmedTranscript = transcriptText.Trim();
-        var sentenceBreak = trimmedTranscript.IndexOfAny(['.', '!', '?', '\r', '\n']);
-        var title = sentenceBreak >= 0
-            ? trimmedTranscript[..sentenceBreak]
-            : trimmedTranscript;
-
-        title = title.Trim();
-        if (title.Length == 0)
+    private static string? BuildMicrophoneRecoveryGuidance(RecordingPreflightStatus status)
+    {
+        return status switch
         {
-            return fallbackTitle;
-        }
+            RecordingPreflightStatus.PermissionDenied =>
+                "Open Windows Privacy > Microphone, allow desktop apps to use the microphone, then retry recording.",
+            RecordingPreflightStatus.DeviceUnavailable =>
+                "No microphone input is currently available. Connect or enable a microphone in Windows Sound settings, then retry recording.",
+            RecordingPreflightStatus.CaptureSetupFailed =>
+                "Windows detected a microphone but could not start capture. Check Sound settings and other apps using the microphone, then retry.",
+            _ => null,
+        };
+    }
 
-        return title.Length <= 80
-            ? title
-            : $"{title[..80].Trim()}...";
+    private static string? BuildScreenCaptureRecoveryGuidance(ScreenCapturePreflightStatus status)
+    {
+        return status switch
+        {
+            ScreenCapturePreflightStatus.Unavailable =>
+                "Windows does not use a separate screenshot permission prompt here. If capture stays unavailable, confirm BugNarrator is running on an interactive desktop session with an available display, then try again.",
+            _ => null,
+        };
     }
 }

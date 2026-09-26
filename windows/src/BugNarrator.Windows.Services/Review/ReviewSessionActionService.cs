@@ -1,10 +1,12 @@
 using BugNarrator.Core.Models;
+using BugNarrator.Core.Workflow;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Extraction;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
+using BugNarrator.Windows.Services.Transcription;
 
 namespace BugNarrator.Windows.Services.Review;
 
@@ -18,11 +20,13 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly ISecretStore secretStore;
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
+    private readonly ITranscriptionClient transcriptionClient;
 
     public ReviewSessionActionService(
         ICompletedSessionStore completedSessionStore,
         IWindowsAppSettingsStore settingsStore,
         ISecretStore secretStore,
+        ITranscriptionClient transcriptionClient,
         IIssueExtractionService issueExtractionService,
         IIssueExportService issueExportService,
         ISessionBundleExporter sessionBundleExporter,
@@ -32,6 +36,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         this.completedSessionStore = completedSessionStore;
         this.settingsStore = settingsStore;
         this.secretStore = secretStore;
+        this.transcriptionClient = transcriptionClient;
         this.issueExtractionService = issueExtractionService;
         this.issueExportService = issueExportService;
         this.sessionBundleExporter = sessionBundleExporter;
@@ -54,6 +59,90 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     {
         await completedSessionStore.DeleteAsync(session, cancellationToken);
         diagnostics.Info("review", $"deleted completed session {session.SessionId}");
+    }
+
+    public async Task<CompletedSession> RetryTranscriptionAsync(
+        CompletedSession session,
+        CancellationToken cancellationToken = default)
+    {
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException(
+                "Add an OpenAI API key in Settings before retrying transcription.");
+        }
+
+        if (string.IsNullOrWhiteSpace(session.AudioFilePath) || !File.Exists(session.AudioFilePath))
+        {
+            throw new InvalidOperationException(
+                "The saved recording audio could not be found for this session.");
+        }
+
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var request = new OpenAiTranscriptionRequest(
+            settings.EffectiveTranscriptionModel,
+            settings.EffectiveLanguageHint,
+            settings.EffectiveTranscriptionPrompt);
+        var retryAttemptAt = DateTimeOffset.UtcNow;
+        var retryCount = session.TranscriptionRetryCount + 1;
+
+        try
+        {
+            diagnostics.Info(
+                "review",
+                $"retrying transcription for session {session.SessionId} using model {request.Model}");
+            var transcriptText = await transcriptionClient.TranscribeToTextAsync(
+                session.AudioFilePath,
+                apiKey,
+                request,
+                cancellationToken);
+            var updatedSession = session with
+            {
+                Title = SessionTitleBuilder.Build(session.Title, transcriptText),
+                TranscriptText = transcriptText,
+                ReviewSummary = SessionSummaryBuilder.Build(
+                    transcriptText,
+                    SessionTranscriptionStatus.Completed,
+                    transcriptionFailureMessage: null,
+                    session.Screenshots.Count,
+                    session.Duration),
+                TranscriptionStatus = SessionTranscriptionStatus.Completed,
+                TranscriptionModel = request.Model,
+                LanguageHint = request.LanguageHint,
+                Prompt = request.Prompt,
+                TranscriptionFailureMessage = null,
+                TranscriptionRetryCount = retryCount,
+                LastTranscriptionRetryAt = retryAttemptAt,
+            };
+
+            await completedSessionStore.SaveAsync(updatedSession, cancellationToken);
+            diagnostics.Info("review", $"retry transcription completed for session {session.SessionId}");
+            return updatedSession;
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("review", "retry transcription failed", exception);
+
+            var updatedSession = session with
+            {
+                ReviewSummary = SessionSummaryBuilder.Build(
+                    session.TranscriptText,
+                    SessionTranscriptionStatus.Failed,
+                    exception.Message,
+                    session.Screenshots.Count,
+                    session.Duration),
+                TranscriptionStatus = SessionTranscriptionStatus.Failed,
+                TranscriptionModel = request.Model,
+                LanguageHint = request.LanguageHint,
+                Prompt = request.Prompt,
+                TranscriptionFailureMessage = exception.Message,
+                TranscriptionRetryCount = retryCount,
+                LastTranscriptionRetryAt = retryAttemptAt,
+            };
+
+            await completedSessionStore.SaveAsync(updatedSession, cancellationToken);
+            return updatedSession;
+        }
     }
 
     public async Task<CompletedSession> ExtractIssuesAsync(
@@ -82,6 +171,9 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         var updatedSession = session with
         {
             IssueExtraction = extraction,
+            ReviewSummary = string.IsNullOrWhiteSpace(extraction.Summary)
+                ? session.ReviewSummary
+                : extraction.Summary.Trim(),
         };
 
         await completedSessionStore.SaveAsync(updatedSession, cancellationToken);

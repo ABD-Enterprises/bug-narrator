@@ -10,12 +10,29 @@ As of 2026-04-04:
 
 - active phase: `RR-002 Windows Runtime Validation And Hardening`
 - required branch: `phase/RR-002-windows-runtime-hardening`
-- remaining phase blocker: `RR-002-T4 Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM`
+- completed phase blocker: `RR-002-T4 Run tray, recording, screenshot, and hotkey validation on a real Windows machine or VM`
 - unresolved phase risks:
-  - `RISK-WIN-001`
   - `RISK-WIN-002`
 - related follow-up risk outside this phase:
   - `RISK-CI-002 -> OPS-011`
+- real Windows evidence captured on this branch:
+  - tray icon found in the system-tray overflow
+  - duplicate launch focused the primary instance
+  - microphone-backed recording completed successfully
+  - screenshot overlay region capture persisted deterministic artifacts
+  - out-of-focus hotkeys worked from Notepad focus
+  - reserved shortcut rejection was observed for `Shift+Win+S`
+  - retry-needed sessions remained recoverable without an OpenAI key
+  - debug-bundle export succeeded from the review flow
+  - live GitHub export succeeded through the production Windows service path using a disposable private repository
+  - production-path session deletion removed the saved session directory cleanly
+  - corrupted screenshot-path metadata was excluded safely from the loaded session and the exported session bundle
+- remaining validation gaps from the April 4, 2026 passes:
+  - live OpenAI validation with a real API key
+  - live Jira export validation with real credentials
+  - alternate keyboard layout behavior on a machine with more than one installed input layout
+  - multi-monitor or mixed-DPI proof on a suitable Windows machine
+  - signed public-release proof after installer and signing prerequisites are available
 
 ## First Command On Windows
 
@@ -64,19 +81,26 @@ After the baseline passes on Windows:
 dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj -c Debug
 ```
 
-2. Execute the real desktop validation that macOS CI cannot cover:
+2. If the tray, recording, screenshot, or hotkey surfaces change again, rerun the real desktop validation that macOS CI cannot cover:
    - tray icon and single-instance behavior
    - recording lifecycle against a real microphone state
    - screenshot overlay and region capture behavior
    - global hotkey behavior against real desktop apps, reserved shortcuts, and alternate layouts
 
-3. Use [WINDOWS_VALIDATION_CHECKLIST.md](WINDOWS_VALIDATION_CHECKLIST.md) as the runtime checklist for `RR-002-T4`.
+3. Use [WINDOWS_VALIDATION_CHECKLIST.md](WINDOWS_VALIDATION_CHECKLIST.md) as the runtime checklist for any rerun and preserve the April 4, 2026 evidence-backed gaps unless you materially expand the real Windows coverage.
 
-4. When real Windows findings land, update:
-   - `docs/roadmap/state.json`
-   - `state/session.json`
-   - `state/tasks.json`
-   - `state/risks.json`
+4. The next honest WIN-010 blockers are now narrower:
+  - OpenAI transcription, summary, and issue extraction with a real key
+  - Jira export with real credentials
+  - alternate keyboard layout validation
+  - mixed-display validation
+  - signed public-release proof through WIN-011
+
+5. When new real Windows findings land, update:
+  - `docs/roadmap/state.json`
+  - `state/session.json`
+  - `state/tasks.json`
+  - `state/risks.json`
    - `state/decisions.json`
    - `windows/README.md`
    - `windows/docs/WINDOWS_VALIDATION_CHECKLIST.md`

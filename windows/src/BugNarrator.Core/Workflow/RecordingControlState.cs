@@ -8,7 +8,9 @@ public sealed record RecordingControlState(
     bool CanStop,
     bool CanCaptureScreenshot,
     string StatusMessage,
-    RecordingSessionDraft? ActiveSession
+    RecordingSessionDraft? ActiveSession,
+    string? RecoveryGuidance = null,
+    RecordingRecoveryAction RecoveryAction = RecordingRecoveryAction.None
 )
 {
     public static RecordingControlState Idle(string statusMessage = "Ready to record.")

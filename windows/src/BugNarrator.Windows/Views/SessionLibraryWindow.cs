@@ -4,6 +4,7 @@ using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Review;
 using BugNarrator.Windows.Services.Storage;
 using System.IO;
+using System.Windows.Automation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -34,6 +35,7 @@ public sealed class SessionLibraryWindow : Window
     private readonly TextBlock issuesSummaryTextBlock;
     private readonly TextBlock libraryStatusTextBlock;
     private readonly IReviewSessionActionService reviewSessionActionService;
+    private readonly Button retryTranscriptionButton;
     private readonly Button saveReviewButton;
     private readonly Image screenshotPreviewImage;
     private readonly TextBlock screenshotPreviewTextBlock;
@@ -205,6 +207,11 @@ public sealed class SessionLibraryWindow : Window
             "Extracting draft issues with OpenAI...",
             ExtractIssuesAsync);
 
+        retryTranscriptionButton = BuildActionButton("Retry Transcription");
+        retryTranscriptionButton.Click += async (_, _) => await RunReviewActionAsync(
+            "Retrying transcription with OpenAI...",
+            RetryTranscriptionAsync);
+
         saveReviewButton = BuildActionButton("Save Review");
         saveReviewButton.Click += async (_, _) => await RunReviewActionAsync(
             "Saving review edits...",
@@ -277,6 +284,7 @@ public sealed class SessionLibraryWindow : Window
 
         Content = BuildWindowContent();
         UpdateCustomDateRangeVisibility();
+        ApplyAccessibilityMetadata();
 
         Loaded += async (_, _) => await RefreshSessionsAsync();
         Activated += async (_, _) => await RefreshSessionsAsync();
@@ -473,6 +481,7 @@ public sealed class SessionLibraryWindow : Window
                         Margin = new Thickness(0, 0, 0, 4),
                         Children =
                         {
+                            retryTranscriptionButton,
                             extractIssuesButton,
                             saveReviewButton,
                             exportBundleButton,
@@ -528,6 +537,23 @@ public sealed class SessionLibraryWindow : Window
             issueCount == 0
                 ? "Issue extraction finished without any draft issues."
                 : $"Issue extraction created {issueCount} draft issue(s). Review and adjust them before export.";
+    }
+
+    private async Task RetryTranscriptionAsync()
+    {
+        var session = RequireSelectedSession();
+        var updatedSession = await reviewSessionActionService.RetryTranscriptionAsync(session);
+        ReplaceSession(updatedSession);
+
+        issuesStatusTextBlock.Text = updatedSession.TranscriptionStatus switch
+        {
+            SessionTranscriptionStatus.Completed =>
+                "Transcription retry completed. Review the updated transcript, summary, and draft issues.",
+            SessionTranscriptionStatus.Failed =>
+                $"Transcription retry failed. {updatedSession.TranscriptionFailureMessage ?? "Review the Windows log for more detail."}",
+            _ =>
+                "Transcription retry finished with no transcript changes.",
+        };
     }
 
     private async Task SaveReviewAsync()
@@ -614,11 +640,13 @@ public sealed class SessionLibraryWindow : Window
     {
         var hasSession = selectedSession is not null;
         var hasTranscript = hasSession && !string.IsNullOrWhiteSpace(selectedSession!.TranscriptText);
+        var requiresRetry = hasSession && selectedSession!.RequiresTranscriptionRetry;
         var hasExtraction = selectedSession?.IssueExtraction is not null;
         var selectedIssueCount = issueEditors.Count > 0
             ? issueEditors.Count(editor => editor.IsSelectedForExport)
             : selectedSession?.IssueExtraction?.SelectedIssues.Count ?? 0;
 
+        retryTranscriptionButton.IsEnabled = requiresRetry && !isRunningReviewAction;
         extractIssuesButton.IsEnabled = hasSession && hasTranscript && !isRunningReviewAction;
         saveReviewButton.IsEnabled = hasExtraction && !isRunningReviewAction;
         exportBundleButton.IsEnabled = hasSession && !isRunningReviewAction;
@@ -797,7 +825,7 @@ public sealed class SessionLibraryWindow : Window
             : session.TranscriptText;
 
         summaryHeaderTextBlock.Text = BuildSummaryHeader(session);
-        summaryTextBox.Text = session.ReviewSummary;
+        summaryTextBox.Text = session.EffectiveReviewSummary;
 
         screenshotListBox.Items.Clear();
         foreach (var screenshot in session.Screenshots.OrderBy(screenshot => screenshot.ElapsedSeconds))
@@ -823,6 +851,15 @@ public sealed class SessionLibraryWindow : Window
 
         if (session.IssueExtraction is null)
         {
+            if (session.RequiresTranscriptionRetry)
+            {
+                issuesSummaryTextBlock.Text = "Transcription retry needed.";
+                issuesGuidanceTextBlock.Text = "Retry transcription after fixing the OpenAI key or network issue. Once the transcript is available, you can extract draft issues here.";
+                issuesEmptyStateTextBlock.Text =
+                    "This session was preserved successfully, but transcription still needs a retry before draft issues can be generated.";
+                return;
+            }
+
             issuesSummaryTextBlock.Text = "No extracted issues yet.";
             issuesGuidanceTextBlock.Text = "Click Extract Issues to turn the saved transcript into editable draft issues before export.";
             issuesEmptyStateTextBlock.Text =
@@ -1128,6 +1165,33 @@ public sealed class SessionLibraryWindow : Window
         };
     }
 
+    private void ApplyAccessibilityMetadata()
+    {
+        AutomationProperties.SetName(dateRangeComboBox, "Session date range filter");
+        AutomationProperties.SetName(customStartDatePicker, "Custom range start date");
+        AutomationProperties.SetName(customEndDatePicker, "Custom range end date");
+        AutomationProperties.SetName(sortOrderComboBox, "Session sort order");
+        AutomationProperties.SetName(searchTextBox, "Session search");
+        AutomationProperties.SetName(sessionListBox, "Saved sessions");
+        AutomationProperties.SetName(deleteSessionButton, "Delete selected session");
+        AutomationProperties.SetName(transcriptTextBox, "Transcript details");
+        AutomationProperties.SetName(screenshotListBox, "Session screenshots");
+        AutomationProperties.SetName(screenshotPreviewImage, "Screenshot preview");
+        AutomationProperties.SetName(summaryTextBox, "Review summary");
+        AutomationProperties.SetName(retryTranscriptionButton, "Retry transcription for selected session");
+        AutomationProperties.SetName(extractIssuesButton, "Extract issues from selected session");
+        AutomationProperties.SetName(saveReviewButton, "Save review edits");
+        AutomationProperties.SetName(exportBundleButton, "Export session bundle");
+        AutomationProperties.SetName(exportDebugBundleButton, "Export debug bundle");
+        AutomationProperties.SetName(exportGitHubButton, "Export selected issues to GitHub");
+        AutomationProperties.SetName(exportJiraButton, "Export selected issues to Jira");
+        AutomationProperties.SetName(libraryStatusTextBlock, "Session library status");
+        AutomationProperties.SetLiveSetting(libraryStatusTextBlock, AutomationLiveSetting.Polite);
+        AutomationProperties.SetName(issuesStatusTextBlock, "Review workspace status");
+        AutomationProperties.SetLiveSetting(issuesStatusTextBlock, AutomationLiveSetting.Polite);
+        AutomationProperties.SetName(issuesGuidanceTextBlock, "Review workspace guidance");
+    }
+
     private static string BuildTranscriptHeader(CompletedSession session)
     {
         return
@@ -1138,9 +1202,12 @@ public sealed class SessionLibraryWindow : Window
     private static string BuildSummaryHeader(CompletedSession session)
     {
         var extractedIssueCount = session.IssueExtraction?.Issues.Count ?? 0;
+        var retryText = session.TranscriptionRetryCount > 0
+            ? $"  |  Retry Attempts: {session.TranscriptionRetryCount}"
+            : string.Empty;
         return
             $"{session.Title}{Environment.NewLine}" +
-            $"Model: {session.TranscriptionModel}  |  Screenshots: {session.Screenshots.Count}  |  Draft issues: {extractedIssueCount}";
+            $"Model: {session.TranscriptionModel}  |  Screenshots: {session.Screenshots.Count}  |  Draft issues: {extractedIssueCount}{retryText}";
     }
 
     private static string BuildTranscriptFallback(CompletedSession session)
@@ -1148,9 +1215,9 @@ public sealed class SessionLibraryWindow : Window
         return session.TranscriptionStatus switch
         {
             SessionTranscriptionStatus.NotConfigured =>
-                "This recording was saved without a transcript because an OpenAI API key was not configured in Settings.",
+                "This recording was saved without a transcript because an OpenAI API key was not configured in Settings. Add the key, then use Retry Transcription from the Session Library.",
             SessionTranscriptionStatus.Failed =>
-                $"Transcription failed for this session. {session.TranscriptionFailureMessage ?? "Check the Windows log for more detail."}",
+                $"Transcription failed for this session. {session.TranscriptionFailureMessage ?? "Check the Windows log for more detail."} Fix the issue, then use Retry Transcription from the Session Library.",
             _ => "No transcript text was saved for this session.",
         };
     }
@@ -1182,7 +1249,9 @@ public sealed class SessionLibraryWindow : Window
     {
         if (session.IssueExtraction is null)
         {
-            return "Extract draft issues from this transcript, or export the local session bundle and debug bundle.";
+            return session.RequiresTranscriptionRetry
+                ? "Retry transcription first. You can still export the local session bundle or debug bundle while this session remains preserved."
+                : "Extract draft issues from this transcript, or export the local session bundle and debug bundle.";
         }
 
         var selectedCount = session.IssueExtraction.SelectedIssues.Count;
@@ -1311,9 +1380,12 @@ public sealed class SessionLibraryWindow : Window
         public override string ToString()
         {
             var issueCount = Session.IssueExtraction?.Issues.Count ?? 0;
+            var retryText = Session.RequiresTranscriptionRetry
+                ? "  |  Retry Needed"
+                : string.Empty;
             return
                 $"{Session.Title}{Environment.NewLine}" +
-                $"{Session.CreatedAt:yyyy-MM-dd HH:mm}  |  {ToDisplayText(Session.TranscriptionStatus)}  |  {Session.Screenshots.Count} screenshots  |  {issueCount} draft issues";
+                $"{Session.CreatedAt:yyyy-MM-dd HH:mm}  |  {ToDisplayText(Session.TranscriptionStatus)}{retryText}  |  {Session.Screenshots.Count} screenshots  |  {issueCount} draft issues";
         }
     }
 

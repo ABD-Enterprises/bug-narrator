@@ -62,7 +62,7 @@ public sealed class TrayShell : IDisposable
         contextMenu.Items.Add(CreateMenuItem("Open Session Library", RaiseOpenSessionLibraryRequested));
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Settings", RaiseSettingsRequested));
-        contextMenu.Items.Add(CreateMenuItem("About", RaiseAboutRequested));
+        contextMenu.Items.Add(CreateMenuItem("Help And Support", RaiseAboutRequested));
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(CreateMenuItem("Quit", RaiseQuitRequested));
     }

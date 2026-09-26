@@ -14,22 +14,22 @@
       "status": "resolved",
       "assigned_phase": "RR-002",
       "note": "Resolved by redacting exact sensitive metadata values from diagnostics free-form text so DiagnosticsLoggerTests and release smoke pass again, and by capturing packaged-smoke exit codes with Start-Process -PassThru -Wait in the Windows package validator."
-    }
-  ],
-  "unresolved": [
+    },
     {
       "id": "RISK-WIN-001",
       "severity": "high",
-      "status": "unresolved",
+      "status": "resolved",
       "assigned_phase": "RR-002",
-      "note": "Real Windows desktop validation is still required for tray, recording, screenshot, and hotkey behavior."
-    },
+      "note": "Resolved by the April 4, 2026 real Windows validation pass: the BugNarrator tray icon appeared in the live system-tray overflow, duplicate launches focused the primary instance, microphone-backed recording reached Ready/recording/stopped states, screenshot overlay region capture saved deterministic artifacts, and out-of-focus hotkeys behaved as expected on Windows."
+    }
+  ],
+  "unresolved": [
     {
       "id": "RISK-WIN-002",
       "severity": "medium",
       "status": "unresolved",
       "assigned_phase": "RR-002",
-      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, uploaded validation evidence artifacts, and a Windows Codex handoff artifact, but the WindowsDesktop test host and full interactive runtime behavior still require Windows."
+      "note": "CI now covers phase branches, both Windows test projects, package validation, packaged-app smoke execution, packaged-file hash parity, uploaded validation evidence artifacts, and a Windows Codex handoff artifact. The April 4, 2026 Windows passes also exercised tray, single-instance, microphone-backed recording, screenshot overlay region capture, out-of-focus hotkeys, reserved-shortcut rejection, retry-needed sessions without an OpenAI key, debug-bundle export, live GitHub export through the production Windows service path using a disposable private repository, and the production deletion and corrupted-local-state bundle-safety paths. Remaining gaps are live OpenAI and Jira validation with real credentials, alternate keyboard layout and mixed-display coverage on a suitable Windows machine, and signed public-release proof."
     },
     {
       "id": "RISK-CI-002",

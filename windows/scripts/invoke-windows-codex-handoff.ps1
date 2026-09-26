@@ -13,6 +13,7 @@ $sessionStatePath = Join-Path $repoRoot "state/session.json"
 $taskStatePath = Join-Path $repoRoot "state/tasks.json"
 $riskStatePath = Join-Path $repoRoot "state/risks.json"
 $decisionStatePath = Join-Path $repoRoot "state/decisions.json"
+$isWindowsHost = $env:OS -eq "Windows_NT"
 
 function Read-JsonFile {
     param(
@@ -29,7 +30,14 @@ function Get-RelativeRepoPath {
         [string]$Path
     )
 
-    return [System.IO.Path]::GetRelativePath($repoRoot, $Path).Replace('\', '/')
+    $basePath = [System.IO.Path]::GetFullPath($repoRoot)
+    if (-not $basePath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $basePath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $baseUri = New-Object System.Uri($basePath)
+    $targetUri = New-Object System.Uri([System.IO.Path]::GetFullPath($Path))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
 }
 
 function Get-GitValue {
@@ -49,7 +57,28 @@ function Get-GitValue {
     }
 
     $value = ($result | Out-String).Trim()
-    return [string]::IsNullOrWhiteSpace($value) ? $null : $value
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $null
+    }
+
+    return $value
+}
+
+function Get-WindowsArtifactSnapshot {
+    $windowsArtifacts = @(
+        (Join-Path $repoRoot "windows/artifacts/packages/BugNarrator-windows-win-x64.zip")
+        (Join-Path $repoRoot "windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json")
+        (Join-Path $repoRoot "windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json")
+    )
+
+    return @(
+        foreach ($artifactPath in $windowsArtifacts) {
+            [PSCustomObject]@{
+                path = Get-RelativeRepoPath -Path $artifactPath
+                exists = Test-Path $artifactPath
+            }
+        }
+    )
 }
 
 function Invoke-BaselineStep {
@@ -60,6 +89,7 @@ function Invoke-BaselineStep {
         [string]$CommandText,
         [Parameter(Mandatory = $true)]
         [scriptblock]$Action,
+        [AllowEmptyCollection()]
         [Parameter(Mandatory = $true)]
         [System.Collections.Generic.List[object]]$StepResults
     )
@@ -101,18 +131,6 @@ $phaseCompletedTasks = @($taskState.completed | Where-Object { $_.phase -eq $cur
 $phaseRisks = @($riskState.unresolved | Where-Object { $_.assigned_phase -eq $currentPhaseId })
 $allUnresolvedRisks = @($riskState.unresolved)
 $phaseDecisions = @($decisionState.entries | Where-Object { $_.phase -eq $currentPhaseId } | Select-Object -Last 5)
-$windowsArtifacts = @(
-    (Join-Path $repoRoot "windows/artifacts/packages/BugNarrator-windows-win-x64.zip")
-    (Join-Path $repoRoot "windows/artifacts/validation/BugNarrator-windows-win-x64-validation.json")
-    (Join-Path $repoRoot "windows/artifacts/publish/win-x64/bugnarrator-smoke-report.json")
-)
-$artifactSnapshot = foreach ($artifactPath in $windowsArtifacts) {
-    [PSCustomObject]@{
-        path = Get-RelativeRepoPath -Path $artifactPath
-        exists = Test-Path $artifactPath
-    }
-}
-
 $baselineState = [ordered]@{
     requested = [bool]$RunBaseline
     executed = $false
@@ -123,7 +141,7 @@ $baselineState = [ordered]@{
 $baselineError = $null
 
 if ($RunBaseline) {
-    if (-not $IsWindows) {
+    if (-not $isWindowsHost) {
         throw "The -RunBaseline option requires a Windows machine because the WPF shell and package validation cannot be honestly executed elsewhere."
     }
 
@@ -162,6 +180,24 @@ if ($RunBaseline) {
     }
 }
 
+$artifactSnapshot = Get-WindowsArtifactSnapshot
+
+$manualValidationRecommendations =
+if ($phaseTasks.Count -gt 0) {
+    @(
+        "Validate the active RR-002 Windows desktop behaviors on a real Windows desktop or VM.",
+        "Update docs/roadmap/state.json and state/*.json after real Windows findings land.",
+        "Update windows/docs/WINDOWS_VALIDATION_CHECKLIST.md and windows/README.md if runtime findings change the expected behavior."
+    )
+}
+else {
+    @(
+        "Rerun the Windows desktop validation only if tray, recording, screenshot, or hotkey behavior changes again.",
+        "Keep alternate keyboard layout coverage and signed public-release proof explicit until a later pass actually exercises them.",
+        "Refresh docs/roadmap/state.json, state/*.json, and the Windows docs if new Windows findings materially change the current evidence."
+    )
+}
+
 New-Item -ItemType Directory -Force -Path $reportDirectory | Out-Null
 
 $report = [ordered]@{
@@ -172,7 +208,7 @@ $report = [ordered]@{
         currentPhaseBranch = $phaseState.current_phase_branch
     }
     environment = [ordered]@{
-        isWindows = [bool]$IsWindows
+        isWindows = [bool]$isWindowsHost
         powershellVersion = $PSVersionTable.PSVersion.ToString()
         outputRoot = Get-RelativeRepoPath -Path (Join-Path $repoRoot $OutputRoot)
     }
@@ -216,11 +252,7 @@ $report = [ordered]@{
             "powershell -ExecutionPolicy Bypass -File windows/scripts/invoke-windows-codex-handoff.ps1 -RunBaseline",
             "dotnet run --project windows/src/BugNarrator.Windows/BugNarrator.Windows.csproj -c Debug"
         )
-        manualValidation = @(
-            "Validate RR-002-T4 tray, recording, screenshot, and hotkey behavior on a real Windows desktop or VM.",
-            "Update docs/roadmap/state.json and state/*.json after real Windows findings land.",
-            "Update windows/docs/WINDOWS_VALIDATION_CHECKLIST.md and windows/README.md if runtime findings change the expected behavior."
-        )
+        manualValidation = @($manualValidationRecommendations)
     }
     artifacts = @($artifactSnapshot)
     baseline = [PSCustomObject]$baselineState
