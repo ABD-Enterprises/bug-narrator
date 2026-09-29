@@ -288,6 +288,14 @@ struct RecordingControlPanelView: View {
         case .success:
             return "Latest session ready."
         case .error:
+            if appState.transcriptStore.latestPendingTranscriptionSession != nil,
+               !appState.needsAPIKeySetup {
+                return "Recording saved. Ready to retry transcription."
+            }
+            if appState.currentError?.suggestsProviderSettings(for: appState.settingsStore.aiProvider) == true,
+               !appState.needsAPIKeySetup {
+                return "Provider settings updated."
+            }
             if let currentError = appState.currentError {
                 return currentError.recoveryHeadline(for: appState.settingsStore.aiProvider) ?? "Action needed before you continue."
             }
@@ -296,7 +304,7 @@ struct RecordingControlPanelView: View {
     }
 
     private var statusMessage: String {
-        if let detail = appState.status.detail, !detail.isEmpty {
+        if let detail = appState.userFacingStatusMessage, !detail.isEmpty {
             return detail
         }
 
@@ -324,6 +332,12 @@ struct RecordingControlPanelView: View {
     }
 
     private var showsRecoveryButton: Bool {
+        if appState.status.phase != .recording,
+           appState.status.phase != .transcribing,
+           appState.transcriptStore.latestPendingTranscriptionSession != nil {
+            return true
+        }
+
         switch appState.currentError {
         case .microphonePermissionDenied, .microphonePermissionRestricted, .screenRecordingPermissionDenied:
             return true
@@ -338,39 +352,58 @@ struct RecordingControlPanelView: View {
 
     @ViewBuilder
     private var recoveryButton: some View {
-        switch appState.currentError {
-        case .microphonePermissionDenied, .microphonePermissionRestricted:
-            Button("Open Microphone Settings") {
-                appState.openMicrophonePrivacySettings()
+        if let pendingSession = appState.transcriptStore.latestPendingTranscriptionSession {
+            if appState.needsAPIKeySetup {
+                Button("Open Settings") {
+                    appState.openSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                Button(appState.retryingSessionID == pendingSession.id ? "Retrying Transcription…" : "Retry Transcription") {
+                    Task {
+                        await appState.retryPendingTranscription(for: pendingSession.id)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(appState.retryingSessionID != nil)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        case .screenRecordingPermissionDenied:
-            Button("Open Screen Recording Settings") {
-                appState.openScreenRecordingPrivacySettings()
+        } else {
+            switch appState.currentError {
+            case .microphonePermissionDenied, .microphonePermissionRestricted:
+                Button("Open Microphone Settings") {
+                    appState.openMicrophonePrivacySettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            case .screenRecordingPermissionDenied:
+                Button("Open Screen Recording Settings") {
+                    appState.openScreenRecordingPrivacySettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            case let error? where error.suggestsSystemAudioSettings:
+                Button("Open Settings") {
+                    appState.openSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            case let error? where error.suggestsSystemAudioPrivacySettings:
+                Button("Open Screen & System Audio Settings") {
+                    appState.openSystemAudioPrivacySettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            case let error? where error.suggestsProviderSettings(for: appState.settingsStore.aiProvider):
+                Button("Open Settings") {
+                    appState.openSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            default:
+                EmptyView()
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        case let error? where error.suggestsSystemAudioSettings:
-            Button("Open Settings") {
-                appState.openSettings()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        case let error? where error.suggestsSystemAudioPrivacySettings:
-            Button("Open Screen & System Audio Settings") {
-                appState.openSystemAudioPrivacySettings()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        case let error? where error.suggestsProviderSettings(for: appState.settingsStore.aiProvider):
-            Button("Open Settings") {
-                appState.openSettings()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        default:
-            EmptyView()
         }
     }
 
@@ -391,6 +424,14 @@ struct RecordingControlPanelView: View {
 
     private var statusBadgeTitle: String {
         if appState.status.phase == .error, let currentError = appState.currentError {
+            if appState.transcriptStore.latestPendingTranscriptionSession != nil,
+               !appState.needsAPIKeySetup {
+                return "Ready to Retry"
+            }
+            if currentError.suggestsProviderSettings(for: appState.settingsStore.aiProvider),
+               !appState.needsAPIKeySetup {
+                return "Settings Updated"
+            }
             return currentError.statusTitle(for: appState.settingsStore.aiProvider)
         }
 
