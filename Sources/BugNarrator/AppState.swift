@@ -321,7 +321,7 @@ final class AppState: ObservableObject {
                 .sink { [weak localTranscriptionManager] provider in
                     guard provider == .parakeetLocal else { return }
                     Task { @MainActor [weak localTranscriptionManager] in
-                        localTranscriptionManager?.start()
+                        localTranscriptionManager?.ensureInstalledAndStarted()
                     }
                 }
         }
