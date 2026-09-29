@@ -780,6 +780,31 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(preservedSession.pendingTranscriptionAudioURL).path))
     }
 
+    func testPendingTranscriptionStatusRefreshesWhenProviderSettingsChange() async throws {
+        let harness = AppStateHarness()
+        defer { harness.cleanup() }
+        harness.settingsStore.aiProvider = .openAI
+        harness.audioRecorder.stopResults = [.success(try harness.makeRecordedAudio(fileName: "retry-status-refresh"))]
+
+        await harness.appState.startSession()
+        harness.settingsStore.removeAPIKey()
+        await harness.appState.stopSession()
+
+        let pendingSession = try XCTUnwrap(harness.transcriptStore.latestPendingTranscriptionSession)
+        XCTAssertTrue(harness.appState.needsAPIKeySetup)
+        XCTAssertTrue(harness.appState.userFacingStatusMessage?.contains("API key") == true)
+
+        harness.settingsStore.apiKey = "restored-key"
+
+        XCTAssertFalse(harness.appState.needsAPIKeySetup)
+        XCTAssertTrue(harness.appState.userFacingStatusMessage?.contains("ready; retry transcription") == true)
+        await harness.transcriptionClient.enqueue(
+            .success(TranscriptionResult(text: "Recovered transcript", segments: []))
+        )
+        await harness.appState.retryPendingTranscription(for: pendingSession.id)
+        XCTAssertFalse(try XCTUnwrap(harness.transcriptStore.session(with: pendingSession.id)).requiresTranscriptionRetry)
+    }
+
     func testRetryPendingTranscriptionHonorsAutoIssueExtraction() async throws {
         let harness = AppStateHarness(autoExtractIssues: true)
         defer { harness.cleanup() }
