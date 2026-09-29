@@ -34,6 +34,7 @@ final class LocalTranscriptionManager: ObservableObject {
     private var server: (any LocalServerProcess)?
     private var operation: Task<Void, Never>?
     private var startOperation: Task<Void, Never>?
+    private var provisioningTask: Task<Void, Never>?
     private var shuttingDown = false
     private var terminationObserver: AnyCancellable?
     private let session: URLSession
@@ -161,6 +162,29 @@ final class LocalTranscriptionManager: ObservableObject {
         }
     }
 
+    func ensureInstalledAndStarted() {
+        guard supported, !shuttingDown, provisioningTask == nil else { return }
+        if installed {
+            start()
+            return
+        }
+        provisioningTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.provisioningTask = nil }
+            while self.busy, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard !Task.isCancelled, !self.shuttingDown else { return }
+            if !self.installed, self.package == nil { await self.discover() }
+            guard !Task.isCancelled, !self.shuttingDown else { return }
+            if self.installed {
+                self.start()
+            } else if self.package != nil {
+                self.installAndStart()
+            }
+        }
+    }
+
     private func launchVerifiedServer() {
         do {
             let process = try dependencies.launch(executable, directory.appendingPathComponent("Models")) { [weak self] status, detail in
@@ -176,6 +200,8 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func stop() {
+        provisioningTask?.cancel()
+        provisioningTask = nil
         operation?.cancel()
         startOperation?.cancel()
         server?.terminate()
