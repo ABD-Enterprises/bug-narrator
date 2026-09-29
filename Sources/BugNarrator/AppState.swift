@@ -64,6 +64,7 @@ final class AppState: ObservableObject {
     private let hotkeySettingsBinder: HotkeySettingsBinder
     private let objectChangeForwarder: ObservableObjectChangeForwarder
     private let lifecycleNotificationBinder: AppLifecycleNotificationBinder
+    private var localTranscriptionProviderObserver: AnyCancellable?
     private let launchDiagnosticsReporter: AppLaunchDiagnosticsReporter
     private let artifactsService: any SessionArtifactsManaging
 
@@ -312,6 +313,18 @@ final class AppState: ObservableObject {
                 applicationTerminationController.prepareForApplicationTermination()
             }
         )
+
+        if !runtimeEnvironment.usesIsolatedRuntime {
+            let localTranscriptionManager = self.localTranscriptionManager
+            localTranscriptionProviderObserver = settingsStore.$aiProvider
+                .removeDuplicates()
+                .sink { [weak localTranscriptionManager] provider in
+                    guard provider == .parakeetLocal else { return }
+                    Task { @MainActor [weak localTranscriptionManager] in
+                        localTranscriptionManager?.start()
+                    }
+                }
+        }
 
         hotkeySettingsBinder.bind(settingsStore: settingsStore)
 
