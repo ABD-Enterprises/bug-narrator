@@ -52,7 +52,7 @@ extension MenuBarView {
                             .fontWeight(.semibold)
                     }
 
-                    if let detail = appState.status.detail {
+                    if let detail = appState.userFacingStatusMessage {
                         Text(detail)
                             .font(.caption)
                             .foregroundStyle(appState.currentError == nil ? .secondary : .primary)
@@ -68,7 +68,7 @@ extension MenuBarView {
                     HStack(spacing: 10) {
                         ProgressView()
                             .controlSize(.small)
-                        Text(appState.status.detail ?? "Uploading audio and waiting for transcription...")
+                        Text(appState.userFacingStatusMessage ?? "Uploading audio and waiting for transcription...")
                             .font(.subheadline)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +77,7 @@ extension MenuBarView {
 
                     statusRecoverySection
                 }
-            } else if let detail = appState.status.detail {
+            } else if let detail = appState.userFacingStatusMessage {
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(statusTint)
