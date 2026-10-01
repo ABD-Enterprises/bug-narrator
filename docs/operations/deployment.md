@@ -105,10 +105,6 @@ Because the channel is the GitHub releases feed, **publishing a release is what
 ships an update notice**. A build that is never released is invisible to
 installed users.
 
-## Terraform Scope
-
-`infra/terraform` currently provides reproducibility scaffolding for future distribution automation and environment metadata. It does not yet provision active runtime infrastructure because the product is a local desktop application.
-
 ## Related Docs
 
 - [Rollback](rollback.md)

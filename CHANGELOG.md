@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] Removed the empty Terraform placeholder directory (no resources, providers or modules) and the docs and `.gitignore` entries that referred to it.
 - [INTERNAL] Dependabot now also covers npm (`/site`) and pip (`/local-transcription`), monthly and grouped with a 7-day cooldown and semver-major held for review.
 - A long recording with a silent stretch now transcribes: an empty chunk is skipped instead of failing the whole transcription (and every retry).
 - Windows: recordings longer than about 13 minutes now transcribe — the WAV is uploaded in 8-minute chunks instead of failing at the provider's 25 MB limit after the upload.

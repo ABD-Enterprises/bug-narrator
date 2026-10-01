@@ -31,8 +31,6 @@ Core product concepts:
   canonical architecture, development, testing, security, release, user, and roadmap docs
 - `scripts/`
   local build, smoke-test, packaging, and cleanup automation
-- `infra/terraform`
-  infrastructure scaffold for future release/distribution automation
 - `site/`
   Docusaurus documentation site scaffold
 
