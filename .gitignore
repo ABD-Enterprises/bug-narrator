@@ -29,11 +29,6 @@ __pycache__/
 AGENTS.md
 CLAUDE.md
 
-infra/terraform/.terraform/
-infra/terraform/*.tfstate
-infra/terraform/*.tfstate.*
-infra/terraform/.terraform.lock.hcl
-
 site/node_modules/
 site/.docusaurus/
 site/build/
