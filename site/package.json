@@ -33,7 +33,7 @@
       "path-to-regexp": "0.1.13"
     },
     "minimatch": {
-      "brace-expansion": "1.1.18"
+      "brace-expansion": "1.1.21"
     },
     "postcss": "8.5.26",
     "qs": "6.16.0",
