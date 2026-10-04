@@ -1,4 +1,4 @@
 -r requirements.txt
-mlx==0.29.4
+mlx==0.32.2
 pip==26.2.1
-pyinstaller==6.20.0
+pyinstaller==6.22.3
