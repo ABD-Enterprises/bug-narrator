@@ -458,6 +458,43 @@ server._serve("127.0.0.1", {port})
             with self.subTest(lock=name):
                 self._assert_windows_lock(Path(__file__).with_name(name))
 
+    def test_hash_locks_carry_every_pin_from_their_inputs(self):
+        # Dependabot bumps the .in/.txt pins but not these uv-compiled locks (#1221), and
+        # the packaged runtimes install only from the locks, so a stale lock ships the old
+        # version while the pins claim the new one.
+        here = Path(__file__).parent
+        for source, locks in (
+            ("requirements-standalone.in", ("requirements-standalone.lock",)),
+            (
+                "requirements-windows.in",
+                ("requirements-windows.lock", "requirements-windows-arm64.lock"),
+            ),
+        ):
+            pins = self._exact_pins(here / source)
+            self.assertTrue(pins)
+            for name in locks:
+                locked = self._exact_pins(here / name)
+                for package, version in pins.items():
+                    with self.subTest(lock=name, package=package):
+                        self.assertEqual(
+                            locked.get(package),
+                            version,
+                            f"{name} does not lock {package}=={version}; "
+                            "run local-transcription/relock.sh",
+                        )
+
+    def _exact_pins(self, path):
+        pins = {}
+        for raw in path.read_text().splitlines():
+            line = raw.split("#")[0].strip().rstrip("\\").strip()
+            if line.startswith("-r "):
+                pins.update(self._exact_pins(path.parent / line[3:].strip()))
+            elif "==" in line and not line.startswith("-"):
+                requirement, version = line.split("==", 1)
+                package = requirement.split("[")[0].strip().lower().replace("_", "-")
+                pins[package] = version.strip()
+        return pins
+
     def _assert_windows_lock(self, lockfile):
         contents = lockfile.read_text()
         packages = [
