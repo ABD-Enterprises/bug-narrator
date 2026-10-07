@@ -65,8 +65,9 @@ struct KeychainSessionDataProtector: SessionDataProtecting {
         }
 
         var keyData = Data(count: 32)
-        let status = keyData.withUnsafeMutableBytes { buffer in
-            SecRandomCopyBytes(kSecRandomDefault, 32, buffer.baseAddress!)
+        let status = keyData.withUnsafeMutableBytes { buffer -> OSStatus in
+            guard let baseAddress = buffer.baseAddress else { return errSecAllocate }
+            return SecRandomCopyBytes(kSecRandomDefault, 32, baseAddress)
         }
         guard status == errSecSuccess else {
             throw AppError.storageFailure("A local session encryption key could not be generated.")
