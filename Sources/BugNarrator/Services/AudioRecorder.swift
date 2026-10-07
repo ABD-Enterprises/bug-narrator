@@ -63,11 +63,13 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate, AudioRecording {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-Preflight-\(UUID().uuidString)")
             .appendingPathExtension(captureFormat.fileExtension)
+        defer {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
 
         do {
             let recorder = try makeRecorder(fileURL, recordingSettings)
             let prepared = recorder.prepareToRecord()
-            try? FileManager.default.removeItem(at: fileURL)
 
             guard prepared else {
                 return .microphoneUnavailable("Check that an input device is connected and available, then try again.")
@@ -75,7 +77,6 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate, AudioRecording {
 
             return nil
         } catch {
-            try? FileManager.default.removeItem(at: fileURL)
             return .microphoneUnavailable("Check that an input device is connected and available, then try again. \(error.localizedDescription)")
         }
     }
@@ -88,6 +89,9 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate, AudioRecording {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-ActivationProbe-\(UUID().uuidString)")
             .appendingPathExtension(captureFormat.fileExtension)
+        defer {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
 
         do {
             let recorder = try makeRecorder(fileURL, recordingSettings)
@@ -104,11 +108,8 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate, AudioRecording {
             }
 
             recorder.stop()
-            try? FileManager.default.removeItem(at: fileURL)
             return nil
         } catch {
-            try? FileManager.default.removeItem(at: fileURL)
-
             if let permissionError = permissionBlockedError {
                 return permissionError
             }

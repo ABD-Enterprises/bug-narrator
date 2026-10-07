@@ -79,34 +79,42 @@ final class SystemAudioRecorder: AudioRecording {
 
         let session = SystemAudioTapSession()
         var writer: SystemAudioFileWriter?
+        var fileURL: URL?
 
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
             let format = try session.prepare()
-            let fileURL = makeRecoverableRecordingURL()
-            let preparedWriter = try SystemAudioFileWriter(fileURL: fileURL, format: format)
+            let recordingURL = makeRecoverableRecordingURL()
+            fileURL = recordingURL
+            let preparedWriter = try SystemAudioFileWriter(fileURL: recordingURL, format: format)
             writer = preparedWriter
 
             try session.start(on: ioQueue, writer: preparedWriter)
 
             tapSession = session
             activeWriter = writer
-            currentFileURL = fileURL
+            currentFileURL = recordingURL
             recordingStartedAt = Date()
 
             recordingLogger.info(
                 "system_audio_recording_started",
                 "System audio recording started successfully.",
-                metadata: ["file_name": fileURL.lastPathComponent]
+                metadata: ["file_name": recordingURL.lastPathComponent]
             )
         } catch let error as AppError {
             session.invalidate()
             try? writer?.close()
+            if let fileURL {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
             recordingLogger.error("system_audio_recording_start_failed", error.userMessage)
             throw error
         } catch {
             session.invalidate()
             try? writer?.close()
+            if let fileURL {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
             recordingLogger.error("system_audio_recording_start_failed", error.localizedDescription)
             throw AppError.systemAudioUnavailable(systemAudioRecoveryMessage(details: error.localizedDescription))
         }
@@ -115,6 +123,10 @@ final class SystemAudioRecorder: AudioRecording {
     func stopRecording() async throws -> RecordedAudio {
         guard let tapSession, let activeWriter, let currentFileURL else {
             throw AppError.recordingFailure("There is no active recording.")
+        }
+
+        defer {
+            cleanupActiveState()
         }
 
         let duration = currentDuration
@@ -127,7 +139,6 @@ final class SystemAudioRecorder: AudioRecording {
         tapSession.invalidate()
         await ioQueue.drain()
         try await Self.closeWriter(activeWriter)
-        cleanupActiveState()
 
         try await Self.validateRecordedAudioFile(at: currentFileURL)
 
@@ -145,12 +156,15 @@ final class SystemAudioRecorder: AudioRecording {
 
     func cancelRecording(preserveFile: Bool) async {
         let fileURL = currentFileURL
+        defer {
+            cleanupActiveState()
+        }
+
         tapSession?.invalidate()
         await ioQueue.drain()
         if let activeWriter {
             try? await Self.closeWriter(activeWriter)
         }
-        cleanupActiveState()
 
         guard !preserveFile, let fileURL else {
             return
