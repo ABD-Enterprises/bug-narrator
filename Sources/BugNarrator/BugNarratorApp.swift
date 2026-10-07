@@ -17,7 +17,8 @@ private struct WindowSceneRegistrar: View {
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
             .onAppear {
-                windowCoordinator.configureSceneActions(
+                let coordinator = windowCoordinator
+                coordinator.configureSceneActions(
                     showTranscript: { openWindow(id: WindowCoordinator.SceneID.transcript) },
                     showSettings: { openWindow(id: WindowCoordinator.SceneID.settings) },
                     showAbout: { openWindow(id: WindowCoordinator.SceneID.about) },
@@ -26,20 +27,20 @@ private struct WindowSceneRegistrar: View {
                     showWelcome: { openWindow(id: WindowCoordinator.SceneID.welcome) }
                 )
 
-                appState.showTranscriptWindow = { [weak windowCoordinator] in
-                    windowCoordinator?.showTranscriptWindow()
+                appState.showTranscriptWindow = { [weak coordinator] in
+                    coordinator?.showTranscriptWindow()
                 }
-                appState.showSettingsWindow = { [weak windowCoordinator] in
-                    windowCoordinator?.showSettingsWindow()
+                appState.showSettingsWindow = { [weak coordinator] in
+                    coordinator?.showSettingsWindow()
                 }
-                appState.showAboutWindow = { [weak windowCoordinator] in
-                    windowCoordinator?.showAboutWindow()
+                appState.showAboutWindow = { [weak coordinator] in
+                    coordinator?.showAboutWindow()
                 }
-                appState.showChangelogWindow = { [weak windowCoordinator] in
-                    windowCoordinator?.showChangelogWindow()
+                appState.showChangelogWindow = { [weak coordinator] in
+                    coordinator?.showChangelogWindow()
                 }
-                appState.showSupportWindow = { [weak windowCoordinator] in
-                    windowCoordinator?.showSupportWindow()
+                appState.showSupportWindow = { [weak coordinator] in
+                    coordinator?.showSupportWindow()
                 }
 
                 presentLaunchWindowIfNeeded()
