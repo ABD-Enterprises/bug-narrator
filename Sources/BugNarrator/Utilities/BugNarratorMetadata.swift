@@ -29,12 +29,12 @@ struct BugNarratorMetadata: Equatable {
         let copyrightLine = (infoDictionary["NSHumanReadableCopyright"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        self.appName = displayName?.isEmpty == false ? displayName! : (bundleName?.isEmpty == false ? bundleName! : defaultName)
+        self.appName = [displayName, bundleName].lazy.compactMap { $0 }.first(where: { !$0.isEmpty }) ?? defaultName
         self.tagline = tagline
-        self.version = version?.isEmpty == false ? version! : "1.0"
-        self.build = build?.isEmpty == false ? build! : "1"
+        self.version = (version?.isEmpty == false ? version : nil) ?? "1.0"
+        self.build = (build?.isEmpty == false ? build : nil) ?? "1"
         self.productDescription = productDescription
-        self.copyrightLine = copyrightLine?.isEmpty == false ? copyrightLine : BugNarratorMetadata.defaultCopyright
+        self.copyrightLine = (copyrightLine?.isEmpty == false ? copyrightLine : nil) ?? BugNarratorMetadata.defaultCopyright
     }
 
     init(bundle: Bundle = .main) {

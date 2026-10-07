@@ -107,14 +107,15 @@ extension AudioObjectID {
         }
 
         var values = Array(repeating: defaultValue, count: elementCount)
-        status = values.withUnsafeMutableBufferPointer { buffer in
-            AudioObjectGetPropertyData(
+        status = values.withUnsafeMutableBufferPointer { buffer -> OSStatus in
+            guard let baseAddress = buffer.baseAddress else { return kAudioHardwareUnspecifiedError }
+            return AudioObjectGetPropertyData(
                 self,
                 &address,
                 0,
                 nil,
                 &dataSize,
-                buffer.baseAddress!
+                baseAddress
             )
         }
 
