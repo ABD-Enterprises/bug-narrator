@@ -91,6 +91,54 @@ final class AudioRecorderTests: XCTestCase {
         XCTAssertEqual(harness.recorderFactory.recordingSettings?[AVFormatIDKey] as? AudioFormatID, kAudioFormatLinearPCM)
         XCTAssertEqual(harness.recorderFactory.recordingSettings?[AVLinearPCMBitDepthKey] as? Int, 16)
     }
+
+    func testValidateRecordingPrerequisitesCleansUpProbeFile() async throws {
+        let harness = try AudioRecorderHarness(timeoutNanoseconds: 500_000_000)
+        defer { harness.cleanup() }
+
+        var createdProbeURLs: [URL] = []
+        let recorder = AudioRecorder(
+            permissionAccess: StaticMicrophonePermissionAccess(),
+            recoveryDirectoryURL: harness.recoveryDirectoryURL,
+            captureFormat: .aacM4A,
+            finalizationTimeoutNanoseconds: 500_000_000
+        ) { url, _ in
+            try? Data("probe file content".utf8).write(to: url)
+            createdProbeURLs.append(url)
+            return FakeAudioRecorderEngine(recordResult: true)
+        }
+
+        let error = await recorder.validateRecordingPrerequisites()
+        XCTAssertNil(error)
+        XCTAssertEqual(createdProbeURLs.count, 1)
+        for url in createdProbeURLs {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        }
+    }
+
+    func testValidateRecordingActivationCleansUpProbeFile() async throws {
+        let harness = try AudioRecorderHarness(timeoutNanoseconds: 500_000_000)
+        defer { harness.cleanup() }
+
+        var createdProbeURLs: [URL] = []
+        let recorder = AudioRecorder(
+            permissionAccess: StaticMicrophonePermissionAccess(),
+            recoveryDirectoryURL: harness.recoveryDirectoryURL,
+            captureFormat: .aacM4A,
+            finalizationTimeoutNanoseconds: 500_000_000
+        ) { url, _ in
+            try? Data("probe file content".utf8).write(to: url)
+            createdProbeURLs.append(url)
+            return FakeAudioRecorderEngine(recordResult: true)
+        }
+
+        let error = await recorder.validateRecordingActivation()
+        XCTAssertNil(error)
+        XCTAssertEqual(createdProbeURLs.count, 1)
+        for url in createdProbeURLs {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        }
+    }
 }
 
 @MainActor
