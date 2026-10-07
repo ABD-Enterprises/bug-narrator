@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Audio recording: guarantee probe cleanup and reset active recording state on failed start, stop, or cancel to prevent temporary file leaks and zombie session locks.
 - [SECURITY] The docs site (`/site`) no longer ships a vulnerable `brace-expansion`: a stale npm override pinned 1.1.18, which three newer advisories (high) affect; it now pins 1.1.21, and `fast-uri` moves to 3.1.8. `npm audit` for the site reports 0 vulnerabilities.
 - [INTERNAL] Removed the unused Gemini Code Assist GitHub App configuration files.
 - [INTERNAL] Removed the empty Terraform placeholder directory (no resources, providers or modules) and the docs and `.gitignore` entries that referred to it.
