@@ -225,6 +225,34 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The self-hosted Linux VMs ship no GitHub CLI. A pinned release is
+      # verified against its published checksums and used by path, so nothing
+      # on the persistent runner's PATH is modified or trusted.
+      - name: Ensure GitHub CLI is available
+        run: |
+          set -euo pipefail
+          GH_VERSION=2.102.0
+          GH_HOME="${RUNNER_TEMP}/gh-cli"
+          mkdir -p "${GH_HOME}/bin"
+          if command -v gh >/dev/null 2>&1; then
+            ln -sf "$(command -v gh)" "${GH_HOME}/bin/gh"
+          else
+            case "$(uname -m)" in
+              x86_64) GH_ARCH=amd64 ;;
+              aarch64|arm64) GH_ARCH=arm64 ;;
+              *) echo "::error::unsupported architecture: $(uname -m)"; exit 1 ;;
+            esac
+            ASSET="gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz"
+            CHECKSUMS="gh_${GH_VERSION}_checksums.txt"
+            BASE_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}"
+            curl -sSfL --retry 3 -o "${GH_HOME}/${ASSET}" "${BASE_URL}/${ASSET}"
+            curl -sSfL --retry 3 -o "${GH_HOME}/${CHECKSUMS}" "${BASE_URL}/${CHECKSUMS}"
+            (cd "${GH_HOME}" && grep " ${ASSET}$" "${CHECKSUMS}" | sha256sum -c -)
+            tar -xzf "${GH_HOME}/${ASSET}" -C "${GH_HOME}" --strip-components=1 \
+              "gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh"
+          fi
+          "${GH_HOME}/bin/gh" --version
+
       - name: Download signed assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -240,16 +268,17 @@ jobs:
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
+          gh="$RUNNER_TEMP/gh-cli/bin/gh"
           files=(assets/bugnarrator-transcription-windows-*.zip assets/bugnarrator-transcription-windows-*.zip.sha256)
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if "$gh" release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             # Re-dispatch on an existing tag replaces its assets (a repaired or re-signed build) —
             # only when the tag still points at the commit these binaries were built from.
-            tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+            tagged=$("$gh" api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
             if [[ "$tagged" != "$GITHUB_SHA" ]]; then
               printf '::error::Tag %s points at %s but this run built %s; refusing to replace its assets.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA"
               exit 1
             fi
-            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            "$gh" release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             exit 0
           fi
           # The tag is created at the commit that produced the binaries, never at the default branch.
@@ -260,4 +289,4 @@ jobs:
                 --notes "Signed Windows builds of the local Parakeet transcription server. BugNarrator discovers the x64 asset automatically from Settings > Local (Parakeet) Server; the arm64 asset is for Windows on ARM machines. Model weights download on first start.")
           [[ "$RELEASE_DRAFT" == "true" ]] && args+=(--draft)
           [[ "$RELEASE_PRERELEASE" == "true" ]] && args+=(--prerelease)
-          gh "${args[@]}"
+          "$gh" "${args[@]}"
