@@ -24,10 +24,10 @@
     "joi": "17.13.8",
     "lodash": "4.18.1",
     "copy-webpack-plugin": {
-      "serialize-javascript": "7.0.5"
+      "serialize-javascript": "7.1.2"
     },
     "css-minimizer-webpack-plugin": {
-      "serialize-javascript": "7.0.5"
+      "serialize-javascript": "7.1.2"
     },
     "express": {
       "path-to-regexp": "0.1.13"
@@ -36,9 +36,13 @@
       "brace-expansion": "1.1.21"
     },
     "postcss": "8.5.26",
+    "postcss-selector-parser": "7.1.6",
     "qs": "6.16.0",
     "sockjs": {
       "uuid": "14.0.0"
+    },
+    "webpack-bundle-analyzer": {
+      "sirv": "3.0.2"
     }
   }
 }
