@@ -41,6 +41,7 @@
     "sockjs": {
       "uuid": "14.0.0"
     },
+    "tinypool": "2.2.0",
     "webpack-bundle-analyzer": {
       "sirv": "3.0.2"
     }
