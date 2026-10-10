@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] CI, CodeQL, the docs-site deploy and the two Windows release workflows run on the organization's self-hosted runners, routed through the `LINUX_RUNNER_LABELS`, `MACOS_RUNNER_LABELS` and `WINDOWS_RUNNER_LABELS` variables; Windows jobs skip (and `required-checks` treats that as a pass) when no Windows runner variable is set, the arm64 transcription-server build waits on a `WINDOWS_ARM64_RUNNER_LABELS` runner, and `runtime-guardrails` installs pinned ruff and shellcheck into a per-job environment since the runners ship no linters.
 - [SECURITY] The docs site (`/site`) dependency tree is updated to patched versions of `proxy-addr`, `shell-quote`, `compression`, `webpack-dev-middleware`, `http-cache-semantics`, `postcss-selector-parser`, `serialize-javascript`, `sirv` and `source-map-js`; `npm audit` for the site drops from 47 to 29 vulnerabilities (the rest need a Docusaurus migration or have no upstream fix).
 - [SECURITY] The docs site (`/site`) now resolves `tinypool` 2.2.0 (root npm override; was 1.1.1, which carries a critical advisory); its only call site is Docusaurus's SSG worker pool behind `future.faster.ssgWorkerThreads`, which the site does not enable, and the site build is unchanged.
 - [FIX] Audio recording: guarantee probe cleanup and reset active recording state on failed start, stop, or cancel to prevent temporary file leaks and zombie session locks.

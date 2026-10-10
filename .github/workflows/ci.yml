@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   detect-ci-changes:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     outputs:
       docs_changed: ${{ steps.changes.outputs.docs_changed }}
       swift_changed: ${{ steps.changes.outputs.swift_changed }}
@@ -37,6 +37,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Detect CI-relevant changes
         id: changes
@@ -92,12 +93,13 @@ jobs:
           fi
 
   runtime-guardrails:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -114,14 +116,46 @@ jobs:
             echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
           fi
 
-      # ruff is not preinstalled on ubuntu-latest (shellcheck is). Pinned so a
-      # ruff release adding rules cannot turn this gate red on its own; bump
-      # deliberately alongside ruff.toml. validate.sh reports NOT RUN when the
-      # tool is absent, so this step is what makes the Python lint enforced.
-      - name: Install ruff
+      # The self-hosted runners are persistent and ship no linters, so every
+      # Python tool goes into a per-job virtual environment under RUNNER_TEMP
+      # (wiped between jobs) rather than the runner's user site-packages.
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Create a per-job virtual environment
         run: |
-          python3 -m pip install --user 'ruff==0.16.6'
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python -m venv "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      # Both linters are pinned so a release adding rules cannot turn this gate
+      # red on its own; bump deliberately alongside ruff.toml and the scripts.
+      # validate.sh reports NOT RUN when a tool is absent, so these two steps
+      # are what make the Python and shell lints enforced.
+      - name: Install ruff
+        run: python3 -m pip install 'ruff==0.16.6'
+
+      - name: Install shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+          SHELLCHECK_SHA256_AARCH64: 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588
+          SHELLCHECK_SHA256_X86_64: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          case "$arch" in
+            aarch64) expected="$SHELLCHECK_SHA256_AARCH64" ;;
+            x86_64)  expected="$SHELLCHECK_SHA256_X86_64" ;;
+            *) echo "::error::no pinned shellcheck checksum for architecture '$arch'"; exit 1 ;;
+          esac
+          archive="$RUNNER_TEMP/shellcheck.tar.xz"
+          curl -sSfL --retry 3 -o "$archive" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.${arch}.tar.xz"
+          echo "${expected}  ${archive}" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/shellcheck-${SHELLCHECK_VERSION}/shellcheck" "$RUNNER_TEMP/venv/bin/shellcheck"
+          shellcheck --version
 
       # The local-transcription unit suite needs the server's runtime deps
       # importable. parakeet-mlx is Apple-only and imported lazily, so it is
@@ -129,7 +163,7 @@ jobs:
       - name: Install local-transcription test dependencies
         run: |
           grep -v '^parakeet-mlx' local-transcription/requirements.txt \
-            | python3 -m pip install --user -r /dev/stdin
+            | python3 -m pip install -r /dev/stdin
 
       # Hermetic on purpose (#962). This job blocks merges, so it must not
       # depend on live board state: a board hiccup or one mislabeled issue
@@ -148,12 +182,13 @@ jobs:
       - detect-ci-changes
       - runtime-guardrails
     if: needs.detect-ci-changes.outputs.docs_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -173,8 +208,10 @@ jobs:
       - detect-ci-changes
       - runtime-guardrails
     if: needs.detect-ci-changes.outputs.swift_changed == 'true'
-    # Public pull-request code must run on GitHub-hosted infrastructure.
-    runs-on: macos-26
+    # Self-hosted Apple Silicon Macs with Xcode. The org runs no GitHub-hosted
+    # jobs (the hosted-runner budget is $0 with a hard stop), and the owner
+    # accepted that pull-request code runs on operator-owned hosts.
+    runs-on: ${{ fromJSON(vars.MACOS_RUNNER_LABELS) }}
     # Fail fast on a hung/contended build instead of running for hours.
     timeout-minutes: 45
     steps:
@@ -182,18 +219,18 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Select Xcode (project file requires Xcode 26)
         run: |
           # The .xcodeproj is in objectVersion 77, which only Xcode 26+
-          # can read. Valid layouts:
-          #   1. GitHub-hosted macos-26 runners: /Applications/Xcode_26*.app
-          #      (multiple side-by-side versions are present; pick newest)
-          #   2. Alternate hosted images: just
-          #      /Applications/Xcode.app, which we accept if its
+          # can read. Valid layouts on a runner:
+          #   1. Side-by-side installs: /Applications/Xcode_26*.app
+          #      (pick the newest)
+          #   2. A single /Applications/Xcode.app, which we accept if its
           #      CFBundleShortVersionString starts with `26`.
-          #   3. Images with xcode-select already pointing at
-          #      an Xcode 26 developer directory outside the app paths above.
+          #   3. xcode-select already pointing at an Xcode 26 developer
+          #      directory outside the app paths above.
           XCODE_APP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' -print | sort -V | tail -1)
 
           if [[ -z "$XCODE_APP" && -d /Applications/Xcode.app ]]; then
@@ -226,7 +263,8 @@ jobs:
           fi
 
           echo "Selected $XCODE_APP"
-          # GitHub-hosted runners allow xcode-select through sudo.
+          # Self-hosted runners have no passwordless sudo; DEVELOPER_DIR below
+          # selects the toolchain for this job without touching the host.
           if [[ -n "$RUNNER_ENVIRONMENT" && "$RUNNER_ENVIRONMENT" == "github-hosted" ]]; then
             sudo xcode-select -s "$XCODE_APP"
           fi
@@ -299,11 +337,13 @@ jobs:
             test
 
   board-audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Run effort-leak / board-state audit
         env:
@@ -322,7 +362,7 @@ jobs:
       - docs-site-validation
       - macos-build-and-test
       - windows-build-and-test
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     steps:
       - name: Verify no required job failed
         env:
@@ -353,12 +393,16 @@ jobs:
   windows-build-and-test:
     needs:
       - detect-ci-changes
-    if: needs.detect-ci-changes.outputs.windows_changed == 'true'
-    # GitHub-hosted: the self-hosted fleet has no Windows runner (#921).
-    runs-on: windows-latest
+    # The org has a single self-hosted Windows runner (group "Windows VM").
+    # When its label variable is unset the job skips, which required-checks
+    # treats as a pass, so Windows never blocks a merge by failing to start.
+    if: needs.detect-ci-changes.outputs.windows_changed == 'true' && vars.WINDOWS_RUNNER_LABELS != ''
+    runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER_LABELS) }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Set up .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1

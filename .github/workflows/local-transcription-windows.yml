@@ -49,7 +49,7 @@ concurrency:
 jobs:
   release-preflight:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     steps:
       - name: Confirm the tag is in the server release namespace
         env:
@@ -75,27 +75,63 @@ jobs:
             exit 1
           fi
 
+  # One matrix entry per Windows architecture that has a self-hosted runner.
+  # The org runs no GitHub-hosted jobs, and a matrix leg naming a runner that
+  # does not exist would queue forever and hold the publish job hostage, so
+  # each architecture is admitted only when its label variable is set: x64 by
+  # WINDOWS_RUNNER_LABELS (the single "Windows VM" runner), arm64 by
+  # WINDOWS_ARM64_RUNNER_LABELS (no such runner exists yet; the arm64 asset is
+  # not built until one is registered and the variable is created).
+  windows-runners:
+    name: Select Windows runners
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
+    outputs:
+      include: ${{ steps.select.outputs.include }}
+    steps:
+      - name: Select Windows runners
+        id: select
+        shell: bash
+        env:
+          X64_LABELS: ${{ vars.WINDOWS_RUNNER_LABELS }}
+          ARM64_LABELS: ${{ vars.WINDOWS_ARM64_RUNNER_LABELS }}
+        run: |
+          set -euo pipefail
+          entries=()
+          # The label variables hold JSON arrays; each is embedded as a JSON
+          # string so the build job can fromJSON() it into runs-on.
+          if [[ -n "$X64_LABELS" ]]; then
+            entries+=("{\"arch\":\"x64\",\"runner\":\"${X64_LABELS//\"/\\\"}\",\"lock\":\"requirements-windows.lock\"}")
+          else
+            echo "::notice::WINDOWS_RUNNER_LABELS is unset; the x64 build is skipped"
+          fi
+          if [[ -n "$ARM64_LABELS" ]]; then
+            entries+=("{\"arch\":\"arm64\",\"runner\":\"${ARM64_LABELS//\"/\\\"}\",\"lock\":\"requirements-windows-arm64.lock\"}")
+          else
+            echo "::notice::WINDOWS_ARM64_RUNNER_LABELS is unset; the arm64 build is skipped"
+          fi
+          include="[$(IFS=,; echo "${entries[*]-}")]"
+          echo "Matrix include: $include"
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   build:
-    needs: [release-preflight]
+    needs: [release-preflight, windows-runners]
     # The preflight only exists on dispatch; skipped is fine for PR/push builds.
-    if: always() && (needs.release-preflight.result == 'success' || needs.release-preflight.result == 'skipped')
+    # An empty matrix is not a valid job, so the build also skips when no
+    # Windows runner variable is set.
+    if: always() && needs.windows-runners.result == 'success' && needs.windows-runners.outputs.include != '[]' && (needs.release-preflight.result == 'success' || needs.release-preflight.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-            lock: requirements-windows.lock
-          - arch: arm64
-            runner: windows-11-arm
-            lock: requirements-windows-arm64.lock
-    runs-on: ${{ matrix.runner }}
+        include: ${{ fromJSON(needs.windows-runners.outputs.include) }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
     env:
       ASSET: bugnarrator-transcription-windows-${{ matrix.arch }}
       OUTPUT_DIR: ${{ github.workspace }}\dist\local-transcription
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -184,7 +220,7 @@ jobs:
   publish:
     if: github.event_name == 'workflow_dispatch'
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     # The only job that writes to the repository (the release and its tag).
     permissions:
       contents: write
