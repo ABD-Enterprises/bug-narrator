@@ -3,6 +3,7 @@
 ## Unreleased
 
 - [SECURITY] The docs site (`/site`) dependency tree is updated to patched versions of `proxy-addr`, `shell-quote`, `compression`, `webpack-dev-middleware`, `http-cache-semantics`, `postcss-selector-parser`, `serialize-javascript`, `sirv` and `source-map-js`; `npm audit` for the site drops from 47 to 29 vulnerabilities (the rest need a Docusaurus migration or have no upstream fix).
+- [SECURITY] The docs site (`/site`) now resolves `tinypool` 2.2.0 (root npm override; was 1.1.1, which carries a critical advisory); its only call site is Docusaurus's SSG worker pool behind `future.faster.ssgWorkerThreads`, which the site does not enable, and the site build is unchanged.
 - [FIX] Audio recording: guarantee probe cleanup and reset active recording state on failed start, stop, or cancel to prevent temporary file leaks and zombie session locks.
 - [SECURITY] The docs site (`/site`) no longer ships a vulnerable `brace-expansion`: a stale npm override pinned 1.1.18, which three newer advisories (high) affect; it now pins 1.1.21, and `fast-uri` moves to 3.1.8. `npm audit` for the site reports 0 vulnerabilities.
 - [INTERNAL] Removed the unused Gemini Code Assist GitHub App configuration files.
