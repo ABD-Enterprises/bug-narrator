@@ -49,9 +49,12 @@ jobs:
 
   signed-windows-tester-release:
     needs: release-preflight
-    # The org has a single self-hosted Windows runner (group "Windows VM"); with
-    # its label variable unset the job skips instead of queueing forever.
-    if: vars.WINDOWS_RUNNER_LABELS != ''
+    # The org has a single self-hosted Windows runner (group "Windows VM"). The
+    # job skips instead of queueing forever unless its label variable is set
+    # and the repo variable BUGNARRATOR_WINDOWS_CI is 'true'; that variable
+    # stays unset until the VM has the .NET 8 SDK and signtool installed
+    # (actions/setup-dotnet cannot install the SDK there without elevation).
+    if: vars.WINDOWS_RUNNER_LABELS != '' && vars.BUGNARRATOR_WINDOWS_CI == 'true'
     runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER_LABELS) }}
     # The only job that writes to the repository (the release and its assets).
     permissions:

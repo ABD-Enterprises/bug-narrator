@@ -394,9 +394,12 @@ jobs:
     needs:
       - detect-ci-changes
     # The org has a single self-hosted Windows runner (group "Windows VM").
-    # When its label variable is unset the job skips, which required-checks
-    # treats as a pass, so Windows never blocks a merge by failing to start.
-    if: needs.detect-ci-changes.outputs.windows_changed == 'true' && vars.WINDOWS_RUNNER_LABELS != ''
+    # The job skips, which required-checks treats as a pass, unless both its
+    # label variable is set and the repo variable BUGNARRATOR_WINDOWS_CI is
+    # 'true'. That variable stays unset until the VM is provisioned with
+    # Python 3.12 x64, the .NET 8 SDK and signtool: actions/setup-dotnet
+    # cannot install the SDK there without elevation (run 38095353919).
+    if: needs.detect-ci-changes.outputs.windows_changed == 'true' && vars.WINDOWS_RUNNER_LABELS != '' && vars.BUGNARRATOR_WINDOWS_CI == 'true'
     runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER_LABELS) }}
     steps:
       - name: Checkout
