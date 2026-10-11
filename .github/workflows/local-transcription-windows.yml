@@ -81,7 +81,11 @@ jobs:
   # each architecture is admitted only when its label variable is set: x64 by
   # WINDOWS_RUNNER_LABELS (the single "Windows VM" runner), arm64 by
   # WINDOWS_ARM64_RUNNER_LABELS (no such runner exists yet; the arm64 asset is
-  # not built until one is registered and the variable is created).
+  # not built until one is registered and the variable is created). Both also
+  # require the repo variable BUGNARRATOR_WINDOWS_CI to be 'true', which stays
+  # unset until the Windows VM is provisioned with Python 3.12 x64, the .NET 8
+  # SDK and signtool: actions/setup-python cannot install Python there without
+  # elevation (run 38095353906).
   windows-runners:
     name: Select Windows runners
     runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
@@ -94,9 +98,15 @@ jobs:
         env:
           X64_LABELS: ${{ vars.WINDOWS_RUNNER_LABELS }}
           ARM64_LABELS: ${{ vars.WINDOWS_ARM64_RUNNER_LABELS }}
+          WINDOWS_CI: ${{ vars.BUGNARRATOR_WINDOWS_CI }}
         run: |
           set -euo pipefail
           entries=()
+          if [[ "$WINDOWS_CI" != "true" ]]; then
+            echo "::notice::BUGNARRATOR_WINDOWS_CI is not 'true'; the Windows VM is not provisioned, skipping every Windows build"
+            X64_LABELS=""
+            ARM64_LABELS=""
+          fi
           # The label variables hold JSON arrays; each is embedded as a JSON
           # string so the build job can fromJSON() it into runs-on.
           if [[ -n "$X64_LABELS" ]]; then

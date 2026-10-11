@@ -37,13 +37,17 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           INCLUDE_SWIFT: ${{ inputs.include_swift }}
           WINDOWS_RUNNER_LABELS: ${{ vars.WINDOWS_RUNNER_LABELS }}
+          WINDOWS_CI: ${{ vars.BUGNARRATOR_WINDOWS_CI }}
         run: |
           set -euo pipefail
           base='"actions","python","javascript-typescript"'
-          if [[ -n "$WINDOWS_RUNNER_LABELS" ]]; then
+          # C# builds on the Windows VM, which is admitted only once the repo
+          # variable BUGNARRATOR_WINDOWS_CI is 'true' (it needs the .NET 8 SDK
+          # installed; actions/setup-dotnet cannot do that there).
+          if [[ -n "$WINDOWS_RUNNER_LABELS" && "$WINDOWS_CI" == "true" ]]; then
             base="$base,\"csharp\""
           else
-            echo "::notice::WINDOWS_RUNNER_LABELS is unset; skipping C# analysis"
+            echo "::notice::WINDOWS_RUNNER_LABELS unset or BUGNARRATOR_WINDOWS_CI != 'true'; skipping C# analysis"
           fi
 
           include_swift=false
