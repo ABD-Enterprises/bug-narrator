@@ -221,21 +221,29 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      - name: Select Xcode (project file requires Xcode 26)
+      - name: Select Xcode (project file requires Xcode 26 or newer)
         run: |
           # The .xcodeproj is in objectVersion 77, which only Xcode 26+
-          # can read. Valid layouts on a runner:
+          # can read (any newer major works too). Valid layouts on a runner:
           #   1. Side-by-side installs: /Applications/Xcode_26*.app
           #      (pick the newest)
           #   2. A single /Applications/Xcode.app, which we accept if its
           #      CFBundleShortVersionString starts with `26`.
           #   3. xcode-select already pointing at an Xcode 26 developer
           #      directory outside the app paths above.
-          XCODE_APP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' -print | sort -V | tail -1)
+          # Accept Xcode 26 or newer: a newer major reads objectVersion 77 too, and
+          # the self-hosted Macs carry whatever Xcode the operator installed (27.0 today).
+          xcode_major() { defaults read "$1/Contents/Info" CFBundleShortVersionString 2>/dev/null | cut -d. -f1; }
+          XCODE_APP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_*.app' -print | sort -V | tail -1)
+          if [[ -n "$XCODE_APP" ]]; then
+            MAJOR=$(xcode_major "$XCODE_APP")
+            if [[ ! "$MAJOR" =~ ^[0-9]+$ || "$MAJOR" -lt 26 ]]; then XCODE_APP=""; fi
+          fi
 
           if [[ -z "$XCODE_APP" && -d /Applications/Xcode.app ]]; then
             VERSION=$(defaults read /Applications/Xcode.app/Contents/Info CFBundleShortVersionString 2>/dev/null || echo "")
-            if [[ "$VERSION" == 26* ]]; then
+            MAJOR=$(xcode_major /Applications/Xcode.app)
+            if [[ "$MAJOR" =~ ^[0-9]+$ && "$MAJOR" -ge 26 ]]; then
               XCODE_APP=/Applications/Xcode.app
               echo "Accepting /Applications/Xcode.app (version $VERSION)."
             fi
@@ -246,7 +254,8 @@ jobs:
             SELECTED_XCODE_APP="${SELECTED_DEVELOPER_DIR%/Contents/Developer}"
             if [[ -n "$SELECTED_DEVELOPER_DIR" && -d "$SELECTED_XCODE_APP/Contents" ]]; then
               VERSION=$(defaults read "$SELECTED_XCODE_APP/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "")
-              if [[ "$VERSION" == 26* ]]; then
+              MAJOR=$(xcode_major "$SELECTED_XCODE_APP")
+              if [[ "$MAJOR" =~ ^[0-9]+$ && "$MAJOR" -ge 26 ]]; then
                 XCODE_APP="$SELECTED_XCODE_APP"
                 echo "Accepting selected Xcode at $XCODE_APP (version $VERSION)."
               fi
@@ -254,7 +263,7 @@ jobs:
           fi
 
           if [[ -z "$XCODE_APP" ]]; then
-            echo "::error::No Xcode 26.x found. Looked for /Applications/Xcode_26*.app, /Applications/Xcode.app, and the selected developer directory."
+            echo "::error::No Xcode 26 or newer found. Looked for /Applications/Xcode_*.app, /Applications/Xcode.app, and the selected developer directory."
             echo "Selected developer directory: $(xcode-select -p 2>/dev/null || echo unavailable)"
             xcodebuild -version || true
             echo "Installed Xcode apps:"
