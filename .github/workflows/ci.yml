@@ -334,6 +334,12 @@ jobs:
       # red. The assertions that could not pass here were removed (see
       # BugNarratorSettingsUITests), so this now gates.
       - name: Run UI tests (BugNarratorUITests)
+        # XCUITest needs a logged-in GUI (Aqua) session. The self-hosted macOS
+        # runners are LaunchDaemons without one: the UI test runner is killed before
+        # it connects ("Test crashed with signal kill before establishing connection",
+        # run 38105650476). Unit tests above still gate. Set
+        # BUGNARRATOR_MACOS_UI_TESTS=true once a GUI-session runner exists.
+        if: runner.environment == 'github-hosted' || vars.BUGNARRATOR_MACOS_UI_TESTS == 'true'
         run: |
           set -o pipefail
           xcodebuild \
