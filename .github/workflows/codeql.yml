@@ -16,14 +16,16 @@ permissions: {}
 
 jobs:
   # Swift is the main product language (230 files under Sources/) but analyzing
-  # it needs a hosted macOS runner, which is metered. The weekly scan stays on
-  # the cheap runners; Swift rides the monthly cron and any manual dispatch that
-  # asks for it. Computing the list here keeps that policy in one readable
-  # place — the previous hard-coded matrix silently ignored the include_swift
-  # input entirely, so Swift was never analyzed at all (#919).
+  # it occupies a self-hosted macOS runner for a long time. The weekly scan
+  # stays on the Linux runners; Swift rides the monthly cron and any manual
+  # dispatch that asks for it. C# needs the single self-hosted Windows runner
+  # and is dropped when its label variable is unset, so the scan never queues a
+  # job no runner can take. Computing the list here keeps that policy in one
+  # readable place — the previous hard-coded matrix silently ignored the
+  # include_swift input entirely, so Swift was never analyzed at all (#919).
   languages:
     name: Select languages
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LINUX_RUNNER_LABELS) }}
     outputs:
       list: ${{ steps.select.outputs.list }}
     steps:
@@ -34,9 +36,19 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
           INCLUDE_SWIFT: ${{ inputs.include_swift }}
+          WINDOWS_RUNNER_LABELS: ${{ vars.WINDOWS_RUNNER_LABELS }}
+          WINDOWS_CI: ${{ vars.BUGNARRATOR_WINDOWS_CI }}
         run: |
           set -euo pipefail
-          base='"actions","python","javascript-typescript","csharp"'
+          base='"actions","python","javascript-typescript"'
+          # C# builds on the Windows VM, which is admitted only once the repo
+          # variable BUGNARRATOR_WINDOWS_CI is 'true' (it needs the .NET 8 SDK
+          # installed; actions/setup-dotnet cannot do that there).
+          if [[ -n "$WINDOWS_RUNNER_LABELS" && "$WINDOWS_CI" == "true" ]]; then
+            base="$base,\"csharp\""
+          else
+            echo "::notice::WINDOWS_RUNNER_LABELS unset or BUGNARRATOR_WINDOWS_CI != 'true'; skipping C# analysis"
+          fi
 
           include_swift=false
           if [[ "$EVENT_NAME" == "workflow_dispatch" && "$INCLUDE_SWIFT" == "true" ]]; then
@@ -57,7 +69,10 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     needs: languages
-    runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || matrix.language == 'csharp' && 'windows-latest' || 'ubuntu-latest' }}
+    # Pick the label set first, then parse it once: an unset Windows variable is
+    # an empty string, never a fromJSON('') error, and the languages job has
+    # already dropped csharp in that case.
+    runs-on: ${{ fromJSON(matrix.language == 'swift' && vars.MACOS_RUNNER_LABELS || matrix.language == 'csharp' && vars.WINDOWS_RUNNER_LABELS || vars.LINUX_RUNNER_LABELS) }}
     permissions:
       security-events: write
       actions: read
@@ -71,6 +86,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
