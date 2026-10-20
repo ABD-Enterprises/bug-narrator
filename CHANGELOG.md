@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [SECURITY] The local transcription server's hash-locked builds (standalone, Windows x64 and Windows ARM64) move `certifi` from 2026.7.22 to 2026.10.19, which drops the emSign root CAs whose intermediate CA keys were compromised (GHSA-6q48-6c7w-9gw2, CWE-295, critical); no other pin changes.
 - [SECURITY] The docs site (`/site`) dependency tree is updated to patched versions of `proxy-addr`, `shell-quote`, `compression`, `webpack-dev-middleware`, `http-cache-semantics`, `postcss-selector-parser`, `serialize-javascript`, `sirv` and `source-map-js`; `npm audit` for the site drops from 47 to 29 vulnerabilities (the rest need a Docusaurus migration or have no upstream fix).
 - [SECURITY] The docs site (`/site`) now resolves `tinypool` 2.2.0 (root npm override; was 1.1.1, which carries a critical advisory); its only call site is Docusaurus's SSG worker pool behind `future.faster.ssgWorkerThreads`, which the site does not enable, and the site build is unchanged.
 - [FIX] Audio recording: guarantee probe cleanup and reset active recording state on failed start, stop, or cancel to prevent temporary file leaks and zombie session locks.
