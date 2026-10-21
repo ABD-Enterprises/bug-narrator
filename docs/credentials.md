@@ -1,10 +1,8 @@
 # Credentials
 
-This page exists because the sure-forge adapter block in `CLAUDE.md` (and its
-mirrors `AGENTS.md`, `.agent/rules.md`) ends with "See `docs/credentials.md`". That
-block is engine-managed and refers to the engine's own document; in an adopted
-repository the relative link would otherwise dangle. This file routes each
-question to where the answer actually lives.
+This page routes each credential question to where the answer actually lives.
+The repository is public, so nothing on it is a secret and nothing here should
+ever become one.
 
 ## What this repository decides
 
@@ -22,14 +20,11 @@ isolated test runtime, so tests never touch the real keychain. The launch-time
 hooks that seed that runtime (`BUGNARRATOR_TEST_*`) are self-guarding and only
 honoured when `usesIsolatedRuntime` is true.
 
-## What the engine decides
+## What the agent rules decide
 
-How the sure-forge loop resolves credentials for its own tooling — `.ai/secrets.json`
-`exec:` sources, why secret-resolution commands must run with the agent sandbox
-disabled, and the portable secrets layer — is the engine's contract, documented in
-sure-forge's `docs/credentials.md` ("Credentials for Self-Hosted ORC"). The adapter
-paragraph in `CLAUDE.md` summarises the one rule that matters most here: a sandboxed
-`op`/`cred`/keychain call fails misleadingly, and that is the sandbox, not an auth
-failure.
+How an agent session reaches a local secret manager or the keychain is set by
+`AGENTS.md` and the operator's own machine rules, not by this repository. The one
+rule that matters most here: a sandboxed `op`/`cred`/keychain call fails
+misleadingly, and that is the sandbox, not an auth failure.
 
 Nothing on this page is a secret and nothing here should ever become one.

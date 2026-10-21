@@ -1,71 +1,65 @@
-# sure-forge AI Adapter (Codex)
+# Agent instructions: bug-narrator
 
-<!-- BEGIN ORC-STANDARDS LOCAL ADAPTER -->
+<!-- fleet-core:begin (generated: edit the fleet source, not this block) -->
+## Fleet core
 
-This repo uses sure-forge (formerly ORC): a ticket-driven coding loop that runs low-friction by default.
+Applies to every repository in the fleet. It is generated from one source; repository-specific rules go outside the markers.
 
-The unit of work is an **ai-task contract** (scope · done_when · validation · evidence) — that contract **is the spec** sure-forge satisfies. Everything below only sets *how strictly* it's enforced.
+### Evidence
+- Read live state before stating it: fetch the remote, read the default branch, run the command. A number or an "X is missing" taken from a doc or a stale checkout is a claim to verify. A figure in a doc carries its date and how it was read.
+- Find the root cause before proposing a remedy. For an unreachable or hung host, check its network interface and the previous boot's log before blaming memory.
+- Give one account of a fact. If two places disagree, fix or flag one.
+- Say plainly what you did not verify.
 
-Posture — two modes: vibe (unlocked, you drive) and enterprise (org-floor-locked compliance):
+### Changes
+- One bounded task per change request. Stay in scope: no drive-by edits and no agent scratch files committed.
+- Run the repository's validation (named below) before pushing.
+- A change request merges when a fresh-context review of the exact head has no unresolved P0 or P1 findings and every required check is green. A new commit needs a new review; a clean automatic merge of the base branch keeps the review.
+- At most three open non-draft change requests per repository. While the fleet backlog check reports a backlog, finish and land existing work and start nothing new.
+- Fix a finding that takes minutes in the current change; fold the rest into an existing tracking issue. A session closes at least as many issues as it opens on its own initiative; tickets the owner asks for in chat are separate.
 
-- sure-forge's operator surface is **two modes** — strictness is expressed through your ai-task contract's `validation` + the mode, not by hand-setting legacy strictness keys. **vibe** (default) is genuinely low-friction: the scope, design, and capture gates do not block, validation runs on the host by default, and there is no claim-lease ceremony. **enterprise** is the locked compliance mode pinned by the org floor: stricter validation, containment, and evidence requirements can block, and `orc posture` prints the active floor. Switch with `orc posture <vibe|enterprise>`.
-- Enterprise carries the compliance-only extras your organization requires, including metrics capture, required evidence, scanner cadence, audit-log retention, and control coverage. Those requirements stay advisory until the active mode or floor makes them block.
+### Safety
+- Never print, log or commit tokens, passwords or keys. Use the credential helper the repository names.
+- One writer per checkout: separate worktrees for separate writers. Do not force-push, rebase or delete a branch another session may own.
+- Private repositories run CI on self-hosted runners only. A job that must not share a host (for example signing) runs on a dedicated self-hosted runner group, never on a GitHub-hosted runner without the owner's approval.
+- Ask the owner only for a step no agent can do or for a spend or legal commitment; decide and record everything else.
 
-Division of labor (Capability + Router):
+### Layout
+- AGENTS.md is the canonical agent file; where a CLAUDE.md exists it only imports it. Keep this file under 200 lines.
+- Name this repository's validation command, merge rule and changelog rule outside the markers. Rules kept outside the repository are not visible here: if a task seems to need one, ask rather than guess.
+- Shared skills are installed per machine from the fleet skills hub. Name the ones this repository expects below.
 
-- Which agent authors the diff is a Capability — the configured coding backend (`.ai/config.json#continuity.model_provider`). The orchestrating/planning agent plans, grooms, reviews, and drives the board; the router delegates implementation to the backend through the loop. Hand-author trivial or mechanical changes directly when spinning up the backend is not worth the overhead.
-- Metrics are always recorded — `orc metrics` (cost/effort/routing) is a primary product — but missing capture is advisory at vibe and can block in enterprise when the active policy requires it.
+### Forge: GitHub
+- Prefer REST (`gh api repos/OWNER/REPO/...`) to GraphQL for single reads: the rate-limit pools are shared by every session on the account.
+- Required checks and review rules are branch protection or rulesets; read them with `gh api`. Review-thread resolution needs GraphQL.
+<!-- fleet-core:end -->
 
-Source of truth:
+## Repository-specific
 
-- Board and provider: `.ai/config.json`
-- Task state: external ticket board, not repo markdown
-- Runtime CLI: `orc` on your PATH — this thin-adopted repo has no tracked bin/orc shim, so the global ORC launcher drives the loop
+- Public repository: the files are world-readable, and so is anything an agent writes into the repository, including issues, pull requests and comments. Keep customer, tenant and internal-host names, private paths, tokens and personal data out of all of it. Hosted GitHub runners are allowed here because the no-hosted-runner rule covers private repositories only.
+- What it is: BugNarrator, a macOS menu bar app (Swift, `BugNarrator.xcodeproj` generated from `project.yml` with xcodegen) that records narrated test sessions, transcribes them and extracts issues; plus a Windows port (`windows/`, .NET 8) and a local transcription server (`local-transcription/`, Python).
+- Layout: Swift sources in `Sources/BugNarrator`, tests in `Tests/BugNarratorTests` and `Tests/BugNarratorUITests`, Windows code in `windows/`, the Python server in `local-transcription/`, docs in `docs/` (product spec `docs/architecture/product-spec.md`), docs site in `site/`, release and check scripts in `scripts/`.
+- Validation: run `./scripts/validate.sh origin/main` before pushing; it is the entry point CI's `runtime-guardrails` job runs. It checks the product-spec contract, Semgrep on changed files, Swift parsing, the repository docs, the agent-file layout (`scripts/check-agent-rules-sync.sh`), shellcheck and ruff. Run it with `VALIDATE_SKIP_BOARD_AUDIT=1` to skip the live issue-board audit (CI does the same). It uses Docker for Semgrep when Docker is running and passes `SEMGREP_APP_TOKEN` from your environment into that container if the variable is set; do not set it. App build and tests: `xcodebuild -project BugNarrator.xcodeproj -scheme BugNarrator -configuration Debug -destination 'platform=macOS' -only-testing:BugNarratorTests CODE_SIGNING_ALLOWED=NO test`. `scripts/verify.sh` chains validate.sh and the Swift parse check and does not build.
+- Merge: the fleet core's merge rule applies. GitHub enforces the organization ruleset "ABD default branch baseline" (no deletion or force push) and branch protection on `main` that requires the checks `detect-ci-changes`, `runtime-guardrails` and `required-checks` (no required reviews, signatures or up-to-date branch), read 2026-10-21. CI is `.github/workflows/ci.yml` and also runs on `merge_group`. The macOS build-and-test job (`macos-26`, unit and UI tests) and the Windows job are path-gated and counted by `required-checks`, so a docs-only change does not wait for them.
+- Changelog: add an entry under `## Unreleased` in `CHANGELOG.md` (lines like `- [FIX] ...`, `- [SECURITY] ...`, `- [INTERNAL] ...`). `scripts/bump_version.sh` moves them into `CHANGELOG-archive.md` at release time; do not move them by hand.
+- Issues: before starting work, check that the issue is open, has no open pull request and is not labelled `ai/blocked` (`gh issue list --repo ABD-Enterprises/bug-narrator --state open`, or `scripts/effort-leak-audit.sh`, which is read-only). If an external credential, signing certificate, account permission or clean-machine check blocks it, say exactly what is missing in the issue and stop; do not add placeholder changes. Run `scripts/effort-leak-audit.sh` before pushing changes to workflows, issue or pull request templates, or release automation.
+- Agent files: `AGENTS.md` is the only copy of these rules; `CLAUDE.md` is exactly `@AGENTS.md` and `.agent/rules.md` is a pointer. `scripts/check-agent-rules-sync.sh` (run by validate.sh) fails if either drifts.
 
-Windows shells:
+### Safety: releases and signing (do not run unless the owner asks)
 
-- Use `orc <verb>` (the launcher on PATH); this thin-adopted repo has no `bin/orc` shim. In PowerShell or `cmd.exe`, `orc <verb>` works directly; from a full ORC engine checkout you can also run `node tools/orc/cli.mjs <verb>`.
+- Publishing is the owner's step. `scripts/build_dmg.sh` signs, notarizes (`xcrun notarytool`, a keychain profile on the owner's Mac) and staples; with `PUBLIC_RELEASE=YES` it refuses an unsigned, unnotarized, dirty-tree or untagged build (`docs/release/release-process.md`, "Release Guardrails"). Do not run it with `CODE_SIGNING_ALLOWED=YES`, `NOTARIZE=YES` or `PUBLIC_RELEASE=YES`, and do not set `ALLOW_NOTARIZATION_FAILURE`. A plain local build needs none of these (the default is unsigned).
+- Two manual (`workflow_dispatch`) workflows create GitHub Releases using the Windows signing secrets: `.github/workflows/windows-tester-release.yml`, and the release path of `.github/workflows/local-transcription-windows.yml` (its pull request and push runs build unsigned and publish nothing). Never dispatch them, and never create or edit releases or tags with `gh`.
+- `docs-site.yml` deploys the docs site to GitHub Pages on every push to `main` that touches `site/**` or `docs/**`, so a merged docs change goes live without a separate step. CodeQL runs on a schedule only.
+- `scripts/bump_version.sh` edits `VERSION`, `project.yml` and the changelogs together and `scripts/check_version_consistency.sh` checks them; change the version only through the script and only for a release the owner has asked for. `scripts/cleanup_local_build_apps.sh` moves built `BugNarrator.app` copies from Xcode's DerivedData to the Trash; run it only when asked.
+- Signing and notarization settings (team, notary profile, Apple account) are defaults inside `scripts/build_dmg.sh`; do not copy them into issues, pull requests or docs, and do not change them without the owner.
 
-Startup:
+### Safety: the app's data and permissions
 
-- If the branch contains a ticket id, run `orc current`. On `main` / `master` or with no ticket id, run `orc next`. For new work with no ticket, run `orc plan "<title>"`.
-- Sanctioned filing/grooming path: use `orc plan "<title>"` to file new repo work and the `refine-*` workflow to groom it. Do not open agent-authored implementation tickets with `gh issue create`, because that bypasses the ai-task contract and the `tier:` / `defect_origin:` labels sure-forge expects.
-- Recovery after `gh issue create`: keep the issue, run `orc refine-route --apply` to adopt any missing `ai/*` state, then finish the contract + `tier:` / `defect_origin:` labels through the `refine-*` workflow before any coder claims it. Human hand-filed issues remain allowed; this recovery step is only for agent-filed bypasses.
-- Queue semantics: pinned ready tickets pull first (max 3, GitHub-enforced).
-- Everything else is oldest-first, so promotion order is priority.
-- Confirm a coding backend is available before relying on the loop to implement; otherwise hand-author the change or provision a backend — do not silently treat hand-authoring as the configured-backend path.
-- Read ticket comments with `orc comments` and diffs with `orc diff` (lockfiles / generated / vendor stripped). Never re-fetch the raw thread or raw diff into the agent context.
-- Every autonomous batch ends with the standard records-derived report via `orc batch close`; set `.ai/config.json#continuity.handoff_anchor` to post that report to a fixed issue, or leave it unset for print-only.
-- Search before broad reads: use `rg` or targeted queries to locate the exact symbol/config/evidence, and read only the surrounding lines you need.
-- For multiple related read-only GitHub lookups, prefer one bounded GraphQL query with aliases over repeated one-endpoint-at-a-time calls when that reduces round trips. Request only decision-relevant fields, set explicit pagination limits on every connection, record `rateLimit { cost remaining resetAt }` for batched investigations, and reuse the result within the run. Do not replace focused calls with oversized queries or unbounded graph traversal. Fall back to REST for one-off lookups, logs or artifacts, unavailable GraphQL surfaces, and mutations where REST has clearer idempotency or failure semantics.
+- The app stores the user's AI, GitHub and Jira credentials in the macOS Keychain and sends recorded audio, transcript text and screenshot names to the configured AI provider (screenshot images only if the user opts in), per the README privacy section. Never feed real recordings, transcripts, screenshots, session folders or keys into a test, issue or pull request. Use fixtures.
+- Unit and UI tests run in an isolated runtime (`AppRuntimeEnvironment.usesIsolatedRuntime`): an in-memory keychain, a test-scoped defaults suite and a temporary storage folder, so they do not read the user's real keychain or sessions. Do not weaken that isolation, and do not launch the Release app from `build/` to "try it": it uses the real keychain and may prompt for microphone and screen recording access (`scripts/keychain_startup_smoke_test.sh` and `scripts/release_smoke_test.sh` do this on purpose; run them only when asked). The UI tests launch the app and need a desktop session.
+- The app does not require the Accessibility permission for its core workflow (README, `docs/security/security.md`). Do not add code or instructions that ask for it.
+- Secrets: `.env`, `.env.*` and `*.local` are ignored, and CI reads the Windows signing certificate from repository secrets. Never print or commit a certificate, password or token; `.gitleaks.toml` and `.gitleaksignore` list reviewed historical exceptions only.
+- The `windows/` and `local-transcription/` code cannot be built on a Mac without extra tools; if a change touches them, say what you could not run.
 
-Hard rules:
-
-- AI task state lives on the external board only. Do not use `docs/roadmap`, `state/`, `work.json`, `state.json`, `markdown.json`, or markdown task lists.
-- Canonical states: `ready_for_work` = unclaimed impl; `in_development` = active impl; `ready_for_local_testing` = cloud-completed handoff; `in_local_testing` = local-validation. Cloud agents may transition to `ready_for_local_testing`; local machines pick up with `orc validate-next`.
-- Cloud/container agents run advisory `validation.cloud_preflight` checks only. Do not open a PR or transition to `in_pr_review` until local validation has passed. Production deploys stay on protected CI or trusted local runners.
-- Local validation mirrors CI-required flags as closely as practical; CI failures override local assumptions. `orc validate` base-freshness failures are blockers — rebase onto the named target and rerun before pushing.
-- Run local validation before pushing; inspect failed check logs; rerun CI only for concrete infra/cancellation/flaky-test reasons. When a self-hosted runner is configured, prefer it for CI-parity feedback before pushing (advisory like other local validation).
-- Same-repo concurrency is narrow: run ONE free-running session per repo, or use `orc parallel` for sanctioned same-repo fanout.
-- Blocked PRs are first-class work. Before taking new `ready_for_work`, inspect owned open PRs and drain red/dirty/blocked ones (security/required CI first, then stale base, review/size blockers, metadata gates, dependency queues). Do not stack feature commits onto a `size:xl` / `needs-independent-review` branch.
-- Before editing any source file, search the issue tracker for the filename and the pattern you are about to change; coordinate on overlaps.
-- **Consolidate; do not accrete.** When evidence shows a shared invariant, duplicate implementation, repeated failure shape, or high-fan-in behavior, identify the invariant and inspect sibling definitions and consumers before coding the fix. Prefer the smallest complete failure-class fix at the authoritative producer, shared predicate, state transition, or existing chokepoint over patching one consumer. Purely local or mechanical fixes do not require an exhaustive repository audit. If the complete class fix needs files outside approved scope, stop, record the incomplete class, and file a bounded follow-up instead of broadening the current PR or claiming the class is closed.
-- Enforce zero bad churn: keep edits scoped to the root cause, preserve the touched file's style, avoid drive-by formatting/import sorting/public API renames, and do not commit scratch harnesses, IDE dotfiles, or agent-specific utility scripts.
-- Treat push as remote verification, not iterative debugging: run the ticket's `validation.local` commands before the first push; if CI fails, reproduce locally before another push.
-- Use host-scoped author email aliases for agent commits when available, and include `Co-Authored-By: <Agent> (<host>) ...` trailers.
-- Run configured local-first reviews before CI spend when `.ai/config.json#local_review` declares them. Track actionable findings in GitHub Issues, not markdown logs.
-- In-session subagents extend hands, not leases: they may search, read, inspect, summarize, classify, and report — they must NOT claim/transition tickets, add evidence, push, open/comment/merge PRs, or mutate provider state, and must NOT spawn further subagents. Close completed subagents immediately after consuming their results; completed subagents still count against runtime pools until closed, so a "subagent pool full" warning is usually hygiene, not repo state.
-- Before local validation, pre-push, or other expensive milestones, respect the board-state heartbeat; stop if the ticket is blocked, reassigned, or no longer in the active state for this session.
-- Do not commit local lease/controller/planner/handoff state files. `.ai/` is local-only; only repos that run their own board (sure-forge itself) track `.ai/config.json`, while adopted repos keep it untracked and bootstrap it via `orc adopt`. This adapter is tracked so fresh clones discover the sure-forge contract; repo-specific guidance lives outside the managed block (`orc adopt --force` preserves it).
-- "Get latest" means update this repo only: `git fetch origin --prune && git pull --ff-only`.
-- Secret-resolution commands run UNSANDBOXED. Any `.ai/secrets.json` `exec:` source — or any command that fetches a secret from a local secret manager, agent, keychain, or socket (whatever you use: `pass`, `gopass`, `vault`, a cloud provider's secrets CLI, an OS keychain, 1Password's `op`, …) — MUST run with the agent Bash sandbox disabled. The sandbox blocks the local socket/agent these tools rely on, so they fail misleadingly (auth timeouts, "not signed in", or hangs) even when correctly configured and unlocked. That is the sandbox, NOT a real auth failure — do not loop or ask the operator to re-authenticate; re-run unsandboxed. Only if the unsandboxed command still errors does an actual credential problem apply. See `docs/credentials.md`.
-
-<!-- END ORC-STANDARDS LOCAL ADAPTER -->
-
-## Repo-Specific Effort Leak Guardrails
-
-- Before starting implementation, run `gh issue list --repo ABD-Enterprises/bug-narrator --state open --limit 200` or `scripts/effort-leak-audit.sh` when GitHub auth is available.
-- Do not implement an issue that is already closed, has an open PR, or is labeled `ai/blocked` unless the blocker has been removed and documented in the issue.
-- If an issue is blocked by an external credential, signing certificate, account permission, hardware, or clean-machine validation, comment with the exact missing input and keep it in `ai/blocked`; do not create placeholder repo churn.
-- Prefer one small PR per issue. If replacing stale work, close or comment on the superseded PR with `superseded-by: #<new-pr>` before spending CI on a new branch.
-- Run `scripts/effort-leak-audit.sh` before pushing batches that touch GitHub workflow, issue, PR, or release automation.
+### Skills
+- This repository expects no hub skills.
