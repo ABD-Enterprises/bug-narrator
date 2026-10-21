@@ -1,41 +1,31 @@
 #!/usr/bin/env bash
-# Verify that CLAUDE.md, AGENTS.md, and .agent/rules.md share an identical
-# body. The first line of each is allowed (and expected) to differ — it names
-# the agent the file is addressed to, e.g. "# Local AI Adapter (Claude)".
-# Every line after the first must match across all three, so updates to the
-# shared repository guardrails are never lost on one tool while another stays
-# current.
+# Verify the agent-file layout of the fleet standard: AGENTS.md is the one
+# canonical copy of the agent rules, CLAUDE.md contains exactly the line
+# "@AGENTS.md" (an import, so there is nothing to drift), and
+# .agent/rules.md is a short pointer that names AGENTS.md.
 #
-# Exits 0 with a one-line PASS message when in sync; exits 1 with a diff
-# preview when any pair drifts.
+# Exits 0 with a one-line PASS message when the layout holds; exits 1 with the
+# reason otherwise.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-files=(
-  "$ROOT/CLAUDE.md"
-  "$ROOT/AGENTS.md"
-  "$ROOT/.agent/rules.md"
-)
-
-for f in "${files[@]}"; do
-  if [[ ! -f "$f" ]]; then
-    printf 'FAIL: missing agent rules file: %s\n' "${f#"$ROOT/"}" >&2
+for f in AGENTS.md CLAUDE.md .agent/rules.md; do
+  if [[ ! -f "$ROOT/$f" ]]; then
+    printf 'FAIL: missing agent rules file: %s\n' "$f" >&2
     exit 1
   fi
 done
 
-reference="${files[0]}"
-for f in "${files[@]:1}"; do
-  if ! diff -q <(tail -n +2 "$reference") <(tail -n +2 "$f") >/dev/null 2>&1; then
-    printf 'FAIL: %s body drift vs %s\n' \
-      "${f#"$ROOT/"}" "${reference#"$ROOT/"}" >&2
-    printf -- '--- %s\n+++ %s\n' \
-      "${reference#"$ROOT/"}" "${f#"$ROOT/"}" >&2
-    diff <(tail -n +2 "$reference") <(tail -n +2 "$f") | head -30 >&2
-    exit 1
-  fi
-done
+if [[ "$(tr -d '[:space:]' < "$ROOT/CLAUDE.md")" != "@AGENTS.md" ]]; then
+  printf 'FAIL: CLAUDE.md must contain only the line "@AGENTS.md"\n' >&2
+  exit 1
+fi
 
-printf 'PASS: CLAUDE.md, AGENTS.md, and .agent/rules.md share identical bodies (only line 1 differs).\n'
+if ! grep -Fq 'AGENTS.md' "$ROOT/.agent/rules.md"; then
+  printf 'FAIL: .agent/rules.md must point at AGENTS.md\n' >&2
+  exit 1
+fi
+
+printf 'PASS: CLAUDE.md imports AGENTS.md and .agent/rules.md points at it.\n'

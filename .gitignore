@@ -23,11 +23,9 @@ __pycache__/
 .env.*
 *.local
 
-# Local AI standards adapters are machine-local and should never be committed.
+# Local agent state is machine-local and should never be committed.
+# AGENTS.md, CLAUDE.md and .agent/rules.md are tracked on purpose.
 .ai/
-.agent/
-AGENTS.md
-CLAUDE.md
 
 site/node_modules/
 site/.docusaurus/
