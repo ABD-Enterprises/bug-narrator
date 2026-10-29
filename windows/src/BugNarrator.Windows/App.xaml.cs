@@ -104,7 +104,8 @@ public partial class App : Application
             transcriptionClient,
             issueExtractionService,
             diagnostics,
-            localServerHealthProbe);
+            localServerHealthProbe,
+            reviewSessionActionService.RetryTranscriptionAsync);
         var hotkeyPlatform = new Win32GlobalHotkeyPlatform();
         var hotkeyService = new WindowsGlobalHotkeyService(
             settingsStore,
