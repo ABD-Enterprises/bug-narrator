@@ -401,6 +401,8 @@ internal static class UriExtensions
 {
     public static Uri AppendPathSegment(this Uri baseUri, string relativePath)
     {
-        return new Uri(baseUri, relativePath);
+        // Treat the configured context path as a directory, even without a trailing slash.
+        var directoryUri = new Uri(baseUri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
+        return new Uri(directoryUri, relativePath);
     }
 }
