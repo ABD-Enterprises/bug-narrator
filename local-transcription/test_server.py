@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import json
 from pathlib import Path
+import shutil
 import signal
 import socket
 import struct
@@ -12,7 +13,7 @@ import threading
 import time
 import unittest
 import wave
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import server
 
@@ -105,53 +106,145 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertNotIn("Traceback", body["error"]["message"])
         self.assertNotIn("Exception", body["error"]["message"])
 
-    def test_transcription_uses_supported_bounded_chunking_argument(self):
+    def test_mlx_transcription_decodes_bounded_windows_and_offsets_sentences(self):
+        # The model must never receive the full recording: each window is decoded on its
+        # own and its timestamps are shifted back into the recording's timeline (#1229).
+        class Sentence:
+            def __init__(self, start, end, text):
+                self.start, self.end, self.text = start, end, text
+
+        class Result:
+            text = "hello."
+            sentences = [Sentence(0.5, 1.0, "hello.")]
+
         class RecordingModel:
             def __init__(self):
                 self.calls = []
 
             def transcribe(self, path, **kwargs):
                 self.calls.append((path, kwargs))
-                return "result"
+                return Result()
 
         model = RecordingModel()
+        windows = ["/tmp/window-0.wav", "/tmp/window-120.wav"]
 
-        result = server._transcribe_audio(model, "/tmp/fixture.m4a")
+        with (
+            patch.object(
+                server,
+                "_decode_audio_window",
+                side_effect=[*windows, None],
+            ) as decode,
+            patch.object(server, "_release_accelerator_cache") as release,
+        ):
+            result = server._transcribe_audio(model, "/tmp/fixture.m4a")
 
-        self.assertEqual(result, "result")
+        self.assertEqual(
+            decode.call_args_list,
+            [
+                call("/tmp/fixture.m4a", 0),
+                call("/tmp/fixture.m4a", 120),
+                call("/tmp/fixture.m4a", 240),
+            ],
+        )
         self.assertEqual(
             model.calls,
-            [("/tmp/fixture.m4a", {"chunk_duration": 120})],
+            [
+                (windows[0], {"chunk_duration": 120}),
+                (windows[1], {"chunk_duration": 120}),
+            ],
         )
+        self.assertEqual(result.text, "hello. hello.")
+        self.assertEqual(
+            [(s.start, s.end, s.text) for s in result.sentences],
+            [(0.5, 1.0, "hello."), (120.5, 121.0, "hello.")],
+        )
+        # Released after each window and once more when leaving the loop.
+        self.assertGreaterEqual(release.call_count, 3)
+
+    def test_mlx_failure_releases_the_accelerator_cache_and_propagates(self):
+        class FailingModel:
+            def transcribe(self, path, **kwargs):
+                raise ValueError("bad window")
+
+        with (
+            patch.object(server, "_decode_audio_window", return_value="/tmp/window.wav"),
+            patch.object(server, "_release_accelerator_cache") as release,
+        ):
+            with self.assertRaises(ValueError):
+                server._transcribe_audio(FailingModel(), "/tmp/fixture.m4a")
+
+        # The inner finally releases the failed window; the outer finally guarantees it.
+        self.assertGreaterEqual(release.call_count, 2)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required to decode windows")
+    def test_audio_windows_decode_bounded_slices_and_stop_past_the_end(self):
+        rate = 8000
+        seconds = server._chunk_duration_seconds + 5  # one full window and a tail
+        source = self._write_wav(rate, seconds)
+
+        first = server._decode_audio_window(source, 0)
+        self.addCleanup(server._unlink_quietly, first)
+        tail = server._decode_audio_window(source, server._chunk_duration_seconds)
+        self.addCleanup(server._unlink_quietly, tail)
+        past_end = server._decode_audio_window(source, 2 * server._chunk_duration_seconds)
+
+        self.assertIsNone(past_end)
+        for window in (first, tail):
+            with wave.open(window, "rb") as handle:
+                self.assertEqual(handle.getframerate(), 16000)  # parakeet's rate
+                self.assertEqual(handle.getnchannels(), 1)
+        with wave.open(first, "rb") as handle:
+            self.assertAlmostEqual(
+                handle.getnframes() / handle.getframerate(),
+                server._chunk_duration_seconds,
+                places=1,
+            )
+        with wave.open(tail, "rb") as handle:
+            self.assertAlmostEqual(handle.getnframes() / handle.getframerate(), 5, places=1)
 
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
     def test_model_load_and_transcription_share_the_inference_thread(self):
         class RecordingModel:
+            def __init__(self):
+                self.threads = []
+                self.calls = []
+
             def transcribe(self, path, **kwargs):
-                return (threading.get_ident(), path, kwargs)
+                self.threads.append(threading.get_ident())
+                self.calls.append((path, kwargs))
 
         model = RecordingModel()
+        load_threads = []
 
         def load_model(_model_id):
+            load_threads.append(threading.get_ident())
             return model
 
-        with patch.object(server, "get_model", side_effect=load_model):
-            first = server._inference_executor.submit(
+        def one_window(_audio_path, start):
+            return "/tmp/window.wav" if start == 0 else None
+
+        with (
+            patch.object(server, "get_model", side_effect=load_model),
+            patch.object(server, "_decode_audio_window", side_effect=one_window),
+            patch.object(server, "_release_accelerator_cache"),
+        ):
+            server._inference_executor.submit(
                 server._run_inference,
                 "model",
                 "/tmp/first.m4a",
             ).result()
-            second = server._inference_executor.submit(
+            server._inference_executor.submit(
                 server._run_inference,
                 "model",
                 "/tmp/second.m4a",
             ).result()
 
-        self.assertEqual(first[0], second[0])
-        self.assertEqual(first[2], {"chunk_duration": 120})
-        self.assertEqual(second[2], {"chunk_duration": 120})
+        self.assertEqual(len(model.threads), 2)
+        self.assertEqual(model.threads, load_threads)
+        self.assertEqual(model.threads[0], model.threads[1])
+        self.assertTrue(all(kwargs == {"chunk_duration": 120} for _, kwargs in model.calls))
 
     def test_shutdown_terminates_process_even_during_active_inference(self):
         # The MLX contract: no drain, re-raise the signal with the default disposition.
@@ -364,6 +457,39 @@ server._serve("127.0.0.1", {port})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(body["error"]["type"], "invalid_request_error")
         self.assertIn("PCM WAV", body["error"]["message"])
+
+    def test_transcription_route_streams_the_upload_to_disk_in_bounded_pieces(self):
+        import io
+
+        from fastapi import UploadFile
+
+        payload = b"\x00" * (3 * server._upload_piece_bytes + 17)
+        seen = {}
+
+        def fake_run_inference(_model_id, path):
+            seen["bytes"] = Path(path).read_bytes()
+            return server._Transcription("ok", [])
+
+        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a")
+        original_read = upload.read
+        read_sizes = []
+
+        async def guarded_read(size=-1):
+            read_sizes.append(size)
+            return await original_read(size)
+
+        upload.read = guarded_read
+
+        with patch.object(server, "_run_inference", side_effect=fake_run_inference):
+            response = asyncio.run(
+                server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3")
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(seen.get("bytes"), payload)
+        # Every read is a bounded piece; the whole upload is never read at once (#1229).
+        self.assertTrue(read_sizes)
+        self.assertEqual(max(read_sizes), server._upload_piece_bytes)
 
     def test_onnx_reads_stereo_and_8_bit_wav(self):
         stereo = self._write_wav(8000, 1, channels=2)

@@ -96,6 +96,13 @@ first `--preload` downloads the speech model. Long recordings are processed in
 bounded local chunks and can take several minutes; BugNarrator waits for the
 active local inference instead of starting duplicate retries.
 
+Memory stays bounded on long recordings: the upload is streamed to disk, each
+120-second window is decoded on its own, and the Metal cache is released after
+every window and when a transcription finishes or fails. The loaded model stays
+resident until you quit the terminal window — `--preload` loads it at startup
+instead of on the first request, so the first transcription skips the load wait
+but the idle cost is the same either way.
+
 - transcription requires a provider endpoint compatible with `/v1/audio/transcriptions`
 - review summary and issue extraction require a provider endpoint compatible with `/v1/chat/completions`
 - unsupported provider/model combinations show clear setup guidance in Settings instead of starting a broken transcription

@@ -18,7 +18,7 @@ lines), `SettingsStore.swift` (reachability probe, lines ~760–815),
 
 | Concern | macOS behaviour |
 | --- | --- |
-| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok",...}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). Model loads lazily on first request; inference is serialized on one worker thread; audio is chunked at 120 s. Default port 8422. |
+| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok",...}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). Model loads lazily on first request and stays resident until the process exits; inference is serialized on one worker thread; the upload is streamed to disk and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
 | Inference | `parakeet-mlx` (Apple MLX). **Apple Silicon only** — `build_standalone.sh` refuses non-arm64. |
 | Packaging | PyInstaller-style standalone binary `bugnarrator-transcription`, shipped as a signed + notarized DMG release asset (`bugnarrator-transcription-macos-arm64.dmg`, ~136 MB) plus a `.sha256` manifest, on its own release cadence. |
 | Discovery of a package | `discover()` pages the GitHub Releases API (≤20 pages × 30) for the first non-draft, non-prerelease release carrying both assets, size-bounded, and only from `https://github.com/ABD-Enterprises/bug-narrator/releases/download/`. |
