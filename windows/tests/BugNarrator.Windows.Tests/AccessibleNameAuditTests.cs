@@ -500,6 +500,7 @@ public sealed class AccessibleNameAuditTests
         public void Publish(RecordingControlState state) { CurrentState = state; StateChanged?.Invoke(this, state); }
         public Task RefreshRecoveryAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default) { RetryCalls++; return Task.CompletedTask; }
+        public Task<CompletedSession> RetryTranscriptionAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.FromResult(session);
         public Task StartRecordingAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StopRecordingAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ScreenshotCaptureResult> CaptureScreenshotAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();

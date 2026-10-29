@@ -30,6 +30,8 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         {
             var duplicate = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
             Assert.Contains("already", duplicate.Message);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteSessionAsync(saved));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveSessionAsync(saved));
             Assert.Equal(1, transcriptionClient.CallCount);
         }
         finally
@@ -41,6 +43,13 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
         Assert.Equal(1, transcriptionClient.CallCount);
         Assert.Equal("Recovered transcript.", Assert.Single(await completedSessionStore.GetAllAsync()).TranscriptText);
+        var staleSave = await service.SaveSessionAsync(saved);
+        Assert.Equal(SessionTranscriptionStatus.Completed, staleSave.TranscriptionStatus);
+        Assert.Equal("Recovered transcript.", staleSave.TranscriptText);
+        await service.DeleteSessionAsync(staleSave);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveSessionAsync(saved));
+        Assert.False(Directory.Exists(saved.SessionDirectory));
     }
 
     private readonly FileCompletedSessionStore completedSessionStore;

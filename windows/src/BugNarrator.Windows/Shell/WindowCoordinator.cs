@@ -154,7 +154,8 @@ public sealed class WindowCoordinator
                 completedSessionStore,
                 reviewSessionActionService,
                 settingsStore,
-                diagnostics);
+                diagnostics,
+                recordingLifecycleService is IRecordingRecoveryService recovery ? recovery.RetryTranscriptionAsync : null);
             sessionLibraryWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "session library window closed");
@@ -274,17 +275,33 @@ public sealed class WindowCoordinator
     {
         var shouldFocusSessionLibrary = state.WorkflowState == RecordingWorkflowState.Completed
                                         && lastObservedWorkflowState != RecordingWorkflowState.Completed;
+        var shouldRefreshSessionLibrary = lastObservedWorkflowState == RecordingWorkflowState.Saving
+                                         && state.CanStart && state.SavedSession is not null;
         lastObservedWorkflowState = state.WorkflowState;
 
         if (!shouldFocusSessionLibrary)
         {
+            if (shouldRefreshSessionLibrary)
+            {
+                Application.Current.Dispatcher.BeginInvoke(async () =>
+                {
+                    if (sessionLibraryWindow is not null)
+                    {
+                        await sessionLibraryWindow.RefreshSessionsAsync();
+                    }
+                });
+            }
             return;
         }
 
-        Application.Current.Dispatcher.BeginInvoke(() =>
+        Application.Current.Dispatcher.BeginInvoke(async () =>
         {
             diagnostics.Info("windows", "recording completed, focusing session library");
             ShowSessionLibrary();
+            if (sessionLibraryWindow is not null)
+            {
+                await sessionLibraryWindow.RefreshSessionsAsync();
+            }
         });
     }
 

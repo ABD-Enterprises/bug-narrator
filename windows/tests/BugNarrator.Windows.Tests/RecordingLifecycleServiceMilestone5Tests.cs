@@ -46,7 +46,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Equal(saved.SessionId, harness.Service.CurrentState.SavedSession!.SessionId);
 
         await harness.CompletedSessionStore.DeleteAsync(saved);
-        await harness.Service.RetrySavedTranscriptionAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Service.RetrySavedTranscriptionAsync());
         Assert.Null(harness.Service.CurrentState.SavedSession);
         Assert.Equal(0, harness.RetryCalls);
     }
@@ -66,7 +66,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
             return session;
         };
 
-        var retry = harness.Service.RetrySavedTranscriptionAsync();
+        // The library's selected-session entry point shares the controls/tray exclusion gate.
+        var retry = harness.Service.RetryTranscriptionAsync(harness.Service.CurrentState.SavedSession!);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         try
         {
@@ -103,7 +104,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         }
         else
         {
-            await harness.Service.RetrySavedTranscriptionAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Service.RetrySavedTranscriptionAsync());
             Assert.Contains("Settings", harness.Service.CurrentState.StatusMessage);
         }
 

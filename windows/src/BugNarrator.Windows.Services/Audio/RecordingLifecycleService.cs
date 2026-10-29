@@ -117,13 +117,25 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
 
     public async Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default)
     {
+        if (CurrentState is { CanStart: true, SavedSession: { RequiresTranscriptionRetry: true } saved })
+        {
+            await RetryTranscriptionAsync(saved, cancellationToken);
+        }
+    }
+
+    public async Task<CompletedSession> RetryTranscriptionAsync(CompletedSession session, CancellationToken cancellationToken = default)
+    {
         if (!await startOrRetryGate.WaitAsync(0, cancellationToken))
         {
-            return;
+            throw new InvalidOperationException("A recording or transcription retry is already active.");
         }
         try
         {
-            await RetrySavedTranscriptionCoreAsync(cancellationToken);
+            if (!CurrentState.CanStart || retryTranscription is null)
+            {
+                throw new InvalidOperationException("Transcription cannot be retried while a recording is active.");
+            }
+            return await RetrySavedTranscriptionCoreAsync(session, cancellationToken);
         }
         finally
         {
@@ -131,22 +143,17 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         }
     }
 
-    private async Task RetrySavedTranscriptionCoreAsync(CancellationToken cancellationToken)
+    private async Task<CompletedSession> RetrySavedTranscriptionCoreAsync(CompletedSession saved, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var initialState = CurrentState;
-        if (!initialState.CanStart || initialState.SavedSession is not { RequiresTranscriptionRetry: true } saved
-            || retryTranscription is null)
-        {
-            return;
-        }
-
         PublishState(initialState with
         {
             WorkflowState = RecordingWorkflowState.Saving,
             CanStart = false,
             StatusMessage = "Retrying transcription... Your recording is saved.",
             Blocker = null,
+            SavedSession = saved,
         });
 
         CompletedSession? session = saved;
@@ -157,14 +164,14 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
                 .FirstOrDefault(item => item.SessionId == saved.SessionId);
             if (session is null)
             {
-                failure = "The saved session is no longer in the library.";
-                return;
+                throw new InvalidOperationException("The saved session is no longer in the library.");
             }
 
             if (session.RequiresTranscriptionRetry)
             {
-                session = await retryTranscription(session, cancellationToken);
+                session = await retryTranscription!(session, cancellationToken);
             }
+            return session;
         }
         catch (OperationCanceledException)
         {
@@ -174,6 +181,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         {
             diagnostics.Error("transcription", "recording controls retry failed", exception);
             failure = $"Transcription could not be retried: {exception.Message} Your recording is saved. Check Settings or try again.";
+            throw;
         }
         finally
         {
