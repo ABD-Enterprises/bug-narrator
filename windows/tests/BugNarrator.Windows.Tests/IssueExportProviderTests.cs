@@ -501,6 +501,44 @@ public sealed class IssueExportProviderTests : IDisposable
         Assert.Equal("Save button clips in the modal", fields.GetProperty("summary").GetString());
     }
 
+    [Theory]
+    [InlineData("https://jira.example.com", "https://jira.example.com/")]
+    [InlineData("https://jira.example.com/", "https://jira.example.com/")]
+    [InlineData("https://jira.example.com/jira", "https://jira.example.com/jira/")]
+    [InlineData("https://jira.example.com/jira/", "https://jira.example.com/jira/")]
+    [InlineData("https://jira.example.com/tools/jira", "https://jira.example.com/tools/jira/")]
+    [InlineData("https://jira.example.com/team%20space/jira", "https://jira.example.com/team%20space/jira/")]
+    [InlineData("https://jira.example.com/jira?view=all#home", "https://jira.example.com/jira/")]
+    public async Task JiraExportAsync_PreservesContextPathInRequestAndBrowseLink(
+        string baseUrl,
+        string expectedPrefix)
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var requestCount = 0;
+        using var client = new HttpClient(new TestHttpMessageHandler((request, _) =>
+        {
+            requestCount++;
+            Assert.Equal(expectedPrefix + "rest/api/3/issue", request.RequestUri!.AbsoluteUri);
+            Assert.Equal(HttpMethod.Post, request.Method);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent("""{"key":"BN-42"}""", Encoding.UTF8, "application/json"),
+            });
+        }));
+        var provider = new JiraExportProvider(diagnostics, client);
+
+        var results = await provider.ExportAsync(
+            session.IssueExtraction!.Issues,
+            session,
+            new JiraExportConfiguration(new Uri(baseUrl), "fixture@example.com", "fixture-token", "BN", "Task"));
+
+        Assert.Equal(1, requestCount);
+        var remoteUrl = Assert.IsType<Uri>(Assert.Single(results).RemoteUrl);
+        Assert.Equal(expectedPrefix + "browse/BN-42", remoteUrl.AbsoluteUri);
+    }
+
     [Fact]
     public async Task JiraExportAsync_MapsValidationFailure()
     {

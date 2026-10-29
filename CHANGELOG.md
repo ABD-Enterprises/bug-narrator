@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Windows Jira exports preserve configured context paths, with or without a trailing slash, in both issue-creation requests and returned issue links.
 - [FIX] Windows issue review now previews screenshot highlights and lets reviewers reposition them by dragging or keyboard arrows and remove them before saving or exporting. Edits preserve annotation metadata and stay inside the image bounds; missing images retain their annotations and offer named removal controls. Session bundles render the current annotations instead of copying stale cached highlights.
 - [INTERNAL] Adds `docs/reviews/2026-10-29-critical-review.md`, a point-in-time audit of the repository (Swift app, Windows port, local transcription server, CI and release automation): 6 P1, 8 P2 and 11 P3 findings, each with file-level evidence, impact and a specific fix, plus the areas that were checked and found sound. It is a work queue for follow-up, not a product document; identifiers that `AGENTS.md` keeps out of public files are redacted.
 - [FIX] Windows recording controls show saved recordings that still need transcription, offer Retry Transcription and Open Settings, and restore recovery after reopening the controls. Retry uses the same saved-session service as the library and refuses duplicate requests for the same session.
