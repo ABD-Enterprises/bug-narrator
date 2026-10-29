@@ -1,5 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Automation;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
@@ -25,6 +30,139 @@ namespace BugNarrator.Windows.Tests;
 /// </summary>
 public sealed class AccessibleNameAuditTests
 {
+    [Theory]
+    [InlineData(96, 440, 80)]
+    [InlineData(192, 220, 190)]
+    public void AnnotationPreview_DragAndKeyboardRespectTheAspectFitImageAndClampMovement(double dpiX, double expectedWidth, double expectedLeft)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var screenshot = CreateAnnotationScreenshot(harness.RootDirectory, dpiX);
+            var annotation = new IssueScreenshotAnnotation(Guid.NewGuid(), screenshot.ScreenshotId, "Target", 0.1, 0.2, 0.3, 0.4, 0.85);
+            var editor = new IssueScreenshotAnnotationEditor(screenshot, [annotation]);
+            editor.Measure(new Size(600, 500));
+            editor.Arrange(new Rect(0, 0, 600, 500));
+            editor.RenderOverlays();
+            var frame = editor.ImageFrame;
+            // PNG stores resolution as integer pixels/metre, so nonsquare DPI has subpixel rounding.
+            Assert.InRange(frame.Width, expectedWidth - 0.1, expectedWidth + 0.1);
+            Assert.Equal(220, frame.Height, 4);
+            Assert.InRange(frame.X, expectedLeft - 0.1, expectedLeft + 0.1);
+            var thumb = Assert.Single(Descendants(editor).OfType<Thumb>());
+            Assert.Equal(frame.X + 0.1 * frame.Width, Canvas.GetLeft(thumb), 4);
+
+            thumb.RaiseEvent(new DragDeltaEventArgs(frame.Width * 0.1, frame.Height * 0.1));
+            var moved = Assert.Single(editor.Annotations);
+            Assert.Equal(0.2, moved.X, 4);
+            Assert.Equal(0.3, moved.Y, 4);
+            Assert.True(editor.MoveWithKey(annotation.AnnotationId, Key.Right, ModifierKeys.Shift));
+            Assert.Equal(0.2 + 10.0 / frame.Width, Assert.Single(editor.Annotations).X, 4);
+            thumb.RaiseEvent(new DragDeltaEventArgs(10000, -10000));
+            moved = Assert.Single(editor.Annotations);
+            Assert.Equal(0.7, moved.X, 4);
+            Assert.Equal(0, moved.Y);
+            Assert.Equal(annotation.AnnotationId, moved.AnnotationId);
+            Assert.Equal(annotation.Confidence, moved.Confidence);
+            Assert.Equal(0.1, annotation.X);
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(thumb)));
+            return true;
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnnotationPreview_MissingOrCorruptImageKeepsMetadataAndOffersNamedRemoval(bool writeCorruptFile)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var screenshot = ReviewSessionTestData.CreateScreenshot(harness.RootDirectory, writeFile: writeCorruptFile);
+            var annotation = new IssueScreenshotAnnotation(Guid.NewGuid(), screenshot.ScreenshotId, "Target", 0, 0, 0.3, 0.4);
+            var editor = new IssueScreenshotAnnotationEditor(screenshot, [annotation]);
+            var window = new Window { Content = editor };
+            try
+            {
+                Assert.Same(annotation, Assert.Single(editor.Annotations));
+                Assert.Contains(Descendants(editor).OfType<TextBlock>(), text => text.Text.Contains("preview unavailable"));
+                Assert.Empty(AccessibleNameAudit.Run(window));
+                var remove = Assert.Single(Descendants(editor).OfType<Button>());
+                Assert.Contains("Target", AutomationProperties.GetName(remove));
+                remove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Empty(editor.Annotations);
+            }
+            finally
+            {
+                window.Close();
+            }
+            return true;
+        });
+    }
+
+    [Fact]
+    public async Task SessionLibrary_AnnotationEditsRoundTripThroughSaveAndSessionStorage()
+    {
+        using var harness = new WindowHarness();
+        var edited = OnStaThread(() =>
+        {
+            var screenshot = CreateAnnotationScreenshot(harness.RootDirectory);
+            var first = new IssueScreenshotAnnotation(Guid.NewGuid(), screenshot.ScreenshotId, "First", 0.1, 0.2, 0.3, 0.4, 0.85);
+            var removed = new IssueScreenshotAnnotation(Guid.NewGuid(), screenshot.ScreenshotId, "Second", 0.5, 0.5, 0.2, 0.2);
+            var unrelated = new IssueScreenshotAnnotation(Guid.NewGuid(), Guid.NewGuid(), "Unavailable", 0, 0, 0.5, 0.5);
+            var extraction = ReviewSessionTestData.CreateIssueExtractionResult();
+            var issue = extraction.Issues[0] with
+            {
+                RelatedScreenshotIds = [screenshot.ScreenshotId],
+                ScreenshotAnnotations = [first, removed, unrelated],
+            };
+            var session = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory,
+                screenshots: [screenshot], issueExtraction: extraction with { Issues = [issue] });
+            var actions = new FakeReviewActions();
+            var window = new SessionLibraryWindow(new FakeSessionStore { Sessions = [session] }, actions, new FakeSettingsStore(), harness.Diagnostics());
+            try
+            {
+                window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+                var editor = Assert.Single(Descendants(window).OfType<IssueScreenshotAnnotationEditor>());
+                editor.Measure(new Size(600, 500));
+                editor.Arrange(new Rect(0, 0, 600, 500));
+                editor.MoveAnnotationPixels(first.AnnotationId, editor.ImageFrame.Width * 0.1, 0);
+                var remove = Descendants(editor).OfType<Button>().Single(button => AutomationProperties.GetName(button).Contains("Second"));
+                remove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Empty(AccessibleNameAudit.Run(window));
+                var save = Descendants(window).OfType<Button>().Single(button => Equals(button.Content, "Save Review"));
+                save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.NotNull(actions.LastSavedSession);
+                return (Session: actions.LastSavedSession!, First: first, Removed: removed, Unrelated: unrelated);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+        var paths = new AppStoragePaths(harness.RootDirectory, Path.Combine(harness.RootDirectory, "Sessions"), Path.Combine(harness.RootDirectory, "Logs"));
+        var store = new FileCompletedSessionStore(paths);
+        await store.SaveAsync(edited.Session);
+        var saved = Assert.Single(await store.GetAllAsync());
+        var annotations = Assert.Single(saved.IssueExtraction!.Issues).ScreenshotAnnotations;
+        var moved = Assert.Single(annotations, item => item.AnnotationId == edited.First.AnnotationId);
+        Assert.Equal(0.2, moved.X, 4);
+        Assert.Equal(edited.First.Confidence, moved.Confidence);
+        Assert.DoesNotContain(annotations, item => item.AnnotationId == edited.Removed.AnnotationId);
+        Assert.Contains(annotations, item => item.AnnotationId == edited.Unrelated.AnnotationId);
+    }
+
+    private static ScreenshotArtifact CreateAnnotationScreenshot(string root, double dpiX = 96)
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(root, writeFile: false) with { Width = 400, Height = 200 };
+        var bitmap = BitmapSource.Create(400, 200, dpiX, 96, PixelFormats.Bgra32, null, new byte[400 * 200 * 4], 400 * 4);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(screenshot.AbsolutePath);
+        encoder.Save(stream);
+        return screenshot;
+    }
+
     [Fact]
     public void RecordingControls_OffersRecoveryAndSettingsAndDisablesRetryWhileBusy()
     {
@@ -562,7 +700,12 @@ public sealed class AccessibleNameAuditTests
 
     private sealed class FakeReviewActions : IReviewSessionActionService
     {
-        public Task<CompletedSession> SaveSessionAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.FromResult(session);
+        public CompletedSession? LastSavedSession { get; private set; }
+        public Task<CompletedSession> SaveSessionAsync(CompletedSession session, CancellationToken cancellationToken = default)
+        {
+            LastSavedSession = session;
+            return Task.FromResult(session);
+        }
         public Task DeleteSessionAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<CompletedSession> RetryTranscriptionAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.FromResult(session);
         public Task<CompletedSession> ExtractIssuesAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.FromResult(session);

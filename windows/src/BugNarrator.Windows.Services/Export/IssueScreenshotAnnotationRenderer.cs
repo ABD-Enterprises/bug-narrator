@@ -13,12 +13,13 @@ public sealed class IssueScreenshotAnnotationRenderer
 
     public IReadOnlyList<AnnotatedScreenshotExport> AnnotatedScreenshotExports(
         ExtractedIssue issue,
-        CompletedSession session)
+        CompletedSession session,
+        string? outputDirectory = null)
     {
         var exports = new List<AnnotatedScreenshotExport>();
-        var annotationDirectory = string.IsNullOrWhiteSpace(session.SessionDirectory)
+        var annotationDirectory = outputDirectory ?? (string.IsNullOrWhiteSpace(session.SessionDirectory)
             ? null
-            : Path.Combine(session.SessionDirectory, "annotated-exports");
+            : Path.Combine(session.SessionDirectory, "annotated-exports"));
 
         foreach (var screenshot in session.Screenshots
             .Where(item => issue.RelatedScreenshotIds.Contains(item.ScreenshotId))

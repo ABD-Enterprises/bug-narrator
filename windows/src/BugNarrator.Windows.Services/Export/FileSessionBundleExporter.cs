@@ -91,22 +91,19 @@ public sealed class FileSessionBundleExporter : ISessionBundleExporter
             exportedFiles.Add($"screenshots/{Path.GetFileName(destinationPath)}");
         }
 
-        var annotatedExportsDirectory = Path.Combine(normalizedSession.SessionDirectory, "annotated-exports");
-        if (Directory.Exists(annotatedExportsDirectory))
+        var bundleAnnotatedExportsDirectory = Path.Combine(bundleDirectory, "annotated-exports");
+        var annotationRenderer = new IssueScreenshotAnnotationRenderer();
+        foreach (var issue in normalizedSession.IssueExtraction?.Issues ?? [])
         {
-            var bundleAnnotatedExportsDirectory = Path.Combine(bundleDirectory, "annotated-exports");
-            Directory.CreateDirectory(bundleAnnotatedExportsDirectory);
-
-            foreach (var filePath in Directory.EnumerateFiles(annotatedExportsDirectory, "*.png").OrderBy(Path.GetFileName))
+            cancellationToken.ThrowIfCancellationRequested();
+            // Render this saved snapshot into the new bundle. Cached session images may contain
+            // highlights that the reviewer has since moved or removed.
+            foreach (var asset in annotationRenderer.AnnotatedScreenshotExports(issue, normalizedSession, bundleAnnotatedExportsDirectory))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var destinationPath = GetUniqueDestinationPath(
-                    Path.Combine(bundleAnnotatedExportsDirectory, Path.GetFileName(filePath)));
-                File.Copy(filePath, destinationPath, overwrite: false);
-                // Windows-only directory, outside the shared layout contract but still a file this
-                // bundle wrote, so the manifest lists it. Kept before manifest.json so that stays last.
-                exportedFiles.Add($"annotated-exports/{Path.GetFileName(destinationPath)}");
+                if (asset.RenderedFileName is { } fileName)
+                {
+                    exportedFiles.Add($"annotated-exports/{fileName}");
+                }
             }
         }
 

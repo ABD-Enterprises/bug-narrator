@@ -1054,7 +1054,7 @@ public sealed class SessionLibraryWindow : Window
         issuesEmptyStateTextBlock.Text = string.Empty;
         foreach (var issue in session.IssueExtraction.Issues)
         {
-            var editor = CreateIssueEditor(issue);
+            var editor = CreateIssueEditor(issue, session);
             issueEditors.Add(editor);
             issueEditorsPanel.Children.Add(editor.Container);
         }
@@ -1074,7 +1074,7 @@ public sealed class SessionLibraryWindow : Window
         UpdateReviewWorkspace(session);
     }
 
-    private IssueEditorRow CreateIssueEditor(ExtractedIssue issue)
+    private IssueEditorRow CreateIssueEditor(ExtractedIssue issue, CompletedSession session)
     {
         var exportCheckBox = new CheckBox
         {
@@ -1126,6 +1126,20 @@ public sealed class SessionLibraryWindow : Window
             .Select(BuildReproductionStepEditor)
             .ToArray();
         var reproductionStepsPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
+        var annotationEditors = session.Screenshots
+            .Where(screenshot => issue.RelatedScreenshotIds.Contains(screenshot.ScreenshotId)
+                && issue.ScreenshotAnnotations.Any(annotation => annotation.ScreenshotId == screenshot.ScreenshotId))
+            .Select(screenshot => new IssueScreenshotAnnotationEditor(screenshot, issue.ScreenshotAnnotations))
+            .ToArray();
+        var annotationsPanel = new StackPanel();
+        if (annotationEditors.Length > 0)
+        {
+            annotationsPanel.Children.Add(BuildLabel("Annotated Screenshots"));
+            foreach (var editor in annotationEditors)
+            {
+                annotationsPanel.Children.Add(editor);
+            }
+        }
         if (reproductionStepEditors.Length > 0)
         {
             reproductionStepsPanel.Children.Add(BuildLabel("Reproduction Steps"));
@@ -1178,6 +1192,7 @@ public sealed class SessionLibraryWindow : Window
                     BuildLabel("Evidence"),
                     evidenceTextBox,
                     reproductionStepsPanel,
+                    annotationsPanel,
                     BuildLabel("Note"),
                     noteTextBox,
                 },
@@ -1197,7 +1212,8 @@ public sealed class SessionLibraryWindow : Window
             summaryTextBox,
             evidenceTextBox,
             noteTextBox,
-            reproductionStepEditors);
+            reproductionStepEditors,
+            annotationEditors);
     }
 
     private static ReproductionStepEditorRow BuildReproductionStepEditor(
@@ -1547,6 +1563,7 @@ public sealed class SessionLibraryWindow : Window
         private readonly TextBox noteTextBox;
         private readonly CheckBox requiresReviewCheckBox;
         private readonly IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors;
+        private readonly IReadOnlyList<IssueScreenshotAnnotationEditor> annotationEditors;
         private readonly TextBox sectionTitleTextBox;
         private readonly ExtractedIssue sourceIssue;
         private readonly TextBox summaryTextBox;
@@ -1565,7 +1582,8 @@ public sealed class SessionLibraryWindow : Window
             TextBox summaryTextBox,
             TextBox evidenceTextBox,
             TextBox noteTextBox,
-            IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors)
+            IReadOnlyList<ReproductionStepEditorRow> reproductionStepEditors,
+            IReadOnlyList<IssueScreenshotAnnotationEditor> annotationEditors)
         {
             this.sourceIssue = sourceIssue;
             Container = container;
@@ -1580,6 +1598,7 @@ public sealed class SessionLibraryWindow : Window
             this.evidenceTextBox = evidenceTextBox;
             this.noteTextBox = noteTextBox;
             this.reproductionStepEditors = reproductionStepEditors;
+            this.annotationEditors = annotationEditors;
         }
 
         public Border Container { get; }
@@ -1606,6 +1625,10 @@ public sealed class SessionLibraryWindow : Window
                 Note = NullIfWhiteSpace(noteTextBox.Text),
                 ReproductionSteps = reproductionStepEditors
                     .Select(editor => editor.BuildStep())
+                    .ToArray(),
+                ScreenshotAnnotations = sourceIssue.ScreenshotAnnotations
+                    .Where(annotation => !annotationEditors.Any(editor => editor.ScreenshotId == annotation.ScreenshotId))
+                    .Concat(annotationEditors.SelectMany(editor => editor.Annotations))
                     .ToArray(),
             };
         }

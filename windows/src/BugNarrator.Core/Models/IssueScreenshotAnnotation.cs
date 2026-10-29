@@ -57,6 +57,18 @@ public sealed class IssueScreenshotAnnotation
     public double? Confidence { get; }
     public IssueScreenshotAnnotationStyle Style { get; }
 
+    public IssueScreenshotAnnotation MovedBy(double deltaX, double deltaY)
+    {
+        if (!double.IsFinite(deltaX) || !double.IsFinite(deltaY))
+        {
+            return this;
+        }
+
+        return new IssueScreenshotAnnotation(
+            AnnotationId, ScreenshotId, Label, X + deltaX, Y + deltaY,
+            Width, Height, Confidence, Style);
+    }
+
     /// <summary>Swift `.rounded()` rounds halves away from zero; C# Math.Round defaults to banker's
     /// rounding, which would render 0.845 as 84% where macOS renders 85%.</summary>
     public string? ConfidenceLabel =>
