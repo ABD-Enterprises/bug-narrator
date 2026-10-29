@@ -50,7 +50,7 @@ public sealed class BundleExporterTests : IDisposable
     }
 
     [Fact]
-    public async Task FileSessionBundleExporter_CopiesAnnotatedExports()
+    public async Task FileSessionBundleExporter_DoesNotCopyStaleAnnotatedExports()
     {
         var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
         var annotatedExportsDirectory = Path.Combine(session.SessionDirectory, "annotated-exports");
@@ -60,7 +60,47 @@ public sealed class BundleExporterTests : IDisposable
         var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
         var bundlePath = await exporter.ExportAsync(session);
 
-        Assert.True(File.Exists(Path.Combine(bundlePath, "annotated-exports", "review-shot-annotated-12345678.png")));
+        Assert.False(Directory.Exists(Path.Combine(bundlePath, "annotated-exports")));
+    }
+
+    [Fact]
+    public async Task FileSessionBundleExporter_RendersCurrentAnnotationsAndOmitsRemovedHighlights()
+    {
+        var screenshot = ReviewSessionTestData.CreateScreenshot(rootDirectory, writeFile: false);
+        using (var image = new System.Drawing.Bitmap(400, 200))
+        {
+            using var graphics = System.Drawing.Graphics.FromImage(image);
+            graphics.Clear(System.Drawing.Color.White);
+            image.Save(screenshot.AbsolutePath, System.Drawing.Imaging.ImageFormat.Png);
+        }
+        var extraction = ReviewSessionTestData.CreateIssueExtractionResult();
+        var annotation = new BugNarrator.Core.Models.IssueScreenshotAnnotation(
+            Guid.NewGuid(), screenshot.ScreenshotId, "Target", 0.1, 0.2, 0.2, 0.2);
+        var issue = extraction.Issues[0] with
+        {
+            RelatedScreenshotIds = [screenshot.ScreenshotId],
+            ScreenshotAnnotations = [annotation],
+        };
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory,
+            screenshots: [screenshot], issueExtraction: extraction with { Issues = [issue] });
+        var exporter = new FileSessionBundleExporter(storagePaths, diagnostics);
+        var first = await exporter.ExportAsync(session);
+        using (var image = new System.Drawing.Bitmap(Assert.Single(Directory.GetFiles(Path.Combine(first, "annotated-exports")))))
+        {
+            Assert.NotEqual(System.Drawing.Color.White.ToArgb(), image.GetPixel(80, 60).ToArgb());
+        }
+
+        var moved = issue with { ScreenshotAnnotations = [annotation.MovedBy(0.5, 0)] };
+        var second = await exporter.ExportAsync(session with { IssueExtraction = extraction with { Issues = [moved] } });
+        using (var image = new System.Drawing.Bitmap(Assert.Single(Directory.GetFiles(Path.Combine(second, "annotated-exports")))))
+        {
+            Assert.Equal(System.Drawing.Color.White.ToArgb(), image.GetPixel(80, 60).ToArgb());
+            Assert.NotEqual(System.Drawing.Color.White.ToArgb(), image.GetPixel(280, 60).ToArgb());
+        }
+
+        var removed = issue with { ScreenshotAnnotations = [] };
+        var third = await exporter.ExportAsync(session with { IssueExtraction = extraction with { Issues = [removed] } });
+        Assert.False(Directory.Exists(Path.Combine(third, "annotated-exports")));
     }
 
     [Fact]
