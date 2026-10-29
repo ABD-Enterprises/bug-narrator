@@ -102,18 +102,25 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         var session = previous is { RequiresTranscriptionRetry: true } ? previous
             : sessions.Where(item => item.RequiresTranscriptionRetry)
                 .OrderByDescending(item => item.CreatedAt).FirstOrDefault();
+        var preserveRecordingFailure = initialState.WorkflowState == RecordingWorkflowState.Failed
+                                       && initialState.Blocker is not null;
         if (session is not null)
         {
             PublishState(initialState with
             {
                 SavedSession = session,
-                StatusMessage = BuildCompletedStatusMessage(session),
-                Blocker = BuildCompletedBlocker(session),
+                StatusMessage = preserveRecordingFailure ? initialState.StatusMessage : BuildCompletedStatusMessage(session),
+                Blocker = preserveRecordingFailure ? initialState.Blocker : BuildCompletedBlocker(session),
             });
         }
         else if (initialState.SavedSession is not null)
         {
-            PublishState(initialState with { SavedSession = null, Blocker = null, StatusMessage = "Ready to record." });
+            PublishState(initialState with
+            {
+                SavedSession = null,
+                Blocker = preserveRecordingFailure ? initialState.Blocker : null,
+                StatusMessage = preserveRecordingFailure ? initialState.StatusMessage : "Ready to record.",
+            });
         }
     }
 
@@ -188,11 +195,14 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         }
         finally
         {
+            var preserveRecordingFailure = initialState.WorkflowState == RecordingWorkflowState.Failed
+                                           && initialState.Blocker is not null;
+            var retryStatus = failure ?? (session is null ? "No saved session to retry." : BuildCompletedStatusMessage(session));
             PublishState(initialState with
             {
                 SavedSession = session,
-                StatusMessage = failure ?? (session is null ? "No saved session to retry." : BuildCompletedStatusMessage(session)),
-                Blocker = session is null ? null : failure is null
+                StatusMessage = preserveRecordingFailure ? $"{initialState.StatusMessage}{Environment.NewLine}{retryStatus}" : retryStatus,
+                Blocker = preserveRecordingFailure ? initialState.Blocker : session is null ? null : failure is null
                     ? BuildCompletedBlocker(session)
                     : new RecoveryBlocker(RecoveryBlockerCategory.Other,
                         "Your recording is saved. Check Settings or retry transcription.", RecoveryDestination.Settings),

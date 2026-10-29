@@ -33,6 +33,31 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task Recovery_DoesNotReplaceRecordingPermissionGuidanceWithAnOlderPendingSession()
+    {
+        using var harness = new TestHarness();
+        var pending = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await harness.CompletedSessionStore.SaveAsync(pending);
+        harness.MicrophonePreflightService.Result = new RecordingPreflightResult(
+            RecordingPreflightStatus.PermissionDenied, CanStart: false, "Microphone access is blocked.");
+        await harness.Service.StartRecordingAsync();
+        var failedStart = harness.Service.CurrentState;
+
+        await harness.Service.RefreshRecoveryAsync();
+        Assert.Equal(failedStart.StatusMessage, harness.Service.CurrentState.StatusMessage);
+        Assert.Equal(failedStart.Blocker, harness.Service.CurrentState.Blocker);
+        Assert.Equal(pending.SessionId, harness.Service.CurrentState.SavedSession!.SessionId);
+        await harness.Service.RetrySavedTranscriptionAsync();
+        Assert.Equal(failedStart.Blocker, harness.Service.CurrentState.Blocker);
+        Assert.Contains(failedStart.StatusMessage, harness.Service.CurrentState.StatusMessage);
+        Assert.False(harness.Service.CurrentState.SavedSession!.RequiresTranscriptionRetry);
+    }
+
+    [Fact]
     public async Task Recovery_ReopeningControlsFindsTheNextPendingRecording()
     {
         using var harness = new TestHarness();
