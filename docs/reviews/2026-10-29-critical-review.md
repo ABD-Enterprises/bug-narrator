@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-29
 **Commit reviewed:** `c8c0070` (local `main`, fast-forwarded from `4981148`; upstream `origin/main` was 3 commits ahead on fetch)
+**Status:** snapshot. `main` moved during the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. See [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) for the one finding that changed.
 **Scope:** whole repository — Swift macOS app (`Sources/BugNarrator`, 248 files / 36,455 LOC), tests (`Tests/`, 119 files / 26,323 LOC), Windows port (`windows/`, .NET 8 / WPF), local transcription server (`local-transcription/`, Python), CI/CD (`.github/workflows/`, 5 workflows), release automation (`scripts/`, 19 scripts), docs site (`site/`, Docusaurus).
 **Method:** five parallel read-only review passes (Swift security; Swift maintainability + UX; Python transcription server; Windows C# port; CI/CD + scripts + docs site + repo hygiene), plus independent line-by-line re-verification of every P0/P1 claim by the parent agent, plus live read-only GitHub API queries (`gh api`, `gh run list`, `gh release list`).
 **Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 10 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*.
@@ -93,9 +94,9 @@ The AI-provider guard was hardened in response to a real incident (the code comm
 154:@app.post("/v1/audio/transcriptions")
 ```
 
-A grep for `CORS|middleware|Depends|Security|api_key|token|Authorization|TrustedHost` across the file returns **no** matching code. The upload path has no size cap:
+A grep for `CORS|middleware|Depends|Security|api_key|token|Authorization|TrustedHost` across the file returns **no** matching code — and still returns none at `origin/main` after #1239 landed.
 
-`local-transcription/server.py:171-177`
+At the reviewed commit the upload path also had no size cap (`server.py:171-177`):
 
 ```python
     suffix = Path(file.filename).suffix if file.filename else ".m4a"
@@ -107,7 +108,7 @@ A grep for `CORS|middleware|Depends|Security|api_key|token|Authorization|Trusted
         tmp.close()
 ```
 
-`await file.read()` buffers the entire body into memory with no limit and no `Content-Length` pre-check.
+`await file.read()` buffered the entire body into memory with no limit and no `Content-Length` pre-check. #1239 (`b30a04e`) has since made the upload **streaming**, so peak memory is bounded — but it added **no total-size cap**, and the endpoint is still unauthenticated. See [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size).
 
 The client side confirms there is nothing to enforce. `Sources/BugNarrator/Services/TranscriptionClient.swift` and `LocalTranscriptionManager.swift` contain no auth header, token, or shared secret on the local-server path. The health probe accepts *any* responder:
 
@@ -502,12 +503,13 @@ Both remaining callers are manual, owner-run, release-time scripts.
 
 ---
 
-### P2-6 · The local transcription server accepts unbounded uploads into memory
+### P2-6 · The local transcription server has no admission control on upload size
 
 **Area:** `local-transcription/server.py`
+**Status:** partially fixed after this review — see below.
 **Evidence**
 
-`local-transcription/server.py:171-177` — the full body is buffered before any validation:
+At the reviewed commit (`c8c0070`), `local-transcription/server.py:171-177` buffered the full body before any validation:
 
 ```python
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -516,13 +518,31 @@ Both remaining callers are manual, owner-run, release-time scripts.
         tmp.write(contents)
 ```
 
-There is no `Content-Length` check, no streaming, and no cap. (The temp file *is* correctly unlinked in a `finally` block at `:237-239` — cleanup is not the problem; admission control is.)
+There was no `Content-Length` check, no streaming, and no cap. (The temp file *was* correctly unlinked in a `finally` block — cleanup was never the problem; admission control was.)
 
-**Failure scenario:** any local process POSTs a multi-gigabyte body to the transcription endpoint. The server buffers it in RAM before rejecting anything, and the request is unauthenticated (P1-2), so nothing stops it.
+**Update — fixed in part by #1239.** `b30a04e` ("fix(transcription): bound memory on long recordings in the local server", refs #1229) landed on `main` after this review was written. It replaced the single-buffer read with a streamed, piece-wise write:
 
-**Impact:** memory pressure on the user's machine, triggered by an unauthenticated local endpoint. A remote-adjacent DoS with a one-line curl.
+```python
+        # Stream the upload to disk in bounded pieces: a long recording must not be
+        # held in memory as one buffer (#1229).
+        written = 0
+        while True:
+            piece = await file.read(_upload_piece_bytes)
+            if not piece:
+                break
+            tmp.write(piece)
+            written += len(piece)
+```
 
-**Fix:** reject on `Content-Length` above the configured cap (return 413), and write the upload to the temp file in bounded chunks instead of `await file.read()`. The Swift client already chunks long recordings, so size the cap above one chunk.
+So the **memory-exhaustion half of this finding is fixed**: peak RSS during an upload is now bounded by `_upload_piece_bytes` (1 MiB) rather than the whole file.
+
+**What still stands.** The fix bounds memory but does not bound *volume*: there is still no `Content-Length` check, no maximum total size, and no early rejection. `grep -nE 'content_length|max_upload|Content-Length'` over `local-transcription/server.py` at `origin/main` returns nothing. The endpoint also remains unauthenticated (P1-2), so nothing gates who may send the body.
+
+**Failure scenario (remaining):** any local process POSTs a multi-terabyte body to the transcription endpoint. The server writes every byte to disk in the temp directory, rejecting nothing, until the volume fills or the request is abandoned. The memory footprint stays flat, which is exactly why this is easy to miss — the symptom moves from RAM to disk.
+
+**Impact:** disk exhaustion on the user's machine from an unauthenticated local endpoint. The memory-pressure variant that made this a P2 at `c8c0070` is gone.
+
+**Fix (remaining):** reject on `Content-Length` above a configured cap (return 413), and enforce the same cap while streaming so a chunked request without a declared length cannot exceed it. The Swift client already chunks long recordings, so size the cap comfortably above one chunk. The shared-secret handshake in P1-2 is the other half — with it, the endpoint is no longer reachable by every local process.
 
 ---
 
@@ -648,7 +668,7 @@ These were checked specifically and found sound — listed so the next reviewer 
 - **Crash safety.** Zero force unwraps, `as!`, `try!`, `fatalError`, `TODO`, `FIXME` and `HACK` in `Sources/BugNarrator/**` — the recent cleanup pass (#1224 era) held.
 
 **Python server**
-- **Temp-file cleanup.** `local-transcription/server.py:237-239` unlinks the uploaded audio in a `finally` block — nothing is left on disk.
+- **Temp-file cleanup.** The uploaded audio is unlinked in a `finally` block — nothing is left on disk. (The block was refactored to use `contextlib.suppress(OSError)` by #1239; the behaviour is unchanged.)
 - **Temp-path safety.** The suffix derived from the client filename cannot contain a separator.
 - **Loopback default.** The server binds `127.0.0.1` by default and the app does not pass `--host`.
 
@@ -703,7 +723,7 @@ Recorded so a future reviewer does not re-investigate them.
 | 3 | P2-3 Redact the Apple ID from `docs/Distribution.md` | ~5 min | Public repository, personal identifier, own rule already says not to. |
 | 4 | P1-1 Jira plaintext gate | ~1 h | Credential disclosure path, and the fix pattern already exists in-repo. |
 | 5 | P2-5 Version consistency into CI | ~15 min | One line in `validate.sh`. |
-| 6 | P1-2 Local server auth | ~1 day | Needs a token handshake on both sides plus the upload cap. |
+| 6 | P1-2 Local server auth | ~1 day | Needs a token handshake on both sides, plus the total-size cap that #1239 left open (P2-6). |
 | 7 | P1-3 Windows at-rest parity | ~2-3 days | The largest single piece of work; decide port-vs-document first. |
 | 8 | P1-6 Release workflow guards | ~1 h | Environment, ref constraint, namespace regex, `--target`. |
 | 9 | P2-1 Update checker asset filter | ~1 h | Mirrors logic that already exists in `LocalTranscriptionManager`. |
