@@ -108,7 +108,7 @@ public sealed class AccessibleNameAuditTests
                 window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
                 var title = Descendants(window).OfType<TextBox>().Single(text => text.Text == first.IssueExtraction!.Issues[0].Title);
                 title.Text = "Unsaved review edit";
-                window.ApplyRecoveredSession(second);
+                window.ApplyRecoveredSession(second with { TranscriptText = "Second recovered transcript." });
                 Assert.Equal("Unsaved review edit", title.Text);
                 Assert.Contains(title, Descendants(window).OfType<TextBox>());
 
@@ -116,6 +116,9 @@ public sealed class AccessibleNameAuditTests
                 var textBoxes = Descendants(window).OfType<TextBox>().ToArray();
                 Assert.Contains(textBoxes, text => text.Text == "Unsaved review edit");
                 Assert.Contains(textBoxes, text => text.Text == "Recovered transcript.");
+                var sessionList = Descendants(window).OfType<ListBox>().Single(list => list.Items.Count == 2);
+                sessionList.SelectedIndex = 1;
+                Assert.Contains(Descendants(window).OfType<TextBox>(), text => text.Text == "Second recovered transcript.");
             }
             finally
             {

@@ -688,8 +688,14 @@ public sealed class SessionLibraryWindow : Window
         allSessions = allSessions
             .Select(session => session.SessionId == recoveredSession.SessionId ? recoveredSession : session)
             .ToArray();
-        if (selectedSession?.SessionId != recoveredSession.SessionId || isRunningReviewAction)
+        if (selectedSession?.SessionId != recoveredSession.SessionId)
         {
+            var item = sessionListBox.Items.OfType<SessionListItem>()
+                .FirstOrDefault(item => item.Session.SessionId == recoveredSession.SessionId);
+            if (item is not null)
+            {
+                sessionListBox.Items[sessionListBox.Items.IndexOf(item)] = new SessionListItem(recoveredSession);
+            }
             return;
         }
 
