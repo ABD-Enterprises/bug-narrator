@@ -12,7 +12,7 @@ using BugNarrator.Windows.Services.Transcription;
 
 namespace BugNarrator.Windows.Services.Audio;
 
-public sealed class RecordingLifecycleService : IRecordingLifecycleService
+public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRecordingRecoveryService
 {
     private readonly IAudioRecorderService audioRecorderService;
     private readonly IAudioInputDeviceCatalog audioInputDeviceCatalog;
@@ -29,6 +29,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
     private readonly ITranscriptionClient transcriptionClient;
     private readonly IIssueExtractionService issueExtractionService;
     private readonly ILocalServerHealthProbe localServerHealthProbe;
+    private readonly Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription;
+    private readonly SemaphoreSlim startOrRetryGate = new(1, 1);
 
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
@@ -47,8 +49,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
         ITranscriptionClient transcriptionClient,
         IIssueExtractionService issueExtractionService,
         WindowsDiagnostics diagnostics,
-        ILocalServerHealthProbe? localServerHealthProbe = null)
+        ILocalServerHealthProbe? localServerHealthProbe = null,
+        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null)
     {
+        this.retryTranscription = retryTranscription;
         this.localServerHealthProbe = localServerHealthProbe ?? new LocalServerHealthProbe();
         this.audioRecorderService = audioRecorderService;
         this.audioInputDeviceCatalog = audioInputDeviceCatalog;
@@ -78,6 +82,113 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
 
     public event EventHandler<RecordingControlState>? StateChanged;
 
+    public async Task RefreshRecoveryAsync(CancellationToken cancellationToken = default)
+    {
+        var initialState = CurrentState;
+        if (!initialState.CanStart)
+        {
+            return;
+        }
+
+        var sessions = await completedSessionStore.GetAllAsync(cancellationToken);
+        if (!ReferenceEquals(initialState, CurrentState))
+        {
+            return;
+        }
+
+        var session = initialState.SavedSession is { } saved
+            ? sessions.FirstOrDefault(item => item.SessionId == saved.SessionId)
+            : sessions.Where(item => item.RequiresTranscriptionRetry)
+                .OrderByDescending(item => item.CreatedAt).FirstOrDefault();
+        if (session is not null)
+        {
+            PublishState(initialState with
+            {
+                SavedSession = session,
+                StatusMessage = BuildCompletedStatusMessage(session),
+                Blocker = BuildCompletedBlocker(session),
+            });
+        }
+        else if (initialState.SavedSession is not null)
+        {
+            PublishState(RecordingControlState.Idle("The saved session is no longer in the library."));
+        }
+    }
+
+    public async Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await startOrRetryGate.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+        try
+        {
+            await RetrySavedTranscriptionCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            startOrRetryGate.Release();
+        }
+    }
+
+    private async Task RetrySavedTranscriptionCoreAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var initialState = CurrentState;
+        if (!initialState.CanStart || initialState.SavedSession is not { RequiresTranscriptionRetry: true } saved
+            || retryTranscription is null)
+        {
+            return;
+        }
+
+        PublishState(initialState with
+        {
+            WorkflowState = RecordingWorkflowState.Saving,
+            CanStart = false,
+            StatusMessage = "Retrying transcription... Your recording is saved.",
+            Blocker = null,
+        });
+
+        CompletedSession? session = saved;
+        string? failure = null;
+        try
+        {
+            session = (await completedSessionStore.GetAllAsync(cancellationToken))
+                .FirstOrDefault(item => item.SessionId == saved.SessionId);
+            if (session is null)
+            {
+                failure = "The saved session is no longer in the library.";
+                return;
+            }
+
+            if (session.RequiresTranscriptionRetry)
+            {
+                session = await retryTranscription(session, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("transcription", "recording controls retry failed", exception);
+            failure = $"Transcription could not be retried: {exception.Message} Your recording is saved. Check Settings or try again.";
+        }
+        finally
+        {
+            PublishState(initialState with
+            {
+                SavedSession = session,
+                StatusMessage = failure ?? (session is null ? "No saved session to retry." : BuildCompletedStatusMessage(session)),
+                Blocker = session is null ? null : failure is null
+                    ? BuildCompletedBlocker(session)
+                    : new RecoveryBlocker(RecoveryBlockerCategory.Other,
+                        "Your recording is saved. Check Settings or retry transcription.", RecoveryDestination.Settings),
+            });
+        }
+    }
+
     public void Dispose()
     {
         if (screenshotSelectionOverlayService is IDisposable disposableOverlay)
@@ -89,6 +200,22 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
     }
 
     public async Task StartRecordingAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await startOrRetryGate.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+        try
+        {
+            await StartRecordingCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            startOrRetryGate.Release();
+        }
+    }
+
+    private async Task StartRecordingCoreAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         diagnostics.Info("recording", "recording start requested");
@@ -320,7 +447,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService
                 CanCaptureScreenshot: false,
                 BuildCompletedStatusMessage(completedSession),
                 ActiveSession: null,
-                Blocker: BuildCompletedBlocker(completedSession)));
+                Blocker: BuildCompletedBlocker(completedSession),
+                SavedSession: completedSession));
         }
         catch (Exception exception)
         {

@@ -20,6 +20,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> activeRetries = new();
 
     public ReviewSessionActionService(
         ICompletedSessionStore completedSessionStore,
@@ -63,6 +64,28 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     public async Task<CompletedSession> RetryTranscriptionAsync(
         CompletedSession session,
         CancellationToken cancellationToken = default)
+    {
+        if (!activeRetries.TryAdd(session.SessionId, 0))
+        {
+            throw new InvalidOperationException("Transcription is already being retried for this session.");
+        }
+
+        try
+        {
+            var saved = (await completedSessionStore.GetAllAsync(cancellationToken))
+                .FirstOrDefault(item => item.SessionId == session.SessionId)
+                ?? throw new InvalidOperationException("The saved session is no longer in the library.");
+            return await RetrySavedSessionAsync(saved, cancellationToken);
+        }
+        finally
+        {
+            activeRetries.TryRemove(session.SessionId, out _);
+        }
+    }
+
+    private async Task<CompletedSession> RetrySavedSessionAsync(
+        CompletedSession session,
+        CancellationToken cancellationToken)
     {
         if (!session.RequiresTranscriptionRetry)
         {

@@ -110,7 +110,8 @@ public sealed class WindowCoordinator
             recordingControlsWindow = new RecordingControlsWindow(
                 recordingLifecycleService,
                 diagnostics,
-                ShowSessionLibrary);
+                ShowSessionLibrary,
+                ShowSettings);
             recordingControlsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "recording controls window closed");

@@ -10,3 +10,9 @@ public interface IRecordingLifecycleService : IDisposable
     Task StopRecordingAsync(CancellationToken cancellationToken = default);
     Task<ScreenshotCaptureResult> CaptureScreenshotAsync(CancellationToken cancellationToken = default);
 }
+
+public interface IRecordingRecoveryService
+{
+    Task RefreshRecoveryAsync(CancellationToken cancellationToken = default);
+    Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default);
+}

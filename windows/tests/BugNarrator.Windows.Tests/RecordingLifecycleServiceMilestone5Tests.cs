@@ -15,6 +15,105 @@ namespace BugNarrator.Windows.Tests;
 public sealed class RecordingLifecycleServiceMilestone5Tests
 {
     [Fact]
+    public async Task Recovery_RestoresSavedRecordingAndClearsRetryAfterSuccess()
+    {
+        using var harness = new TestHarness();
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+        var saved = harness.Service.CurrentState.SavedSession!;
+        Assert.True(saved.RequiresTranscriptionRetry);
+
+        await harness.Service.RetrySavedTranscriptionAsync();
+
+        Assert.Equal(saved.SessionId, harness.Service.CurrentState.SavedSession!.SessionId);
+        Assert.False(harness.Service.CurrentState.SavedSession.RequiresTranscriptionRetry);
+        Assert.Null(harness.Service.CurrentState.Blocker);
+        Assert.True(harness.Service.CurrentState.CanStart);
+        Assert.Equal(1, harness.RetryCalls);
+    }
+
+    [Fact]
+    public async Task Recovery_LoadsPendingSessionFromDiskAndDropsDeletedSession()
+    {
+        using var harness = new TestHarness();
+        var saved = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await harness.CompletedSessionStore.SaveAsync(saved);
+        await harness.Service.RefreshRecoveryAsync();
+        Assert.Equal(saved.SessionId, harness.Service.CurrentState.SavedSession!.SessionId);
+
+        await harness.CompletedSessionStore.DeleteAsync(saved);
+        await harness.Service.RetrySavedTranscriptionAsync();
+        Assert.Null(harness.Service.CurrentState.SavedSession);
+        Assert.Equal(0, harness.RetryCalls);
+    }
+
+    [Fact]
+    public async Task Recovery_RefusesDuplicateRetryAndRecordingWhileRetryRuns()
+    {
+        using var harness = new TestHarness();
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.RetryHandler = async (session, token) =>
+        {
+            entered.SetResult();
+            await release.Task.WaitAsync(token);
+            return session;
+        };
+
+        var retry = harness.Service.RetrySavedTranscriptionAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            Assert.False(harness.Service.CurrentState.CanStart);
+            await harness.Service.RetrySavedTranscriptionAsync();
+            await harness.Service.StartRecordingAsync();
+            Assert.False(harness.AudioRecorderService.IsRecording);
+            Assert.Equal(1, harness.RetryCalls);
+        }
+        finally
+        {
+            release.SetResult();
+            await retry;
+        }
+        Assert.True(harness.Service.CurrentState.CanStart);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Recovery_FailureOrCancellationKeepsTheSavedAudioRetryable(bool cancel)
+    {
+        using var harness = new TestHarness();
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+        var saved = harness.Service.CurrentState.SavedSession!;
+        harness.RetryHandler = (_, _) => throw (cancel
+            ? new OperationCanceledException()
+            : new InvalidOperationException("Finish AI provider setup in Settings."));
+
+        if (cancel)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => harness.Service.RetrySavedTranscriptionAsync());
+        }
+        else
+        {
+            await harness.Service.RetrySavedTranscriptionAsync();
+            Assert.Contains("Settings", harness.Service.CurrentState.StatusMessage);
+        }
+
+        Assert.True(harness.Service.CurrentState.CanStart);
+        Assert.True(harness.Service.CurrentState.SavedSession!.RequiresTranscriptionRetry);
+        Assert.True(File.Exists(saved.AudioFilePath));
+        Assert.Equal(saved.SessionId, Assert.Single(await harness.CompletedSessionStore.GetAllAsync()).SessionId);
+    }
+
+    [Fact]
     public async Task StopRecordingAsync_WithAutoExtractOff_NeverCallsExtraction()
     {
         using var harness = new TestHarness();
@@ -324,10 +423,29 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                 TranscriptionClient,
                 IssueExtractionService,
                 diagnostics,
-                LocalServerHealthProbe);
+                LocalServerHealthProbe,
+                async (session, token) =>
+                {
+                    RetryCalls++;
+                    if (RetryHandler is not null)
+                    {
+                        return await RetryHandler(session, token);
+                    }
+                    var updated = session with
+                    {
+                        TranscriptionStatus = SessionTranscriptionStatus.Completed,
+                        TranscriptText = "Recovered transcript.",
+                        TranscriptionFailureMessage = null,
+                    };
+                    await CompletedSessionStore.SaveAsync(updated, token);
+                    return updated;
+                });
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
+        public string RootDirectory => rootDirectory;
+        public int RetryCalls { get; private set; }
+        public Func<CompletedSession, CancellationToken, Task<CompletedSession>>? RetryHandler { get; set; }
         public FakeAudioInputDeviceCatalog AudioInputDeviceCatalog { get; }
         public FileCompletedSessionStore CompletedSessionStore { get; }
         public FileSessionDraftStore DraftStore { get; }
