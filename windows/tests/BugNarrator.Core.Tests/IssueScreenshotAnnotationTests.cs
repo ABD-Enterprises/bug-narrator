@@ -6,6 +6,25 @@ namespace BugNarrator.Core.Tests;
 
 public sealed class IssueScreenshotAnnotationTests
 {
+    [Fact]
+    public void MovedBy_PreservesMetadataAndClampsTheWholeRegionWithinTheImage()
+    {
+        var original = new IssueScreenshotAnnotation(Guid.NewGuid(), ScreenshotId, "Target", 0.1, 0.2, 0.3, 0.4, 0.85);
+        var moved = original.MovedBy(1, -1);
+        Assert.Equal(0.7, moved.X, 6);
+        Assert.Equal(0, moved.Y);
+        Assert.Equal(original.AnnotationId, moved.AnnotationId);
+        Assert.Equal(original.ScreenshotId, moved.ScreenshotId);
+        Assert.Equal(original.Label, moved.Label);
+        Assert.Equal(original.Width, moved.Width);
+        Assert.Equal(original.Height, moved.Height);
+        Assert.Equal(original.Confidence, moved.Confidence);
+        Assert.Equal(original.Style, moved.Style);
+        Assert.Equal(0.1, original.X);
+        Assert.Same(original, original.MovedBy(double.NaN, 1));
+        Assert.Same(original, original.MovedBy(0, double.PositiveInfinity));
+    }
+
     private static readonly Guid ScreenshotId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
     private static Dictionary<string, Guid> Index() =>

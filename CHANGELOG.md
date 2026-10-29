@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FIX] Windows issue review now previews screenshot highlights and lets reviewers reposition them by dragging or keyboard arrows and remove them before saving or exporting. Edits preserve annotation metadata and stay inside the image bounds; missing images retain their annotations and offer named removal controls. Session bundles render the current annotations instead of copying stale cached highlights.
+
 - [FIX] Windows recording controls show saved recordings that still need transcription, offer Retry Transcription and Open Settings, and restore recovery after reopening the controls. Retry uses the same saved-session service as the library and refuses duplicate requests for the same session.
 
 - [FIX] Local transcription bounds its memory on long recordings (#1229): uploads are streamed to disk in 1 MB pieces instead of read whole, each backend decodes one 120 s window at a time (ffmpeg seek windows on macOS, windowed WAV reads elsewhere), and the MLX Metal cache is released after every window and when a job finishes or fails, so peak resident memory no longer grows with recording length.
