@@ -646,7 +646,7 @@ The app starts the server on the default port 8422 and — per P1-2 — the heal
 **Fix:** closed by the token + `model_loaded` check in P1-2.
 
 ### P3-11 · Cross-port first-run gating semantics have diverged
-The Windows port blocks recording until the provider is configured (`BlocksRecording` → `step == OnboardingStep.Provider`), while the macOS `canStartRecording` is now an identity function (P2-7). The macOS behaviour moved to the `aiProviderCompatibilityIssue` gate; the Windows port kept a separate mechanism. The parity matrix tracks 25 contracts as "In Progress" but does not track this one.
+The Windows port blocks recording until the provider is configured (`windows/src/BugNarrator.Core/Workflow/FirstRunFunnel.cs:48` — `BlocksRecording(step) => step == OnboardingStep.Provider`), while the macOS `canStartRecording` is now an identity function (P2-7). The macOS behaviour moved to the `aiProviderCompatibilityIssue` gate; the Windows port kept a separate mechanism. The parity matrix tracks 25 contracts as "In Progress" but does not track this one.
 **Fix:** add a parity-matrix row for first-run recording gating, and reconcile the two implementations.
 
 ---
