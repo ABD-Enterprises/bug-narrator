@@ -20,6 +20,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> activeSessionActions = new();
 
     public ReviewSessionActionService(
         ICompletedSessionStore completedSessionStore,
@@ -47,22 +48,71 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         CompletedSession session,
         CancellationToken cancellationToken = default)
     {
-        await completedSessionStore.SaveAsync(session, cancellationToken);
-        diagnostics.Info("review", $"saved completed session {session.SessionId}");
-        return session;
+        BeginSessionAction(session.SessionId);
+        try
+        {
+            var saved = (await completedSessionStore.GetAllAsync(cancellationToken))
+                .FirstOrDefault(item => item.SessionId == session.SessionId)
+                ?? throw new InvalidOperationException("The saved session is no longer in the library.");
+            // The workspace edits extracted issues only. Keep authoritative transcription fields
+            // when a controls retry has completed since the workspace loaded its snapshot.
+            var updated = saved with { IssueExtraction = session.IssueExtraction ?? saved.IssueExtraction };
+            await completedSessionStore.SaveAsync(updated, cancellationToken);
+            diagnostics.Info("review", $"saved completed session {session.SessionId}");
+            return updated;
+        }
+        finally
+        {
+            activeSessionActions.TryRemove(session.SessionId, out _);
+        }
     }
 
     public async Task DeleteSessionAsync(
         CompletedSession session,
         CancellationToken cancellationToken = default)
     {
-        await completedSessionStore.DeleteAsync(session, cancellationToken);
-        diagnostics.Info("review", $"deleted completed session {session.SessionId}");
+        BeginSessionAction(session.SessionId);
+        try
+        {
+            await completedSessionStore.DeleteAsync(session, cancellationToken);
+            diagnostics.Info("review", $"deleted completed session {session.SessionId}");
+        }
+        finally
+        {
+            activeSessionActions.TryRemove(session.SessionId, out _);
+        }
+    }
+
+    private void BeginSessionAction(Guid sessionId)
+    {
+        if (!activeSessionActions.TryAdd(sessionId, 0))
+        {
+            throw new InvalidOperationException("This session is already being updated. Wait for transcription or the current action to finish.");
+        }
     }
 
     public async Task<CompletedSession> RetryTranscriptionAsync(
         CompletedSession session,
         CancellationToken cancellationToken = default)
+    {
+        BeginSessionAction(session.SessionId);
+
+        try
+        {
+            var saved = (await completedSessionStore.GetAllAsync(cancellationToken))
+                .FirstOrDefault(item => item.SessionId == session.SessionId)
+                ?? throw new InvalidOperationException("The saved session is no longer in the library.");
+            return await RetrySavedSessionAsync(saved, cancellationToken);
+        }
+        finally
+        {
+            activeSessionActions.TryRemove(session.SessionId, out _);
+        }
+    }
+
+    private async Task<CompletedSession> RetrySavedSessionAsync(
+        CompletedSession session,
+        CancellationToken cancellationToken)
     {
         if (!session.RequiresTranscriptionRetry)
         {

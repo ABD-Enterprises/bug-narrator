@@ -1,4 +1,5 @@
 using BugNarrator.Core.Workflow;
+using BugNarrator.Core.Models;
 
 namespace BugNarrator.Windows.Services.Audio;
 
@@ -9,4 +10,11 @@ public interface IRecordingLifecycleService : IDisposable
     Task StartRecordingAsync(CancellationToken cancellationToken = default);
     Task StopRecordingAsync(CancellationToken cancellationToken = default);
     Task<ScreenshotCaptureResult> CaptureScreenshotAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IRecordingRecoveryService
+{
+    Task RefreshRecoveryAsync(CancellationToken cancellationToken = default);
+    Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default);
+    Task<CompletedSession> RetryTranscriptionAsync(CompletedSession session, CancellationToken cancellationToken = default);
 }

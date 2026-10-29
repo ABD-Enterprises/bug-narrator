@@ -42,6 +42,7 @@ public sealed class SessionLibraryWindow : Window
     private readonly TextBlock issuesSummaryTextBlock;
     private readonly TextBlock libraryStatusTextBlock;
     private readonly IReviewSessionActionService reviewSessionActionService;
+    private readonly Func<CompletedSession, CancellationToken, Task<CompletedSession>> retryTranscription;
     private readonly Button saveReviewButton;
     private readonly Image screenshotPreviewImage;
     private readonly TextBlock screenshotPreviewTextBlock;
@@ -68,8 +69,10 @@ public sealed class SessionLibraryWindow : Window
         ICompletedSessionStore completedSessionStore,
         IReviewSessionActionService reviewSessionActionService,
         IWindowsAppSettingsStore settingsStore,
-        WindowsDiagnostics diagnostics)
+        WindowsDiagnostics diagnostics,
+        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null)
     {
+        this.retryTranscription = retryTranscription ?? reviewSessionActionService.RetryTranscriptionAsync;
         this.completedSessionStore = completedSessionStore;
         this.reviewSessionActionService = reviewSessionActionService;
         this.diagnostics = diagnostics;
@@ -574,7 +577,7 @@ public sealed class SessionLibraryWindow : Window
     private async Task RetryTranscriptionAsync()
     {
         var session = RequireSelectedSession();
-        var updatedSession = await reviewSessionActionService.RetryTranscriptionAsync(session);
+        var updatedSession = await retryTranscription(session, CancellationToken.None);
         ReplaceSession(updatedSession);
         issuesStatusTextBlock.Text = "Transcription completed. Extract issues to continue the review.";
     }
@@ -678,6 +681,29 @@ public sealed class SessionLibraryWindow : Window
             .ToArray();
         selectedSession = updatedSession;
         ApplyCurrentQuery();
+    }
+
+    internal void ApplyRecoveredSession(CompletedSession recoveredSession)
+    {
+        allSessions = allSessions
+            .Select(session => session.SessionId == recoveredSession.SessionId ? recoveredSession : session)
+            .ToArray();
+        if (selectedSession?.SessionId != recoveredSession.SessionId)
+        {
+            var item = sessionListBox.Items.OfType<SessionListItem>()
+                .FirstOrDefault(item => item.Session.SessionId == recoveredSession.SessionId);
+            if (item is not null)
+            {
+                sessionListBox.Items[sessionListBox.Items.IndexOf(item)] = new SessionListItem(recoveredSession);
+            }
+            return;
+        }
+
+        var editedSession = BuildEditedSessionSnapshot(selectedSession);
+        ReplaceSession(recoveredSession with
+        {
+            IssueExtraction = editedSession.IssueExtraction ?? recoveredSession.IssueExtraction,
+        });
     }
 
     /// <summary>

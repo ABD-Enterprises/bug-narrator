@@ -13,6 +13,45 @@ namespace BugNarrator.Windows.Tests;
 
 public sealed class ReviewSessionActionServiceTests : IDisposable
 {
+    [Fact]
+    public async Task RetryTranscriptionAsync_RejectsConcurrentAndStaleRequestsAcrossSurfaces()
+    {
+        var saved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await completedSessionStore.SaveAsync(saved);
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "sk-test";
+        transcriptionClient.Pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var retry = service.RetryTranscriptionAsync(saved);
+        await transcriptionClient.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            var duplicate = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
+            Assert.Contains("already", duplicate.Message);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteSessionAsync(saved));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveSessionAsync(saved));
+            Assert.Equal(1, transcriptionClient.CallCount);
+        }
+        finally
+        {
+            transcriptionClient.Pending.SetResult("Recovered transcript.");
+            await retry;
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
+        Assert.Equal(1, transcriptionClient.CallCount);
+        Assert.Equal("Recovered transcript.", Assert.Single(await completedSessionStore.GetAllAsync()).TranscriptText);
+        var staleSave = await service.SaveSessionAsync(saved);
+        Assert.Equal(SessionTranscriptionStatus.Completed, staleSave.TranscriptionStatus);
+        Assert.Equal("Recovered transcript.", staleSave.TranscriptText);
+        await service.DeleteSessionAsync(staleSave);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(saved));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveSessionAsync(saved));
+        Assert.False(Directory.Exists(saved.SessionDirectory));
+    }
+
     private readonly FileCompletedSessionStore completedSessionStore;
     private readonly string rootDirectory;
     private readonly FakeIssueExportService issueExportService;
@@ -287,6 +326,8 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
 
     private sealed class FakeTranscriptionClient : ITranscriptionClient
     {
+        public TaskCompletionSource<string>? Pending { get; set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int CallCount { get; private set; }
         public Exception? ExceptionToThrow { get; set; }
         public string? LastAudioFilePath { get; private set; }
@@ -299,13 +340,14 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             CancellationToken cancellationToken = default)
         {
             CallCount++;
+            Started.TrySetResult();
             LastAudioFilePath = audioFilePath;
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
             }
 
-            return Task.FromResult(TranscriptText);
+            return Pending?.Task ?? Task.FromResult(TranscriptText);
         }
 
         public Task ValidateApiKeyAsync(string apiKey, string? providerBaseUrl, CancellationToken cancellationToken = default)
