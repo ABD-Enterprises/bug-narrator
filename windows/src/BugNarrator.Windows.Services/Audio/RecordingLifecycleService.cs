@@ -96,8 +96,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
             return;
         }
 
-        var session = initialState.SavedSession is { } saved
+        var previous = initialState.SavedSession is { } saved
             ? sessions.FirstOrDefault(item => item.SessionId == saved.SessionId)
+            : null;
+        var session = previous is { RequiresTranscriptionRetry: true } ? previous
             : sessions.Where(item => item.RequiresTranscriptionRetry)
                 .OrderByDescending(item => item.CreatedAt).FirstOrDefault();
         if (session is not null)
@@ -111,7 +113,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         }
         else if (initialState.SavedSession is not null)
         {
-            PublishState(RecordingControlState.Idle("The saved session is no longer in the library."));
+            PublishState(initialState with { SavedSession = null, Blocker = null, StatusMessage = "Ready to record." });
         }
     }
 
@@ -180,7 +182,8 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         catch (Exception exception)
         {
             diagnostics.Error("transcription", "recording controls retry failed", exception);
-            failure = $"Transcription could not be retried: {exception.Message} Your recording is saved. Check Settings or try again.";
+            failure = session is null ? exception.Message
+                : $"Transcription could not be retried: {exception.Message} Your recording is saved. Check Settings or try again.";
             throw;
         }
         finally

@@ -31,6 +31,7 @@ public sealed class WindowCoordinator
     private readonly ITranscriptionClient transcriptionClient;
     private AboutWindow? aboutWindow;
     private RecordingWorkflowState lastObservedWorkflowState;
+    private bool wasRetryingTranscription;
     private RecordingControlsWindow? recordingControlsWindow;
     private SessionLibraryWindow? sessionLibraryWindow;
     private SettingsWindow? settingsWindow;
@@ -273,35 +274,29 @@ public sealed class WindowCoordinator
 
     private void OnRecordingStateChanged(object? sender, RecordingControlState state)
     {
+        var finishedRetry = wasRetryingTranscription && state.CanStart;
+        wasRetryingTranscription = state.WorkflowState == RecordingWorkflowState.Saving
+                                  && state.SavedSession is not null && state.ActiveSession is null;
         var shouldFocusSessionLibrary = state.WorkflowState == RecordingWorkflowState.Completed
-                                        && lastObservedWorkflowState != RecordingWorkflowState.Completed;
-        var shouldRefreshSessionLibrary = lastObservedWorkflowState == RecordingWorkflowState.Saving
-                                         && state.CanStart && state.SavedSession is not null;
+                                        && lastObservedWorkflowState != RecordingWorkflowState.Completed && !finishedRetry;
         lastObservedWorkflowState = state.WorkflowState;
 
         if (!shouldFocusSessionLibrary)
         {
-            if (shouldRefreshSessionLibrary)
+            if (finishedRetry && state.SavedSession is { } recoveredSession)
             {
-                Application.Current.Dispatcher.BeginInvoke(async () =>
+                Application.Current.Dispatcher.BeginInvoke(() =>
                 {
-                    if (sessionLibraryWindow is not null)
-                    {
-                        await sessionLibraryWindow.RefreshSessionsAsync();
-                    }
+                    sessionLibraryWindow?.ApplyRecoveredSession(recoveredSession);
                 });
             }
             return;
         }
 
-        Application.Current.Dispatcher.BeginInvoke(async () =>
+        Application.Current.Dispatcher.BeginInvoke(() =>
         {
             diagnostics.Info("windows", "recording completed, focusing session library");
             ShowSessionLibrary();
-            if (sessionLibraryWindow is not null)
-            {
-                await sessionLibraryWindow.RefreshSessionsAsync();
-            }
         });
     }
 

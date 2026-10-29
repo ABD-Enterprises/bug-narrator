@@ -683,6 +683,23 @@ public sealed class SessionLibraryWindow : Window
         ApplyCurrentQuery();
     }
 
+    internal void ApplyRecoveredSession(CompletedSession recoveredSession)
+    {
+        allSessions = allSessions
+            .Select(session => session.SessionId == recoveredSession.SessionId ? recoveredSession : session)
+            .ToArray();
+        if (selectedSession?.SessionId != recoveredSession.SessionId || isRunningReviewAction)
+        {
+            return;
+        }
+
+        var editedSession = BuildEditedSessionSnapshot(selectedSession);
+        ReplaceSession(recoveredSession with
+        {
+            IssueExtraction = editedSession.IssueExtraction ?? recoveredSession.IssueExtraction,
+        });
+    }
+
     /// <summary>
     /// Disables Extract Issues and shows the macOS guidance beneath the action row when the
     /// configured provider is transcription-only (#1168). Null re-enables it.
@@ -812,7 +829,7 @@ public sealed class SessionLibraryWindow : Window
         await RefreshSessionsAsync();
     }
 
-    internal async Task RefreshSessionsAsync()
+    private async Task RefreshSessionsAsync()
     {
         if (isRefreshing || isRunningReviewAction)
         {

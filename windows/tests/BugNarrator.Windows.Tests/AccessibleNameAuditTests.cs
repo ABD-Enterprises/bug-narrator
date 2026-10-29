@@ -84,6 +84,47 @@ public sealed class AccessibleNameAuditTests
         }
     }
 
+    [Fact]
+    public void SessionLibrary_RecoveryUpdatesOnlyItsSessionAndKeepsUnsavedIssueEdits()
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var first = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory,
+                issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult()) with
+            {
+                CreatedAt = DateTimeOffset.Now,
+                TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+                TranscriptText = string.Empty,
+            };
+            var second = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+            {
+                CreatedAt = first.CreatedAt.AddMinutes(-1),
+            };
+            var store = new FakeSessionStore { Sessions = [first, second] };
+            var window = new SessionLibraryWindow(store, new FakeReviewActions(), new FakeSettingsStore(), harness.Diagnostics());
+            try
+            {
+                window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+                var title = Descendants(window).OfType<TextBox>().Single(text => text.Text == first.IssueExtraction!.Issues[0].Title);
+                title.Text = "Unsaved review edit";
+                window.ApplyRecoveredSession(second);
+                Assert.Equal("Unsaved review edit", title.Text);
+                Assert.Contains(title, Descendants(window).OfType<TextBox>());
+
+                window.ApplyRecoveredSession(first with { TranscriptionStatus = SessionTranscriptionStatus.Completed, TranscriptText = "Recovered transcript." });
+                var textBoxes = Descendants(window).OfType<TextBox>().ToArray();
+                Assert.Contains(textBoxes, text => text.Text == "Unsaved review edit");
+                Assert.Contains(textBoxes, text => text.Text == "Recovered transcript.");
+            }
+            finally
+            {
+                window.Close();
+            }
+            return true;
+        });
+    }
+
     public static IEnumerable<object[]> Windows()
     {
         yield return ["SettingsWindow"];
@@ -509,8 +550,9 @@ public sealed class AccessibleNameAuditTests
 
     private sealed class FakeSessionStore : ICompletedSessionStore
     {
+        public IReadOnlyList<CompletedSession> Sessions { get; set; } = [];
         public string SessionsDirectory => Path.GetTempPath();
-        public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<CompletedSession>>([]);
+        public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult(Sessions);
         public Task SaveAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DeleteAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

@@ -33,6 +33,25 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task Recovery_ReopeningControlsFindsTheNextPendingRecording()
+    {
+        using var harness = new TestHarness();
+        await harness.Service.StartRecordingAsync();
+        await harness.Service.StopRecordingAsync();
+        var first = harness.Service.CurrentState.SavedSession!;
+        var older = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+        {
+            CreatedAt = first.CreatedAt.AddMinutes(-1),
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await harness.CompletedSessionStore.SaveAsync(older);
+        await harness.Service.RetrySavedTranscriptionAsync();
+        await harness.Service.RefreshRecoveryAsync();
+        Assert.Equal(older.SessionId, harness.Service.CurrentState.SavedSession!.SessionId);
+    }
+
+    [Fact]
     public async Task Recovery_LoadsPendingSessionFromDiskAndDropsDeletedSession()
     {
         using var harness = new TestHarness();
