@@ -5,7 +5,7 @@
 **Status:** snapshot. `main` moved during the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. See [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) for the one finding that changed.
 **Scope:** whole repository — Swift macOS app (`Sources/BugNarrator`, 248 files / 36,455 LOC), tests (`Tests/`, 119 files / 26,323 LOC), Windows port (`windows/`, .NET 8 / WPF), local transcription server (`local-transcription/`, Python), CI/CD (`.github/workflows/`, 5 workflows), release automation (`scripts/`, 19 scripts), docs site (`site/`, Docusaurus).
 **Method:** five parallel read-only review passes (Swift security; Swift maintainability + UX; Python transcription server; Windows C# port; CI/CD + scripts + docs site + repo hygiene), plus independent line-by-line re-verification of every P0/P1 claim by the parent agent, plus live read-only GitHub API queries (`gh api`, `gh run list`, `gh release list`).
-**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 10 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*.
+**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*.
 
 > **Status.** This is a point-in-time audit, committed as a reference for follow-up
 > work. It is not a product document and describes a snapshot at `c8c0070`; it
@@ -40,10 +40,12 @@
 var jiraBaseURLPlaintextWarning: String? {
 ```
 
-It has exactly **two** references in the entire source tree:
+It has exactly **two** references in `Sources/`:
 
 - `Sources/BugNarrator/Services/SettingsStore.swift:619` — the definition
-- `Sources/BugNarrator/Views/Settings/SettingsIntegrationsPanes.swift:226` — a `Text(...)` in the settings pane
+- `Sources/BugNarrator/Views/Settings/SettingsIntegrationsPanes.swift:226` — a `Label` in the settings pane
+
+(`Tests/BugNarratorTests/SettingsStoreTests.swift:490,494` exercise the computed property, so the behaviour is covered — the gap is that nothing *acts* on it.)
 
 Nothing in the export path consults it. `Sources/BugNarrator/Services/JiraExportProvider+Networking.swift:34-45` builds the request URL with no scheme check:
 
@@ -94,9 +96,9 @@ The AI-provider guard was hardened in response to a real incident (the code comm
 154:@app.post("/v1/audio/transcriptions")
 ```
 
-A grep for `CORS|middleware|Depends|Security|api_key|token|Authorization|TrustedHost` across the file returns **no** matching code — and still returns none at `origin/main` after #1239 landed.
+A grep for `CORS|middleware|Depends|Security|api_key|Authorization|TrustedHost` across the file returns **no** matching code, at either the reviewed commit or `origin/main` after #1239 landed. (Adding `token` to that pattern does match, but only the Whisper tokenization identifiers `token`/`tokens` at `server.py:423,428,431,432,457` — not an auth token.)
 
-At the reviewed commit the upload path also had no size cap (`server.py:171-177`):
+At the reviewed commit the upload path also had no size cap (`server.py:170-176`):
 
 ```python
     suffix = Path(file.filename).suffix if file.filename else ".m4a"
@@ -145,7 +147,7 @@ Note `LocalProviderHealth` decodes `model_loaded` at line 552 and **never reads 
 **Area:** Windows port vs `SECURITY.md`
 **Evidence**
 
-`SECURITY.md:43-59` states the at-rest posture as a product-wide table:
+`SECURITY.md:43-59` states the at-rest posture as a product-wide table (the two `yes` rows quoted; the four `no` rows — screenshots, preserved audio, telemetry, launch state — are elided):
 
 ```markdown
 ## At-Rest Encryption And Recoverability
@@ -157,6 +159,7 @@ encrypted, and nothing else:
 |---|---|---|
 | `Sessions/<id>.json` | **yes** | transcript, summary, markers, extracted issues |
 | `sessions.index.json` (+ backup) | **yes** | full-transcript search text, titles, previews |
+| … | no | (four further rows, all unencrypted) |
 
 Session bodies and the index are AES-GCM encrypted with a key held in the login
 Keychain under `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
@@ -251,7 +254,7 @@ else
 fi
 ```
 
-Distinguish "no changed files" (genuine pass) from "diff failed" (fail closed). Audit the other process substitutions in `validate.sh` for the same pattern — lines 251-254 and 271-273 use the same idiom.
+Distinguish "no changed files" (genuine pass) from "diff failed" (fail closed). Audit the other process substitutions in `validate.sh` for the same pattern — the shell and Python target lists at lines 238-240 and 259-261 use the same idiom.
 
 ---
 
@@ -275,7 +278,7 @@ $ gh api repos/ABD-Enterprises/bug-narrator/actions/workflows/259967316
 {"name":"CodeQL","state":"disabled_manually","updated_at":"2026-05-27T08:44:57.000-04:00"}
 ```
 
-GitHub's separate default CodeQL workflow (id `246559978`) last ran **2026-08-26** — and the repository recorded **1,215** workflow runs since 2026-08-27:
+GitHub's separate default CodeQL workflow (id `246559978`) last ran **2026-08-26** — and the repository recorded **1,215** workflow runs between 2026-08-27 and this review (a count that keeps growing):
 
 ```
 $ gh api "repos/ABD-Enterprises/bug-narrator/actions/runs?created=>2026-08-27&per_page=1" --jq .total_count
@@ -284,7 +287,7 @@ $ gh api "repos/ABD-Enterprises/bug-narrator/actions/runs?created=>2026-08-27&pe
 
 Meanwhile `docs/release/release-process.md:95` and `docs/operations/deployment.md:22` still instruct maintainers to review CodeQL alerts before releasing.
 
-**Failure scenario:** Swift (248 files), Python, C# and JS/TS have had no static security analysis for roughly two months — and the repo's own schedule-driven workflow has been off for five. The documented release step ("review CodeQL alerts") can no longer produce any alerts, so it is a step that always passes without checking anything.
+**Failure scenario:** Swift (248 files), Python, C# and JS/TS have had no static security analysis for roughly two months — and the repo's own schedule-driven workflow has been off for five. The documented release step ("review CodeQL alerts") can no longer produce any *new* alerts, so it is a step that always passes without checking anything. The last run left 18 alerts on record, all since closed — the scanner was finding things before it was switched off.
 
 **Impact:** a large, entirely unmonitored static-analysis surface across four languages, combined with a release checklist that references a tool nobody is running.
 
@@ -389,7 +392,7 @@ Current state is benign: `releases/latest` is `v1.1.0`.
 **Area:** Windows port
 **Evidence**
 
-`windows/src/BugNarrator.Windows.Services/Settings/WindowsAppSettings.cs:259-262` normalizes without adding a trailing slash:
+`windows/src/BugNarrator.Windows.Services/Settings/WindowsAppSettings.cs:258-261` normalizes without adding a trailing slash:
 
 ```csharp
     public string NormalizedJiraBaseUrl =>
@@ -509,7 +512,7 @@ Both remaining callers are manual, owner-run, release-time scripts.
 **Status:** partially fixed after this review — see below.
 **Evidence**
 
-At the reviewed commit (`c8c0070`), `local-transcription/server.py:171-177` buffered the full body before any validation:
+At the reviewed commit (`c8c0070`), `local-transcription/server.py:170-176` buffered the full body before any validation:
 
 ```python
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -633,7 +636,7 @@ The Windows HTTP layer reads the entire response body and interpolates it into t
 **Fix:** add the `Basic` and `ATATT3xFfGF0` patterns to the macOS redactor.
 
 ### P3-9 · The transcription server echoes a client-supplied filename into its logs
-`local-transcription/server.py:184`:
+`local-transcription/server.py:181-183` (at the reviewed commit; `190-193` after #1239):
 ```python
         logger.info(
             f"Transcribing {file.filename} ({file_size_mb:.1f} MB) "
@@ -662,7 +665,7 @@ These were checked specifically and found sound — listed so the next reviewer 
 - **LLM output → GitHub.** `Sources/BugNarrator/Services/GitHubExportProvider+IssueBody.swift` neutralizes LLM-derived markdown so it cannot create `@mentions`, `#issue` cross-links, raw HTML, or new block-level structure.
 - **LLM output → Jira.** Issues are built as ADF plain-text blocks — no markdown rendering surface.
 - **Prompt injection from tracker data.** `Sources/BugNarrator/Services/SimilarIssueReviewService.swift:177-210` delimits remote issue text, labels it untrusted, and neutralizes attempts to forge the delimiters (issue #950). This is a mature defence.
-- **No command injection.** The `/bin/sh` wrapper in `Sources/BugNarrator/Services/LocalTranscriptionManager.swift:435,459` runs `exec "$@"` with positional parameters — arguments are passed as separate argv entries, never interpolated into the script text.
+- **No command injection.** The `/bin/sh` wrapper in `Sources/BugNarrator/Services/LocalTranscriptionManager.swift:459,462` runs `exec "$@"` with positional parameters — arguments are passed as separate argv entries, never interpolated into the script text.
 - **No ATS exceptions** in `Resources/Info.plist` — ATS is on by default.
 - **At-rest encryption on macOS.** `Sources/BugNarrator/Services/SessionDataProtector.swift:38` uses `AES.GCM.seal` with a device-scoped Keychain key.
 - **Crash safety.** Zero force unwraps, `as!`, `try!`, `fatalError`, `TODO`, `FIXME` and `HACK` in `Sources/BugNarrator/**` — the recent cleanup pass (#1224 era) held.
