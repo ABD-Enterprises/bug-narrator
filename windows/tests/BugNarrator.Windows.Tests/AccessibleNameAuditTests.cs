@@ -25,6 +25,109 @@ namespace BugNarrator.Windows.Tests;
 /// </summary>
 public sealed class AccessibleNameAuditTests
 {
+    [Fact]
+    public void RecordingControls_OffersRecoveryAndSettingsAndDisablesRetryWhileBusy()
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var saved = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+            {
+                TranscriptText = string.Empty,
+                TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+            };
+            var lifecycle = new FakeLifecycleService
+            {
+                CurrentState = RecordingControlState.Idle() with { SavedSession = saved },
+            };
+            var settingsOpened = false;
+            var window = new RecordingControlsWindow(lifecycle, harness.Diagnostics(), () => { }, () => settingsOpened = true);
+            try
+            {
+                var buttons = Descendants(window).OfType<Button>().ToDictionary(button => (string)button.Content);
+                var retry = buttons["Retry Transcription"];
+                Assert.True(retry.IsVisible || retry.Visibility == Visibility.Visible);
+                Assert.True(retry.IsEnabled);
+                Assert.Contains(Descendants(window).OfType<TextBlock>(), text => text.Text.Contains(saved.Title));
+                buttons["Open Settings"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.True(settingsOpened);
+                retry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(1, lifecycle.RetryCalls);
+
+                lifecycle.Publish(lifecycle.CurrentState with { CanStart = false, WorkflowState = RecordingWorkflowState.Saving });
+                Assert.False(retry.IsEnabled);
+                lifecycle.Publish(lifecycle.CurrentState with
+                {
+                    CanStart = true,
+                    SavedSession = saved with { TranscriptionStatus = SessionTranscriptionStatus.Completed },
+                });
+                Assert.Equal(Visibility.Collapsed, ((StackPanel)LogicalTreeHelper.GetParent(retry)).Visibility);
+                Assert.Empty(AccessibleNameAudit.Run(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+            return true;
+        });
+    }
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    [Fact]
+    public void SessionLibrary_RecoveryUpdatesOnlyItsSessionAndKeepsUnsavedIssueEdits()
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var first = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory,
+                issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult()) with
+            {
+                CreatedAt = DateTimeOffset.Now,
+                TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+                TranscriptText = string.Empty,
+            };
+            var second = ReviewSessionTestData.CreateCompletedSession(harness.RootDirectory) with
+            {
+                CreatedAt = first.CreatedAt.AddMinutes(-1),
+            };
+            var store = new FakeSessionStore { Sessions = [first, second] };
+            var window = new SessionLibraryWindow(store, new FakeReviewActions(), new FakeSettingsStore(), harness.Diagnostics());
+            try
+            {
+                window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+                var title = Descendants(window).OfType<TextBox>().Single(text => text.Text == first.IssueExtraction!.Issues[0].Title);
+                title.Text = "Unsaved review edit";
+                window.ApplyRecoveredSession(second with { TranscriptText = "Second recovered transcript." });
+                Assert.Equal("Unsaved review edit", title.Text);
+                Assert.Contains(title, Descendants(window).OfType<TextBox>());
+
+                window.ApplyRecoveredSession(first with { TranscriptionStatus = SessionTranscriptionStatus.Completed, TranscriptText = "Recovered transcript." });
+                var textBoxes = Descendants(window).OfType<TextBox>().ToArray();
+                Assert.Contains(textBoxes, text => text.Text == "Unsaved review edit");
+                Assert.Contains(textBoxes, text => text.Text == "Recovered transcript.");
+                var sessionList = Descendants(window).OfType<ListBox>().Single(list => list.Items.Count == 2);
+                sessionList.SelectedIndex = 1;
+                Assert.Contains(Descendants(window).OfType<TextBox>(), text => text.Text == "Second recovered transcript.");
+            }
+            finally
+            {
+                window.Close();
+            }
+            return true;
+        });
+    }
+
     public static IEnumerable<object[]> Windows()
     {
         yield return ["SettingsWindow"];
@@ -433,10 +536,15 @@ public sealed class AccessibleNameAuditTests
         public IReadOnlyList<AudioInputDeviceOption> GetAvailableInputDevices() => [];
     }
 
-    private sealed class FakeLifecycleService : IRecordingLifecycleService
+    private sealed class FakeLifecycleService : IRecordingLifecycleService, IRecordingRecoveryService
     {
-        public RecordingControlState CurrentState => RecordingControlState.Idle();
-        public event EventHandler<RecordingControlState>? StateChanged { add { } remove { } }
+        public RecordingControlState CurrentState { get; set; } = RecordingControlState.Idle();
+        public event EventHandler<RecordingControlState>? StateChanged;
+        public int RetryCalls { get; private set; }
+        public void Publish(RecordingControlState state) { CurrentState = state; StateChanged?.Invoke(this, state); }
+        public Task RefreshRecoveryAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RetrySavedTranscriptionAsync(CancellationToken cancellationToken = default) { RetryCalls++; return Task.CompletedTask; }
+        public Task<CompletedSession> RetryTranscriptionAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.FromResult(session);
         public Task StartRecordingAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StopRecordingAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ScreenshotCaptureResult> CaptureScreenshotAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -445,8 +553,9 @@ public sealed class AccessibleNameAuditTests
 
     private sealed class FakeSessionStore : ICompletedSessionStore
     {
+        public IReadOnlyList<CompletedSession> Sessions { get; set; } = [];
         public string SessionsDirectory => Path.GetTempPath();
-        public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<CompletedSession>>([]);
+        public Task<IReadOnlyList<CompletedSession>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult(Sessions);
         public Task SaveAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DeleteAsync(CompletedSession session, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

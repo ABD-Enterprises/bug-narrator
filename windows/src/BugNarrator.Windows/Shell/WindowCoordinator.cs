@@ -31,6 +31,7 @@ public sealed class WindowCoordinator
     private readonly ITranscriptionClient transcriptionClient;
     private AboutWindow? aboutWindow;
     private RecordingWorkflowState lastObservedWorkflowState;
+    private bool wasRetryingTranscription;
     private RecordingControlsWindow? recordingControlsWindow;
     private SessionLibraryWindow? sessionLibraryWindow;
     private SettingsWindow? settingsWindow;
@@ -110,7 +111,8 @@ public sealed class WindowCoordinator
             recordingControlsWindow = new RecordingControlsWindow(
                 recordingLifecycleService,
                 diagnostics,
-                ShowSessionLibrary);
+                ShowSessionLibrary,
+                ShowSettings);
             recordingControlsWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "recording controls window closed");
@@ -153,7 +155,8 @@ public sealed class WindowCoordinator
                 completedSessionStore,
                 reviewSessionActionService,
                 settingsStore,
-                diagnostics);
+                diagnostics,
+                recordingLifecycleService is IRecordingRecoveryService recovery ? recovery.RetryTranscriptionAsync : null);
             sessionLibraryWindow.Closed += (_, _) =>
             {
                 diagnostics.Info("windows", "session library window closed");
@@ -271,12 +274,22 @@ public sealed class WindowCoordinator
 
     private void OnRecordingStateChanged(object? sender, RecordingControlState state)
     {
+        var finishedRetry = wasRetryingTranscription && state.CanStart;
+        wasRetryingTranscription = state.WorkflowState == RecordingWorkflowState.Saving
+                                  && state.SavedSession is not null && state.ActiveSession is null;
         var shouldFocusSessionLibrary = state.WorkflowState == RecordingWorkflowState.Completed
-                                        && lastObservedWorkflowState != RecordingWorkflowState.Completed;
+                                        && lastObservedWorkflowState != RecordingWorkflowState.Completed && !finishedRetry;
         lastObservedWorkflowState = state.WorkflowState;
 
         if (!shouldFocusSessionLibrary)
         {
+            if (finishedRetry && state.SavedSession is { } recoveredSession)
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    sessionLibraryWindow?.ApplyRecoveredSession(recoveredSession);
+                });
+            }
             return;
         }
 

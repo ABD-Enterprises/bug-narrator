@@ -18,6 +18,10 @@ public sealed class RecordingControlsWindow : Window
     private readonly TextBlock stateTextBlock;
     private readonly TextBlock elapsedTextBlock;
     private readonly TextBlock statusTextBlock;
+    private readonly StackPanel recoveryPanel;
+    private readonly TextBlock recoveryTextBlock;
+    private readonly Button retryButton;
+    private readonly IRecordingRecoveryService? recoveryService;
     // The presenter decides what to show and caches the final duration across the states that
     // carry no draft; the timer only ticks while recording (RecordingElapsedTimePresenter.ShouldTick).
     private readonly RecordingElapsedTimePresenter elapsedPresenter = new();
@@ -27,8 +31,10 @@ public sealed class RecordingControlsWindow : Window
     public RecordingControlsWindow(
         IRecordingLifecycleService recordingLifecycleService,
         WindowsDiagnostics diagnostics,
-        Action openSessionLibrary)
+        Action openSessionLibrary,
+        Action? openSettings = null)
     {
+        recoveryService = recordingLifecycleService as IRecordingRecoveryService;
         this.recordingLifecycleService = recordingLifecycleService;
         this.diagnostics = diagnostics;
         this.openSessionLibrary = openSessionLibrary;
@@ -84,6 +90,18 @@ public sealed class RecordingControlsWindow : Window
         {
             Margin = new Thickness(0, 8, 0, 0),
             TextWrapping = TextWrapping.Wrap,
+        };
+
+        recoveryTextBlock = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 6) };
+        retryButton = new Button { Content = "Retry Transcription", Height = 34 };
+        retryButton.Click += OnRetryTranscriptionClicked;
+        var settingsButton = new Button { Content = "Open Settings", Height = 34, Margin = new Thickness(0, 6, 0, 0) };
+        settingsButton.Click += (_, _) => openSettings?.Invoke();
+        settingsButton.Visibility = openSettings is null ? Visibility.Collapsed : Visibility.Visible;
+        recoveryPanel = new StackPanel
+        {
+            Visibility = Visibility.Collapsed,
+            Children = { recoveryTextBlock, retryButton, settingsButton },
         };
 
         var openLibraryButton = new Button
@@ -151,6 +169,7 @@ public sealed class RecordingControlsWindow : Window
                     stateTextBlock,
                     elapsedTextBlock,
                     statusTextBlock,
+                    recoveryPanel,
                 },
             },
         };
@@ -206,6 +225,7 @@ public sealed class RecordingControlsWindow : Window
 
         currentState = recordingLifecycleService.CurrentState;
         recordingLifecycleService.StateChanged += OnStateChanged;
+        Activated += OnActivated;
         Closed += OnClosed;
         ApplyState(currentState);
     }
@@ -228,6 +248,11 @@ public sealed class RecordingControlsWindow : Window
         startButton.IsEnabled = state.CanStart;
         stopButton.IsEnabled = state.CanStop;
         screenshotButton.IsEnabled = state.CanCaptureScreenshot;
+        var needsRecovery = recoveryService is not null && state.SavedSession is { RequiresTranscriptionRetry: true };
+        recoveryPanel.Visibility = needsRecovery ? Visibility.Visible : Visibility.Collapsed;
+        recoveryTextBlock.Text = needsRecovery ? $"Saved recording: {state.SavedSession!.Title}" : string.Empty;
+        retryButton.IsEnabled = needsRecovery && state.CanStart;
+        retryButton.Content = needsRecovery && !state.CanStart ? "Retrying Transcription..." : "Retry Transcription";
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -235,6 +260,42 @@ public sealed class RecordingControlsWindow : Window
         elapsedTimer.Stop();
         elapsedTimer.Tick -= OnElapsedTick;
         recordingLifecycleService.StateChanged -= OnStateChanged;
+        Activated -= OnActivated;
+    }
+
+    private async void OnActivated(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (recoveryService is not null)
+            {
+                await recoveryService.RefreshRecoveryAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("ui", "recording recovery refresh failed", exception);
+            statusTextBlock.Text = "Saved recordings could not be loaded. Open Session Library to check recovery.";
+        }
+    }
+
+    private async void OnRetryTranscriptionClicked(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (recoveryService is not null)
+            {
+                await recoveryService.RetrySavedTranscriptionAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The lifecycle restores the saved recording's recovery state.
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Error("ui", "recording recovery retry failed", exception);
+        }
     }
 
     private void OnElapsedTick(object? sender, EventArgs e)
