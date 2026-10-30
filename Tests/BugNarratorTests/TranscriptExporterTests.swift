@@ -68,6 +68,72 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains(session.transcript))
     }
 
+    /// The exported bundle is handed to the user, who usually puts it on the
+    /// Desktop or in Downloads -- directories that other accounts on a shared
+    /// machine can read. The bundle and the files inside it must therefore be
+    /// owner-only rather than world-readable.
+    func testWriteBundleCreatesOwnerOnlyFilesAndDirectories() throws {
+        let fileManager = FileManager.default
+        let rootDirectoryURL = fileManager.temporaryDirectory
+            .appendingPathComponent("TranscriptExporterPermissionsTests-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: rootDirectoryURL) }
+
+        // Prove the mode comes from the export and not from the umask of
+        // whoever runs the test: make the process umask permissive, so an
+        // unprotected export would land as world-readable.
+        let previousUmask = umask(0o000)
+        defer { umask(previousUmask) }
+
+        let screenshotURL = rootDirectoryURL.appendingPathComponent("capture-1.png")
+        try Data("image-data".utf8).write(to: screenshotURL, options: [.atomic])
+
+        let session = TranscriptSession(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_200),
+            transcript: "The export button is missing on the reports page.",
+            duration: 42,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            screenshots: [
+                SessionScreenshot(elapsedTime: 13, filePath: screenshotURL.path)
+            ],
+            issueExtraction: IssueExtractionResult(
+                summary: "One bug in the reports page.",
+                issues: [
+                    ExtractedIssue(
+                        title: "Export button missing",
+                        category: .bug,
+                        summary: "The reports page is missing an export button.",
+                        evidenceExcerpt: "The reports page is missing an export button.",
+                        timestamp: 13
+                    )
+                ]
+            )
+        )
+
+        let exporter = TranscriptExporter(fileManager: fileManager)
+        let bundleURL = try exporter.writeBundle(session: session, to: rootDirectoryURL)
+
+        XCTAssertEqual(try posixPermissions(of: bundleURL), 0o700)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("transcript.md")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("summary.md")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("manifest.json")), 0o600)
+
+        let screenshotsDirectoryURL = bundleURL.appendingPathComponent("screenshots")
+        XCTAssertEqual(try posixPermissions(of: screenshotsDirectoryURL), 0o700)
+        XCTAssertEqual(
+            try posixPermissions(of: screenshotsDirectoryURL.appendingPathComponent("capture-1.png")),
+            0o600
+        )
+    }
+
+    /// The POSIX mode of a file or directory, or -1 when it cannot be read.
+    private func posixPermissions(of url: URL) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
     /// Replaces an earlier test that asserted export *threw* on a missing
     /// screenshot. #914 deliberately inverts that: one moved or pruned file must
     /// not make an otherwise complete session unexportable.
