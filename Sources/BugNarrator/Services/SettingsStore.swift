@@ -715,25 +715,32 @@ final class SettingsStore: ObservableObject {
         let lowered = host
             .lowercased()
             .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        // A trailing dot makes the name absolute rather than different: a
+        // resolver answers the same name either way, so the two are the same
+        // host and have to be classified the same way.
+        let name = lowered.hasSuffix(".") ? String(lowered.dropLast()) : lowered
 
-        guard !lowered.isEmpty else { return false }
+        guard !name.isEmpty else { return false }
         // An IPv4 literal in another notation — `134744072`, `0x7f000001` — is
         // an address, not a name anybody can claim for it.
-        if isNumericAddressLiteral(lowered) { return false }
+        if isNumericAddressLiteral(name) { return false }
         // `localhost` is reserved and always resolves to loopback.
-        if lowered == "localhost" || lowered.hasSuffix(".localhost") { return false }
-        if lowered.hasSuffix(".local") { return true }
-        return !lowered.contains(".") && !lowered.contains(":")
+        if isReservedLocalhostName(name) { return false }
+        if name.hasSuffix(".local") { return true }
+        return !name.contains(".") && !name.contains(":")
     }
 
     /// Whether `host` is a number written in a notation other than the dotted
     /// quad: decimal (`134744072`) or hexadecimal (`0x7f000001`).
     static func isNumericAddressLiteral(_ host: String) -> Bool {
         guard !host.isEmpty else { return false }
-        if host.allSatisfy({ $0.isNumber }) { return true }
+        // Only ASCII digits count. A character is a number in more than one
+        // script, and a name written in one of them is a name, not an
+        // address.
+        if host.allSatisfy({ $0.isASCII && $0.isNumber }) { return true }
         guard host.hasPrefix("0x") || host.hasPrefix("0X") else { return false }
         let digits = host.dropFirst(2)
-        return !digits.isEmpty && digits.allSatisfy({ $0.isHexDigit })
+        return !digits.isEmpty && digits.allSatisfy({ $0.isASCII && $0.isHexDigit })
     }
 
     /// The message for an endpoint that is refused over plaintext HTTP because

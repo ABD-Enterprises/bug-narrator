@@ -581,6 +581,37 @@ final class SettingsStoreTests: XCTestCase {
     /// is the same address as `::1`, and `::ffff:127.0.0.1` is the loopback
     /// written as an IPv4-mapped IPv6 address. Comparing the strings would
     /// refuse a local endpoint the user can reach.
+    /// A trailing dot makes the name absolute rather than different: a
+    /// resolver answers the same name either way, so `nas.local.` is the same
+    /// host as `nas.local` and has to be classified the same way.
+    func testATrailingDotDoesNotChangeWhichClassAHostIsIn() {
+        XCTAssertTrue(
+            SettingsStore.isUnqualifiedLocalName("nas.local."),
+            "a trailing dot does not make a claimable name a different host"
+        )
+        XCTAssertTrue(
+            SettingsStore.isUnqualifiedLocalName("lmstudio."),
+            "a trailing dot does not make a claimable name a different host"
+        )
+        XCTAssertFalse(
+            SettingsStore.isUnqualifiedLocalName("localhost."),
+            "localhost is reserved, however it is written"
+        )
+    }
+
+    /// A character is a number in more than one script. A name written in one
+    /// of them is a name, not an address.
+    func testOnlyASCIIDigitsAreAnAddressLiteral() {
+        XCTAssertFalse(
+            SettingsStore.isNumericAddressLiteral("\u{FF11}\u{FF12}\u{FF13}"),
+            "fullwidth digits are a name, not an address"
+        )
+        XCTAssertTrue(
+            SettingsStore.isNumericAddressLiteral("134744072"),
+            "an ASCII number is an address literal"
+        )
+    }
+
     func testEverySpellingOfTheIPv6LocalAddressesIsTrusted() {
         for trusted in [
             "::1",
