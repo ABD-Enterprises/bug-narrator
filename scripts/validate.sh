@@ -94,6 +94,18 @@ if ! "$ROOT/scripts/check-release-environment-wiring.sh"; then
   exit 1
 fi
 
+# The wiring check proves that the gate is wired up, not that it decides
+# correctly. This one drives the gate against the recorded responses the
+# environment API can answer with, so the gate cannot rot into a script that
+# always says yes. It is required for the same reason as the two above.
+if [[ ! -x "$ROOT/scripts/check-release-environment-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-release-environment-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-release-environment-gate.sh"; then
+  exit 1
+fi
+
 # Build the changed-files target list, or fall back to scanning the whole
 # tree when there is no base ref available (e.g. first push of a branch).
 #

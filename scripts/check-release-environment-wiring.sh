@@ -27,13 +27,17 @@
 # can fail the job at all (continue-on-error or a condition would let the
 # release publish after the gate said no).
 #
+# A job that publishes is a job that runs a publish command, that delegates
+# to a release-publishing action, or that can write to the repository at all.
+# The last one is what catches a publisher this check cannot see: a script
+# in the repository, a reusable workflow, or a path that is assembled at run
+# time. Nothing publishes that way today, so the rule costs nothing now and
+# keeps the guarantee from being defeatable with ordinary YAML.
+#
 # It proves itself: a drifted name, a step that stopped running the gate, a
-# gate that runs too late, a gate that cannot fail the job and a check script
-# with a baked-in name all have to be rejected, or the check would be
-# decoration. A publishing job that is not recognised as one — because it
-# publishes with `gh release edit`, with a line continued command, or with a
-# path split across quotes — has to be rejected too, or the guarantee would
-# only hold for the commands it happens to know.
+# gate that runs too late, a gate that cannot fail the job, a check script
+# with a baked-in name and a publishing job that is not recognised as one all
+# have to be rejected, or the check would be decoration.
 #
 # It runs as part of scripts/validate.sh, so a drifted name fails the gate
 # before a release is dispatched rather than during one.
@@ -57,6 +61,11 @@ fail() {
 # Prints the distinct values of `KEY: value` lines in a file, one per line.
 # A file without such a line yields no output, which is a valid answer here:
 # the caller decides whether a missing value is a problem.
+#
+# The value is taken whole and then normalised, so a quoted scalar, a value
+# with a space in it and an expression all read the same here as they do in
+# the job parser below. The two parsers have to agree: when they did not, a
+# legitimate value was rejected by one and accepted by the other.
 read_values() {
     local file="$1"
     local key="$2"
@@ -65,7 +74,7 @@ read_values() {
     # The exit status is checked explicitly: inside a process substitution git's
     # and grep's exit status is discarded, so a failed listing would read as
     # "no values" and the caller would compare two empty strings.
-    if ! found="$(grep -oE "^[[:space:]]*${key}:[[:space:]]*[A-Za-z0-9._-]+" "$file" 2>&1)"; then
+    if ! found="$(grep -oE "^[[:space:]]*${key}:[[:space:]]*.*" "$file" 2>&1)"; then
         if [[ -n "$found" ]]; then
             printf 'ERROR: could not read the %s values from %s: %s\n' "$key" "$file" "$found" >&2
             return 1
@@ -78,13 +87,21 @@ read_values() {
     # a file that simply has no such key.
     printf '%s\n' "$found" \
         | sed -E "s/^[[:space:]]*${key}:[[:space:]]*//" \
+        | awk '{
+            sub(/[ \t]+#.*$/, "")
+            sub(/^[ \t]+/, "")
+            sub(/[ \t]+$/, "")
+            if ($0 ~ /^".*"$/) { print substr($0, 2, length($0) - 2) }
+            else if ($0 ~ /^'"'"'.*'"'"'$/) { print substr($0, 2, length($0) - 2) }
+            else { print }
+        }' \
         | sed -e '/^[[:space:]]*$/d' \
         | sort -u
 }
 
 # Prints one record per job of a workflow file:
-#   job|environment values|job environment values|publishes|publish step|runs
-#   the gate|gate step|checked names|cannot fail
+#   job|environment values|publishes|publish step|runs the gate|gate step|
+#   checked names|cannot fail
 #
 # The environment values and the checked names are space separated lists. The
 # three step numbers are the index of the step that publishes the release, the
@@ -97,10 +114,35 @@ parse_jobs() {
     awk '
         function flush() {
             if (job != "") {
+                # A job that does not declare its own permissions inherits the
+                # workflow default, so it can write when the default can.
+                writes = (job_write || (!job_has_perms && workflow_write))
+                publishes = publishes || (job_uses != "") || writes
                 printf "%s|%s|%d|%d|%d|%d|%s|%d\n", job, envs, publishes, publish_step, gate, gate_step, gate_envs, neutered
             }
-            job = ""; envs = ""; job_envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; neutered = 0
-            pending_environment = 0
+            job = ""; envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; neutered = 0
+            pending_environment = 0; job_write = 0; job_has_perms = 0; job_uses = ""
+        }
+        # The value of a key, without the surrounding whitespace, without a
+        # trailing comment and without the quotes around a quoted scalar.
+        function normalize_value(value) {
+            sub(/[ \t]+#.*$/, "", value)
+            sub(/^[ \t]+/, "", value)
+            sub(/[ \t]+$/, "", value)
+            if (value ~ /^".*"$/) { value = substr(value, 2, length(value) - 2) }
+            else if (value ~ /^'"'"'.*'"'"'$/) { value = substr(value, 2, length(value) - 2) }
+            return value
+        }
+        # Whether an action publishes a release. The name is the last segment
+        # of the action path, without the version.
+        function is_release_action(value,   name) {
+            name = value
+            sub(/@.*$/, "", name)
+            sub(/^[^ ]*\//, "", name)
+            # release-drafter writes a changelog into a pull request; it does
+            # not publish a release.
+            if (name == "release-drafter") { return 0 }
+            return name ~ /release/
         }
         # A command counts only when it runs the thing. A comment that names
         # the script does not run it, and a command that merely mentions it
@@ -121,7 +163,7 @@ parse_jobs() {
                 step_gate = 1
             }
             # The release is published by creating it, by replacing its
-            # assets, or by editing a draft into a published release — and by
+            # assets, or by editing a draft into a published release -- and by
             # the API behind those commands.
             if (c ~ /(^|[^A-Za-z0-9_])release (create|upload|edit|publish)/) {
                 step_publish = 1
@@ -182,10 +224,18 @@ parse_jobs() {
                     gate_envs = (step_envs != "" ? step_envs : job_envs)
                 }
             }
+            # A step that delegates to a release-publishing action publishes
+            # just as much as one that runs the command itself.
+            if (step_uses != "" && is_release_action(step_uses)) {
+                step_publish = 1
+            }
             if (step_publish && publish_step == 0) { publishes = 1; publish_step = step }
-            step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0; step_envs = ""
+            step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0; step_envs = ""; step_uses = ""
         }
         /^jobs:[ \t]*$/ { injobs = 1; next }
+        !injobs && /^permissions:[ \t]*$/ { workflow_perms = 1; next }
+        workflow_perms && /^  contents:[ \t]*write[ \t]*$/ { workflow_write = 1; next }
+        workflow_perms && /^[^ \t]/ { workflow_perms = 0 }
         injobs && /^[^ \t]/ { close_step(); flush(); injobs = 0; next }
         injobs && /^  [A-Za-z0-9_.-]+:[ \t]*$/ { close_step(); flush(); job = $1; sub(/:$/, "", job); step = 0; next }
         injobs && job != "" {
@@ -201,18 +251,36 @@ parse_jobs() {
             }
             if ($0 ~ /^        if:[ \t]*/) { step_conditional = 1 }
 
+            # The action a step delegates to.
+            if ($0 ~ /^        uses:[ \t]*[^ \t]/) {
+                value = $0; sub(/^        uses:[ \t]*/, "", value)
+                step_uses = value
+            }
+
+            # A job that delegates to a reusable workflow publishes whatever
+            # that workflow publishes.
+            if ($0 ~ /^    uses:[ \t]*[^ \t]/) {
+                value = $0; sub(/^    uses:[ \t]*/, "", value)
+                job_uses = value
+            }
+
+            # The permissions of the job. A job that does not declare any
+            # inherits the workflow default.
+            if ($0 ~ /^    permissions:[ \t]*$/) { job_has_perms = 1 }
+            if ($0 ~ /^      contents:[ \t]*write[ \t]*$/) { job_write = 1 }
+
             # A job-level environment: key sits at the job level indentation.
             # It is either the scalar form or the object form, where the name
             # is on the next line.
-            if ($0 ~ /^    environment:[ \t]*[A-Za-z0-9._-]+/) {
+            if ($0 ~ /^    environment:[ \t]*[^ \t]/) {
                 value = $0; sub(/^    environment:[ \t]*/, "", value)
-                envs = (envs == "" ? value : envs " " value)
+                envs = (envs == "" ? normalize_value(value) : envs " " normalize_value(value))
                 pending_environment = 0
             } else if ($0 ~ /^    environment:[ \t]*$/) {
                 pending_environment = 1
-            } else if (pending_environment && $0 ~ /^      name:[ \t]*[A-Za-z0-9._-]+/) {
+            } else if (pending_environment && $0 ~ /^      name:[ \t]*[^ \t]/) {
                 value = $0; sub(/^      name:[ \t]*/, "", value)
-                envs = (envs == "" ? value : envs " " value)
+                envs = (envs == "" ? normalize_value(value) : envs " " normalize_value(value))
                 pending_environment = 0
             }
 
@@ -222,8 +290,7 @@ parse_jobs() {
             if ($0 !~ /^[[:space:]]*#/ && $0 ~ /RELEASE_ENVIRONMENT:[ \t]*/) {
                 value = $0
                 sub(/.*RELEASE_ENVIRONMENT:[ \t]*/, "", value)
-                sub(/[ \t]*#.*$/, "", value)
-                sub(/[ \t]+$/, "", value)
+                value = normalize_value(value)
                 if ($0 ~ /^      RELEASE_ENVIRONMENT:/) {
                     if (job_envs == "") { job_envs = value }
                 } else {
@@ -306,7 +373,7 @@ check_tree() {
             fail "$workflow runs $CHECK_SCRIPT_NAME without naming the environment (RELEASE_ENVIRONMENT)."
         fi
         if [[ "$(printf '%s\n' "$checked" | wc -l | tr -d ' ')" != "1" ]]; then
-            fail "$workflow names more than one environment for the release gate: $checked"
+            fail "$workflow names more than one environment for the release gate: $(printf '%s\n' "$checked" | paste -sd, -)"
         fi
         local gate_env="$checked"
 
@@ -357,7 +424,10 @@ check_tree() {
 
             # The gate has to run before the release exists: a gate that runs
             # after the release cannot retract what it should have stopped.
-            if [[ "$gate_step" -ge "$publish_step" ]]; then
+            # A job that publishes in a way this check cannot place -- a
+            # reusable workflow, or a script that assembles the path at run
+            # time -- has no publish step to compare against.
+            if [[ "$publish_step" -gt 0 && "$gate_step" -ge "$publish_step" ]]; then
                 fail "$workflow: job \"$job\" publishes a release in step $publish_step, before the gate runs in step $gate_step."
             fi
         done <<<"$jobs"
@@ -556,16 +626,26 @@ elif mutation == "decoy-env":
         "        run: echo hi\n"
     )
     steps.insert(gate_index + 1, decoy)
-elif mutation == "environment-object-form":
-    job_text, count = re.subn(
-        r"(?m)^(    )environment:([ \t]*)([A-Za-z0-9._-]+)[ \t]*$",
-        r"\1environment:\n\1  name: \3",
-        jobs[job_index],
-    )
-    if count != 1:
-        print("could not rewrite the environment key")
+elif mutation == "remove-gate-env":
+    lines = steps[gate_index].split("\n")
+    removed = False
+    for line_index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("#") or "RELEASE_ENVIRONMENT:" not in stripped:
+            continue
+        del lines[line_index]
+        removed = True
+        break
+    if not removed:
+        print("could not find the environment of the gate step")
         sys.exit(1)
-    jobs[job_index] = job_text
+    steps[gate_index] = "\n".join(lines)
+elif mutation == "environment-object-form":
+    pass
+elif mutation == "remove-environment":
+    pass
+elif mutation == "quoted-environment":
+    pass
 elif mutation == "publish-before":
     early = '      - name: Publish GitHub Release\n        shell: bash\n        run: gh release create "$RELEASE_TAG"\n'
     steps.insert(gate_index, early)
@@ -578,6 +658,42 @@ else:
     sys.exit(1)
 
 jobs[job_index] = "".join(steps)
+
+# The job level mutations run after the steps are rebuilt, so they are not
+# overwritten by the rebuild.
+if mutation == "environment-object-form":
+    job_text, count = re.subn(
+        r"(?m)^(    )environment:([ \t]*)([A-Za-z0-9._-]+)[ \t]*$",
+        r"\1environment:\n\1  name: \3",
+        jobs[job_index],
+    )
+    if count != 1:
+        print("could not rewrite the environment key")
+        sys.exit(1)
+    jobs[job_index] = job_text
+elif mutation == "remove-environment":
+    # The key in either form: the scalar one and the object one, where the
+    # name is on the next line.
+    job_text, count = re.subn(
+        r"(?m)^    environment:([ \t]*)([A-Za-z0-9._-]+)?[ \t]*\n(      name:[ \t]*[^\n]*\n)?",
+        "",
+        jobs[job_index],
+    )
+    if count != 1:
+        print("could not remove the environment key")
+        sys.exit(1)
+    jobs[job_index] = job_text
+elif mutation == "quoted-environment":
+    job_text, count = re.subn(
+        r"(?m)^(    )environment:([ \t]*)([A-Za-z0-9._-]+)[ \t]*$",
+        r'\1environment: "\3"',
+        jobs[job_index],
+    )
+    if count != 1:
+        print("could not quote the environment key")
+        sys.exit(1)
+    jobs[job_index] = job_text
+
 open(path, "w", encoding="utf-8").write(head + "\njobs:\n" + "".join(jobs))
 PYTHON
 }
@@ -626,9 +742,10 @@ fi
 restore_workflow ".github/workflows/local-transcription-windows.yml"
 
 # The publishing job losing its environment has to be caught, even when another
-# job in the same file still declares one.
-sed -i.bak '/^    environment: windows-release$/d' \
-    "$workspace/.github/workflows/windows-tester-release.yml"
+# job in the same file still declares one. The key is removed in whichever
+# form it is written, so the mutation keeps working when the repository moves
+# to the object form.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" remove-environment
 printf '\n  decoy-job:\n    runs-on: ubuntu-latest\n    environment: windows-release\n    steps:\n      - run: echo hi\n' \
     >>"$workspace/.github/workflows/windows-tester-release.yml"
 if (check_tree "$workspace") >/dev/null 2>&1; then
@@ -690,6 +807,15 @@ if (check_tree "$workspace") >/dev/null 2>&1; then
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
+# A gate step that names no environment, while another job in the same file
+# does, has to be caught by the per-job rule: the file as a whole still names
+# exactly one environment.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" remove-gate-env
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a gate step that names no environment'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
 # A release published before the gate runs has to be caught.
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" publish-before
 if (check_tree "$workspace") >/dev/null 2>&1; then
@@ -735,10 +861,51 @@ if (check_tree "$workspace") >/dev/null 2>&1; then
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
+# A publishing job that hands the release to a release-publishing action has
+# to be caught: the check cannot see inside the action, so the job still has
+# to declare its environment and run the gate.
+{
+    printf '\n  action-publisher:\n'
+    printf '    runs-on: ubuntu-latest\n'
+    printf '    permissions:\n'
+    printf '      contents: write\n'
+    printf '    steps:\n'
+    printf '      - name: Publish\n'
+    printf '        uses: softprops/action-gh-release@v2\n'
+} >>"$workspace/.github/workflows/windows-tester-release.yml"
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a publishing job that delegates to a release action'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A publishing job that hands the release to a script in the repository has to
+# be caught: the check cannot see what the script does, so the job still has
+# to declare its environment and run the gate.
+{
+    printf '\n  script-publisher:\n'
+    printf '    runs-on: ubuntu-latest\n'
+    printf '    permissions:\n'
+    printf '      contents: write\n'
+    printf '    steps:\n'
+    printf '      - name: Publish\n'
+    printf '        run: bash windows/scripts/publish.sh\n'
+} >>"$workspace/.github/workflows/windows-tester-release.yml"
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a publishing job that runs a repository script'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
 # The object form of the environment key is valid, so it has to be accepted.
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" environment-object-form
 if ! (check_tree "$workspace") >/dev/null 2>&1; then
     fail 'the wiring check rejected the object form of the environment key'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A quoted environment name is the same name, so it has to be accepted.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" quoted-environment
+if ! (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check rejected a quoted environment key'
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
