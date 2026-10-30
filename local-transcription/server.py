@@ -188,8 +188,8 @@ async def transcribe(
         model_id = _resolve_model_id(model)
 
         logger.info(
-            f"Transcribing {file.filename} ({file_size_mb:.1f} MB) "
-            f"with model {model_id} in {_chunk_duration_seconds}s chunks"
+            f"Transcribing {_log_safe(file.filename, 'audio')} ({file_size_mb:.1f} MB) "
+            f"with model {_log_safe(model_id, 'unknown')} in {_chunk_duration_seconds}s chunks"
         )
         start = time.time()
         result = await asyncio.get_running_loop().run_in_executor(
@@ -248,6 +248,22 @@ async def transcribe(
             tmp.close()
         with contextlib.suppress(OSError):
             os.unlink(tmp.name)
+
+
+def _log_safe(value: Optional[str], fallback: str = "") -> str:
+    """A value safe to write into a log line.
+
+    The filename and the model name both come from the request, so either can
+    carry newlines and other control characters that would forge log lines.
+    Only printable characters are kept, and the result is short: a log line is
+    not a place for an unbounded string.
+    """
+    if value is None:
+        return fallback
+    cleaned = "".join(character for character in value if character.isprintable()).strip()
+    if not cleaned:
+        return fallback
+    return cleaned[:120]
 
 
 def _resolve_model_id(model: Optional[str]) -> str:
