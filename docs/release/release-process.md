@@ -85,6 +85,24 @@ Do not release unless all of these are true:
 - signing/notarization inputs are present for a public build
 - no unapproved critical or high-severity risk remains
 
+## Windows Release Environment Gate
+
+The two Windows release workflows — `.github/workflows/windows-tester-release.yml` and the release path of `.github/workflows/local-transcription-windows.yml` — publish signed Windows artifacts from GitHub Actions. Both publish through the `windows-release` environment, which requires a named reviewer and admits only `refs/heads/main`.
+
+A workflow that names an environment that does not exist makes GitHub create it with no protection rules at all, so the release would publish with no approval and no branch restriction, and nothing would say so. `scripts/check-release-environment.sh` refuses to publish in that case. It runs twice on purpose: in the preflight, before a Windows runner is reserved, and again as the first step of the publishing job, because GitHub resolves the environment when the job starts — an environment deleted or unprotected in between would otherwise be auto-created with no rules.
+
+The check reads the environment live and refuses unless all of these hold:
+
+- the environment exists and can be read
+- it requires a reviewer and names at least one
+- it declares `prevent_self_review` explicitly
+- administrators cannot bypass its protection rules
+- its deployment branch policy admits exactly `main`
+
+The environment name is not defaulted in the script: each workflow passes the environment it deploys to through `RELEASE_ENVIRONMENT`, and `scripts/check-release-environment-wiring.sh` — part of `./scripts/validate.sh` — keeps that name and the release job's `environment:` key from drifting apart.
+
+**Known limitation:** this repository has one maintainer, so the environment's approval can be self-issued. `prevent_self_review` is therefore verified and reported in the release log rather than required to be true, because requiring it would leave every release unapprovable. The gate still stops an ungated, unapproved or wrongly-targeted release. When a second maintainer is added, turn on "Prevent self-review" for the `windows-release` environment; the check then reports that the release blocks self-approval.
+
 ## Current Maintainer Flow
 
 1. Review [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues) for unresolved risks and active release blockers.

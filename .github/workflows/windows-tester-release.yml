@@ -24,12 +24,55 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  # One release at a time per tag. This workflow only runs on dispatch, so
+  # the group is the tag alone: a second dispatch for the same tag waits
+  # instead of building again and failing on "already exists".
+  group: windows-tester-release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   release-preflight:
     runs-on: ubuntu-latest
+    # The preflight validates the dispatch before a Windows runner is reserved.
+    permissions:
+      actions: read
+      contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Confirm the release runs from the main branch
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          # A release must be built from the reviewed default branch, not from a
+          # branch someone dispatched by hand.
+          if [[ "$RELEASE_REF" != "refs/heads/main" ]]; then
+            printf '::error::Windows tester release must run from refs/heads/main, not %s.\n' "$RELEASE_REF"
+            exit 1
+          fi
+
+      - name: Confirm the release environment still gates the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ENVIRONMENT: windows-release
+        run: bash scripts/check-release-environment.sh
+
+      - name: Confirm the tag is in the tester release namespace
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          # Only this workflow's own tags may be created; an app or local server
+          # release tag must never be touched from here.
+          if [[ ! "$RELEASE_TAG" =~ ^windows-tester-v[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$ ]]; then
+            printf '::error::Release tag "%s" is not in the windows-tester-v<semver> namespace.\n' "$RELEASE_TAG"
+            exit 1
+          fi
+
       - name: Confirm signing secrets exist before reserving Windows runner
         env:
           CERT_BASE64: ${{ secrets.BUGNARRATOR_WINDOWS_CERT_BASE64 }}
@@ -50,9 +93,77 @@ jobs:
   signed-windows-tester-release:
     needs: release-preflight
     runs-on: windows-latest
+    # A signed release waits for a human approval in this environment. The
+    # environment's deployment branch policy admits only refs/heads/main.
+    environment: windows-release
+    # The only job that writes to the repository (the release and its tag).
+    permissions:
+      actions: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Confirm the release environment still gates the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ENVIRONMENT: windows-release
+        run: bash scripts/check-release-environment.sh
+
+      - name: Refuse a tag that already points at another commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # `gh release create` ignores --target when the tag already exists, so an
+          # existing tag would publish these binaries under a tag that points at a
+          # different commit. Look the tag up in the tag namespace and refuse.
+          #
+          # A missing tag is the normal case for a first release, and GitHub
+          # reports it as "Not Found (HTTP 404)". Any other failure must not be
+          # read as "no tag", so it stops the release instead.
+          tag_lookup=""
+          tag_error="$(mktemp)"
+          trap 'rm -f "$tag_error"' EXIT
+          if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>"$tag_error")"; then
+            # gh writes the response body to stdout and its message to stderr.
+            # Only the message carries the HTTP status, so the body is never
+            # consulted: a body that quotes someone else's 404 says nothing
+            # about the status this request got. A missing tag is the one
+            # answer that means "no tag", and gh reports it as
+            # "gh: Not Found (HTTP 404)".
+            if ! grep -qE '^gh: .*\(HTTP 404\)$' "$tag_error"; then
+              printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$(cat "$tag_error")" >&2
+              exit 1
+            fi
+            # The tag does not exist yet, which is the normal case for a first
+            # release: the release creates it.
+            tag_lookup=""
+          elif [[ ! "$tag_lookup" =~ ^(commit|tag)\ [0-9a-f]{40}$ ]]; then
+            # A successful answer has to name an object type and a commit. An
+            # empty or malformed answer is not "no tag", so it stops the
+            # release rather than reading as absence.
+            printf '::error::The tag lookup for %s returned an unexpected answer: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
+            exit 1
+          fi
+          if [[ -n "$tag_lookup" ]]; then
+            read -r tag_type tagged <<<"$tag_lookup"
+            if [[ "$tag_type" == "tag" ]]; then
+              # An annotated tag points at a tag object; peel it to the commit.
+              # A failed peel is not "no tag": it stops the release instead.
+              if ! tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagged" --jq .object.sha 2>&1)"; then
+                printf '::error::Could not peel the annotated tag %s: %s\n' "$RELEASE_TAG" "$tagged" >&2
+                exit 1
+              fi
+            fi
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              printf '::error::Tag %s points at %s but this run built %s; refusing to publish it.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA" >&2
+              exit 1
+            fi
+          fi
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
@@ -95,7 +206,7 @@ jobs:
           retention-days: 14
 
       - name: Publish GitHub Release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DRAFT: ${{ inputs.draft }}
@@ -103,21 +214,64 @@ jobs:
           RELEASE_RUNTIME: ${{ inputs.runtime }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $args = @(
-            "release", "create", "$env:RELEASE_TAG",
-            "windows/artifacts/packages/BugNarrator-windows-$env:RELEASE_RUNTIME.zip",
-            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-signature.json",
-            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-validation.json",
-            "--title", "BugNarrator Windows tester $env:RELEASE_TAG",
-            "--notes-file", "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-release-notes.md"
+          set -euo pipefail
+          files=(
+            "windows/artifacts/packages/BugNarrator-windows-$RELEASE_RUNTIME.zip"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-signature.json"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-validation.json"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md"
           )
-          if ("$env:RELEASE_DRAFT" -eq "true") {
-            $args += "--draft"
-          }
-          if ("$env:RELEASE_PRERELEASE" -eq "true") {
-            $args += "--prerelease"
-          }
-          gh @args
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-dispatch replaces the assets of the same tag (a repaired or
+            # re-signed build) — only when the tag still points at the commit
+            # these binaries were built from.
+            tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              printf '::error::Tag %s points at %s but this run built %s; refusing to replace its assets.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA"
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            # The re-dispatch may also be what publishes the release: a release
+            # created as a draft stays a draft until it is edited, so the
+            # flags and the notes are refreshed here too.
+            edit_args=(release edit "$RELEASE_TAG"
+                       --repo "$GITHUB_REPOSITORY"
+                       --title "BugNarrator Windows tester $RELEASE_TAG"
+                       --notes-file "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md"
+                       --draft="$RELEASE_DRAFT"
+                       --prerelease="$RELEASE_PRERELEASE")
+            gh "${edit_args[@]}"
+            exit 0
+          fi
+          # The tag is checked once more here. `gh release create --target` is
+          # ignored when the tag already exists, so a tag created between the
+          # guard step and this one would be published with its own commit
+          # instead of the one these binaries were built from.
+          tag_error="$(mktemp)"
+          trap 'rm -f "$tag_error"' EXIT
+          tagged=""
+          if ! tagged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha 2>"$tag_error")"; then
+            # A missing tag is the normal case for a first release. Any other
+            # failure has to stop the release rather than read as absence.
+            if ! grep -qE '^gh: .*\(HTTP 404\)$' "$tag_error"; then
+              printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$(cat "$tag_error")" >&2
+              exit 1
+            fi
+            tagged=""
+          fi
+          if [[ -n "$tagged" && "$tagged" != "$GITHUB_SHA" ]]; then
+            printf '::error::Tag %s points at %s but this run built %s; refusing to publish it.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA" >&2
+            exit 1
+          fi
+          # The tag is created at the commit that produced the binaries, never at the default branch.
+          args=(release create "$RELEASE_TAG" "${files[@]}"
+                --repo "$GITHUB_REPOSITORY"
+                --target "$GITHUB_SHA"
+                --title "BugNarrator Windows tester $RELEASE_TAG"
+                --notes-file "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md")
+          [[ "$RELEASE_DRAFT" == "true" ]] && args+=(--draft)
+          [[ "$RELEASE_PRERELEASE" == "true" ]] && args+=(--prerelease)
+          gh "${args[@]}"
 
       - name: Remove decoded signing certificate
         if: always()
