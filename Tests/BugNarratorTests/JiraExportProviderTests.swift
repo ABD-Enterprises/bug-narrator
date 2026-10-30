@@ -63,25 +63,17 @@ final class JiraExportProviderTests: XCTestCase {
     /// carries the credentials. A test that only calls the policy's static
     /// helper cannot tell whether the policy is wired into that session at
     /// all — dropping it leaves the helper test green — so this drives the
-    /// session the provider actually uses.
+    /// session the provider actually uses, through a real redirect.
     func testTheProvidersOwnSessionRefusesARedirectToAPlaintextRemoteHost() async throws {
-        var requestedHosts: [String] = []
-        MockURLProtocol.requestHandler = { request in
-            requestedHosts.append(request.url?.host ?? "")
-            let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url),
-                statusCode: 307,
-                httpVersion: nil,
-                headerFields: ["Location": "http://plaintext-remote.example.com/rest/api/3/search/jql"]
-            )!
-            return (response, Data())
-        }
+        // The redirect target is a host the app cannot check, and nothing
+        // listens on it: the point is that the session refuses before it goes
+        // there.
+        let server = try RedirectServer(location: "http://plaintext-remote.invalid/rest/api/3/search/jql")
+        server.serve()
 
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
         // No session is injected: the provider builds the one the app uses,
         // with the redirect policy on it.
-        let provider = JiraExportProvider(sessionConfiguration: configuration)
+        let provider = JiraExportProvider()
         let issue = ExtractedIssue(
             title: "Checkout fails",
             category: .bug,
@@ -94,7 +86,7 @@ final class JiraExportProviderTests: XCTestCase {
             _ = try await provider.findOpenIssues(
                 matching: issue,
                 configuration: JiraExportConfiguration(
-                    baseURL: URL(string: "https://acme.atlassian.net")!,
+                    baseURL: URL(string: "http://127.0.0.1:\(server.port)")!,
                     email: "you@example.com",
                     apiToken: "fixture-jira-token",
                     projectKey: "FM",
@@ -110,9 +102,37 @@ final class JiraExportProviderTests: XCTestCase {
         }
 
         XCTAssertEqual(
-            requestedHosts,
-            ["acme.atlassian.net"],
+            server.requestCount,
+            1,
             "the redirect target must never be requested: it would carry the credentials in the clear"
+        )
+    }
+
+    func testAPlaintextURLWithNoHostIsRefused() async throws {
+        // A URL with no host is a host the app cannot check, so it is refused
+        // like any other one it cannot vouch for. Refusing it is the point:
+        // a guard that fails open here would put the credentials on the wire
+        // for a host nobody can name.
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        do {
+            _ = try await provider.authenticatedRequest(
+                url: URL(string: "http://")!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTFail("expected a plaintext URL with no host to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+        }
+
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(URL(string: "http://")),
+            "a redirect to a plaintext URL with no host must be refused too"
         )
     }
 

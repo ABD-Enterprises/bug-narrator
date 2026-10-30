@@ -592,6 +592,46 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// One host gets one answer, on every surface that refuses it: the
+    /// warning next to the setting, the issue that blocks the export, and the
+    /// refusal the request builder raises.
+    func testEverySurfaceThatRefusesAHostSaysTheSameThing() async throws {
+        let suiteName = "BugNarrator-JiraPlaintextOneSurfaceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let provider = JiraExportProvider()
+
+        for endpoint in [
+            "http://8.8.8.8:8080/jira",
+            "http://jira.example.com:8080/jira",
+            "http://nas.local:8080/jira",
+            "http://134744072:8080/jira"
+        ] {
+            store.jiraBaseURL = endpoint
+            let warning = store.jiraBaseURLPlaintextWarning
+            XCTAssertNotNil(warning, "expected a refusal for \(endpoint)")
+            XCTAssertEqual(store.jiraBaseURLCompatibilityIssue, warning)
+
+            do {
+                _ = try await provider.authenticatedRequest(
+                    url: URL(string: endpoint)!,
+                    httpMethod: "POST",
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    includesJSONContentType: true
+                )
+                XCTFail("expected the request builder to refuse \(endpoint)")
+            } catch let error as AppError {
+                guard case .exportConfigurationIncompatible(let message) = error else {
+                    return XCTFail("expected an incompatible-configuration error, got \(error)")
+                }
+                XCTAssertEqual(message, warning)
+            }
+        }
+    }
+
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
                       "192.168.0.1", "169.254.1.1", "::1", "app.localhost"] {
