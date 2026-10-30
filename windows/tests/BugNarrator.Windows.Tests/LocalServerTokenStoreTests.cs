@@ -34,8 +34,19 @@ public sealed class LocalServerTokenStoreTests
             .GetProperty("windows")
             .GetProperty("directoryRelativeToLocalAppData")
             .GetString()!;
+
+        // The fixture spells the relative directory with forward slashes so
+        // that one file can describe both platforms. Join its segments with
+        // this platform's separator: passing the whole string to Path.Combine
+        // would build a mixed-separator expectation that the port never
+        // produces, and the comparison would fail on a correct path.
+        var relativeSegments = relativeDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var expected = Path.Combine(localAppData, relativeDirectory, LocalServerTokenStore.TokenFileName);
+        var expected = Path.Combine(
+            new[] { localAppData }
+                .Concat(relativeSegments)
+                .Append(LocalServerTokenStore.TokenFileName)
+                .ToArray());
 
         Assert.Equal(expected, LocalServerTokenStore.TokenFilePath(LocalServerPaths.DefaultInstallDirectory));
         Assert.Equal(expected, Path.Combine(LocalServerPaths.DefaultInstallDirectory, LocalServerTokenStore.TokenFileName));
