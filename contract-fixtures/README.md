@@ -63,6 +63,18 @@ of the text the user wrote, so a URL Foundation cannot build a URL from —
 A port belongs to a name and not to an address, so an authority that carries
 more than one colon is an address and the whole of it is the host.
 
+The scheme is read out of the text as well, and the table says so: the app
+trims the value of `/` at both ends before it builds the URL from it, so
+`/http://example.com` is a plaintext URL to example.com and not a value the
+app refuses to read. A leading slash in the value is therefore a row of its
+own.
+
+One kind of URL is deliberately not a row: a URL with no host, such as
+`http:///v1`. Neither port acts on it — the macOS app falls back to the
+default provider address and the Windows port refuses the value outright —
+so the two ports have no common answer to pin, and a row would have to
+record one of them as the truth.
+
 ## The canonical session
 
 Fixed values so both platforms can build the same input:
