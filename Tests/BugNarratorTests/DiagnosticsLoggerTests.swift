@@ -23,6 +23,20 @@ final class DiagnosticsLoggerTests: XCTestCase {
         XCTAssertFalse(sanitized.contains("Bearer test.token-123"))
     }
 
+    func testFreeformRedactionSanitizesBasicAndAtlassianTokens() {
+        let basic = DiagnosticsRedactor.sanitizeFreeformText(
+            "Authorization: Basic dXNlcjpwYXNzd29yZDEyMzQ1Njc4OTA="
+        )
+        XCTAssertFalse(basic.contains("dXNlcjpwYXNzd29yZDEyMzQ1Njc4OTA="))
+        XCTAssertTrue(basic.contains("<redacted>"))
+
+        let atlassian = DiagnosticsRedactor.sanitizeFreeformText(
+            "token ATATT3xFfGF0abcdefghijklmnopqrstuvwxyz012345"
+        )
+        XCTAssertFalse(atlassian.contains("ATATT3xFfGF0abcdefghijklmnopqrstuvwxyz012345"))
+        XCTAssertTrue(atlassian.contains("<redacted>"))
+    }
+
     func testLoggerRedactsCredentialsFromMetadataAndMessage() async {
         BugNarratorDiagnostics.setDebugModeEnabled(true)
         let storageURL = FileManager.default.temporaryDirectory
