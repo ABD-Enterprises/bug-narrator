@@ -54,6 +54,14 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Confirm the release environment still gates the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-release-environment.sh
+
       - name: Confirm the release runs from the main branch
         env:
           RELEASE_REF: ${{ github.ref }}
@@ -62,45 +70,6 @@ jobs:
           # branch someone dispatched by hand.
           if [[ "$RELEASE_REF" != "refs/heads/main" ]]; then
             printf '::error::Local transcription release must run from refs/heads/main, not %s.\n' "$RELEASE_REF"
-            exit 1
-          fi
-
-      - name: Confirm the release environment still gates the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # A workflow that names an environment that does not exist makes
-          # GitHub create it with no protection rules, so the release would
-          # publish with no approval and no branch restriction. The gate has to
-          # fail closed when the environment is missing or unprotected.
-          if ! rules="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq '[.protection_rules[]?.type] | join(",")' 2>&1)"; then
-            printf '::error::The windows-release environment could not be read: %s\n' "$rules" >&2
-            exit 1
-          fi
-          if [[ "$rules" != *required_reviewers* ]]; then
-            printf '::error::The windows-release environment does not require a reviewer; refusing to publish.\n' >&2
-            exit 1
-          fi
-          # A required-reviewers rule with nobody in it gates nobody: a reviewer
-          # who loses repository access can be dropped from the list, and an
-          # empty list would leave the rule satisfied by no one at all.
-          reviewers="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length')"
-          if [[ "$reviewers" == "0" ]]; then
-            printf '::error::The windows-release environment requires a reviewer but names none; refusing to publish.\n' >&2
-            exit 1
-          fi
-          if [[ "$rules" != *branch_policy* ]]; then
-            printf '::error::The windows-release environment does not restrict which branch may deploy; refusing to publish.\n' >&2
-            exit 1
-          fi
-          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq 'if .can_admins_bypass == false then "no" else "yes" end')" != "no" ]]; then
-            printf '::error::The windows-release environment lets administrators bypass its protection rules; refusing to publish.\n' >&2
-            exit 1
-          fi
-          policies="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release/deployment-branch-policies" --jq '[.branch_policies[]? | "\(.type) \(.name)"] | join(" | ")')"
-          if [[ "$policies" != "branch main" ]]; then
-            printf '::error::The windows-release environment admits "%s", not exactly main; refusing to publish.\n' "$policies" >&2
             exit 1
           fi
 
@@ -243,8 +212,17 @@ jobs:
     environment: windows-release
     # The only job that writes to the repository (the release and its tag).
     permissions:
+      actions: read
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Confirm the release environment still gates the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-release-environment.sh
+
       - name: Refuse a tag that already points at another commit
         shell: bash
         env:
@@ -266,7 +244,15 @@ jobs:
               printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
               exit 1
             fi
+            # The tag does not exist yet, which is the normal case for a first
+            # release: the release creates it.
             tag_lookup=""
+          elif [[ ! "$tag_lookup" =~ ^(commit|tag)\ [0-9a-f]{40}$ ]]; then
+            # A successful answer has to name an object type and a commit. An
+            # empty or malformed answer is not "no tag", so it stops the
+            # release rather than reading as absence.
+            printf '::error::The tag lookup for %s returned an unexpected answer: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
+            exit 1
           fi
           if [[ -n "$tag_lookup" ]]; then
             read -r tag_type tagged <<<"$tag_lookup"
