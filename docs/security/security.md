@@ -26,6 +26,15 @@ Current approach:
 - operational telemetry is local-only and redacted before persistence
 - unclean-exit detection is stored as a local launch marker and never shipped remotely by default
 
+## Stored Session Text
+
+Windows session stores use AES-GCM envelopes with current-user DPAPI-wrapped
+per-file keys by default, including retained draft notes. Older plaintext
+sessions remain readable and upgrade on save; exported bundles are intentionally
+plaintext. The exact protected files, media exclusions and account-recovery
+limitations for each platform are listed in
+[SECURITY.md](../../SECURITY.md#at-rest-encryption-and-recoverability).
+
 ## Permission Model
 
 BugNarrator requests permissions only when required for the user action:
