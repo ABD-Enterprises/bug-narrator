@@ -19,6 +19,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# The Semgrep image and the rules it scans with are pinned.
+#
+# The image is addressed by digest, so a tag move cannot change what runs
+# here, and the rules are vendored in the repository, so the registry cannot
+# change what the scan looks for between two runs of the same commit. The
+# token is not needed for either: a vendored rule set needs no registry
+# login, so it never has to be handed to the container.
+SEMGREP_IMAGE="semgrep/semgrep:1.182.1@sha256:451b3d875c00dac7ed5db5293e584a07de11449a409c10b3c2d2652f429630b6"
+SEMGREP_CONFIG="semgrep/semgrep-auto.yaml"
+
 if ! command -v python3 >/dev/null 2>&1; then
   printf 'FAIL: python3 is required to check the product-spec contract\n' >&2
   exit 1
@@ -64,10 +74,33 @@ should_skip_semgrep_target() {
     tools/validators/*)
       return 0
       ;;
+    # The vendored ruleset holds rule patterns, not code: scanning it reports
+    # the patterns themselves as findings.
+    semgrep/semgrep-auto.yaml)
+      return 0
+      ;;
   esac
 
   return 1
 }
+
+# The scan has to stay pinned to the image and the rule set in the
+# repository. The check is required, not optional: a missing or
+# non-executable check would silently drop the guarantee.
+if [[ ! -x "$ROOT/scripts/check-semgrep-pinning.sh" ]]; then
+  printf 'FAIL: scripts/check-semgrep-pinning.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-semgrep-pinning.sh"; then
+  exit 1
+fi
+
+# A missing rule set must not turn into a scan with whatever the registry
+# serves that day, or into no scan at all.
+if [[ ! -f "$ROOT/$SEMGREP_CONFIG" ]]; then
+  printf 'FAIL: the pinned Semgrep ruleset %s is missing; refusing to scan with unpinned rules\n' "$SEMGREP_CONFIG" >&2
+  exit 1
+fi
 
 if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
   # The scan list below depends on this helper failing closed, so check it
@@ -110,8 +143,8 @@ run_semgrep_docker() {
     return 2
   fi
 
-  if docker run --rm -v "${ROOT}":/src -w /src -e SEMGREP_APP_TOKEN \
-    semgrep/semgrep semgrep scan --config=auto --error "$@" \
+  if docker run --rm -v "${ROOT}":/src -w /src \
+    "$SEMGREP_IMAGE" semgrep scan --config "$SEMGREP_CONFIG" --error "$@" \
     >"$SEMGREP_OUTPUT_FILE" 2>&1; then
     return 0
   fi
@@ -128,7 +161,7 @@ run_semgrep_local() {
     return 2
   fi
 
-  if semgrep scan --config=auto --error "$@" >"$SEMGREP_OUTPUT_FILE" 2>&1; then
+  if semgrep scan --config "$SEMGREP_CONFIG" --error "$@" >"$SEMGREP_OUTPUT_FILE" 2>&1; then
     return 0
   fi
   return 1
