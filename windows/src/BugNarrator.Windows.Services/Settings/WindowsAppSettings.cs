@@ -163,8 +163,9 @@ public sealed record WindowsAppSettings(
 
     /// <summary>
     /// Explanatory warning when the Jira base URL would send Basic-auth
-    /// credentials (email + API token) over plaintext HTTP to a remote host.
-    /// Null for remote HTTPS and local HTTP. Export also enforces the compatibility policy below.
+    /// credentials (email + API token) over plaintext HTTP to a host the app
+    /// cannot check as local. Null for remote HTTPS and local HTTP. Export also
+    /// enforces the compatibility policy below.
     /// </summary>
     public string? JiraBaseUrlSecurityWarning
     {
@@ -178,7 +179,14 @@ public sealed record WindowsAppSettings(
                 return null;
             }
 
-            return $"This Jira URL uses plaintext HTTP to a remote host ({parsed.Host}). "
+            if (OpenAiCompatibleEndpoint.IsUnqualifiedLocalName(parsed.Host))
+            {
+                return OpenAiCompatibleEndpoint.UnqualifiedLocalHostPlaintextMessage(
+                    parsed.Host, "email and API token");
+            }
+
+            return "This Jira URL uses plaintext HTTP to a host that is not an address this app "
+                + $"can check as local ({parsed.Host}). "
                 + "Your email and API token would be sent unencrypted. Use https:// "
                 + "unless this is a trusted local server.";
         }
