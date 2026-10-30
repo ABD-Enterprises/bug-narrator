@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Windows.Services.Settings;
 using System.Runtime.CompilerServices;
 using Xunit;
@@ -122,7 +123,14 @@ public sealed class WindowsAiProviderSettingsTests
 
         // Transcription is allowed with no key and the pinned Parakeet model/URL.
         Assert.Null(settings.AiProviderCompatibilityIssue);
-        Assert.Equal(string.Empty, settings.AiProviderCredentialForWorkflow(null));
+        // The local server checks a bearer token on every route, so the
+        // credential the app presents is that token rather than an empty
+        // string (#1270).
+        var credential = settings.AiProviderCredentialForWorkflow(null);
+        Assert.False(string.IsNullOrWhiteSpace(credential));
+        Assert.Equal(
+            LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory),
+            credential);
         Assert.Equal("parakeet-tdt-0.6b-v3", settings.EffectiveTranscriptionModel);
         Assert.Equal("http://localhost:8422", settings.EffectiveAiProviderBaseUrl);
         // A base URL left over from a previously selected provider never redirects Parakeet.

@@ -39,6 +39,13 @@ final class SettingsStore: ObservableObject {
 
     @Published private(set) var jiraEmailPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var localProviderReachability: LocalProviderReachability = .unknown
+    /// Why the local server said it is not usable, when it said so. The server
+    /// stays up when it cannot load its model, so "unreachable" would be a lie.
+    @Published private(set) var localProviderModelError: String?
+    /// Why the app cannot present the local server its access token, when it
+    /// cannot. The server then refuses every request, so without this the
+    /// user is told the server could not be reached.
+    @Published private(set) var localProviderTokenProblem: LocalServerTokenStore.TokenUnavailable?
 
     @Published var openAIBaseURL: String = "" {
         didSet {
@@ -538,19 +545,43 @@ final class SettingsStore: ObservableObject {
         return components.url ?? fallback
     }
 
-    static func isHealthyLocalProvider(data: Data?, response: URLResponse?) -> Bool {
+    /// What the local server's health check said.
+    struct LocalProviderHealthReport: Equatable {
+        /// Whether the server is the Parakeet server and is ready to work.
+        let isHealthy: Bool
+        /// Why the server is not usable, when the server said so itself.
+        let modelError: String?
+    }
+
+    static func localProviderHealthReport(data: Data?, response: URLResponse?, expectedProof: String?) -> LocalProviderHealthReport {
         guard let response = response as? HTTPURLResponse,
               response.statusCode == 200,
+              let expectedProof,
               let data,
               let health = try? JSONDecoder().decode(LocalProviderHealth.self, from: data) else {
-            return false
+            return LocalProviderHealthReport(isHealthy: false, modelError: nil)
         }
-        return health.status == "ok"
+        // The peer has to prove that it knows the token. A listener that
+        // answers the health check with the right body is still not the
+        // server, and the app must not upload the user's audio to it.
+        guard response.value(forHTTPHeaderField: LocalServerTokenStore.proofHeader) == expectedProof else {
+            return LocalProviderHealthReport(isHealthy: false, modelError: nil)
+        }
+        // `model_loaded` has to be true as well: a stub that answers
+        // {"status":"ok"} is not a Parakeet server, and the health probe is
+        // what decides whether the app hands it the user's audio (#1270).
+        let isHealthy = health.status == "ok" && health.model_loaded
+        return LocalProviderHealthReport(isHealthy: isHealthy, modelError: health.model_error)
+    }
+
+    static func isHealthyLocalProvider(data: Data?, response: URLResponse?, expectedProof: String?) -> Bool {
+        localProviderHealthReport(data: data, response: response, expectedProof: expectedProof).isHealthy
     }
 
     private struct LocalProviderHealth: Decodable {
         let status: String
         let model_loaded: Bool
+        let model_error: String?
     }
 
     /// Whether `host` denotes a loopback / private / link-local endpoint.
@@ -886,7 +917,15 @@ final class SettingsStore: ObservableObject {
     }
 
     var localProviderUnreachableMessage: String {
-        "BugNarrator could not reach the local transcription server at \(openAIBaseURLValue.absoluteString). \(localProviderSetupDetail)"
+        let reported: String
+        if let modelError = localProviderModelError, !modelError.isEmpty {
+            reported = " The server is running but could not load its model: \(modelError)."
+        } else if let tokenProblem = localProviderTokenProblem {
+            reported = " \(tokenProblem.explanation)"
+        } else {
+            reported = ""
+        }
+        return "BugNarrator could not reach the local transcription server at \(openAIBaseURLValue.absoluteString).\(reported) \(localProviderSetupDetail)"
     }
 
 
@@ -916,7 +955,11 @@ final class SettingsStore: ObservableObject {
 
             return openAIAPIKeyForUserInitiatedAccess() ?? ""
         case .parakeetLocal:
-            return ""
+            // The local server refuses every request that does not carry its
+            // bearer token, and the request factory already sends the
+            // credential as one. An empty credential means no header at all,
+            // which the server refuses — the safe direction to fail in.
+            return LocalServerTokenStore.token(installDirectory: localServerInstallDirectory) ?? ""
         }
     }
 
@@ -1012,6 +1055,8 @@ final class SettingsStore: ObservableObject {
         localProviderRequestID = requestID
         guard aiProvider == .parakeetLocal else {
             localProviderReachability = .unknown
+            localProviderModelError = nil
+            localProviderTokenProblem = nil
             lastLocalProviderReachabilityURL = nil
             return
         }
@@ -1027,15 +1072,39 @@ final class SettingsStore: ObservableObject {
         var request = URLRequest(url: url.appendingPathComponent("health"))
         request.timeoutInterval = 2
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        // The peer has to prove that it is the server before the app hands it
+        // anything. A listener that answers on the port is not the server,
+        // and the app must not learn its token from the first request it
+        // sends (#1270). So the challenge carries a fresh nonce and no token:
+        // the server answers with an HMAC of the nonce that only a peer that
+        // knows the token can produce, and the app sends the token on later
+        // requests only once that proof checks out.
+        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        request.setValue(nonce, forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
+        // A token the app cannot present is remembered, so the message can
+        // name the cause: the server is running and healthy, and it is the
+        // token file that stops the app from talking to it.
+        let tokenOutcome = LocalServerTokenStore.tokenOutcome(installDirectory: localServerInstallDirectory)
+        let expectedProof: String? = {
+            if case .ready(let token) = tokenOutcome {
+                return LocalServerTokenStore.proof(nonce: nonce, token: token)
+            }
+            return nil
+        }()
         localProviderTask = localProviderSession.dataTaskPublisher(for: request)
-            .map { Self.isHealthyLocalProvider(data: $0.data, response: $0.response) }
-            .replaceError(with: false)
+            .map { Self.localProviderHealthReport(data: $0.data, response: $0.response, expectedProof: expectedProof) }
+            .replaceError(with: LocalProviderHealthReport(isHealthy: false, modelError: nil))
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] reachable in
+            .sink { [weak self] report in
                 guard let self, self.localProviderRequestID == requestID,
                       self.aiProvider == .parakeetLocal else { return }
                 self.localProviderTask = nil
-                let result: LocalProviderReachability = reachable ? .reachable : .unreachable
+                self.localProviderModelError = report.modelError
+                self.localProviderTokenProblem = {
+                    if case .unavailable(let reason) = tokenOutcome { return reason }
+                    return nil
+                }()
+                let result: LocalProviderReachability = report.isHealthy ? .reachable : .unreachable
                 if self.localProviderReachability != result {
                     self.localProviderReachability = result
                 }
@@ -1093,6 +1162,12 @@ final class SettingsStore: ObservableObject {
     private let launchAtLoginService: any LaunchAtLoginControlling
     private let legacyDefaultsDomains: [String]
     private let localProviderReachabilityProbe: ((URL) -> Bool)?
+
+    /// Where the local transcription server keeps the token that the app and
+    /// the server agree on. The isolated test runtime points this at its own
+    /// temporary directory, so the unit suite never reads or writes the
+    /// user's real token file.
+    private let localServerInstallDirectory: URL
     private var localProviderTask: AnyCancellable?
     private let localProviderSession: URLSession
     private var localProviderRefresh: DispatchWorkItem?
@@ -1108,7 +1183,8 @@ final class SettingsStore: ObservableObject {
         launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
         legacyDefaultsDomains: [String]? = nil,
         localProviderReachabilityProbe: ((URL) -> Bool)? = nil,
-        localProviderSession: URLSession = .shared
+        localProviderSession: URLSession = .shared,
+        localServerInstallDirectory: URL = LocalServerPaths.defaultInstallDirectory
     ) {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
@@ -1141,6 +1217,7 @@ final class SettingsStore: ObservableObject {
         )
         self.launchAtLoginService = launchAtLoginService
         self.localProviderReachabilityProbe = localProviderReachabilityProbe
+        self.localServerInstallDirectory = localServerInstallDirectory
         self.localProviderSession = localProviderSession
         self.legacyDefaultsDomains = resolvedLegacyDefaultsDomains
 

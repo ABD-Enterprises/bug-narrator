@@ -28,6 +28,7 @@ Windows test was green against an output macOS produced nowhere outside UTC.
 |---|---|
 | `transcript.golden.md` | The exact `transcript.md` the canonical session must export |
 | `summary.golden.md` | The shared `summary.md` subset both platforms emit identically today |
+| `local-server-token.json` | The token file name, its path convention and the environment variable the local transcription server and both clients agree on |
 
 ## The canonical session
 

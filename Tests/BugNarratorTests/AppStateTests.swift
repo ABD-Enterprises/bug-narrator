@@ -720,7 +720,12 @@ final class AppStateTests: XCTestCase {
         let requestedAPIKeys = await harness.transcriptionClient.requestedAPIKeys
         let requestedModels = await harness.transcriptionClient.requestedModels
         let requestedBaseURLs = await harness.transcriptionClient.requestedBaseURLs
-        XCTAssertEqual(requestedAPIKeys, [""])
+        // The local server checks a bearer token, so the credential the app
+        // presents is that token rather than an empty string (#1270).
+        XCTAssertEqual(
+            requestedAPIKeys,
+            [LocalServerTokenStore.storedToken(installDirectory: harness.localServerInstallDirectory) ?? ""]
+        )
         XCTAssertEqual(requestedModels, ["parakeet-tdt-0.6b-v3"])
         XCTAssertEqual(requestedBaseURLs.map(\.absoluteString), ["http://localhost:8422"])
         XCTAssertEqual(harness.transcriptStore.sessions.first?.transcript, "Local transcript")

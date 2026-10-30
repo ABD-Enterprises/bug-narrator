@@ -71,7 +71,7 @@ Important:
 - `OpenAI` requires your own OpenAI API key and uses `https://api.openai.com` unless you override it
 - `OpenAI-Compatible` is for enterprise gateways or hosted providers that expose compatible transcription and chat endpoints
 - `Local-Compatible` is for local or self-hosted OpenAI-compatible endpoints such as LM Studio or Ollama
-- `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio
+- `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio; the server refuses every request that does not carry the private access token it shares with BugNarrator, so no process that cannot read the user's own token file can drive the model or receive the recording
 
 #### Installing the local Parakeet server
 
