@@ -873,6 +873,25 @@ final class SettingsStore: ObservableObject {
         )
     }
 
+    /// A blocking issue when the configured Jira base URL would put the account
+    /// email, the API token and the issue content on the wire in the clear.
+    ///
+    /// The AI provider path hard-gates the identical condition (#953): a remote
+    /// plaintext endpoint is a credential leak, not a preference, so warning
+    /// about it was never enough — something has to refuse. The Jira export
+    /// path consumes this instead of only showing `jiraBaseURLPlaintextWarning`.
+    var jiraBaseURLCompatibilityIssue: String? {
+        guard let url = jiraBaseURLValue,
+              url.scheme?.lowercased() == "http",
+              let host = url.host,
+              !Self.isLocalEndpointHost(host) else {
+            return nil
+        }
+        return "The Jira base URL uses plaintext HTTP to a remote host (\(host)). "
+            + "Your Jira email, API token and issue content would cross the network "
+            + "unencrypted. Use https://, or point this at a local address."
+    }
+
     var localProviderSetupCommand: String {
         Self.localTranscriptionRunCommand
     }

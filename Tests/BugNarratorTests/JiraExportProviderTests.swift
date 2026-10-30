@@ -8,6 +8,44 @@ final class JiraExportProviderTests: XCTestCase {
         super.tearDown()
     }
 
+    func testAuthenticatedRequestRefusesPlaintextRemoteHost() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        // A remote plaintext host would put the email, the API token and the
+        // issue content on the wire in the clear.
+        do {
+            _ = try await provider.authenticatedRequest(
+                url: URL(string: "http://jira.example.com/rest/api/3/issue")!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTFail("expected a plaintext remote host to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible(let message) = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("jira.example.com"))
+        }
+
+        // Remote HTTPS and local plaintext endpoints stay allowed.
+        for allowed in [
+            "https://acme.atlassian.net/rest/api/3/issue",
+            "http://localhost:8080/rest/api/3/issue",
+            "http://192.168.1.10/rest/api/3/issue"
+        ] {
+            let request = try await provider.authenticatedRequest(
+                url: URL(string: allowed)!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTAssertEqual(request.url?.absoluteString, allowed)
+        }
+    }
+
     func testMakeURLRequestIncludesBasicAuthAndProjectFields() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let screenshotURL = makeScreenshotFileURL(named: "modal-shot.png")

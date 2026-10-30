@@ -536,6 +536,32 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    func testJiraBaseURLCompatibilityIssueBlocksOnlyPlaintextRemoteHost() {
+        let suiteName = "BugNarrator-JiraPlaintextCompatibilityTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for allowed in [
+            "https://acme.atlassian.net",   // remote HTTPS
+            "http://localhost:8080",         // loopback HTTP
+            "http://192.168.1.10",           // private network
+            "http://jira.localhost",         // loopback by name
+            "acme.atlassian.net",            // no scheme → defaults to https
+            ""
+        ] {
+            store.jiraBaseURL = allowed
+            XCTAssertNil(store.jiraBaseURLCompatibilityIssue, "expected no issue for \(allowed)")
+        }
+
+        store.jiraBaseURL = "http://jira.example.com"
+        let issue = store.jiraBaseURLCompatibilityIssue
+        XCTAssertNotNil(issue)
+        XCTAssertTrue(issue?.contains("jira.example.com") == true)
+        XCTAssertTrue(issue?.contains("https://") == true)
+    }
+
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
                       "192.168.0.1", "169.254.1.1", "::1", "app.localhost"] {

@@ -61,13 +61,20 @@ extension JiraExportProvider {
     /// Produces a Jira REST request with the shared Basic auth, Accept, and
     /// User-Agent headers applied. Pass `includesJSONContentType` for requests
     /// that carry a JSON body.
+    ///
+    /// Refuses to attach the credentials to a plaintext remote host: the Jira
+    /// base URL is typed by the user and a self-hosted Jira on plain HTTP is
+    /// common, so this is the last point where the account email, the API token
+    /// and the issue content can be kept off the wire in the clear.
     func authenticatedRequest(
         url: URL,
         httpMethod: String,
         email: String,
         apiToken: String,
         includesJSONContentType: Bool
-    ) -> URLRequest {
+    ) throws -> URLRequest {
+        try Self.requireEncryptedTransport(url)
+
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         request.setValue(
@@ -80,6 +87,24 @@ extension JiraExportProvider {
         }
         request.setValue("BugNarrator", forHTTPHeaderField: "User-Agent")
         return request
+    }
+
+    /// Refuses a request that would send Basic-auth credentials over plaintext
+    /// HTTP to a host outside the machine. Loopback, private-range and `.local`
+    /// endpoints stay allowed: that traffic never leaves the machine or the
+    /// trusted local network.
+    private static func requireEncryptedTransport(_ url: URL) throws {
+        guard url.scheme?.lowercased() == "http",
+              let host = url.host,
+              !SettingsStore.isLocalEndpointHost(host) else {
+            return
+        }
+
+        throw AppError.exportConfigurationIncompatible(
+            "The Jira base URL uses plaintext HTTP to a remote host (\(host)). "
+            + "Your Jira email, API token and issue content would cross the network "
+            + "unencrypted. Use https://, or point this at a local address."
+        )
     }
 
     func mapJiraError(
