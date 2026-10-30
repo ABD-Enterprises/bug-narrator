@@ -86,7 +86,16 @@ public static class OpenAiCompatibleEndpoint
     {
         if (host.Length >= 2 && host[0] == '[' && host[^1] == ']' && host.Contains(':'))
         {
-            return host[1..^1];
+            var inner = host[1..^1];
+
+            // .NET's parser accepts the brackets around a literal, so they
+            // have to come off before the address is parsed. Only one pair
+            // comes off: `[[::1]]` is not a literal, and reading it as one
+            // would trust a host the app never checked.
+            if (!inner.Contains('[') && !inner.Contains(']'))
+            {
+                return inner;
+            }
         }
 
         return host;
@@ -425,12 +434,6 @@ public static class OpenAiCompatibleEndpoint
             || IsLocalEndpointHost(parsed.Host))
         {
             return null;
-        }
-
-        if (IsUnqualifiedLocalName(parsed.Host))
-        {
-            return PlaintextTransportRefusal(
-                parsed.Host, "This endpoint", "API key and transcript text", "endpoint");
         }
 
         return PlaintextTransportRefusal(

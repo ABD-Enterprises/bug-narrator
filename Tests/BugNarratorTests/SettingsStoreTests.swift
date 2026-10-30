@@ -774,6 +774,21 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// A host that starts with a zone id has nothing before it, and the text
+    /// after the `%` is not an address the app checked.
+    func testAHostThatOnlyHasAZoneIdIsRefused() {
+        for untrusted in [
+            "%::",          // the unspecified address, after an empty host
+            "%::1",         // the loopback, after an empty host
+            "%fe80::1"      // the link-local address, after an empty host
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: there is no host before the zone id"
+            )
+        }
+    }
+
     /// The canonical spelling rule applies to the IPv4 address an IPv4-mapped
     /// IPv6 literal carries too. The mapped form is another way to write the
     /// same address, so a leading zero in it is the same ambiguity.

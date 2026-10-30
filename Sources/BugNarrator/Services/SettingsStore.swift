@@ -642,7 +642,13 @@ final class SettingsStore: ObservableObject {
         // it is removed before the address is parsed. Darwin's parser accepts
         // it and writes the interface index into the address bytes, which
         // would corrupt the comparison.
-        let addressText = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+        // The empty leading component matters: a host that starts with `%`
+        // has nothing before the zone id, and dropping the empty piece would
+        // leave the text after it to be read as the address.
+        let addressText = host
+            .split(separator: "%", maxSplits: 1, omittingEmptySubsequences: false)
+            .first
+            .map(String.init) ?? host
 
         // An address that carries an IPv4 address in its last group has to
         // spell that address the way an address is written too. The mapped

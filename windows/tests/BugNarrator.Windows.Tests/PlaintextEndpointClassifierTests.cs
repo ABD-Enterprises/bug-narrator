@@ -157,6 +157,30 @@ public sealed class PlaintextEndpointClassifierTests
     }
 
     /// <summary>
+    /// A host that only has a zone id has nothing before it, and the text
+    /// after the <c>%</c> is not an address the app checked.
+    /// </summary>
+    [Theory]
+    [InlineData("%::")]
+    [InlineData("%::1")]
+    [InlineData("%fe80::1")]
+    public void AHostThatOnlyHasAZoneIdIsRefused(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
+    }
+
+    /// <summary>
+    /// Brackets belong to an IPv6 literal, and only one pair of them comes
+    /// off: <c>[[::1]]</c> is not a literal, and .NET's parser would read the
+    /// inner brackets as one.
+    /// </summary>
+    [Fact]
+    public void ADoublyBracketedLiteralIsNotOne()
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost("[[::1]]"));
+    }
+
+    /// <summary>
     /// A string that only starts like a link-local address is not one. The
     /// prefix is not a shortcut: the address has to parse.
     /// </summary>
