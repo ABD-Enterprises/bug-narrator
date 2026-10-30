@@ -41,9 +41,11 @@ LOCAL_TRANSCRIPTION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-
 EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
 REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
+REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
+VERSION_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/version-status.txt"
+VERSION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/version-output.txt"
 SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
 RUFF_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/python-lint-status.txt"
-REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
 rm -f \
   "$SEMGREP_STATUS_FILE" \
@@ -54,6 +56,8 @@ rm -f \
   "$EFFORT_LEAK_OUTPUT_FILE" \
   "$REPO_DOCS_STATUS_FILE" \
   "$REPO_DOCS_OUTPUT_FILE" \
+  "$VERSION_STATUS_FILE" \
+  "$VERSION_OUTPUT_FILE" \
   "$SHELLCHECK_STATUS_FILE" \
   "$RUFF_STATUS_FILE"
 
@@ -249,6 +253,26 @@ fi
 
 if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   if ! "$ROOT/scripts/check-agent-rules-sync.sh"; then
+    exit 1
+  fi
+fi
+
+# VERSION, project.yml's MARKETING_VERSION and the latest released heading in
+# the changelog archive have to agree. Only the release-time scripts checked
+# that, so the drift was found at release time rather than on the push that
+# caused it — and CI reported green while the version contract was broken.
+if [[ -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
+  if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
+    exit 1
+  fi
+fi
+
+if [[ -x "$ROOT/scripts/check_version_consistency.sh" ]]; then
+  if "$ROOT/scripts/check_version_consistency.sh" >"$VERSION_OUTPUT_FILE" 2>&1; then
+    printf 'PASS: VERSION, the app version and the latest release agree\n' \
+      >"$VERSION_STATUS_FILE"
+  else
+    cat "$VERSION_OUTPUT_FILE" >&2
     exit 1
   fi
 fi
