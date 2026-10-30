@@ -576,6 +576,41 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// An address has to be spelled the way an address is written, because the
+    /// app and the network have to read the host the same way.
+    ///
+    /// A leading zero is a different octet to a resolver that reads it as
+    /// octal — `010.0.0.1` is eight to one reading and ten to another — and a
+    /// trailing dot turns the host into an absolute DNS name that a resolver
+    /// anywhere on the network can answer with any address it likes. A host
+    /// whose reading the app cannot pin down is not one it can call local.
+    func testOnlyACanonicalDottedQuadIsTrusted() {
+        for untrusted in [
+            "010.0.0.1",          // a leading zero
+            "10.00.0.1",
+            "127.000.000.001",
+            "192.168.001.010",
+            "127.0.0.1.",         // a trailing dot
+            ".127.0.0.1",         // a leading dot
+            "127..0.1",           // an empty part
+            "127.0.0.256",        // not an octet
+            "2130706433"          // one number, not four
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the app cannot pin down how it is read"
+            )
+        }
+
+        // The canonical spellings of the same addresses stay trusted.
+        for trusted in ["10.0.0.1", "127.0.0.1", "192.168.1.10"] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: it is an address written the way an address is written"
+            )
+        }
+    }
+
     /// A `.local` name and a single-label name are resolved over mDNS, which any
     /// device on the local network can answer, so they are the names the app
     /// refuses for plaintext HTTP.

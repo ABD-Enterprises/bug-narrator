@@ -572,18 +572,46 @@ final class SettingsStore: ObservableObject {
         // IPv6 loopback / link-local.
         if lowered == "::1" || lowered.hasPrefix("fe80:") { return true }
 
-        let octets = lowered.split(separator: ".").compactMap { UInt8($0) }
-        if octets.count == 4, lowered.allSatisfy({ $0.isNumber || $0 == "." }) {
-            switch (octets[0], octets[1]) {
-            case (127, _): return true        // loopback 127.0.0.0/8
-            case (10, _): return true         // private 10.0.0.0/8
-            case (192, 168): return true      // private 192.168.0.0/16
-            case (169, 254): return true      // link-local 169.254.0.0/16
-            case (172, 16...31): return true  // private 172.16.0.0/12
-            default: return false
-            }
+        guard let octets = canonicalDottedQuad(lowered) else { return false }
+        switch (octets.0, octets.1) {
+        case (127, _): return true        // loopback 127.0.0.0/8
+        case (10, _): return true         // private 10.0.0.0/8
+        case (192, 168): return true      // private 192.168.0.0/16
+        case (169, 254): return true      // link-local 169.254.0.0/16
+        case (172, 16...31): return true  // private 172.16.0.0/12
+        default: return false
         }
-        return false
+    }
+
+    /// The four octets of `host`, when it is an IPv4 literal written the way an
+    /// address is written.
+    ///
+    /// The spelling has to be canonical, because the app and the network have to
+    /// read the host the same way. A leading zero (`010.0.0.1`) is a different
+    /// octet to a resolver that reads it as octal — eight, not ten — and a
+    /// trailing or leading dot (`127.0.0.1.`) turns the host into an absolute
+    /// DNS name that a resolver anywhere on the network can answer. The app
+    /// cannot know which reading it will be handed, so it trusts none of them.
+    private static func canonicalDottedQuad(_ host: String) -> (UInt8, UInt8, UInt8, UInt8)? {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+
+        var octets: [UInt8] = []
+        octets.reserveCapacity(4)
+        for part in parts {
+            guard !part.isEmpty,
+                  part.count <= 3,
+                  part.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  // A leading zero is another spelling of the same octet, not
+                  // the octet itself.
+                  !(part.count > 1 && part.hasPrefix("0")),
+                  let value = UInt8(part)
+            else {
+                return nil
+            }
+            octets.append(value)
+        }
+        return (octets[0], octets[1], octets[2], octets[3])
     }
 
     /// Whether `host` is an address the app parsed and found to be somewhere
@@ -597,12 +625,7 @@ final class SettingsStore: ObservableObject {
             .lowercased()
             .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
 
-        let parts = lowered.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 4,
-              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy({ $0.isNumber }) }),
-              parts.compactMap({ UInt8($0) }).count == 4 else {
-            return false
-        }
+        guard canonicalDottedQuad(lowered) != nil else { return false }
         return !isLocalEndpointHost(host)
     }
 
