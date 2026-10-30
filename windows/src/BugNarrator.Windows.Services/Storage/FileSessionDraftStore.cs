@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using BugNarrator.Core.Models;
 using BugNarrator.Core.Workflow;
@@ -12,10 +13,12 @@ public sealed class FileSessionDraftStore : ISessionDraftStore
     };
 
     private readonly AppStoragePaths storagePaths;
+    private readonly ISessionDataProtector dataProtector;
 
-    public FileSessionDraftStore(AppStoragePaths storagePaths)
+    public FileSessionDraftStore(AppStoragePaths storagePaths, ISessionDataProtector? dataProtector = null)
     {
         this.storagePaths = storagePaths;
+        this.dataProtector = dataProtector ?? new WindowsSessionDataProtector();
         Directory.CreateDirectory(storagePaths.SessionsDirectory);
     }
 
@@ -59,6 +62,13 @@ public sealed class FileSessionDraftStore : ISessionDraftStore
             "recording session draft metadata");
         var json = JsonSerializer.Serialize(draft, JsonOptions);
 
-        await AtomicFileOperations.WriteAllTextAsync(metadataFilePath, json, cancellationToken);
+        var plaintext = Encoding.UTF8.GetBytes(json);
+        if (plaintext.Length > 4 * 1024 * 1024)
+        {
+            throw new InvalidDataException("The recording draft metadata is too large to save.");
+        }
+
+        var payload = dataProtector.Protect(plaintext);
+        await AtomicFileOperations.WriteAllBytesAsync(metadataFilePath, payload, cancellationToken);
     }
 }
