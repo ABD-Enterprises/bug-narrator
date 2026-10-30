@@ -63,6 +63,14 @@ jobs:
             printf '::error::The windows-release environment does not require a reviewer; refusing to publish.\n' >&2
             exit 1
           fi
+          # A required-reviewers rule with nobody in it gates nobody: a reviewer
+          # who loses repository access can be dropped from the list, and an
+          # empty list would leave the rule satisfied by no one at all.
+          reviewers="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length')"
+          if [[ "$reviewers" == "0" ]]; then
+            printf '::error::The windows-release environment requires a reviewer but names none; refusing to publish.\n' >&2
+            exit 1
+          fi
           if [[ "$rules" != *branch_policy* ]]; then
             printf '::error::The windows-release environment does not restrict which branch may deploy; refusing to publish.\n' >&2
             exit 1
