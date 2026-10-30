@@ -69,8 +69,14 @@ final class MockLaunchAtLoginService: LaunchAtLoginControlling {
 /// the user's Application Support directory. The suite must not read or write
 /// that file: a test that depends on it depends on the machine, and a run
 /// would leave a token behind on the developer's disk.
+///
+/// The directory is one per run rather than one fixed path, so a token file
+/// left by an earlier run is never picked up by a later one.
 let isolatedLocalServerInstallDirectory = FileManager.default.temporaryDirectory
-    .appendingPathComponent("BugNarratorTests-LocalServerInstall", isDirectory: true)
+    .appendingPathComponent(
+        "BugNarratorTests-LocalServerInstall-\(UUID().uuidString)",
+        isDirectory: true
+    )
 
 func makeIsolatedSettingsStore(
     defaults: UserDefaults,

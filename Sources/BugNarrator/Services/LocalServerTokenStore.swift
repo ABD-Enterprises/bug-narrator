@@ -45,11 +45,28 @@ enum LocalServerTokenStore {
     static func token(installDirectory: URL) -> String? {
         let url = tokenFileURL(installDirectory: installDirectory)
         if let stored = storedToken(at: url) {
+            // A token file that an older build left readable by anyone else
+            // is repaired when the app reads it: the token is written back
+            // with the permissions it is supposed to have. A token another
+            // account can read is not a secret, so a file that cannot be
+            // repaired is a file the app must not use.
+            if !isReadableOnlyByItsOwner(url) {
+                guard writeToken(stored, at: url) else { return nil }
+            }
             return stored
         }
         let token = newToken()
         guard writeToken(token, at: url) else { return nil }
         return token
+    }
+
+    /// Whether the file at `url` can be read by its owner and nobody else.
+    private static func isReadableOnlyByItsOwner(_ url: URL) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let permissions = attributes[.posixPermissions] as? NSNumber else {
+            return false
+        }
+        return permissions.int16Value == 0o600
     }
 
     /// The stored token, without creating one.

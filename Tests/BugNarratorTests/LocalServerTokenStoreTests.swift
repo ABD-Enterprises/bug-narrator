@@ -65,6 +65,29 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "a-new-token")
     }
 
+    /// A token file that an older build left readable by everyone else is
+    /// repaired when the app reads it: the token is written back with the
+    /// permissions it is supposed to have. The server rewrites the file at
+    /// every start as well, but the app should not leave a secret lying
+    /// around until the next start.
+    func testAStoredTokenFileIsRepairedWhenItIsTooReadable() throws {
+        let directory = makeInstallDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        FileManager.default.createFile(
+            atPath: url.path,
+            contents: Data("an-old-token".utf8),
+            attributes: [.posixPermissions: NSNumber(value: 0o644)]
+        )
+
+        let token = LocalServerTokenStore.token(installDirectory: directory)
+
+        XCTAssertEqual(token, "an-old-token")
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let permissions = try XCTUnwrap(attributes[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(permissions.int16Value, 0o600)
+    }
+
     func testAStoredTokenIsReadBackUnchanged() throws {
         let directory = makeInstallDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
