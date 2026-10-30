@@ -162,9 +162,9 @@ public sealed record WindowsAppSettings(
         OpenAiCompatibleEndpoint.PlaintextRemoteWarning(AiProviderBaseUrl);
 
     /// <summary>
-    /// Non-blocking warning when the Jira base URL would send Basic-auth
+    /// Explanatory warning when the Jira base URL would send Basic-auth
     /// credentials (email + API token) over plaintext HTTP to a remote host.
-    /// Null for remote HTTPS and local HTTP. Mirrors the macOS app (#504).
+    /// Null for remote HTTPS and local HTTP. Export also enforces the compatibility policy below.
     /// </summary>
     public string? JiraBaseUrlSecurityWarning
     {
@@ -183,6 +183,11 @@ public sealed record WindowsAppSettings(
                 + "unless this is a trusted local server.";
         }
     }
+
+    public string? JiraBaseUrlCompatibilityIssue =>
+        Uri.TryCreate(NormalizedJiraBaseUrl, UriKind.Absolute, out var endpoint)
+            ? JiraEndpointTransportPolicy.CompatibilityIssue(endpoint)
+            : null;
 
     public string? AiProviderCompatibilityIssue
     {
