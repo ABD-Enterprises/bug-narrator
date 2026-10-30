@@ -19,11 +19,13 @@ extension SettingsStore {
         }
     }
 
-    /// Rejects a remote `http://` base URL. Loopback, private-range,
-    /// link-local, `.local`, and single-label hosts stay allowed — that is the
-    /// whole Parakeet / LM Studio / Ollama story, and the shipped defaults are
-    /// themselves `http://localhost`. Parakeet is exempt outright because
-    /// `normalizedOpenAIBaseURL` ignores the typed value for that provider.
+    /// Rejects a remote `http://` base URL. Loopback, private-range and
+    /// link-local hosts stay allowed — that is the whole Parakeet / LM Studio /
+    /// Ollama story, and the shipped defaults are themselves `http://localhost`.
+    /// A `.local` or single-label host does not: both resolve over mDNS, which
+    /// any device on the local network can answer. Parakeet is exempt outright
+    /// because `normalizedOpenAIBaseURL` ignores the typed value for that
+    /// provider.
     var remotePlaintextEndpointIssue: String? {
         guard aiProvider != .parakeetLocal else {
             return nil
@@ -36,6 +38,12 @@ extension SettingsStore {
             return nil
         }
 
+        if SettingsStore.isUnqualifiedLocalName(host) {
+            return SettingsStore.unqualifiedLocalHostPlaintextMessage(
+                host: host,
+                secret: "API key and recordings"
+            )
+        }
         return "Use https:// for \(host), or point this at a local address. "
             + "Over plaintext HTTP your API key and your recordings would cross the network unencrypted."
     }
