@@ -69,16 +69,39 @@ should_skip_semgrep_target() {
   return 1
 }
 
+if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
+  # The scan list below depends on this helper failing closed, so check it
+  # before spending a Semgrep run on it. The check is required, not optional:
+  # a missing or non-executable check would silently drop the guarantee.
+  if [[ ! -x "$ROOT/scripts/check-changed-files.sh" ]]; then
+    printf 'FAIL: scripts/check-changed-files.sh is missing or not executable\n' >&2
+    exit 1
+  fi
+  if ! "$ROOT/scripts/check-changed-files.sh"; then
+    exit 1
+  fi
+fi
+
 # Build the changed-files target list, or fall back to scanning the whole
 # tree when there is no base ref available (e.g. first push of a branch).
+#
+# The list is captured with an explicit error check. Inside a process
+# substitution git's exit status was discarded, so a stale, missing or
+# unrelated base ref produced an empty list and this script reported a green
+# "no scannable changed files" PASS while the scanner had looked at nothing.
 SEMGREP_TARGETS=()
 if [[ -n "$BASE_REF" ]]; then
+  CHANGED_FILES=""
+  if ! CHANGED_FILES="$("$ROOT/scripts/changed-files.sh" "$BASE_REF")"; then
+    printf 'FAIL: could not diff against %s; refusing to report a clean scan\n' "$BASE_REF" >&2
+    exit 1
+  fi
   while IFS= read -r target; do
     [[ -n "$target" ]] || continue
     [[ -f "$target" ]] || continue
     should_skip_semgrep_target "$target" && continue
     SEMGREP_TARGETS+=("$target")
-  done < <(git diff --name-only "${BASE_REF}...HEAD" --)
+  done <<<"$CHANGED_FILES"
 fi
 
 # Returns 0 on semgrep pass, 1 on semgrep findings, 2 on "runner unavailable".
@@ -235,9 +258,18 @@ fi
 # Mirror the semgrep contract: a missing tool is reported as NOT RUN on stdout,
 # never silently as a pass (#1031 is why).
 SHELL_TARGETS=()
-while IFS= read -r f; do SHELL_TARGETS+=("$f"); done < <(
-  find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.sh' -type f 2>/dev/null | sort
-)
+# The listing is captured with an explicit error check: find's exit status was
+# discarded inside the process substitution, so a failed listing looked like
+# "no shell scripts found to lint" and the gate passed without linting.
+SHELL_FILES=""
+if ! SHELL_FILES="$(find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.sh' -type f 2>&1 | sort)"; then
+  printf 'FAIL: could not list the shell scripts to lint: %s\n' "$SHELL_FILES" >&2
+  exit 1
+fi
+while IFS= read -r f; do
+  [[ -n "$f" ]] || continue
+  SHELL_TARGETS+=("$f")
+done <<<"$SHELL_FILES"
 if [[ ${#SHELL_TARGETS[@]} -eq 0 ]]; then
   printf 'PASS: no shell scripts found to lint\n' | tee "$SHELLCHECK_STATUS_FILE"
 elif command -v shellcheck >/dev/null 2>&1; then
@@ -256,9 +288,17 @@ fi
 # Python scripts: same contract as the shell gate. Bug-class rules only (see
 # ruff.toml); a missing tool is NOT RUN on stdout, never a silent pass.
 PY_TARGETS=()
-while IFS= read -r f; do PY_TARGETS+=("$f"); done < <(
-  find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.py' -type f 2>/dev/null | sort
-)
+# Same explicit error check as the shell listing above: a failed listing must
+# not read as "no Python scripts found to lint".
+PY_FILES=""
+if ! PY_FILES="$(find "$ROOT/scripts" "$ROOT/local-transcription" -maxdepth 1 -name '*.py' -type f 2>&1 | sort)"; then
+  printf 'FAIL: could not list the Python scripts to lint: %s\n' "$PY_FILES" >&2
+  exit 1
+fi
+while IFS= read -r f; do
+  [[ -n "$f" ]] || continue
+  PY_TARGETS+=("$f")
+done <<<"$PY_FILES"
 if [[ ${#PY_TARGETS[@]} -eq 0 ]]; then
   printf 'PASS: no Python scripts found to lint\n' | tee "$RUFF_STATUS_FILE"
 elif command -v ruff >/dev/null 2>&1; then
