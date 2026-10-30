@@ -28,7 +28,7 @@ public sealed class JiraExportProvider
         IssueScreenshotAnnotationRenderer? annotationRenderer = null)
     {
         this.diagnostics = diagnostics;
-        this.httpClient = httpClient ?? new HttpClient
+        this.httpClient = httpClient ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = TimeSpan.FromMinutes(2),
         };
@@ -93,6 +93,7 @@ public sealed class JiraExportProvider
         CompletedSession session,
         JiraExportConfiguration configuration)
     {
+        JiraEndpointTransportPolicy.RequireCompatible(configuration.BaseUrl);
         var request = new HttpRequestMessage(
             HttpMethod.Post,
             configuration.BaseUrl.AppendPathSegment("rest/api/3/issue"));
@@ -283,6 +284,8 @@ public sealed class JiraExportProvider
                 "Jira rate limited the request. Wait a moment and try again.",
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
                 $"Jira rejected the credentials for project {configuration.ProjectKey}.",
+            _ when (int)statusCode is >= 300 and <= 399 =>
+                "Jira redirected the request. Update the Jira base URL in Settings; redirects are not followed to protect credentials and issue content.",
             HttpStatusCode.NotFound =>
                 $"Jira could not find the configured site or project {configuration.ProjectKey}.",
             HttpStatusCode.BadRequest =>

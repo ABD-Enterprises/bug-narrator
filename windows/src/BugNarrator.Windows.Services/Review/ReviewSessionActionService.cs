@@ -262,6 +262,11 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         }
 
         var settings = await settingsStore.LoadAsync(cancellationToken);
+        if (settings.JiraBaseUrlCompatibilityIssue is { } compatibilityIssue)
+        {
+            throw new InvalidOperationException(compatibilityIssue);
+        }
+
         var email = await secretStore.GetAsync(SecretKeys.JiraEmail, cancellationToken);
         var apiToken = await secretStore.GetAsync(SecretKeys.JiraApiToken, cancellationToken);
         var configuration = settings.CreateJiraExportConfiguration(email, apiToken)

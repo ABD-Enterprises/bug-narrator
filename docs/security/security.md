@@ -26,6 +26,17 @@ Current approach:
 - operational telemetry is local-only and redacted before persistence
 - unclean-exit detection is stored as a local launch marker and never shipped remotely by default
 
+## Windows Jira Transport
+
+Windows refuses Jira exports to public plaintext HTTP endpoints both during
+review preflight and in the request builder, before attaching Basic-auth
+credentials. HTTPS and the existing local-endpoint exceptions (loopback,
+private/link-local addresses and local hostnames) remain supported, matching
+the AI endpoint policy. Those HTTP exceptions assume the local network is
+trusted; they do not encrypt traffic. The default Jira client refuses redirects
+rather than forwarding issue content to a different destination. Update the
+configured base URL in Settings when Jira responds with a redirect.
+
 ## Stored Session Text
 
 Windows session stores use AES-GCM envelopes with current-user DPAPI-wrapped
