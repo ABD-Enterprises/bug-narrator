@@ -2,10 +2,10 @@
 
 **Date:** 2026-10-29
 **Commit reviewed:** `c8c0070` (local `main`, fast-forwarded from `4981148`; upstream `origin/main` was 3 commits ahead on fetch)
-**Status:** snapshot. `main` moved during and after the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. Two have moved: [P2-2](#p2-2--the-windows-jira-export-drops-the-base-urls-context-path-fixed-by-1245) was fixed by #1245, and [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) was partly fixed by #1239. Everything else was still open at the time of writing.
+**Status:** snapshot. `main` moved during and after the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. Three have moved: [P1-3](#p1-3--the-windows-port-stores-session-bodies-in-plaintext-contradicting-the-repositorys-published-encryption-contract-fixed-by-1249) was fixed by #1249, [P2-2](#p2-2--the-windows-jira-export-drops-the-base-urls-context-path-fixed-by-1245) by #1245, and [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) was partly fixed by #1239. Everything else was still open at the time of writing.
 **Scope:** whole repository — Swift macOS app (`Sources/BugNarrator`, 248 files / 36,455 LOC), tests (`Tests/`, 119 files / 26,323 LOC), Windows port (`windows/`, .NET 8 / WPF), local transcription server (`local-transcription/`, Python), CI/CD (`.github/workflows/`, 5 workflows), release automation (`scripts/`, 19 scripts), docs site (`site/`, Docusaurus).
 **Method:** five parallel read-only review passes (Swift security; Swift maintainability + UX; Python transcription server; Windows C# port; CI/CD + scripts + docs site + repo hygiene), plus independent line-by-line re-verification of every P0/P1 claim by the parent agent, plus live read-only GitHub API queries (`gh api`, `gh run list`, `gh release list`).
-**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*. Of the P2s, one (P2-2) has since been fixed and one (P2-6) is partly fixed; the other six are open.
+**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*. One P1 (P1-3) has since been fixed, so five remain open. Of the P2s, one (P2-2) has since been fixed and one (P2-6) is partly fixed; the other six are open.
 
 > **Status.** This is a point-in-time audit, committed as a reference for follow-up
 > work. It is not a product document and describes a snapshot at `c8c0070`; it
@@ -142,9 +142,10 @@ Note `LocalProviderHealth` decodes `model_loaded` at line 552 and **never reads 
 
 ---
 
-### P1-3 · The Windows port stores session bodies in plaintext, contradicting the repository's published encryption contract
+### P1-3 · The Windows port stores session bodies in plaintext, contradicting the repository's published encryption contract (fixed by #1249)
 
 **Area:** Windows port vs `SECURITY.md`
+**Status:** **fixed** — see below.
 **Evidence**
 
 `SECURITY.md:43-59` states the at-rest posture as a product-wide table (the two `yes` rows quoted; the four `no` rows — screenshots, preserved audio, telemetry, launch state — are elided):
@@ -171,30 +172,49 @@ The macOS implementation matches. `Sources/BugNarrator/Services/SessionDataProte
 let sealedBox = try AES.GCM.seal(data, using: symmetricKey())
 ```
 
-The Windows implementation does not. The **only** cryptography anywhere in `windows/src` is DPAPI, and it protects secrets, not sessions:
+At the reviewed commit the Windows implementation did not. The **only** cryptography anywhere in `windows/src` was DPAPI, and it protected secrets, not sessions:
 
 ```
 windows/src/BugNarrator.Windows.Services/Secrets/DpapiSecretStore.cs:42:  var unprotectedBytes = ProtectedData.Unprotect(
 windows/src/BugNarrator.Windows.Services/Secrets/DpapiSecretStore.cs:73:  var protectedBytes = ProtectedData.Protect(
 ```
 
-There is no `AesGcm`, no `Aes.*`, no `Encrypt`/`Decrypt` for session data in the Windows tree.
+There was no `AesGcm`, no `Aes.*`, no `Encrypt`/`Decrypt` for session data in the Windows tree.
 
-Neither disclosure exists. `docs/security/security.md:50` says only:
+Neither disclosure existed. `docs/security/security.md:50` said only:
 
 > Windows release and runtime security posture has not yet been validated on Windows hardware
 
-and `docs/architecture/parity-matrix.md` has no row covering at-rest encryption scope.
+and `docs/architecture/parity-matrix.md` had no row covering at-rest encryption scope.
 
-**Failure scenario:** a Windows user reads `SECURITY.md` (or the app's own Settings copy) and believes their transcripts and extracted issues are encrypted at rest. They are plain JSON on disk. On a shared or backed-up Windows machine, the session library is readable by anything with file access.
+**Failure scenario (before the fix):** a Windows user reads `SECURITY.md` (or the app's own Settings copy) and believes their transcripts and extracted issues are encrypted at rest. They are plain JSON on disk. On a shared or backed-up Windows machine, the session library is readable by anything with file access.
 
-**Impact:** confidentiality expectation is wrong on one of two platforms. The doc explicitly names the threat model ("the derived text is protected from casual file-level access; the source media is not") — on Windows today the derived text is not protected either.
+**Impact (before the fix):** confidentiality expectation was wrong on one of two platforms. The doc explicitly names the threat model ("the derived text is protected from casual file-level access; the source media is not") — on Windows the derived text was not protected either.
 
 **Fix** — pick one and make it explicit:
 - **Port the protection:** implement AES-GCM session storage in `BugNarrator.Core`/`BugNarrator.Windows.Services` with a DPAPI-wrapped key (DPAPI `CurrentUser` scope), matching `SessionDataProtector`. This preserves the documented contract across platforms. **Preferred** — the macOS implementation is small and portable.
 - **Or amend the contract:** scope `SECURITY.md` and `docs/security/security.md` explicitly to macOS, state that the Windows port stores sessions in plaintext, and add a parity-matrix row so the difference is tracked rather than implied.
 
 Either way, add the parity row — the matrix currently tracks 25 other contracts but not this one.
+
+**Update — fixed by #1249.** `0215fe1` ("fix(windows): protect derived session text at rest", closes #1247) landed on `main` after this review was written, and took the **preferred** option: it ports the protection rather than amending the contract.
+
+The new `windows/src/BugNarrator.Windows.Services/Storage/WindowsSessionDataProtector.cs` mirrors the macOS design with a Windows-appropriate key:
+
+```csharp
+public sealed class WindowsSessionDataProtector : ISessionDataProtector
+{
+    private const int NonceSize = 12;
+    private const int TagSize = 16;
+```
+
+Each file gets a **fresh random 256-bit key**, wrapped with `ProtectedData.Protect(key, null, DataProtectionScope.CurrentUser)` and stored only in wrapped form; the plaintext key is zeroed with `CryptographicOperations.ZeroMemory(key)` after use, and `AesGcm` provides the authenticated encryption. `FileCompletedSessionStore.cs` and `FileSessionDraftStore.cs` were updated to write through the protector, and `SessionDataProtectionTests.cs` adds 264 lines covering the round-trip, tampering, malformed envelopes, legacy plaintext and size-boundary cases.
+
+The documentation half was done too. `SECURITY.md` now scopes the at-rest table to macOS explicitly and documents the Windows behaviour — AES-GCM envelopes with a DPAPI-wrapped per-file key, `CurrentUser` recovery limits, legacy files upgraded on save rather than by background migration, and no fallback to plaintext on failure. `docs/security/security.md` and `docs/architecture/product-spec.md` were updated to match.
+
+Two things remain true of the fix and are worth keeping in view: explicit session-bundle **exports** are still plaintext by design, for portability; and legacy Windows plaintext files stay plaintext until the session is next saved. Both are documented in `SECURITY.md`.
+
+**Nothing further is required for this finding.** It is recorded here for traceability.
 
 ---
 
@@ -743,7 +763,7 @@ Recorded so a future reviewer does not re-investigate them.
 | 4 | P1-1 Jira plaintext gate | ~1 h | Credential disclosure path, and the fix pattern already exists in-repo. |
 | 5 | P2-5 Version consistency into CI | ~15 min | One line in `validate.sh`. |
 | 6 | P1-2 Local server auth | ~1 day | Needs a token handshake on both sides, plus the total-size cap that #1239 left open (P2-6). |
-| 7 | P1-3 Windows at-rest parity | ~2-3 days | The largest single piece of work; decide port-vs-document first. |
+| 7 | ~~P1-3 Windows at-rest parity~~ | — | **Done** — fixed by #1249 (`0215fe1`, closes #1247); AES-GCM with a DPAPI-wrapped per-file key. |
 | 8 | P1-6 Release workflow guards | ~1 h | Environment, ref constraint, namespace regex, `--target`. |
 | 9 | P2-1 Update checker asset filter | ~1 h | Mirrors logic that already exists in `LocalTranscriptionManager`. |
 | 10 | ~~P2-2 Windows Jira context path~~ | — | **Done** — fixed by #1245 (`0d078b2`) with regression tests. |
