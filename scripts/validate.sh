@@ -253,6 +253,17 @@ if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   fi
 fi
 
+# The job token must not sit in the git configuration, and no workflow may
+# push with it. The check is required, not optional: a missing check would
+# silently drop the guarantee.
+if [[ ! -x "$ROOT/scripts/check-no-token-push.sh" ]]; then
+  printf 'FAIL: scripts/check-no-token-push.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-no-token-push.sh"; then
+  exit 1
+fi
+
 # Shell scripts gate the release path — build_dmg.sh signs and notarizes, and
 # build_standalone.sh produces the Parakeet artifact — yet nothing linted them.
 # Mirror the semgrep contract: a missing tool is reported as NOT RUN on stdout,
