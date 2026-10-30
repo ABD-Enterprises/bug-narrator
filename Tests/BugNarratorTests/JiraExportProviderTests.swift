@@ -59,16 +59,58 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(nil))
     }
 
+    /// A redirect that leaves the origin the user configured would put the
+    /// account email, the API token and the issue content in the hands of a
+    /// host they never named - encrypted or not.
+    func testARedirectThatLeavesTheConfiguredOriginIsRefused() throws {
+        let original = URL(string: "https://jira.example.com/rest/api/3/issue")!
+
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://other.example.com/rest/api/3/issue"),
+                from: original
+            ),
+            "another host would get the credentials and the issue content."
+        )
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com:8443/rest/api/3/issue"),
+                from: original
+            ),
+            "another port is another origin."
+        )
+        XCTAssertTrue(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com/rest/api/3/issue/KEY-1"),
+                from: original
+            ),
+            "the same origin is fine."
+        )
+        XCTAssertTrue(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com:443/rest/api/3/issue"),
+                from: original
+            ),
+            "the default port spelled out is the same origin."
+        )
+    }
+
     /// The provider builds its own session, and that session is the one that
     /// carries the credentials. A test that only calls the policy's static
     /// helper cannot tell whether the policy is wired into that session at
     /// all — dropping it leaves the helper test green — so this drives the
     /// session the provider actually uses, through a real redirect.
-    func testTheProvidersOwnSessionRefusesARedirectToAPlaintextRemoteHost() async throws {
-        // The redirect target is a host the app cannot check, and nothing
-        // listens on it: the point is that the session refuses before it goes
-        // there.
-        let server = try RedirectServer(location: "http://plaintext-remote.invalid/rest/api/3/search/jql")
+    func testTheProvidersOwnSessionRefusesARedirectThatLeavesTheConfiguredOrigin() async throws {
+        // The redirect target is a second server that is listening, so the
+        // test can see whether the session went there: a target that nothing
+        // listens on cannot tell a refused redirect from a failed one.
+        let target = try RedirectServer(location: "http://127.0.0.1/never")
+        target.serve()
+        defer { target.stop() }
+
+        // The target is on another port, so it is another origin: the
+        // credentials belong to the site the user configured.
+        let server = try RedirectServer(location: "http://127.0.0.1:\(target.port)/rest/api/3/search/jql")
         server.serve()
         defer { server.stop() }
 
@@ -105,15 +147,20 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertEqual(
             server.requestCount,
             1,
+            "the server that answered the request should have been asked once"
+        )
+        XCTAssertEqual(
+            target.requestCount,
+            0,
             "the redirect target must never be requested: it would carry the credentials in the clear"
         )
     }
 
-    /// The server that answers the redirect releases its port when it is
+    /// The server that answers the redirect stops listening when it is
     /// stopped. A server that went on answering for the rest of the test run
     /// would let one test's server answer another test's request, and would
     /// keep the socket open for no reason.
-    func testTheRedirectServerReleasesItsPortWhenItIsStopped() throws {
+    func testTheRedirectServerStopsListeningWhenItIsStopped() throws {
         let server = try RedirectServer(location: "http://plaintext-remote.invalid/")
         server.serve()
         defer { server.stop() }
@@ -127,7 +174,7 @@ final class JiraExportProviderTests: XCTestCase {
 
         XCTAssertFalse(
             acceptsConnections(on: server.port),
-            "the port should be released when the server stops"
+            "the server should stop listening when it stops"
         )
     }
 

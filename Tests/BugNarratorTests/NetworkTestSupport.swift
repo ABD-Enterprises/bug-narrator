@@ -68,6 +68,12 @@ final class RedirectServer: @unchecked Sendable {
             )
         }
 
+        // The address may be reused: a socket that answered a connection and
+        // was closed leaves the port in TIME_WAIT, and the next server the
+        // system hands that port to would not be able to bind it.
+        var reuse: Int32 = 1
+        setsockopt(opened, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
+
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)

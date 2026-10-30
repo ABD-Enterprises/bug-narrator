@@ -1,27 +1,53 @@
 import Foundation
 
-/// Refuses a redirect that would move a request to a plaintext remote host.
+/// Refuses a redirect that would move a request off the origin the user
+/// configured, and a redirect that would move it to a plaintext remote host.
 ///
 /// `requireEncryptedTransport` looks at the URL of the request it builds. A
 /// redirect is a second request that the guard never sees, and CFNetwork
 /// follows redirects on its own: an `https` base URL that answers with a 307
 /// to an `http` URL would put the issue content on the wire in cleartext,
-/// with the Basic-auth credentials attached.
+/// with the Basic-auth credentials attached. A redirect to another host
+/// would put the account email, the API token and the issue content in the
+/// hands of a host the user never named.
 final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
     /// Whether a redirect to `url` may be followed.
     ///
-    /// A redirect to plaintext HTTP at a remote host would send the Basic-auth
-    /// credentials and the issue content in the clear. A redirect that stays
-    /// on https, or that goes to a local address, is fine.
-    static func mayFollow(_ url: URL?) -> Bool {
-        guard let url,
-              url.scheme?.lowercased() == "http" else {
-            return true
+    /// A redirect that leaves the origin the request started at is refused:
+    /// the credentials belong to the site the user configured and to nowhere
+    /// else. A redirect that stays on the origin is fine, and so is one to a
+    /// local address over plaintext.
+    static func mayFollow(_ url: URL?, from original: URL? = nil) -> Bool {
+        guard let url else { return true }
+
+        if let original, !sameOrigin(url, original) {
+            return false
         }
+
+        guard url.scheme?.lowercased() == "http" else { return true }
         // A plaintext URL without a host is a host the app cannot check, so it
         // is refused like any other one it cannot vouch for.
         guard let host = url.host else { return false }
         return SettingsStore.isLocalEndpointHost(host)
+    }
+
+    /// Whether two URLs name the same origin: the same scheme, the same host
+    /// and the same port.
+    static func sameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
+            && lhs.host?.lowercased() == rhs.host?.lowercased()
+            && effectivePort(lhs) == effectivePort(rhs)
+    }
+
+    /// The port the URL addresses, counting the scheme's default when the URL
+    /// does not spell one out.
+    private static func effectivePort(_ url: URL) -> Int? {
+        if let port = url.port { return port }
+        switch url.scheme?.lowercased() {
+        case "http": return 80
+        case "https": return 443
+        default: return nil
+        }
     }
 
     func urlSession(
@@ -31,10 +57,10 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        guard Self.mayFollow(request.url) else {
+        guard Self.mayFollow(request.url, from: task.originalRequest?.url) else {
             DiagnosticsLogger(category: .export).error(
                 "export_redirect_refused",
-                "Refused a redirect to a plaintext remote host: \(request.url?.host ?? "unknown")"
+                "Refused a redirect to \(request.url?.absoluteString ?? "unknown"): it leaves the configured origin or would put the credentials and the issue content in the clear."
             )
             completionHandler(nil)
             return
@@ -190,8 +216,8 @@ extension JiraExportProvider {
         // A redirect the app did not follow: either the policy refused it, or
         // it pointed somewhere the transport rule would not allow. 300 counts
         // as one: RFC 9110 lets it carry a Location header. The other 3xx
-        // codes are not redirects: 304 is a cached response, 305 and 306 are
-        // unused.
+        // codes are not redirects: 304 is a cached response, 305 is
+        // deprecated and 306 is unused.
         if [300, 301, 302, 303, 307, 308].contains(statusCode) {
             return .exportConfigurationIncompatible(
                 "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
