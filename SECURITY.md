@@ -42,6 +42,24 @@ The app does not stream live dictation into other apps and does not upload audio
 
 ## At-Rest Encryption And Recoverability
 
+The table and Keychain recovery details below describe macOS. On Windows,
+newly saved `session.json`, `transcript.md`, `summary.md` and
+`session-draft.json` use authenticated AES-GCM envelopes. Each file has a fresh
+random key wrapped with Windows DPAPI (`CurrentUser`); no unwrapped key is
+written to disk or included in an export. Recovery requires the original
+Windows user's DPAPI profile/key material, so copying the session directory
+alone to another account or machine is not a migration strategy.
+
+Older Windows plaintext files remain readable and **stay plaintext until the
+session is saved again**. A successful save protects the current metadata,
+transcript, review summary and any retained draft, removing a stale summary
+when review output has been cleared. This is not a background whole-library
+migration. Encryption failure never falls back to plaintext. Explicit session
+bundles are still plaintext for portability; export important sessions before
+changing Windows accounts or reinstalling. Windows screenshots, audio and
+operational logs remain outside this encryption scope; use BitLocker or other
+volume protection if you need protection for those files too.
+
 Encryption at rest is **partial, and deliberately so**. Exactly this is
 encrypted, and nothing else:
 

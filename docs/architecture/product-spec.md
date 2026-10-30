@@ -361,10 +361,17 @@ It must not include:
 
 ### At-Rest Protection Scope
 
-Encryption at rest is partial by decision (#954). Session bodies and the
+Encryption at rest is partial by decision (#954). On macOS, session bodies and the
 library index are AES-GCM encrypted with a device-scoped Keychain key;
 screenshots, preserved recording audio, and the operational log are plaintext
 files.
+
+Windows protects newly saved session metadata, transcript/review text and draft
+notes with AES-GCM and current-user DPAPI-wrapped per-file keys. Legacy Windows
+plaintext files remain readable and upgrade on save, not in a background
+migration. Explicit exports remain plaintext on both platforms. See
+[SECURITY.md](../../SECURITY.md#at-rest-encryption-and-recoverability) for the
+exact scope and platform-specific recovery limits.
 
 The asymmetry is deliberate: screenshots must remain openable by Finder and
 Preview and renderable by the thumbnail cache, and preserved audio must be
