@@ -352,7 +352,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.True(File.Exists(session.MetadataFilePath));
         Assert.True(File.Exists(session.TranscriptMarkdownFilePath));
 
-        var transcriptMarkdown = await File.ReadAllTextAsync(session.TranscriptMarkdownFilePath);
+        var transcriptMarkdown = System.Text.Encoding.UTF8.GetString(new WindowsSessionDataProtector().Unprotect(
+            await File.ReadAllBytesAsync(session.TranscriptMarkdownFilePath)));
         Assert.Contains("## Raw Transcript", transcriptMarkdown);
         Assert.Contains("Tester opens Settings and validates the OpenAI API key.", transcriptMarkdown);
     }
@@ -421,7 +422,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Equal(RecordingWorkflowState.Completed, harness.Service.CurrentState.WorkflowState);
         Assert.Contains("boom", harness.Service.CurrentState.StatusMessage);
 
-        var transcriptMarkdown = await File.ReadAllTextAsync(session.TranscriptMarkdownFilePath);
+        var transcriptMarkdown = System.Text.Encoding.UTF8.GetString(new WindowsSessionDataProtector().Unprotect(
+            await File.ReadAllBytesAsync(session.TranscriptMarkdownFilePath)));
         Assert.Contains("Transcription Note: boom", transcriptMarkdown);
     }
 

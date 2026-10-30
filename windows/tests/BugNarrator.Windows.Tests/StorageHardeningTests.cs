@@ -89,8 +89,8 @@ public sealed class StorageHardeningTests : IDisposable
 
     /// <summary>
     /// Every session.json written before #1139 starts with a UTF-8 BOM. Those files must keep loading:
-    /// the store reads with File.ReadAllText, which strips the BOM, and this pins that so a later move
-    /// to a byte-level reader cannot silently orphan existing libraries.
+    /// the protected store must still strip the legacy BOM after decoding, so upgrading cannot
+    /// silently orphan existing libraries.
     /// </summary>
     [Fact]
     public async Task FileCompletedSessionStore_GetAllAsync_LoadsSessionJsonWrittenWithABom()

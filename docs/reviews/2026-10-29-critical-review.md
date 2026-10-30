@@ -189,7 +189,7 @@ and `docs/architecture/parity-matrix.md` had no row covering at-rest encryption 
 
 **Failure scenario (before the fix):** a Windows user reads `SECURITY.md` (or the app's own Settings copy) and believes their transcripts and extracted issues are encrypted at rest. They are plain JSON on disk. On a shared or backed-up Windows machine, the session library is readable by anything with file access.
 
-**Impact (before the fix):** confidentiality expectation was wrong on one of two platforms. The doc explicitly names the threat model ("the derived text is protected from casual file-level access; the source media is not") — on Windows the derived text was not protected either.
+**Impact (before the fix):** confidentiality expectation was wrong on one of two platforms. The doc explicitly names the threat model ("the derived text is protected from casual file-level access; the source media is not") — on Windows today the derived text is not protected either.
 
 **Fix** — pick one and make it explicit:
 - **Port the protection:** implement AES-GCM session storage in `BugNarrator.Core`/`BugNarrator.Windows.Services` with a DPAPI-wrapped key (DPAPI `CurrentUser` scope), matching `SessionDataProtector`. This preserves the documented contract across platforms. **Preferred** — the macOS implementation is small and portable.
