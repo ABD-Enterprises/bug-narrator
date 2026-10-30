@@ -48,6 +48,13 @@ public static class OpenAiCompatibleEndpoint
 
         var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
 
+        // A host that carries a bracket in any other shape is not an address
+        // the app checked.
+        if (lowered is null)
+        {
+            return false;
+        }
+
         if (IsReservedLocalhostName(lowered))
         {
             return true;
@@ -75,6 +82,69 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
+    /// The host of <paramref name="url"/>, as it was written.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Uri"/> rewrites a host that is a number written in another
+    /// notation: <c>http://127.1/</c> and <c>http://0x7f000001/</c> both
+    /// become <c>127.0.0.1</c>. The macOS port reads the host as it was
+    /// written and refuses those spellings, so the Windows port has to read
+    /// it the same way: the same URL cannot be trusted on one port and
+    /// refused on the other.
+    /// </remarks>
+    public static string? HostAsWritten(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var text = url.Trim();
+        var schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0)
+        {
+            return null;
+        }
+
+        var authority = text[(schemeEnd + 3)..];
+        var end = authority.IndexOfAny(new[] { '/', '?', '#' });
+        if (end >= 0)
+        {
+            authority = authority[..end];
+        }
+
+        // The user information comes before the host and is not part of it.
+        var at = authority.LastIndexOf('@');
+        if (at >= 0)
+        {
+            authority = authority[(at + 1)..];
+        }
+
+        if (authority.StartsWith('['))
+        {
+            // An IPv6 literal is written in brackets, and the port follows
+            // the closing bracket.
+            var close = authority.IndexOf(']');
+            return close > 1 ? authority[..(close + 1)] : null;
+        }
+
+        // A name cannot contain a colon, so the last one separates the port.
+        var colon = authority.LastIndexOf(':');
+        if (colon >= 0)
+        {
+            authority = authority[..colon];
+        }
+
+        return authority.Length == 0 ? null : authority;
+    }
+
+    /// <summary>
+    /// The host of <paramref name="url"/>, as it was written.
+    /// </summary>
+    public static string? HostAsWritten(Uri? url) =>
+        url is null ? null : HostAsWritten(url.OriginalString);
+
+    /// <summary>
     /// The host without the brackets an IPv6 literal is written in.
     /// </summary>
     /// <remarks>
@@ -82,23 +152,29 @@ public static class OpenAiCompatibleEndpoint
     /// and reading it as <c>localhost</c> would make the app trust a name it
     /// cannot check - the brackets are part of the host, not decoration.
     /// </remarks>
-    private static string WithoutIPv6Brackets(string host)
+    private static string? WithoutIPv6Brackets(string host)
     {
-        if (host.Length >= 2 && host[0] == '[' && host[^1] == ']' && host.Contains(':'))
+        if (!host.Contains('[') && !host.Contains(']'))
+        {
+            return host;
+        }
+
+        // A bracket belongs to an IPv6 literal and to nothing else, and the
+        // literal is the whole host: one pair of brackets around an address,
+        // with nothing after it. `[[::1]]` is not a literal, and neither is
+        // `[::1]:8080` - a port does not belong to the host. .NET's parser
+        // accepts the brackets around a literal, so they have to come off
+        // before the address is parsed.
+        if (host.Length >= 2 && host[0] == '[' && host[^1] == ']')
         {
             var inner = host[1..^1];
-
-            // .NET's parser accepts the brackets around a literal, so they
-            // have to come off before the address is parsed. Only one pair
-            // comes off: `[[::1]]` is not a literal, and reading it as one
-            // would trust a host the app never checked.
-            if (!inner.Contains('[') && !inner.Contains(']'))
+            if (!inner.Contains('[') && !inner.Contains(']') && inner.Contains(':'))
             {
                 return inner;
             }
         }
 
-        return host;
+        return null;
     }
 
     /// <summary>
@@ -269,7 +345,7 @@ public static class OpenAiCompatibleEndpoint
     {
         var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
 
-        if (!TryParseDottedQuad(lowered, out var first, out var second, out var third, out var fourth))
+        if (lowered is null || !TryParseDottedQuad(lowered, out var first, out var second, out var third, out var fourth))
         {
             return false;
         }
@@ -306,6 +382,11 @@ public static class OpenAiCompatibleEndpoint
     public static bool IsUnqualifiedLocalName(string host)
     {
         var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
+
+        if (lowered is null)
+        {
+            return false;
+        }
 
         // A trailing dot makes the name absolute rather than different: a
         // resolver answers the same name either way, so the two are the same
@@ -380,7 +461,7 @@ public static class OpenAiCompatibleEndpoint
     public static string UnqualifiedLocalHostPlaintextMessage(string host, string secret) =>
         $"{host} is not an address this app trusts for plaintext HTTP: a .local or single-word host "
         + "name is answered by the network rather than by the app, so it can point anywhere and the "
-        + "traffic could be intercepted. Use the machine's IP address (for example 192.168.1.20), "
+        + "traffic could be intercepted. Use that host's IP address (for example 192.168.1.20), "
         + $"or https://. Over plaintext HTTP your {secret} would cross the network unencrypted.";
 
     /// <summary>
@@ -430,14 +511,22 @@ public static class OpenAiCompatibleEndpoint
             return null;
         }
 
-        if (!string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase)
-            || IsLocalEndpointHost(parsed.Host))
+        if (!string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        // The host is read as it was written: .NET rewrites a number written
+        // in another notation into the address it stands for, and the macOS
+        // port refuses those spellings.
+        var host = HostAsWritten(configuredBaseUrl);
+        if (host is null || IsLocalEndpointHost(host))
         {
             return null;
         }
 
         return PlaintextTransportRefusal(
-            parsed.Host, "This endpoint", "API key and transcript text", "endpoint");
+            host, "This endpoint", "API key and transcript text", "endpoint");
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)

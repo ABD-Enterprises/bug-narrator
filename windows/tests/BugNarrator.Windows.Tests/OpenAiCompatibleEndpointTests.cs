@@ -178,9 +178,11 @@ public sealed class OpenAiCompatibleEndpointTests
 
     /// <summary>
     /// .NET normalises a legacy IPv4 notation when it parses a URL, so a host
-    /// written as a single number arrives as the dotted quad it stands for. The
-    /// app then knows where it points and can call it remote. The address is
-    /// refused either way, which is the part that matters.
+    /// written as a single number would arrive as the dotted quad it stands
+    /// for. The host is read as it was written instead, so the app cannot say
+    /// where it points and cannot call it remote: the refusal says the host is
+    /// not one it can use as a local address, which is what it knows. The
+    /// macOS port says the same about the same URL.
     /// </summary>
     [Fact]
     public void PlaintextRemoteWarning_RefusesANumericAddressWrittenInAnotherNotation()
@@ -188,8 +190,46 @@ public sealed class OpenAiCompatibleEndpointTests
         var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://134744072:1234/v1");
 
         Assert.NotNull(warning);
-        Assert.Contains("remote host", warning, StringComparison.Ordinal);
+        Assert.Contains("cannot use as a local address", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", warning, StringComparison.Ordinal);
         Assert.Contains("API key and transcript text would be sent unencrypted", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The host is read as it was written, not as .NET rewrote it. The macOS
+    /// port refuses these spellings, so the Windows port has to refuse them
+    /// too: the same URL cannot be trusted on one port and refused on the
+    /// other.
+    /// </summary>
+    [Theory]
+    [InlineData("http://127.1:1234/v1")]
+    [InlineData("http://2130706433:1234/v1")]
+    [InlineData("http://0x7f000001:1234/v1")]
+    [InlineData("http://0177.0.0.1:1234/v1")]
+    public void PlaintextRemoteWarning_RefusesANonCanonicalAddress(string url)
+    {
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning(url);
+
+        Assert.NotNull(warning);
+        Assert.Contains("cannot use as a local address", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The host as it was written: the port and the user information are not
+    /// part of it, and the brackets of an IPv6 literal are.
+    /// </summary>
+    [Theory]
+    [InlineData("http://127.1:1234/v1", "127.1")]
+    [InlineData("http://2130706433/v1", "2130706433")]
+    [InlineData("http://0x7f000001/v1", "0x7f000001")]
+    [InlineData("http://[::1]:8080/v1", "[::1]")]
+    [InlineData("http://nas.local:8080/v1", "nas.local")]
+    [InlineData("http://user:pass@nas.local:8080/v1", "nas.local")]
+    [InlineData("http://nas.local/v1", "nas.local")]
+    [InlineData("http://nas.local/v1?a=b", "nas.local")]
+    public void TheHostIsReadAsItWasWritten(string url, string expected)
+    {
+        Assert.Equal(expected, OpenAiCompatibleEndpoint.HostAsWritten(url));
     }
 
     /// <summary>

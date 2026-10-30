@@ -552,6 +552,37 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// The two ports have their own copy of the classifier, and they have to
+    /// agree: the same host has to be trusted on both, or the same secret
+    /// goes out in the clear on one of them. The table is shared, so a change
+    /// to one port that the other does not follow fails a build.
+    func testTheClassifierAgreesWithTheSharedHostTable() throws {
+        let fixturesDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // BugNarratorTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("contract-fixtures", isDirectory: true)
+        let fixtureURL = fixturesDirectory.appendingPathComponent("plaintext-endpoint-hosts.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: fixtureURL.path),
+            "the shared host table is missing: \(fixtureURL.path)"
+        )
+
+        let hosts = try JSONDecoder().decode(
+            [PlaintextEndpointHostTableEntry].self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        XCTAssertFalse(hosts.isEmpty, "the shared host table is empty")
+
+        for entry in hosts {
+            XCTAssertEqual(
+                SettingsStore.isLocalEndpointHost(entry.host),
+                entry.trusted,
+                "\(entry.host): \(entry.note)"
+            )
+        }
+    }
+
     /// The trusted names are the ones the standards reserve for the loopback:
     /// `localhost` and the names under it. A name that merely *looks* like it
     /// points at this machine is not one of them.
@@ -2470,4 +2501,16 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+}
+
+/// One row of the shared host table the two classifiers have to agree about.
+private struct PlaintextEndpointHostTableEntry: Decodable {
+    /// The host, as the app can be given it.
+    let host: String
+
+    /// Whether the app may send a secret to it over plaintext HTTP.
+    let trusted: Bool
+
+    /// Why the answer is what it is.
+    let note: String
 }

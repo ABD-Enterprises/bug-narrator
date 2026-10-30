@@ -28,6 +28,24 @@ Windows test was green against an output macOS produced nowhere outside UTC.
 |---|---|
 | `transcript.golden.md` | The exact `transcript.md` the canonical session must export |
 | `summary.golden.md` | The shared `summary.md` subset both platforms emit identically today |
+| `plaintext-endpoint-hosts.json` | The hosts the two plaintext-endpoint classifiers have to agree about |
+
+## The plaintext-endpoint host table
+
+`plaintext-endpoint-hosts.json` holds the hosts the macOS and Windows copies
+of the plaintext-endpoint classifier have to agree about, and whether each
+one is trusted — that is, whether the app may send a secret to it over
+plaintext HTTP.
+
+The two ports each have their own copy of the classifier, and a copy is a
+copy that drifts: the macOS app read an IPv6 literal with a hex group longer
+than four digits by truncating it, the Windows port read a host written as a
+number in another notation after .NET had rewritten it, and the two ports
+answered differently about the same URL. A secret that one port refuses and
+the other trusts goes out in the clear on the port that trusts it.
+
+Each row names why the answer is what it is, so a disagreement is a claim
+about the rule rather than two different literals to re-type.
 
 ## The canonical session
 

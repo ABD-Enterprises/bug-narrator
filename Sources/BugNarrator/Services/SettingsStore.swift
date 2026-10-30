@@ -565,7 +565,7 @@ final class SettingsStore: ObservableObject {
     /// no protection for them either. A local server is addressed by its IP
     /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
         if isReservedLocalhostName(lowered) { return true }
         if isIPv6LocalEndpointHost(lowered) { return true }
@@ -575,14 +575,22 @@ final class SettingsStore: ObservableObject {
         return isTrustedIPv4(octets.0, octets.1)
     }
 
-    /// The host without the brackets an IPv6 literal is written in.
+    /// The host without the brackets an IPv6 literal is written in, or nil
+    /// when the host is not one the app can check.
     ///
-    /// Only an IPv6 literal carries brackets. `[localhost]` is not one, and
-    /// reading it as `localhost` would make the app trust a name it cannot
-    /// check - the brackets are part of the host, not decoration.
-    private static func withoutIPv6Brackets(_ host: String) -> String {
-        guard host.hasPrefix("["), host.hasSuffix("]"), host.contains(":") else { return host }
-        return String(host.dropFirst().dropLast())
+    /// A bracket belongs to an IPv6 literal and to nothing else, and the
+    /// literal is the whole host: one pair of brackets around an address,
+    /// with nothing after it. `[localhost]` is not a literal, and reading it
+    /// as `localhost` would make the app trust a name it cannot check - the
+    /// brackets are part of the host, not decoration. `[[::1]]` is not a
+    /// literal either, and neither is `[::1]:8080`: a port does not belong to
+    /// the host.
+    private static func withoutIPv6Brackets(_ host: String) -> String? {
+        guard host.contains("[") || host.contains("]") else { return host }
+        guard host.hasPrefix("["), host.hasSuffix("]") else { return nil }
+        let inner = String(host.dropFirst().dropLast())
+        guard !inner.contains("["), !inner.contains("]"), inner.contains(":") else { return nil }
+        return inner
     }
 
     /// The name `host` refers to, with one trailing dot removed.
@@ -748,7 +756,7 @@ final class SettingsStore: ObservableObject {
     /// it is neither a local nor a public address as far as the app is
     /// concerned: the app cannot say where it points.
     static func isPublicAddress(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
         guard let octets = canonicalDottedQuad(lowered) else { return false }
         // The unspecified, multicast and broadcast addresses are not a host on
@@ -766,7 +774,7 @@ final class SettingsStore: ObservableObject {
     /// `lmstudio`. Any device on the local network can answer for such a name,
     /// so it is not a trusted endpoint even though it looks local.
     static func isUnqualifiedLocalName(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
         // A trailing dot makes the name absolute rather than different: a
         // resolver answers the same name either way, so the two are the same
         // host and have to be classified the same way.
@@ -812,7 +820,7 @@ final class SettingsStore: ObservableObject {
     static func unqualifiedLocalHostPlaintextMessage(host: String, secret: String) -> String {
         "\(host) is not an address this app trusts for plaintext HTTP: a .local or single-word host "
             + "name is answered by the network rather than by the app, so it can point anywhere and "
-            + "the traffic could be intercepted. Use the machine's IP address (for example "
+            + "the traffic could be intercepted. Use that host's IP address (for example "
             + "192.168.1.20), or https://. "
             + "Over plaintext HTTP your \(secret) would cross the network unencrypted."
     }

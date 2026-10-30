@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using BugNarrator.Windows.Services.Http;
 using Xunit;
 
@@ -192,4 +194,40 @@ public sealed class PlaintextEndpointClassifierTests
     {
         Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
     }
+
+    /// <summary>
+    /// The two ports have their own copy of the classifier, and they have to
+    /// agree: the same host has to be trusted on both, or the same secret
+    /// goes out in the clear on one of them. The table is shared, so a change
+    /// to one port that the other does not follow fails a build.
+    /// </summary>
+    [Fact]
+    public void TheClassifierAgreesWithTheSharedHostTable()
+    {
+        var path = Path.Combine(RepositoryRoot(), "contract-fixtures", "plaintext-endpoint-hosts.json");
+        Assert.True(File.Exists(path), $"Missing contract fixture at {path}.");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var entries = document.RootElement.EnumerateArray().ToList();
+        Assert.NotEmpty(entries);
+
+        foreach (var entry in entries)
+        {
+            var host = entry.GetProperty("host").GetString() ?? string.Empty;
+            var trusted = entry.GetProperty("trusted").GetBoolean();
+            var note = entry.GetProperty("note").GetString() ?? string.Empty;
+
+            Assert.True(
+                OpenAiCompatibleEndpoint.IsLocalEndpointHost(host) == trusted,
+                $"{host}: {note}");
+        }
+    }
+
+    private static string RepositoryRoot([CallerFilePath] string sourceFilePath = "")
+    {
+        // <root>/windows/tests/BugNarrator.Windows.Tests/<this file>
+        var directory = Path.GetDirectoryName(sourceFilePath)!;
+        return Path.GetFullPath(Path.Combine(directory, "..", "..", ".."));
+    }
+
 }

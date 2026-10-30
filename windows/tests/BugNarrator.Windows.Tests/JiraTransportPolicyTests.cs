@@ -57,6 +57,26 @@ public sealed class JiraTransportPolicyTests : IDisposable
     }
 
     /// <summary>
+    /// .NET rewrites a host that is a number written in another notation into
+    /// the address it stands for, so the host has to be read as it was
+    /// written. The macOS port refuses these spellings, so the Windows port
+    /// has to refuse them too: the same URL cannot be trusted on one port and
+    /// refused on the other.
+    /// </summary>
+    [Theory]
+    [InlineData("http://127.1:8080/jira")]
+    [InlineData("http://2130706433:8080/jira")]
+    [InlineData("http://0x7f000001:8080/jira")]
+    public void ANonCanonicalAddressIsRefusedByTheExportGate(string endpoint)
+    {
+        var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
+
+        Assert.NotNull(settings.JiraBaseUrlCompatibilityIssue);
+        Assert.NotNull(settings.JiraBaseUrlSecurityWarning);
+        Assert.Equal(settings.JiraBaseUrlCompatibilityIssue, settings.JiraBaseUrlSecurityWarning);
+    }
+
+    /// <summary>
     /// The export gate refuses the same hosts as the settings warning and says
     /// why: a host the app parsed and found to be public is remote, a host it
     /// cannot parse is one it cannot check. Both refusals name what would cross

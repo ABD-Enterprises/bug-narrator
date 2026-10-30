@@ -173,8 +173,16 @@ public sealed record WindowsAppSettings(
         {
             if (string.IsNullOrWhiteSpace(JiraBaseUrl)
                 || !Uri.TryCreate(JiraBaseUrl.Trim(), UriKind.Absolute, out var parsed)
-                || !string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase)
-                || OpenAiCompatibleEndpoint.IsLocalEndpointHost(parsed.Host))
+                || !string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            // The host is read as it was written: .NET rewrites a number
+            // written in another notation into the address it stands for, and
+            // the macOS port refuses those spellings.
+            var host = OpenAiCompatibleEndpoint.HostAsWritten(JiraBaseUrl);
+            if (host is null || OpenAiCompatibleEndpoint.IsLocalEndpointHost(host))
             {
                 return null;
             }
@@ -183,7 +191,7 @@ public sealed record WindowsAppSettings(
             // so the warning next to the field and the refusal that blocks the
             // export cannot describe one host two different ways.
             return OpenAiCompatibleEndpoint.PlaintextTransportRefusal(
-                parsed.Host, "This Jira URL", "email, API token and issue content", "server");
+                host, "This Jira URL", "email, API token and issue content", "server");
         }
     }
 
