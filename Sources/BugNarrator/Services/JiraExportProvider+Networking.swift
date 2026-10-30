@@ -15,10 +15,12 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
     /// on https, or that goes to a local address, is fine.
     static func mayFollow(_ url: URL?) -> Bool {
         guard let url,
-              url.scheme?.lowercased() == "http",
-              let host = url.host else {
+              url.scheme?.lowercased() == "http" else {
             return true
         }
+        // A plaintext URL without a host is a host the app cannot check, so it
+        // is refused like any other one it cannot vouch for.
+        guard let host = url.host else { return false }
         return SettingsStore.isLocalEndpointHost(host)
     }
 
@@ -137,25 +139,26 @@ extension JiraExportProvider {
     /// machine or the trusted local network. A name the app cannot check — a
     /// `.local` name, a single-label name, a numeric address — is not local.
     private static func requireEncryptedTransport(_ url: URL) throws {
-        guard url.scheme?.lowercased() == "http",
-              let host = url.host,
-              !SettingsStore.isLocalEndpointHost(host) else {
+        guard url.scheme?.lowercased() == "http" else {
             return
         }
-
-        // The refusal is built the same way the settings warning builds it, so
-        // the export path and the settings screen cannot describe one host
-        // differently. A host the app parsed and found to be public is a remote
-        // host; a host it could not parse is one it cannot check as a local
-        // address.
-        throw AppError.exportConfigurationIncompatible(
-            SettingsStore.plaintextTransportRefusal(
-                host: host,
-                subject: "This Jira URL",
-                secret: "email, API token and issue content",
-                localNoun: "server"
+        // A plaintext URL the app cannot check is refused. A host it cannot
+        // even name is not one it can vouch for either.
+        guard let host = url.host, SettingsStore.isLocalEndpointHost(host) else {
+            // The refusal is built the same way the settings warning builds
+            // it, so the export path and the settings screen cannot describe
+            // one host differently. A host the app parsed and found to be
+            // public is a remote host; a host it could not parse is one it
+            // cannot check as a local address.
+            throw AppError.exportConfigurationIncompatible(
+                SettingsStore.plaintextTransportRefusal(
+                    host: url.host,
+                    subject: "This Jira URL",
+                    secret: "email, API token and issue content",
+                    localNoun: "server"
+                )
             )
-        )
+        }
     }
 
     func mapJiraError(
@@ -189,8 +192,8 @@ extension JiraExportProvider {
         if (300..<400).contains(statusCode) {
             return .exportConfigurationIncompatible(
                 "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
-                + "A redirect to a plaintext remote host would send the credentials and the issue "
-                + "content in the clear. Use the final https:// URL of your Jira site."
+                + "A redirect to a plaintext remote host would send the account email, the API token "
+                + "and the issue content in the clear. Use the final https:// URL of your Jira site."
             )
         }
 

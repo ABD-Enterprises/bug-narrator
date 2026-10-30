@@ -59,6 +59,63 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(nil))
     }
 
+    /// The provider builds its own session, and that session is the one that
+    /// carries the credentials. A test that only calls the policy's static
+    /// helper cannot tell whether the policy is wired into that session at
+    /// all — dropping it leaves the helper test green — so this drives the
+    /// session the provider actually uses.
+    func testTheProvidersOwnSessionRefusesARedirectToAPlaintextRemoteHost() async throws {
+        var requestedHosts: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            requestedHosts.append(request.url?.host ?? "")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 307,
+                httpVersion: nil,
+                headerFields: ["Location": "http://plaintext-remote.example.com/rest/api/3/search/jql"]
+            )!
+            return (response, Data())
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        // No session is injected: the provider builds the one the app uses,
+        // with the redirect policy on it.
+        let provider = JiraExportProvider(sessionConfiguration: configuration)
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout never enabled.",
+            timestamp: nil
+        )
+
+        do {
+            _ = try await provider.findOpenIssues(
+                matching: issue,
+                configuration: JiraExportConfiguration(
+                    baseURL: URL(string: "https://acme.atlassian.net")!,
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    projectKey: "FM",
+                    issueType: "Task"
+                )
+            )
+            XCTFail("expected the redirect to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible(let message) = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("redirect"), message)
+        }
+
+        XCTAssertEqual(
+            requestedHosts,
+            ["acme.atlassian.net"],
+            "the redirect target must never be requested: it would carry the credentials in the clear"
+        )
+    }
+
     func testMakeURLRequestIncludesBasicAuthAndProjectFields() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let screenshotURL = makeScreenshotFileURL(named: "modal-shot.png")
