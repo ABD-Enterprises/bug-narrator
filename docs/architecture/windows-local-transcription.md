@@ -18,7 +18,7 @@ lines), `SettingsStore.swift` (reachability probe, lines ~760–815),
 
 | Concern | macOS behaviour |
 | --- | --- |
-| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok","model_loaded":…}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). **Every route requires `Authorization: Bearer <token>`** — the token is generated at startup and kept in a per-user file next to the managed install, so nothing else on the machine can drive the model or receive the recording (#1270). The upload is streamed to disk under a hard size limit and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
+| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok","model_loaded":…}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). **Every route requires `Authorization: Bearer <token>`** — the token is created when there is none and kept in a per-user file next to the managed install, so nothing else on the machine can drive the model or receive the recording (#1270). The check runs in front of the router, so a request that is refused is refused from its headers alone and its body is never written to disk. The upload is streamed to disk under a hard size limit and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
 | Inference | `parakeet-mlx` (Apple MLX). **Apple Silicon only** — `build_standalone.sh` refuses non-arm64. |
 | Packaging | PyInstaller-style standalone binary `bugnarrator-transcription`, shipped as a signed + notarized DMG release asset (`bugnarrator-transcription-macos-arm64.dmg`, ~136 MB) plus a `.sha256` manifest, on its own release cadence. |
 | Discovery of a package | `discover()` pages the GitHub Releases API (≤20 pages × 30) for the first non-draft, non-prerelease release carrying both assets, size-bounded, and only from `https://github.com/ABD-Enterprises/bug-narrator/releases/download/`. |
@@ -121,8 +121,12 @@ captured (last 4 KB) for the exit message, process assigned to a Job Object
 with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
 
 `--preload` is what macOS already passes: the health probe treats a server
-that has not loaded its model as not ready, so a lazily loaded server would
-never report itself reachable. The bearer token is handed over in the
+that has not loaded its model as not ready. The server therefore loads its
+model at startup rather than on the first request — otherwise the two would
+deadlock, because the app waits for a loaded model before it hands over a
+recording and the model only arrived with a request the app was not allowed
+to make. A server started without `--preload` loads the model in the
+background and reaches the same state on its own. The bearer token is handed over in the
 environment as `BUGNARRATOR_TRANSCRIPTION_TOKEN` — never on the command line,
 where it would be visible in the process list — and is read from the same
 per-user token file the macOS app uses (`contract-fixtures/local-server-token.json`

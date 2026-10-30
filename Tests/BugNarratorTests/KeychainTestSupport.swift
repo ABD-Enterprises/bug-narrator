@@ -63,13 +63,23 @@ final class MockLaunchAtLoginService: LaunchAtLoginControlling {
 
 
 /// Incidental settings tests must not inherit production health polling.
+/// Where the unit suite keeps the local transcription token.
+///
+/// The token file lives next to the managed server install, which is under
+/// the user's Application Support directory. The suite must not read or write
+/// that file: a test that depends on it depends on the machine, and a run
+/// would leave a token behind on the developer's disk.
+let isolatedLocalServerInstallDirectory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("BugNarratorTests-LocalServerInstall", isDirectory: true)
+
 func makeIsolatedSettingsStore(
     defaults: UserDefaults,
     keychainService: KeychainServicing = MockKeychainService(),
     launchAtLoginService: any LaunchAtLoginControlling = MockLaunchAtLoginService(),
     legacyDefaultsDomains: [String]? = nil,
     localProviderReachabilityProbe: ((URL) -> Bool)? = { _ in false },
-    localProviderSession: URLSession = .shared
+    localProviderSession: URLSession = .shared,
+    localServerInstallDirectory: URL = isolatedLocalServerInstallDirectory
 ) -> SettingsStore {
     SettingsStore(
         defaults: defaults,
@@ -77,6 +87,7 @@ func makeIsolatedSettingsStore(
         launchAtLoginService: launchAtLoginService,
         legacyDefaultsDomains: legacyDefaultsDomains,
         localProviderReachabilityProbe: localProviderReachabilityProbe ?? { _ in false },
-        localProviderSession: localProviderSession
+        localProviderSession: localProviderSession,
+        localServerInstallDirectory: localServerInstallDirectory
     )
 }

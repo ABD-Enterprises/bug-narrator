@@ -8,6 +8,7 @@ struct AppStateHarness {
     let defaults: UserDefaults
     let keychainService: MockKeychainService
     let settingsStore: SettingsStore
+    let localServerInstallDirectory: URL
     let transcriptStore: TranscriptStore
     let audioRecorder: MockAudioRecorder
     let transcriptionClient: MockTranscriptionClient
@@ -57,12 +58,16 @@ struct AppStateHarness {
 
         let keychainService = MockKeychainService()
         let launchAtLoginService = MockLaunchAtLoginService(status: launchAtLoginStatus)
+        let localServerInstallDirectory = rootDirectoryURL
+            .appendingPathComponent("LocalTranscription", isDirectory: true)
         let settingsStore = makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: keychainService,
             launchAtLoginService: launchAtLoginService,
-            localProviderReachabilityProbe: { _ in localProviderIsReachable }
+            localProviderReachabilityProbe: { _ in localProviderIsReachable },
+            localServerInstallDirectory: localServerInstallDirectory
         )
+        self.localServerInstallDirectory = localServerInstallDirectory
         settingsStore.apiKey = apiKey
         settingsStore.debugMode = debugMode
         settingsStore.autoCopyTranscript = autoCopyTranscript

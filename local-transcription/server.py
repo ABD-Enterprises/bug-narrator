@@ -45,7 +45,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("bugnarrator-transcription")
 
-app = FastAPI(title="BugNarrator Local Transcription Server")
+app = FastAPI(
+    title="BugNarrator Local Transcription Server",
+    # FastAPI registers the interactive documentation and the schema it
+    # renders as plain routes that no dependency covers, so they answer
+    # without the bearer token. Nothing a client of this server needs lives
+    # in them, so they are switched off rather than left open.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 _model = None
 _model_name = None
@@ -93,6 +102,12 @@ DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 
 _auth_token: Optional[str] = None
 _max_upload_bytes = DEFAULT_MAX_UPLOAD_BYTES
+# not_loaded | loading | loaded | failed. The health check reports it, so a
+# client can tell "the server is still starting" from "the server cannot
+# load its model".
+_model_load_state = "not_loaded"
+_model_load_error: Optional[str] = None
+_model_lock = threading.Lock()
 
 
 def default_token_file() -> Path:
@@ -128,12 +143,16 @@ def write_token_file(path: Path, token: str) -> None:
     """Store `token` in `path`, readable by its owner only.
 
     The file is created with owner-only permissions before the token is
-    written, so it is never briefly world-readable.
+    written, so it is never briefly world-readable. The mode is set again
+    after the write: `O_CREAT` only applies the mode when it creates the
+    file, so a token file left at 0644 by an older build, a restored backup
+    or a copy would otherwise stay readable by everyone.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         handle.write(token)
+    os.chmod(path, 0o600)
 
 
 def resolve_auth_token(
@@ -162,22 +181,37 @@ def resolve_auth_token(
     return token
 
 
+def _authorization_failure(authorization: Optional[str]) -> Optional[tuple]:
+    """Why an Authorization header is not acceptable, or None when it is.
+
+    The comparison is constant-time. It compares bytes rather than `str`
+    values: `hmac.compare_digest` refuses to compare two strings that carry
+    non-ASCII characters, and the header is attacker-controlled, so a
+    non-ASCII token has to be refused with a 401 rather than crash the
+    request with a 500.
+    """
+    if not _auth_token:
+        return (503, "The server token is not configured")
+    if not authorization:
+        return (401, "Missing Authorization header")
+    prefix = "Bearer "
+    if not authorization.startswith(prefix):
+        return (401, "Invalid Authorization header")
+    presented = authorization[len(prefix):].encode("utf-8")
+    if not hmac.compare_digest(presented, _auth_token.encode("utf-8")):
+        return (401, "Invalid bearer token")
+    return None
+
+
 def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
     """Reject every request that does not carry the server's bearer token.
 
     Without this, any process on the machine could drive the model or, worse,
     receive the user's microphone audio.
     """
-    expected = _auth_token
-    if not expected:
-        raise HTTPException(status_code=503, detail="The server token is not configured")
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    prefix = "Bearer "
-    if not authorization.startswith(prefix):
-        raise HTTPException(status_code=401, detail="Invalid Authorization header")
-    if not hmac.compare_digest(authorization[len(prefix):], expected):
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
+    failure = _authorization_failure(authorization)
+    if failure is not None:
+        raise HTTPException(status_code=failure[0], detail=failure[1])
 
 
 def configure_auth(token: str, max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES) -> None:
@@ -208,6 +242,90 @@ def _reject_oversized_upload(request: Request) -> None:
         )
 
 
+def _upload_too_large_detail(limit: int) -> str:
+    return f"The upload exceeds the {limit} byte limit"
+
+
+def _scope_header(scope, name: bytes) -> Optional[str]:
+    """Read one header out of an ASGI scope."""
+    for key, value in scope.get("headers", []):
+        if key.lower() == name:
+            return value.decode("latin-1")
+    return None
+
+
+def _capped_receive(receive, limit: int):
+    """A receive channel that refuses to deliver more than `limit` bytes.
+
+    A request that declares no length is still bounded: the body is refused
+    as soon as it exceeds the ceiling, so it never reaches the spooled
+    temporary file the multipart parser writes to.
+    """
+    delivered = 0
+
+    async def capped():
+        nonlocal delivered
+        message = await receive()
+        if message["type"] == "http.request":
+            delivered += len(message.get("body", b""))
+            if delivered > limit:
+                raise HTTPException(status_code=413, detail=_upload_too_large_detail(limit))
+        return message
+
+    return capped
+
+
+class _BearerTokenMiddleware:
+    """Refuse a request before its body is read.
+
+    FastAPI parses a multipart body before it solves the route's
+    dependencies, so a check that lives in a dependency runs only after the
+    body has been spooled to disk. An unauthenticated caller could therefore
+    make the server write an unbounded amount of data to its temporary
+    directory before it was refused — and a web page the user visits could
+    make that call cross-origin, because `multipart/form-data` is a
+    CORS-safelisted content type.
+
+    This middleware sits in front of the router. It reads the headers, so
+    the body is never touched when the request is refused, and it caps how
+    many bytes the body may deliver when the request is accepted.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        failure = _authorization_failure(_scope_header(scope, b"authorization"))
+        if failure is not None:
+            await self._respond(scope, receive, send, failure[0], failure[1])
+            return
+
+        limit = _max_upload_bytes
+        declared = _scope_header(scope, b"content-length")
+        if declared is not None:
+            try:
+                declared_bytes = int(declared)
+            except ValueError:
+                declared_bytes = None
+            if declared_bytes is not None and declared_bytes > limit:
+                await self._respond(scope, receive, send, 413, _upload_too_large_detail(limit))
+                return
+
+        await self.app(scope, _capped_receive(receive, limit), send)
+
+    @staticmethod
+    async def _respond(scope, receive, send, status: int, detail: str) -> None:
+        response = JSONResponse({"detail": detail}, status_code=status)
+        await response(scope, receive, send)
+
+
+app.add_middleware(_BearerTokenMiddleware)
+
+
 class _SignalPreservingServer(uvicorn.Server):
     """Keep process handlers installed while pinned Uvicorn 0.47 serves."""
 
@@ -229,38 +347,81 @@ def configure_default_model(model_name: str):
 
 def get_model(model_name: Optional[str] = None):
     """Lazy-load the Parakeet model. Keeps it warm after first load."""
-    global _model, _model_name
+    global _model, _model_name, _model_load_error, _model_load_state
     resolved_model_name = _resolve_model_id(model_name)
     if _model is not None and _model_name == resolved_model_name:
         return _model
 
-    logger.info(f"Loading model: {resolved_model_name} ({_backend})")
-    start = time.time()
+    # The startup load and a request that arrives while it is still running
+    # must not load the model twice.
+    with _model_lock:
+        if _model is not None and _model_name == resolved_model_name:
+            return _model
 
-    if _backend == "mlx":
-        from parakeet_mlx import from_pretrained
+        logger.info(f"Loading model: {resolved_model_name} ({_backend})")
+        start = time.time()
 
-        _model = from_pretrained(resolved_model_name)
-    else:
-        import onnx_asr
+        if _backend == "mlx":
+            from parakeet_mlx import from_pretrained
 
-        _model = onnx_asr.load_model(
-            _onnx_model_for(resolved_model_name),
-            quantization=_onnx_quantization,
-        ).with_timestamps()
-    _model_name = resolved_model_name
-    elapsed = time.time() - start
-    logger.info(f"Model loaded in {elapsed:.1f}s")
-    return _model
+            _model = from_pretrained(resolved_model_name)
+        else:
+            import onnx_asr
+
+            _model = onnx_asr.load_model(
+                _onnx_model_for(resolved_model_name),
+                quantization=_onnx_quantization,
+            ).with_timestamps()
+        _model_name = resolved_model_name
+        _model_load_error = None
+        _model_load_state = "loaded"
+        elapsed = time.time() - start
+        logger.info(f"Model loaded in {elapsed:.1f}s")
+        return _model
+
+
+def _load_model_in_background(model_name: Optional[str]) -> None:
+    """Load the model without holding up the server's startup.
+
+    The health check reports whether the model is loaded, and the desktop app
+    will not hand the server a recording until the health check passes. A
+    server that only loaded its model on the first request could therefore
+    never become healthy: the app waited for the model, and the model only
+    arrived with a request the app was not allowed to make.
+
+    A failure here leaves the server up and says why in the health check: the
+    model may be missing or may need to be downloaded, and the user is better
+    served by the server's own answer than by a refused connection.
+    """
+    global _model_load_state
+    _model_load_state = "loading"
+
+    def load() -> None:
+        global _model_load_error
+        try:
+            _inference_executor.submit(get_model, model_name).result()
+        except Exception as exc:  # noqa: BLE001 - the server stays up and says why
+            _model_load_error = str(exc)
+            _model_load_state = "failed"
+            logger.error(f"Could not load the model at startup: {exc}")
+
+    threading.Thread(target=load, name="model-preload", daemon=True).start()
 
 
 @app.get("/health", dependencies=[Depends(require_bearer_token)])
 async def health():
     """Health check endpoint for BugNarrator to verify the server is running."""
+    if _model_load_state == "loaded":
+        status = "ok"
+    elif _model_load_state == "failed":
+        status = "degraded"
+    else:
+        status = _model_load_state
     return {
-        "status": "ok",
+        "status": status,
         "model_loaded": _model is not None,
         "model_name": _model_name,
+        "model_error": _model_load_error,
     }
 
 
@@ -599,6 +760,19 @@ def _transcribe_onnx(model, audio_path: str) -> _Transcription:
     return _Transcription(" ".join(texts), sentences)
 
 
+def _child_environment() -> dict:
+    """The environment for a child process, without the server's token.
+
+    The token is in this process's environment so that a server the app did
+    not start can still find it. A child process does not need it, and
+    `ps eww` prints the environment of every process the user owns, so the
+    token is removed rather than handed to ffmpeg.
+    """
+    environment = dict(os.environ)
+    environment.pop(TOKEN_ENVIRONMENT_VARIABLE, None)
+    return environment
+
+
 def _unlink_quietly(path: str):
     with contextlib.suppress(OSError):
         os.unlink(path)
@@ -653,7 +827,7 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
         destination,
     ]
     try:
-        subprocess.run(command, check=True, capture_output=True)
+        subprocess.run(command, check=True, capture_output=True, env=_child_environment())
         if _wav_data_size(destination) == 0:
             # Seek past the end decodes to nothing (ffmpeg exits 0 with an empty file):
             # the recording is fully consumed.
@@ -775,6 +949,7 @@ def _serve(host: str, port: int):
 
 
 def main():
+    global _model_load_state
     parser = argparse.ArgumentParser(
         description="BugNarrator Local Transcription Server"
     )
@@ -798,7 +973,15 @@ def main():
     parser.add_argument(
         "--preload",
         action="store_true",
-        help="Load the model at startup instead of on first request",
+        help="Load the model at startup and wait for it before serving "
+        "(the default is to load it in the background)",
+    )
+    parser.add_argument(
+        "--lazy",
+        action="store_true",
+        help="Do not load the model at startup at all. The desktop app waits "
+        "for a loaded model before it hands over a recording, so a lazy "
+        "server never becomes usable to the app.",
     )
     parser.add_argument(
         "--token-file",
@@ -830,7 +1013,13 @@ def main():
         signal.signal(signal.SIGBREAK, _shutdown_handler)
 
     if args.preload:
+        # A server that was asked to wait for its model and could not load it
+        # does not start: the app that launched it reports the failure, and a
+        # server that stays up without a model would only look healthy.
+        _model_load_state = "loading"
         _inference_executor.submit(get_model, args.model).result()
+    elif not args.lazy:
+        _load_model_in_background(args.model)
 
     logger.info(
         f"Starting BugNarrator transcription server on {args.host}:{args.port}"

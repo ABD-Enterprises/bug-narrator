@@ -49,6 +49,12 @@ PY
 say -r 175 -o "$AUDIO_PATH" \
     "Bug Narrator local transcription is ready."
 
+# Every route of the packaged server requires the bearer token (#1270). The
+# token is handed over in the environment, the way the app hands it over, and
+# it is presented on every request below.
+TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export BUGNARRATOR_TRANSCRIPTION_TOKEN="$TOKEN"
+
 "$SERVER_BINARY" --host 127.0.0.1 --port "$PORT" --preload \
     >"$SERVER_LOG_PATH" 2>&1 &
 SERVER_PID="$!"
@@ -61,6 +67,7 @@ for _ in $(seq 1 "$PRELOAD_TIMEOUT_SECONDS"); do
     fi
 
     if curl --silent --show-error --max-time 2 \
+        --header "Authorization: Bearer $TOKEN" \
         "http://127.0.0.1:$PORT/health" >"$HEALTH_PATH" 2>/dev/null \
         && python3 - "$HEALTH_PATH" <<'PY'
 import json
@@ -96,6 +103,7 @@ then
 fi
 
 HTTP_STATUS="$(curl --silent --show-error --max-time 300 \
+    --header "Authorization: Bearer $TOKEN" \
     --output "$RESPONSE_PATH" \
     --write-out '%{http_code}' \
     --form "file=@$AUDIO_PATH" \

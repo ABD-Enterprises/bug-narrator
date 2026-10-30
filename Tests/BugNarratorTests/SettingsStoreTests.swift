@@ -1127,7 +1127,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(credential?.isEmpty ?? true)
         XCTAssertEqual(
             credential,
-            LocalServerTokenStore.storedToken(installDirectory: LocalServerPaths.defaultInstallDirectory)
+            LocalServerTokenStore.storedToken(installDirectory: isolatedLocalServerInstallDirectory)
         )
     }
 
@@ -1194,6 +1194,29 @@ final class SettingsStoreTests: XCTestCase {
         ] {
             XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response))
         }
+    }
+
+    func testParakeetHealthReportsTheServersOwnReasonWhenItCannotLoadItsModel() {
+        let url = URL(string: "http://localhost:8422/health")!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+
+        // A server that is running but has no model says why, so the app can
+        // say something true instead of "could not reach the server".
+        let degraded = Data(#"{"status":"degraded","model_loaded":false,"model_error":"model file missing"}"#.utf8)
+        let report = SettingsStore.localProviderHealthReport(data: degraded, response: response)
+        XCTAssertFalse(report.isHealthy)
+        XCTAssertEqual(report.modelError, "model file missing")
+
+        // A healthy server has no error to report.
+        let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: healthy, response: response).modelError)
+
+        // A server that is still loading its model is not an error.
+        let loading = Data(#"{"status":"loading","model_loaded":false}"#.utf8)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: loading, response: response).modelError)
+
+        // A response that is not the server's health check says nothing.
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: nil, response: response).modelError)
     }
 
     func testParakeetProviderReportsUnreachableServerBeforeRecordingStarts() {
@@ -1525,7 +1548,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotEqual(credential, "sk-saved-openai-key")
         XCTAssertEqual(
             credential,
-            LocalServerTokenStore.storedToken(installDirectory: LocalServerPaths.defaultInstallDirectory),
+            LocalServerTokenStore.storedToken(installDirectory: isolatedLocalServerInstallDirectory),
             "Switching to a non-requiresAPIKey provider must not return the saved OpenAI key."
         )
 

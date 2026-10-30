@@ -724,7 +724,7 @@ final class AppStateTests: XCTestCase {
         // presents is that token rather than an empty string (#1270).
         XCTAssertEqual(
             requestedAPIKeys,
-            [LocalServerTokenStore.storedToken(installDirectory: LocalServerPaths.defaultInstallDirectory) ?? ""]
+            [LocalServerTokenStore.storedToken(installDirectory: harness.localServerInstallDirectory) ?? ""]
         )
         XCTAssertEqual(requestedModels, ["parakeet-tdt-0.6b-v3"])
         XCTAssertEqual(requestedBaseURLs.map(\.absoluteString), ["http://localhost:8422"])

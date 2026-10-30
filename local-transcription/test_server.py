@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import signal
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -680,10 +681,13 @@ class ServerAuthenticationTests(unittest.TestCase):
         finally:
             connection.close()
 
-    def _serve(self, token, port, token_file):
+    def _serve(self, token, port, token_file, max_upload_mb=None):
+        # `--lazy` keeps the test server from loading a real model: the tests
+        # are about the transport, not about inference.
+        extra = "" if max_upload_mb is None else f', "--max-upload-mb", "{max_upload_mb}"'
         script = f"""
 import sys
-sys.argv = ["server", "--host", "127.0.0.1", "--port", "{port}", "--token-file", r"{token_file}"]
+sys.argv = ["server", "--host", "127.0.0.1", "--port", "{port}", "--token-file", r"{token_file}", "--lazy"{extra}]
 import server
 server.main()
 """
@@ -764,7 +768,11 @@ server.main()
 
             status, body = self._request(f"{base}/health", token="s3cret-token-value")
             self.assertEqual(status, 200)
-            self.assertEqual(json.loads(body)["status"], "ok")
+            health = json.loads(body)
+            # The token was accepted. The server reports that it has not
+            # loaded its model, because this test server runs with --lazy.
+            self.assertIn(health["status"], ("not_loaded", "loading", "ok"))
+            self.assertIn("model_loaded", health)
 
             status, body = self._request(f"{base}/v1/models", token="s3cret-token-value")
             self.assertEqual(status, 200)
@@ -900,6 +908,233 @@ server.main()
         with self.assertRaises(server.HTTPException) as raised:
             asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
         self.assertEqual(raised.exception.status_code, 413)
+
+
+class ServerTransportAdmissionTests(unittest.TestCase):
+    """The request has to be refused before its body reaches the disk.
+
+    FastAPI parses a multipart body before it solves the route's
+    dependencies, so a check that lives in a dependency runs only after the
+    body has been spooled to disk. These tests send the headers of a request
+    and read the answer without sending the body at all: the server has to
+    answer from the headers alone.
+    """
+
+    def _free_port(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            return listener.getsockname()[1]
+
+    def _serve(self, token, port, token_file, max_upload_mb=None):
+        extra = "" if max_upload_mb is None else f', "--max-upload-mb", "{max_upload_mb}"'
+        script = f"""
+import sys
+sys.argv = ["server", "--host", "127.0.0.1", "--port", "{port}", "--token-file", r"{token_file}", "--lazy"{extra}]
+import server
+server.main()
+"""
+        environment = dict(os.environ)
+        environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
+        environment["PYTHONUNBUFFERED"] = "1"
+        process = subprocess.Popen(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).parent,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=environment,
+        )
+        self.addCleanup(self._stop, process)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                self.fail("the transcription server exited before accepting connections")
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                    return process
+            except OSError:
+                time.sleep(0.05)
+        self.fail("the transcription server did not start within 20 seconds")
+
+    def _stop(self, process):
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+    def _headers_only(self, port, request_line, headers, timeout=10.0):
+        """Send a request's headers and read the status line, sending no body."""
+        request = request_line + "\r\n"
+        request += "".join(f"{name}: {value}\r\n" for name, value in headers)
+        request += "\r\n"
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout) as connection:
+            connection.settimeout(timeout)
+            connection.sendall(request.encode("latin-1"))
+            data = b""
+            try:
+                while b"\r\n" not in data:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+            except socket.timeout:
+                self.fail(
+                    "the server waited for the request body before answering; "
+                    "the body would have been spooled to disk first"
+                )
+            return data.decode("latin-1", "replace")
+
+    def test_an_unauthenticated_upload_is_refused_before_the_body_is_read(self):
+        port = self._free_port()
+        with tempfile.TemporaryDirectory() as directory:
+            self._serve("s3cret-token-value", port, str(Path(directory) / server.TOKEN_FILE_NAME))
+
+            response = self._headers_only(
+                port,
+                "POST /v1/audio/transcriptions HTTP/1.1",
+                [
+                    ("Host", f"127.0.0.1:{port}"),
+                    ("Content-Type", "multipart/form-data; boundary=boundary"),
+                    ("Content-Length", str(512 * 1024 * 1024)),
+                ],
+            )
+        self.assertIn("401", response.split("\r\n")[0])
+
+    def test_an_oversized_declared_upload_is_refused_before_the_body_is_read(self):
+        port = self._free_port()
+        with tempfile.TemporaryDirectory() as directory:
+            self._serve(
+                "s3cret-token-value",
+                port,
+                str(Path(directory) / server.TOKEN_FILE_NAME),
+                max_upload_mb=1,
+            )
+
+            response = self._headers_only(
+                port,
+                "POST /v1/audio/transcriptions HTTP/1.1",
+                [
+                    ("Host", f"127.0.0.1:{port}"),
+                    ("Authorization", "Bearer s3cret-token-value"),
+                    ("Content-Type", "multipart/form-data; boundary=boundary"),
+                    ("Content-Length", str(64 * 1024 * 1024)),
+                ],
+            )
+        self.assertIn("413", response.split("\r\n")[0])
+
+    def test_a_chunked_upload_over_the_cap_is_refused(self):
+        port = self._free_port()
+        with tempfile.TemporaryDirectory() as directory:
+            self._serve(
+                "s3cret-token-value",
+                port,
+                str(Path(directory) / server.TOKEN_FILE_NAME),
+                max_upload_mb=1,
+            )
+
+            request = (
+                "POST /v1/audio/transcriptions HTTP/1.1\r\n"
+                f"Host: 127.0.0.1:{port}\r\n"
+                "Authorization: Bearer s3cret-token-value\r\n"
+                "Content-Type: multipart/form-data; boundary=boundary\r\n"
+                "Transfer-Encoding: chunked\r\n\r\n"
+            )
+            # A well-formed multipart body, so the request fails on the size
+            # ceiling rather than on the parser.
+            body = (
+                b"--boundary\r\n"
+                b'Content-Disposition: form-data; name="file"; filename="clip.m4a"\r\n'
+                b"Content-Type: application/octet-stream\r\n\r\n"
+                + b"x" * (3 * 1024 * 1024)
+                + b"\r\n--boundary--\r\n"
+            )
+            with socket.create_connection(("127.0.0.1", port), timeout=30) as connection:
+                connection.settimeout(30)
+                connection.sendall(request.encode("latin-1"))
+                sent = 0
+                try:
+                    while sent < len(body):
+                        chunk = body[sent : sent + 65536]
+                        sent += len(chunk)
+                        connection.sendall(f"{len(chunk):x}\r\n".encode("latin-1") + chunk + b"\r\n")
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                try:
+                    connection.sendall(b"0\r\n\r\n")
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                data = b""
+                try:
+                    while b"\r\n" not in data:
+                        chunk = connection.recv(4096)
+                        if not chunk:
+                            break
+                        data += chunk
+                except socket.timeout:
+                    self.fail("the server did not answer the oversized chunked upload")
+        self.assertIn("413", data.decode("latin-1", "replace").split("\r\n")[0])
+
+    def test_a_non_ascii_token_is_refused_with_401(self):
+        port = self._free_port()
+        with tempfile.TemporaryDirectory() as directory:
+            self._serve("s3cret-token-value", port, str(Path(directory) / server.TOKEN_FILE_NAME))
+
+            status, _ = self._request(
+                f"http://127.0.0.1:{port}/health",
+                token="ééé",
+            )
+        self.assertEqual(status, 401)
+
+    def test_the_documentation_routes_are_not_served(self):
+        port = self._free_port()
+        with tempfile.TemporaryDirectory() as directory:
+            self._serve("s3cret-token-value", port, str(Path(directory) / server.TOKEN_FILE_NAME))
+            base = f"http://127.0.0.1:{port}"
+
+            for path in ("/docs", "/redoc", "/openapi.json"):
+                status, _ = self._request(f"{base}{path}")
+                self.assertNotEqual(status, 200, f"{path} is served without the token")
+                status, _ = self._request(f"{base}{path}", token="s3cret-token-value")
+                self.assertEqual(status, 404, f"{path} is served")
+
+    def _request(self, url, token=None, data=None, method=None):
+        import http.client
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(url)
+        path = parts.path or "/"
+        headers = {}
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
+        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=10)
+        try:
+            connection.request(method or "GET", path, body=data, headers=headers)
+            response = connection.getresponse()
+            return response.status, response.read()
+        finally:
+            connection.close()
+
+
+class ServerTokenFileAndChildProcessTests(unittest.TestCase):
+    def test_the_token_file_mode_is_repaired_when_it_is_rewritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            token_file.write_text("an-old-token", encoding="utf-8")
+            os.chmod(token_file, 0o644)
+
+            server.write_token_file(token_file, "s3cret-token-value")
+
+            self.assertEqual(token_file.read_text(encoding="utf-8"), "s3cret-token-value")
+            self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
+
+    def test_the_token_is_not_handed_to_a_child_process(self):
+        environment = dict(os.environ)
+        environment[server.TOKEN_ENVIRONMENT_VARIABLE] = "s3cret-token-value"
+        with patch.dict(os.environ, environment, clear=True):
+            child_environment = server._child_environment()
+
+        self.assertNotIn(server.TOKEN_ENVIRONMENT_VARIABLE, child_environment)
 
 
 if __name__ == "__main__":
