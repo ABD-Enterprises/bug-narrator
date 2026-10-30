@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
@@ -46,7 +47,13 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("status", out var value)
                 && value.ValueKind == JsonValueKind.String
-                && value.GetString() == "ok";
+                && value.GetString() == "ok"
+                // `model_loaded` has to be true as well: a stub that answers
+                // {"status":"ok"} is not a Parakeet server, and the health probe
+                // is what decides whether the app hands it the user's audio
+                // (#1270).
+                && document.RootElement.TryGetProperty("model_loaded", out var loaded)
+                && loaded.ValueKind == JsonValueKind.True;
         }
         catch (JsonException)
         {
@@ -67,6 +74,16 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             timeout.CancelAfter(Timeout);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+            // The server checks the bearer token on every route, health
+            // included: a listener that cannot present the token is not the
+            // server, and must not be treated as one (#1270).
+            var token = LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue(
+                    LocalServerTokenStore.AuthorizationScheme,
+                    token);
+            }
             using var response = await httpClient.SendAsync(request, timeout.Token);
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
             return IsHealthy(response.StatusCode, body);

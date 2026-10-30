@@ -18,16 +18,16 @@ lines), `SettingsStore.swift` (reachability probe, lines ~760–815),
 
 | Concern | macOS behaviour |
 | --- | --- |
-| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok",...}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). Model loads lazily on first request and stays resident until the process exits; inference is serialized on one worker thread; the upload is streamed to disk and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
+| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok","model_loaded":…}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). **Every route requires `Authorization: Bearer <token>`** — the token is generated at startup and kept in a per-user file next to the managed install, so nothing else on the machine can drive the model or receive the recording (#1270). The upload is streamed to disk under a hard size limit and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
 | Inference | `parakeet-mlx` (Apple MLX). **Apple Silicon only** — `build_standalone.sh` refuses non-arm64. |
 | Packaging | PyInstaller-style standalone binary `bugnarrator-transcription`, shipped as a signed + notarized DMG release asset (`bugnarrator-transcription-macos-arm64.dmg`, ~136 MB) plus a `.sha256` manifest, on its own release cadence. |
 | Discovery of a package | `discover()` pages the GitHub Releases API (≤20 pages × 30) for the first non-draft, non-prerelease release carrying both assets, size-bounded, and only from `https://github.com/ABD-Enterprises/bug-narrator/releases/download/`. |
 | Install | Download manifest + image, SHA-256 + size check, `codesign --verify --strict -R <publisher requirement>` on the image and on the binary, `hdiutil attach` read-only, copy to `~/Library/Application Support/BugNarrator/LocalTranscription/`, verify again, atomic move. Install dir must not be a symlink. |
-| Launch | Verify the binary's signature again, then run it through `/bin/sh` job control in its own process group (so TERM/KILL reaches uvicorn's children), stdout discarded, stderr captured for the exit message, `Models/` under the install dir as the weights cache. |
-| Health / readiness | `SettingsStore` polls `GET {baseURL}/health` every 2 s with a 2 s timeout while the provider is Parakeet; `aiProviderConfigurationIsReady` requires `reachable`. The "Check Server" button uses the same probe. The typed base URL is ignored for Parakeet. |
+| Launch | Verify the binary's signature again, then run it through `/bin/sh` job control in its own process group (so TERM/KILL reaches uvicorn's children), stdout discarded, stderr captured for the exit message, `Models/` under the install dir as the weights cache. The bearer token is handed over in the environment (`BUGNARRATOR_TRANSCRIPTION_TOKEN`), never on the command line. |
+| Health / readiness | `SettingsStore` polls `GET {baseURL}/health` every 2 s with a 2 s timeout while the provider is Parakeet, presenting the server's bearer token; the answer must be 200 with `status == "ok"` **and** `model_loaded == true`, so a stub that answers `{"status":"ok"}` is not mistaken for a Parakeet server (#1270). `aiProviderConfigurationIsReady` requires `reachable`. The "Check Server" button uses the same probe. The typed base URL is ignored for Parakeet. |
 | Stop / shutdown | `stop()` on `NSApplication.willTerminate`; `shutdown()` awaits in-flight install/start and then the process exit. TERM, 2 s grace for uvicorn to drain an in-flight request, then KILL (#1128). |
 | Remove | Deletes the install dir including the model cache. |
-| Already-running server | Not launched by BugNarrator: nothing special — the health probe simply reports reachable, and the app never starts a second copy because `start()` requires `installed && server == nil`. It does **not** adopt or stop a foreign server. |
+| Already-running server | Not launched by BugNarrator: nothing special — the app never starts a second copy because `start()` requires `installed && server == nil`, and it does **not** adopt or stop a foreign server. A foreign process on the port cannot answer the health probe, because it does not hold the bearer token, so it is never treated as the server (#1270). |
 | Failure surface | `message` string in Settings (download failed, checksum failed, verification failed, exited with status N + stderr tail). |
 
 ## 2. Constraints that differ on Windows
@@ -87,11 +87,13 @@ shape as the macOS `@Published` set: `Package?`, `Progress?`, `Busy`,
 Kept identical to macOS: the manager never adopts a foreign process. The
 health probe (`GET http://127.0.0.1:8422/health`, 2 s timeout, polled every
 2 s while the provider is Parakeet, and on "Check Server") is the only
-readiness signal. If something else answers `{"status":"ok"}` on 8422 the app
-is ready and does not try to start its own copy; `Start` stays disabled
-while `Running == false && reachable == true` with the message "A local
-transcription server is already responding on port 8422." This matches macOS
-where `start()` is a no-op only because the user would not press it, and
+readiness signal. A server started outside the app can still be reached,
+because it reads the same per-user token file and therefore uses the same
+token; anything else that answers on 8422 cannot, so the probe reports
+unreachable and the app does not treat it as the server (#1270). `Start` stays
+disabled while `Running == false && reachable == true` with the message "A
+local transcription server is already responding on port 8422." This matches
+macOS where `start()` is a no-op only because the user would not press it, and
 makes the rule explicit.
 
 Port is fixed at 8422 (the profile's base URL), as on macOS. A user-provided
@@ -113,16 +115,26 @@ Two install sources, in priority order:
    publisher. Remove and reinstall it." — same posture as macOS `verifyBinary`.
 
 Launch: `bugnarrator-transcription.exe --host 127.0.0.1 --port 8422
---model parakeet-tdt-0.6b-v3`, working directory = install dir,
+--model parakeet-tdt-0.6b-v3 --preload`, working directory = install dir,
 `HF_HOME`/model cache = `<install dir>\Models`, stdout discarded, stderr
 captured (last 4 KB) for the exit message, process assigned to a Job Object
 with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
 
+`--preload` is what macOS already passes: the health probe treats a server
+that has not loaded its model as not ready, so a lazily loaded server would
+never report itself reachable. The bearer token is handed over in the
+environment as `BUGNARRATOR_TRANSCRIPTION_TOKEN` — never on the command line,
+where it would be visible in the process list — and is read from the same
+per-user token file the macOS app uses (`contract-fixtures/local-server-token.json`
+pins the path, the file name and the variable name).
+
 ### 3.4 Health check
 
 Identical to macOS: `GET /health` must return HTTP 200 with JSON
-`status == "ok"`. 2 s timeout, no caching, 2 s cadence, only while the
-provider is Parakeet. `aiProviderConfigurationIsReady` for Parakeet =
+`status == "ok"` **and** `model_loaded == true`, and the request must carry
+`Authorization: Bearer <token>` — a listener that cannot present the token is
+not the server and must never be treated as one. 2 s timeout, no caching, 2 s
+cadence, only while the provider is Parakeet. `aiProviderConfigurationIsReady` for Parakeet =
 no compatibility issue **and** reachable. Recording start (the
 `RecordingLifecycleService` preflight) refuses with the existing
 "Finish AI provider setup" path when unreachable, so audio is never
@@ -169,6 +181,7 @@ and not running.
 | Behaviour | Decision | Reason |
 | --- | --- | --- |
 | Server HTTP protocol (`/health`, `/v1/models`, `/v1/audio/transcriptions`), port 8422, model aliases, chunking, failure message | Identical | Client code and contract fixtures are shared; WIN-034 already pins the URL and model. |
+| Bearer token on every route, including the health check, and the per-user token file that carries it | Identical | `contract-fixtures/local-server-token.json` pins the path, file name and environment variable for both ports and the Python server, so the three cannot drift apart silently. |
 | Health probe semantics (2 s timeout, 2 s cadence, `status == "ok"`), readiness = reachable | Identical | Same "fail before transcription" guarantee. |
 | No adoption of a foreign server; never start a second copy when 8422 answers | Identical (made explicit in UI) | Same safety posture; explicit message avoids a silent no-op. |
 | Signed-asset discovery bounded to the project's GitHub Releases download path, size caps, checksum manifest | Identical | Supply-chain posture must not be weaker on Windows. |

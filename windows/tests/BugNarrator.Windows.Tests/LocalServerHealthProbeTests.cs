@@ -9,7 +9,9 @@ namespace BugNarrator.Windows.Tests;
 public sealed class LocalServerHealthProbeTests
 {
     [Theory]
-    [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\",\"model\":\"parakeet-tdt-0.6b-v3\"}", true)]
+    [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\",\"model_loaded\":true,\"model\":\"parakeet-tdt-0.6b-v3\"}", true)]
+    [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\"}", false)]
+    [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\",\"model_loaded\":false}", false)]
     [InlineData(HttpStatusCode.OK, "{\"status\":\"loading\"}", false)]
     [InlineData(HttpStatusCode.OK, "{\"other\":\"ok\"}", false)]
     [InlineData(HttpStatusCode.OK, "not json", false)]
@@ -17,7 +19,7 @@ public sealed class LocalServerHealthProbeTests
     [InlineData(HttpStatusCode.OK, "[\"ok\"]", false)]
     [InlineData(HttpStatusCode.ServiceUnavailable, "{\"status\":\"ok\"}", false)]
     [InlineData(HttpStatusCode.NotFound, "{\"status\":\"ok\"}", false)]
-    public void IsHealthy_RequiresA200WithJsonStatusOk(HttpStatusCode status, string body, bool expected)
+    public void IsHealthy_RequiresA200WithJsonStatusOkAndAModelLoaded(HttpStatusCode status, string body, bool expected)
     {
         Assert.Equal(expected, LocalServerHealthProbe.IsHealthy(status, body));
     }
@@ -29,12 +31,31 @@ public sealed class LocalServerHealthProbeTests
         var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(request =>
         {
             sent = request;
-            return Json("{\"status\":\"ok\"}");
+            return Json("{\"status\":\"ok\",\"model_loaded\":true}");
         })));
 
         Assert.True(await probe.IsReachableAsync("http://localhost:8422"));
         Assert.Equal("http://localhost:8422/health", sent!.RequestUri!.AbsoluteUri);
         Assert.True(sent.Headers.CacheControl!.NoCache);
+    }
+
+    [Fact]
+    public async Task IsReachable_PresentsTheServerToken()
+    {
+        // The server checks the bearer token on every route, health included:
+        // a listener that cannot present it is not the server (#1270).
+        HttpRequestMessage? sent = null;
+        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(request =>
+        {
+            sent = request;
+            return Json("{\"status\":\"ok\",\"model_loaded\":true}");
+        })));
+
+        await probe.IsReachableAsync("http://localhost:8422");
+
+        Assert.NotNull(sent!.Headers.Authorization);
+        Assert.Equal(LocalServerTokenStore.AuthorizationScheme, sent.Headers.Authorization.Scheme);
+        Assert.False(string.IsNullOrWhiteSpace(sent.Headers.Authorization.Parameter));
     }
 
     [Fact]

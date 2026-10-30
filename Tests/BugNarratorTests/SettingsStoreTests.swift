@@ -1120,7 +1120,15 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:8422")
-        XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+        // The local server checks a bearer token on every route, so the
+        // credential the app presents is that token rather than an empty
+        // string (#1270).
+        let credential = store.aiProviderCredentialForUserInitiatedAccess()
+        XCTAssertFalse(credential?.isEmpty ?? true)
+        XCTAssertEqual(
+            credential,
+            LocalServerTokenStore.storedToken(installDirectory: LocalServerPaths.defaultInstallDirectory)
+        )
     }
 
     func testAutomaticParakeetProbeRecoversWithoutChangingProvider() {
@@ -1136,7 +1144,7 @@ final class SettingsStoreTests: XCTestCase {
             requests += 1
             let code = requests == 1 ? 503 : 200
             return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!,
-                    Data(#"{"status":"ok","model_loaded":false}"#.utf8))
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
         }
         let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
                                   localProviderSession: makeMockURLSession())
@@ -1169,14 +1177,21 @@ final class SettingsStoreTests: XCTestCase {
 
     func testParakeetHealthRequiresSuccessfulStructuredResponse() {
         let url = URL(string: "http://localhost:8422/health")!
-        let healthy = Data(#"{"status":"ok","model_loaded":false}"#.utf8)
+        let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
         for status in [404, 500] {
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
             XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
         }
         let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
         XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
-        for body in ["OK", #"{"status":"ok"}"#, #"{"status":"error","model_loaded":true}"#] {
+        // A server that has not loaded its model is not ready: the app must not
+        // hand the user's audio to it (#1270).
+        for body in [
+            "OK",
+            #"{"status":"ok"}"#,
+            #"{"status":"ok","model_loaded":false}"#,
+            #"{"status":"error","model_loaded":true}"#
+        ] {
             XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response))
         }
     }
@@ -1504,9 +1519,13 @@ final class SettingsStoreTests: XCTestCase {
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = "http://localhost:8422"
 
+        // The local provider presents the server's bearer token, never the
+        // saved OpenAI key (#1270).
+        let credential = store.aiProviderCredentialForUserInitiatedAccess()
+        XCTAssertNotEqual(credential, "sk-saved-openai-key")
         XCTAssertEqual(
-            store.aiProviderCredentialForUserInitiatedAccess(),
-            "",
+            credential,
+            LocalServerTokenStore.storedToken(installDirectory: LocalServerPaths.defaultInstallDirectory),
             "Switching to a non-requiresAPIKey provider must not return the saved OpenAI key."
         )
 

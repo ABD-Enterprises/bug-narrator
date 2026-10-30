@@ -1,0 +1,11 @@
+{
+  "tokenFileName": "bugnarrator-transcription.token",
+  "environmentVariable": "BUGNARRATOR_TRANSCRIPTION_TOKEN",
+  "authorizationScheme": "Bearer",
+  "macos": {
+    "directoryRelativeToHome": "Library/Application Support/BugNarrator/LocalTranscription"
+  },
+  "windows": {
+    "directoryRelativeToLocalAppData": "BugNarrator/LocalTranscription"
+  }
+}

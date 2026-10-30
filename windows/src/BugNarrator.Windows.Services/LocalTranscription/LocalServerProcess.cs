@@ -56,9 +56,17 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
         }
     }
 
-    /// <summary>The server's command line: loopback only, fixed port, pinned model (design note §3.3).</summary>
+    /// <summary>
+    /// The server's command line: loopback only, fixed port, pinned model, model
+    /// loaded up front (design note §3.3).
+    /// </summary>
+    /// <remarks>
+    /// <c>--preload</c> is what macOS already passes. The health probe treats
+    /// a server that has not loaded its model as not ready, so a lazily loaded
+    /// server would never report itself reachable (#1270).
+    /// </remarks>
     public static string ServerArguments =>
-        $"--host 127.0.0.1 --port 8422 --model {Settings.WindowsAiProviderProfile.ParakeetTranscriptionModel}";
+        $"--host 127.0.0.1 --port 8422 --model {Settings.WindowsAiProviderProfile.ParakeetTranscriptionModel} --preload";
 
     /// <summary>The <see cref="LocalServerLaunch"/> the app composes.</summary>
     public static ILocalServerProcess LaunchServer(string executablePath, string modelsDirectory, Action<int, string> onExit) =>
@@ -110,7 +118,10 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
                 lpAttributeList = attributes.Pointer,
             };
             var commandLine = new StringBuilder($"\"{executablePath}\" {arguments}");
-            var environment = BuildEnvironmentBlock(modelsDirectory);
+            // The install directory holds the token file, so the server the app
+            // starts and the app itself agree on the bearer token.
+            var token = LocalServerTokenStore.Token(workingDirectory);
+            var environment = BuildEnvironmentBlock(modelsDirectory, token);
             var environmentPointer = Marshal.StringToHGlobalUni(environment);
             try
             {
@@ -406,7 +417,7 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
     }
 
     /// <summary>Our environment plus the model cache variables, as a double-NUL-terminated Unicode block.</summary>
-    private static string BuildEnvironmentBlock(string modelsDirectory)
+    private static string BuildEnvironmentBlock(string modelsDirectory, string? token)
     {
         var variables = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
@@ -416,6 +427,13 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
 
         variables["HF_HOME"] = modelsDirectory;
         variables["BUGNARRATOR_MODELS_DIR"] = modelsDirectory;
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            // The server refuses every request that does not carry the token.
+            // It goes through the environment rather than the command line,
+            // where it would be visible in the process list.
+            variables[LocalServerTokenStore.EnvironmentVariable] = token;
+        }
 
         var block = new StringBuilder();
         foreach (var (key, value) in variables)

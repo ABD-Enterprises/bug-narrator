@@ -105,7 +105,14 @@ def default_token_file() -> Path:
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(base) / "BugNarrator" / "LocalTranscription" / TOKEN_FILE_NAME
-    return Path.home() / "Library" / "Application Support" / TOKEN_FILE_NAME
+    return (
+        Path.home()
+        / "Library"
+        / "Application Support"
+        / "BugNarrator"
+        / "LocalTranscription"
+        / TOKEN_FILE_NAME
+    )
 
 
 def read_token_file(path: Path) -> Optional[str]:

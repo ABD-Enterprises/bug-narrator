@@ -662,17 +662,23 @@ class ServerAuthenticationTests(unittest.TestCase):
         self.addCleanup(setattr, server, "_max_upload_bytes", self._previous_max_upload_bytes)
 
     def _request(self, url, token=None, data=None, method=None):
-        import urllib.error
-        import urllib.request
+        import http.client
+        from urllib.parse import urlsplit
 
-        request = urllib.request.Request(url, data=data, method=method)
+        parts = urlsplit(url)
+        path = parts.path or "/"
+        if parts.query:
+            path = f"{path}?{parts.query}"
+        headers = {}
         if token is not None:
-            request.add_header("Authorization", f"Bearer {token}")
+            headers["Authorization"] = f"Bearer {token}"
+        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=10)
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return response.status, response.read()
-        except urllib.error.HTTPError as error:
-            return error.code, error.read()
+            connection.request(method or "GET", path, body=data, headers=headers)
+            response = connection.getresponse()
+            return response.status, response.read()
+        finally:
+            connection.close()
 
     def _serve(self, token, port, token_file):
         script = f"""
@@ -831,7 +837,40 @@ server.main()
         with patch.object(server.sys, "platform", "darwin"):
             self.assertEqual(
                 server.default_token_file(),
-                Path.home() / "Library" / "Application Support" / server.TOKEN_FILE_NAME,
+                Path.home()
+                / "Library"
+                / "Application Support"
+                / "BugNarrator"
+                / "LocalTranscription"
+                / server.TOKEN_FILE_NAME,
+            )
+
+    def test_the_token_path_matches_the_shared_contract_fixture(self):
+        fixture = json.loads(
+            (Path(__file__).parent.parent / "contract-fixtures" / "local-server-token.json").read_text()
+        )
+        self.assertEqual(server.TOKEN_FILE_NAME, fixture["tokenFileName"])
+        self.assertEqual(
+            server.TOKEN_ENVIRONMENT_VARIABLE,
+            fixture["environmentVariable"],
+        )
+
+        with patch.object(server.sys, "platform", "darwin"):
+            self.assertEqual(
+                server.default_token_file(),
+                Path.home()
+                / fixture["macos"]["directoryRelativeToHome"]
+                / fixture["tokenFileName"],
+            )
+
+        with patch.object(server.sys, "platform", "win32"), patch.dict(
+            os.environ, {"LOCALAPPDATA": "/tmp/localappdata"}
+        ):
+            self.assertEqual(
+                server.default_token_file(),
+                Path("/tmp/localappdata")
+                / fixture["windows"]["directoryRelativeToLocalAppData"]
+                / fixture["tokenFileName"],
             )
 
     def test_an_oversized_upload_is_refused_before_it_is_written(self):

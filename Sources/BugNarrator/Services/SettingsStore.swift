@@ -545,7 +545,10 @@ final class SettingsStore: ObservableObject {
               let health = try? JSONDecoder().decode(LocalProviderHealth.self, from: data) else {
             return false
         }
-        return health.status == "ok"
+        // `model_loaded` has to be true as well: a stub that answers
+        // {"status":"ok"} is not a Parakeet server, and the health probe is
+        // what decides whether the app hands it the user's audio (#1270).
+        return health.status == "ok" && health.model_loaded
     }
 
     private struct LocalProviderHealth: Decodable {
@@ -916,7 +919,11 @@ final class SettingsStore: ObservableObject {
 
             return openAIAPIKeyForUserInitiatedAccess() ?? ""
         case .parakeetLocal:
-            return ""
+            // The local server refuses every request that does not carry its
+            // bearer token, and the request factory already sends the
+            // credential as one. An empty credential means no header at all,
+            // which the server refuses — the safe direction to fail in.
+            return LocalServerTokenStore.token(installDirectory: LocalServerPaths.defaultInstallDirectory) ?? ""
         }
     }
 
@@ -1027,6 +1034,15 @@ final class SettingsStore: ObservableObject {
         var request = URLRequest(url: url.appendingPathComponent("health"))
         request.timeoutInterval = 2
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        // The server checks the bearer token on every route, health included:
+        // a listener that cannot present the token is not the server, and must
+        // not be treated as one (#1270).
+        if let token = LocalServerTokenStore.token(installDirectory: LocalServerPaths.defaultInstallDirectory) {
+            request.setValue(
+                "\(LocalServerTokenStore.authorizationScheme) \(token)",
+                forHTTPHeaderField: "Authorization"
+            )
+        }
         localProviderTask = localProviderSession.dataTaskPublisher(for: request)
             .map { Self.isHealthyLocalProvider(data: $0.data, response: $0.response) }
             .replaceError(with: false)
