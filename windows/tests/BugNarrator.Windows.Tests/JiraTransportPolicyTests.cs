@@ -36,6 +36,27 @@ public sealed class JiraTransportPolicyTests : IDisposable
         Assert.Contains("email and API token would be sent unencrypted", uncheckable, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The export gate refuses the same hosts as the settings warning and says
+    /// why: a host the app parsed and found to be public is remote, a host it
+    /// cannot parse is one it cannot check. Both refusals name what would cross
+    /// the network in the clear.
+    /// </summary>
+    [Fact]
+    public void CompatibilityIssue_NamesTheCredentialsItWouldSendInTheClear()
+    {
+        var remote = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://8.8.8.8:8080/jira"));
+        Assert.NotNull(remote);
+        Assert.Contains("remote host", remote, StringComparison.Ordinal);
+        Assert.Contains("would cross the network unencrypted", remote, StringComparison.Ordinal);
+
+        var uncheckable = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://jira.example.com:8080/jira"));
+        Assert.NotNull(uncheckable);
+        Assert.Contains("cannot check as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("would cross the network unencrypted", uncheckable, StringComparison.Ordinal);
+    }
+
     private readonly string root = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));
     private WindowsDiagnostics Diagnostics => new(new AppStoragePaths(root, Path.Combine(root, "Sessions"), Path.Combine(root, "Logs")));
 
