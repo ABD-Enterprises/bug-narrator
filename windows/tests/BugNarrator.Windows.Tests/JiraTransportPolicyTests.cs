@@ -13,6 +13,29 @@ namespace BugNarrator.Windows.Tests;
 
 public sealed class JiraTransportPolicyTests : IDisposable
 {
+    /// <summary>
+    /// The refusal for a plaintext remote Jira URL has to say what the user
+    /// loses if they accept it: the account email and the API token cross the
+    /// network in the clear. The two refusals differ in why the host was refused
+    /// - one the app knows to be remote, one it cannot check at all.
+    /// </summary>
+    [Fact]
+    public void JiraBaseUrlSecurityWarning_NamesTheCredentialsItWouldSendInTheClear()
+    {
+        var remoteSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://8.8.8.8:8080/jira" };
+        var remote = remoteSettings.JiraBaseUrlSecurityWarning;
+        Assert.NotNull(remote);
+        Assert.Contains("remote host", remote, StringComparison.Ordinal);
+        Assert.Contains("email and API token would be sent unencrypted", remote, StringComparison.Ordinal);
+
+        var uncheckableSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://jira.example.com:8080/jira" };
+        var uncheckable = uncheckableSettings.JiraBaseUrlSecurityWarning;
+        Assert.NotNull(uncheckable);
+        Assert.Contains("cannot check as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("email and API token would be sent unencrypted", uncheckable, StringComparison.Ordinal);
+    }
+
     private readonly string root = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));
     private WindowsDiagnostics Diagnostics => new(new AppStoragePaths(root, Path.Combine(root, "Sessions"), Path.Combine(root, "Logs")));
 

@@ -74,6 +74,38 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
+    /// Whether <paramref name="host"/> is an address the app parsed and found to
+    /// be somewhere else - a public address, written the way an address is
+    /// written.
+    /// </summary>
+    /// <remarks>
+    /// A host in another notation (<c>134744072</c>, <c>127.1</c>) is not
+    /// parseable, so it is neither a local nor a public address as far as the app
+    /// is concerned: the app cannot say where it points.
+    /// Mirrors SettingsStore.isPublicAddress in the macOS app.
+    /// </remarks>
+    public static bool IsPublicAddress(string host)
+    {
+        var lowered = host.ToLowerInvariant().Trim('[', ']');
+
+        var parts = lowered.Split('.');
+        if (parts.Length != 4)
+        {
+            return false;
+        }
+
+        foreach (var part in parts)
+        {
+            if (part.Length == 0 || !part.All(char.IsAsciiDigit) || !byte.TryParse(part, out _))
+            {
+                return false;
+            }
+        }
+
+        return !IsLocalEndpointHost(host);
+    }
+
+    /// <summary>
     /// Whether <paramref name="host"/> is a name that resolves over mDNS rather
     /// than an address the app can check: a <c>.local</c> name, or a single-label
     /// name such as <c>lmstudio</c>. Any device on the local network can answer
@@ -118,6 +150,11 @@ public static class OpenAiCompatibleEndpoint
     /// </summary>
     public static bool IsNumericAddressLiteral(string host)
     {
+        if (host.Length == 0)
+        {
+            return false;
+        }
+
         if (host.All(char.IsAsciiDigit))
         {
             return true;
@@ -173,9 +210,16 @@ public static class OpenAiCompatibleEndpoint
             return UnqualifiedLocalHostPlaintextMessage(parsed.Host, "API key and transcript text");
         }
 
-        return "This endpoint uses plaintext HTTP to a host that is not an address this app "
-            + $"can check as local ({parsed.Host}). Your API key and transcript text would be sent "
-            + "unencrypted. Use https:// unless this is a trusted local endpoint.";
+        if (IsPublicAddress(parsed.Host))
+        {
+            return "This endpoint uses plaintext HTTP to a remote host "
+                + $"({parsed.Host}). Your API key and transcript text would be sent "
+                + "unencrypted. Use https:// unless this is a trusted local endpoint.";
+        }
+
+        return "This endpoint uses plaintext HTTP to a host this app cannot check as a local "
+            + $"address ({parsed.Host}). Your API key and transcript text would be sent "
+            + "unencrypted. Use https://, or point this at an address the app can check.";
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)

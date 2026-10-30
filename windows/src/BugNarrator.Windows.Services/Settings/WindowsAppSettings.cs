@@ -185,8 +185,16 @@ public sealed record WindowsAppSettings(
                     parsed.Host, "email and API token");
             }
 
-            return "This Jira URL uses plaintext HTTP to a host that is not an address this app "
-                + $"can check as local ({parsed.Host}). "
+            if (OpenAiCompatibleEndpoint.IsPublicAddress(parsed.Host))
+            {
+                return "This Jira URL uses plaintext HTTP to a remote host "
+                    + $"({parsed.Host}). "
+                    + "Your email and API token would be sent unencrypted. Use https:// "
+                    + "unless this is a trusted local server.";
+            }
+
+            return "This Jira URL uses plaintext HTTP to a host this app cannot check as a local "
+                + $"address ({parsed.Host}). "
                 + "Your email and API token would be sent unencrypted. Use https:// "
                 + "unless this is a trusted local server.";
         }
