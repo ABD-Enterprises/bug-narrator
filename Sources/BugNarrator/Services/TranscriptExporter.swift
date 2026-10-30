@@ -125,10 +125,9 @@ struct TranscriptExporter {
             in: destinationRoot,
             suggestedName: session.suggestedBundleDirectoryName
         ) { bundleDirectoryURL in
-            try session.markdownContent.write(
-                to: bundleDirectoryURL.appendingPathComponent("transcript.md"),
-                atomically: true,
-                encoding: .utf8
+            try self.bundleWriter.writeOwnerOnly(
+                session.markdownContent,
+                to: bundleDirectoryURL.appendingPathComponent("transcript.md")
             )
 
             // `summaryMarkdownContent` renders the review summary and every
@@ -136,16 +135,19 @@ struct TranscriptExporter {
             // Sessions that never ran extraction get no file rather than a
             // placeholder saying so.
             if session.issueExtraction != nil {
-                try session.summaryMarkdownContent.write(
-                    to: bundleDirectoryURL.appendingPathComponent("summary.md"),
-                    atomically: true,
-                    encoding: .utf8
+                try self.bundleWriter.writeOwnerOnly(
+                    session.summaryMarkdownContent,
+                    to: bundleDirectoryURL.appendingPathComponent("summary.md")
                 )
                 exportedFiles.append("summary.md")
             }
 
             let screenshotsDirectoryURL = bundleDirectoryURL.appendingPathComponent("screenshots", isDirectory: true)
-            try fileManager.createDirectory(at: screenshotsDirectoryURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: screenshotsDirectoryURL,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
 
             for screenshot in session.screenshots {
                 let destinationURL = uniqueScreenshotDestinationURL(
@@ -155,6 +157,10 @@ struct TranscriptExporter {
 
                 do {
                     try fileManager.copyItem(at: screenshot.fileURL, to: destinationURL)
+                    // A copy keeps the source's permissions, and the source
+                    // lives in the app's own library rather than in the
+                    // exported bundle: the exported copy is owner-only.
+                    try self.bundleWriter.restrictToOwner(destinationURL)
                     copiedScreenshotCount += 1
                     exportedFiles.append("screenshots/\(destinationURL.lastPathComponent)")
                 } catch {
@@ -183,9 +189,9 @@ struct TranscriptExporter {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
-            try encoder.encode(manifest).write(
-                to: bundleDirectoryURL.appendingPathComponent("manifest.json"),
-                options: [.atomic]
+            try self.bundleWriter.writeOwnerOnly(
+                try encoder.encode(manifest),
+                to: bundleDirectoryURL.appendingPathComponent("manifest.json")
             )
         }
 

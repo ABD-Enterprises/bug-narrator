@@ -3,6 +3,12 @@ import XCTest
 @testable import BugNarrator
 
 final class PrivacyDataExporterTests: XCTestCase {
+
+    /// The POSIX mode of a file or directory, or -1 when it cannot be read.
+    private func posixPermissions(of url: URL) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
     func testPrivacyDataExporterWritesManifestSessionsSettingsAndDiagnosticsWithoutSecrets() throws {
         let rootDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BugNarrator-PrivacyDataExporterTests-\(UUID().uuidString)", isDirectory: true)
@@ -45,6 +51,14 @@ final class PrivacyDataExporterTests: XCTestCase {
             diagnostics: diagnostics,
             to: rootDirectoryURL
         )
+        // The bundle is handed to the user and usually lands on the Desktop
+        // or in Downloads, so it and the files inside it are owner-only.
+        XCTAssertEqual(try posixPermissions(of: exportURL), 0o700)
+        XCTAssertEqual(try posixPermissions(of: exportURL.appendingPathComponent("manifest.json")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: exportURL.appendingPathComponent("sessions.json")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: exportURL.appendingPathComponent("settings.json")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: exportURL.appendingPathComponent("diagnostics.json")), 0o600)
+
         let manifestData = try Data(contentsOf: exportURL.appendingPathComponent("manifest.json"))
         let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
         let sessionsData = try Data(contentsOf: exportURL.appendingPathComponent("sessions.json"))

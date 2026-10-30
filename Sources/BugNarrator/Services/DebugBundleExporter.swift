@@ -60,28 +60,25 @@ struct DebugBundleExporter {
             in: destinationRoot,
             suggestedName: suggestedBundleName()
         ) { bundleDirectoryURL in
-            try encoder.encode(systemInfoDocument).write(
-                to: bundleDirectoryURL.appendingPathComponent("system-info.json"),
-                options: [.atomic]
+            try bundleWriter.writeOwnerOnly(
+                try encoder.encode(systemInfoDocument),
+                to: bundleDirectoryURL.appendingPathComponent("system-info.json")
             )
-            try snapshot.debugInfo.appVersionText.write(
-                to: bundleDirectoryURL.appendingPathComponent("app-version.txt"),
-                atomically: true,
-                encoding: .utf8
+            try bundleWriter.writeOwnerOnly(
+                snapshot.debugInfo.appVersionText,
+                to: bundleDirectoryURL.appendingPathComponent("app-version.txt")
             )
-            try snapshot.debugInfo.macOSVersionText.write(
-                to: bundleDirectoryURL.appendingPathComponent("macos-version.txt"),
-                atomically: true,
-                encoding: .utf8
+            try bundleWriter.writeOwnerOnly(
+                snapshot.debugInfo.macOSVersionText,
+                to: bundleDirectoryURL.appendingPathComponent("macos-version.txt")
             )
-            try snapshot.recentLogText.write(
-                to: bundleDirectoryURL.appendingPathComponent("recent-log.txt"),
-                atomically: true,
-                encoding: .utf8
+            try bundleWriter.writeOwnerOnly(
+                snapshot.recentLogText,
+                to: bundleDirectoryURL.appendingPathComponent("recent-log.txt")
             )
-            try encoder.encode(snapshot.sessionMetadata).write(
-                to: bundleDirectoryURL.appendingPathComponent("session-metadata.json"),
-                options: [.atomic]
+            try bundleWriter.writeOwnerOnly(
+                try encoder.encode(snapshot.sessionMetadata),
+                to: bundleDirectoryURL.appendingPathComponent("session-metadata.json")
             )
         }
     }

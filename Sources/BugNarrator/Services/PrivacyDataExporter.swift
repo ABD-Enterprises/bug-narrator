@@ -93,17 +93,17 @@ struct PrivacyDataExporter {
                 ]
             )
 
-            try encoder.encode(manifest).write(
-                to: bundleDirectoryURL.appendingPathComponent("manifest.json"),
-                options: [.atomic]
+            try bundleWriter.writeOwnerOnly(
+                try encoder.encode(manifest),
+                to: bundleDirectoryURL.appendingPathComponent("manifest.json")
             )
-            try encoder.encode(settings).write(
-                to: bundleDirectoryURL.appendingPathComponent("settings.json"),
-                options: [.atomic]
+            try bundleWriter.writeOwnerOnly(
+                try encoder.encode(settings),
+                to: bundleDirectoryURL.appendingPathComponent("settings.json")
             )
-            try encoder.encode(diagnostics).write(
-                to: bundleDirectoryURL.appendingPathComponent("diagnostics.json"),
-                options: [.atomic]
+            try bundleWriter.writeOwnerOnly(
+                try encoder.encode(diagnostics),
+                to: bundleDirectoryURL.appendingPathComponent("diagnostics.json")
             )
         }
     }
@@ -138,6 +138,11 @@ struct PrivacyDataExporter {
             // Match JSONEncoder's pretty output: an empty array is `[\n\n]`;
             // a non-empty one closes with `\n]`.
             try handle.write(contentsOf: Data((index == 0 ? "[\n\n]" : "\n]").utf8))
+            // The file was streamed into the bundle rather than written in one
+            // go, so it still carries the default permissions. The writes above
+            // go straight to the file, so restricting it now is enough; the
+            // handle is closed by the `defer` above.
+            try bundleWriter.restrictToOwner(url)
             return index
         } catch {
             didThrow = true

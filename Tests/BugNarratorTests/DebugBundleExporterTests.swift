@@ -3,6 +3,12 @@ import XCTest
 
 @MainActor
 final class DebugBundleExporterTests: XCTestCase {
+
+    /// The POSIX mode of a file or directory, or -1 when it cannot be read.
+    private func posixPermissions(of url: URL) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
     func testWriteBundleCreatesExpectedFilesWithoutCredentials() throws {
         let fileManager = FileManager.default
         let rootDirectoryURL = fileManager.temporaryDirectory
@@ -60,6 +66,15 @@ final class DebugBundleExporterTests: XCTestCase {
 
         let exporter = DebugBundleExporter(fileManager: fileManager)
         let bundleURL = try exporter.writeBundle(snapshot: snapshot, to: rootDirectoryURL)
+
+        // The bundle is handed to the user and usually lands on the Desktop
+        // or in Downloads, so it and the files inside it are owner-only.
+        XCTAssertEqual(try posixPermissions(of: bundleURL), 0o700)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("system-info.json")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("app-version.txt")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("macos-version.txt")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("recent-log.txt")), 0o600)
+        XCTAssertEqual(try posixPermissions(of: bundleURL.appendingPathComponent("session-metadata.json")), 0o600)
 
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("system-info.json").path))
         XCTAssertTrue(fileManager.fileExists(atPath: bundleURL.appendingPathComponent("app-version.txt").path))
