@@ -10,16 +10,12 @@ actor JiraExportProvider {
     init(
         session: URLSession? = nil,
         receiptStore: any ExportReceiptStoring = ExportReceiptStore(),
-        retryConfiguration: ExportRetryConfiguration = .default,
-        sessionConfiguration: URLSessionConfiguration? = nil
+        retryConfiguration: ExportRetryConfiguration = .default
     ) {
         if let session {
             self.session = session
         } else {
-            // A caller can hand in the configuration so that a test can drive
-            // the session this provider builds, rather than a session of its
-            // own that would not carry the redirect policy.
-            let configuration = sessionConfiguration ?? URLSessionConfiguration.ephemeral
+            let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 60
             configuration.timeoutIntervalForResource = 90
             // The delegate refuses a redirect to a plaintext remote host: the

@@ -188,10 +188,11 @@ extension JiraExportProvider {
         }
 
         // A redirect the app did not follow: either the policy refused it, or
-        // it pointed somewhere the transport rule would not allow. The other
-        // 3xx codes are not redirects: 304 is a cached response, 305 and 306
-        // are unused.
-        if [301, 302, 303, 307, 308].contains(statusCode) {
+        // it pointed somewhere the transport rule would not allow. 300 counts
+        // as one: RFC 9110 lets it carry a Location header. The other 3xx
+        // codes are not redirects: 304 is a cached response, 305 and 306 are
+        // unused.
+        if [300, 301, 302, 303, 307, 308].contains(statusCode) {
             return .exportConfigurationIncompatible(
                 "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
                 + "A redirect to a plaintext remote host would send the account email, the API token "
