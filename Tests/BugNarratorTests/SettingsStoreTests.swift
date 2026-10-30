@@ -527,7 +527,7 @@ final class SettingsStoreTests: XCTestCase {
         let uncheckable = store.jiraBaseURLPlaintextWarning
         XCTAssertNotNil(uncheckable)
         XCTAssertTrue(
-            uncheckable?.contains("cannot check as a local address") ?? false,
+            uncheckable?.contains("cannot use as a local address") ?? false,
             "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
         XCTAssertTrue(
@@ -607,6 +607,78 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(
             SettingsStore.isLocalEndpointHost("127.0.0.1."),
             "a trailing dot turns an address into a name the app cannot check"
+        )
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("[localhost]"),
+            "brackets belong to an IPv6 literal; a bracketed name is not one"
+        )
+    }
+
+    /// `::ffff:0.0.0.0` is `0.0.0.0` written as an IPv6 address, so it reaches
+    /// this machine the same way `0.0.0.0` and `::ffff:127.0.0.1` do.
+    func testTheMappedUnspecifiedAddressIsThisMachineToo() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::ffff:0.0.0.0"),
+            "the mapped unspecified address reaches this machine"
+        )
+    }
+
+    /// The settings screen shows the refusal once. For a refused plaintext
+    /// endpoint the warning next to the base URL field and the compatibility
+    /// issue are the same sentence, so rendering both would show it twice.
+    func testTheSettingsScreenShowsTheRefusalOnce() {
+        let suiteName = "BugNarrator-SingleRefusal-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = "http://nas.local/v1"
+
+        XCTAssertNotNil(store.aiBaseURLPlaintextWarning)
+        XCTAssertNotNil(store.aiProviderCompatibilityIssue)
+        XCTAssertFalse(
+            store.shouldRenderCompatibilityIssue,
+            "the warning next to the field already says it"
+        )
+
+        // A different compatibility issue is a different sentence, so it is
+        // shown.
+        store.openAIBaseURL = "https://api.example.com/v1"
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = ""
+        XCTAssertNotNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(
+            store.shouldRenderCompatibilityIssue,
+            "a missing base URL is not the same sentence as the warning"
+        )
+    }
+
+    /// The refusal for a name the network answers has to say so. The message
+    /// used to claim that any device on the local network can claim the name,
+    /// which is only true for a `.local` name: a single-label name is answered
+    /// through the resolver's search list, which is not always mDNS.
+    func testTheNetworkAnsweredRefusalDoesNotClaimMdns() {
+        let suiteName = "BugNarrator-NetworkAnswered-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = "http://lmstudio/v1"
+
+        let issue = store.aiProviderCompatibilityIssue
+
+        XCTAssertNotNil(issue)
+        XCTAssertTrue(
+            issue?.contains("answered by the network rather than by the app") ?? false,
+            "the refusal has to say who answers the name: \(issue ?? "nil")"
+        )
+        XCTAssertFalse(
+            issue?.contains("mDNS") ?? false,
+            "the refusal must not claim mDNS answers a single-label name: \(issue ?? "nil")"
         )
     }
 
@@ -832,7 +904,7 @@ final class SettingsStoreTests: XCTestCase {
         let uncheckable = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://134744072:1234/v1")
         XCTAssertNotNil(uncheckable)
         XCTAssertTrue(
-            uncheckable?.contains("cannot check as a local address") ?? false,
+            uncheckable?.contains("cannot use as a local address") ?? false,
             "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
         XCTAssertFalse(

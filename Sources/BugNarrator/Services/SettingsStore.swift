@@ -565,9 +565,7 @@ final class SettingsStore: ObservableObject {
     /// no protection for them either. A local server is addressed by its IP
     /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
-        let lowered = host
-            .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let lowered = withoutIPv6Brackets(host.lowercased())
 
         if isReservedLocalhostName(lowered) { return true }
         if isIPv6LocalEndpointHost(lowered) { return true }
@@ -575,6 +573,16 @@ final class SettingsStore: ObservableObject {
         guard let octets = canonicalDottedQuad(lowered) else { return false }
         if octets == (0, 0, 0, 0) { return true }  // this machine
         return isTrustedIPv4(octets.0, octets.1)
+    }
+
+    /// The host without the brackets an IPv6 literal is written in.
+    ///
+    /// Only an IPv6 literal carries brackets. `[localhost]` is not one, and
+    /// reading it as `localhost` would make the app trust a name it cannot
+    /// check - the brackets are part of the host, not decoration.
+    private static func withoutIPv6Brackets(_ host: String) -> String {
+        guard host.hasPrefix("["), host.hasSuffix("]"), host.contains(":") else { return host }
+        return String(host.dropFirst().dropLast())
     }
 
     /// The name `host` refers to, with one trailing dot removed.
@@ -659,6 +667,9 @@ final class SettingsStore: ObservableObject {
         if bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80 { return true }
         // ::ffff:a.b.c.d — an IPv4 address written as an IPv6 one.
         if bytes[0..<10].allSatisfy({ $0 == 0 }) && bytes[10] == 0xff && bytes[11] == 0xff {
+            // ::ffff:0.0.0.0 is 0.0.0.0 written as an IPv6 address, so it is
+            // this machine the same way 0.0.0.0 is.
+            if bytes[12] == 0 && bytes[13] == 0 && bytes[14] == 0 && bytes[15] == 0 { return true }
             return isTrustedIPv4(bytes[12], bytes[13])
         }
         return false
@@ -710,9 +721,7 @@ final class SettingsStore: ObservableObject {
     /// it is neither a local nor a public address as far as the app is
     /// concerned: the app cannot say where it points.
     static func isPublicAddress(_ host: String) -> Bool {
-        let lowered = host
-            .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let lowered = withoutIPv6Brackets(host.lowercased())
 
         guard let octets = canonicalDottedQuad(lowered) else { return false }
         // The unspecified, multicast and broadcast addresses are not a host on
@@ -730,9 +739,7 @@ final class SettingsStore: ObservableObject {
     /// `lmstudio`. Any device on the local network can answer for such a name,
     /// so it is not a trusted endpoint even though it looks local.
     static func isUnqualifiedLocalName(_ host: String) -> Bool {
-        let lowered = host
-            .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let lowered = withoutIPv6Brackets(host.lowercased())
         // A trailing dot makes the name absolute rather than different: a
         // resolver answers the same name either way, so the two are the same
         // host and have to be classified the same way.
@@ -761,6 +768,17 @@ final class SettingsStore: ObservableObject {
         return !digits.isEmpty && digits.allSatisfy({ $0.isASCII && $0.isHexDigit })
     }
 
+    /// Whether the settings screen has to render the compatibility issue.
+    ///
+    /// For a refused plaintext endpoint the warning next to the base URL field
+    /// and the compatibility issue are the same sentence, so the screen shows
+    /// it once. A different compatibility issue - a missing base URL, a model
+    /// the provider does not offer - is a different sentence and is shown.
+    var shouldRenderCompatibilityIssue: Bool {
+        guard let compatibilityIssue = aiProviderCompatibilityIssue else { return false }
+        return compatibilityIssue != aiBaseURLPlaintextWarning
+    }
+
     /// The message for an endpoint that is refused over plaintext HTTP because
     /// its name is answered by the network rather than by the app. It names the
     /// fix, because the user is looking at a field they believe is correct.
@@ -782,7 +800,7 @@ final class SettingsStore: ObservableObject {
     /// A name any device on the local network can claim is neither remote nor
     /// checkable, and its refusal names the fix. A host the app parsed and
     /// found to be public is a remote host. A host it could not parse is one
-    /// it cannot check as a local address — calling that one remote would be a
+    /// it cannot use as a local address — calling that one remote would be a
     /// claim the app cannot make. Every refusal says what would cross the
     /// network, because that is the part the user acts on.
     static func plaintextTransportRefusal(
@@ -799,7 +817,7 @@ final class SettingsStore: ObservableObject {
                 + "Your \(secret) would be sent unencrypted. "
                 + "Use https://, or configure a trusted local \(localNoun)."
         }
-        return "\(subject) uses plaintext HTTP to a host this app cannot check as a local "
+        return "\(subject) uses plaintext HTTP to a host this app cannot use as a local "
             + "address (\(host)). Your \(secret) would be sent unencrypted. "
             + "Use https://, or point this at an address the app can check."
     }

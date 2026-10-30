@@ -396,10 +396,6 @@ private final class IssueExportControllerHarness {
 
         settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
         settingsStore.apiKey = "test-api-key"
-        // The export review sends the API key to the AI provider endpoint, so
-        // the provider has to be a usable one. The default provider is Local
-        // (Parakeet), which cannot extract issues at all.
-        settingsStore.aiProvider = .openAI
 
         transcriptStore = TranscriptStore(
             fileManager: fileManager,

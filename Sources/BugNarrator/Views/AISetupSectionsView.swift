@@ -142,8 +142,8 @@ struct AISetupSectionsView: View {
                 // The warning next to the field and this issue are the same
                 // sentence for a refused endpoint, so only one of them is
                 // rendered.
-                if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue,
-                   compatibilityIssue != settingsStore.aiBaseURLPlaintextWarning {
+                if settingsStore.shouldRenderCompatibilityIssue,
+                   let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
                     Text(compatibilityIssue)
                         .font(.footnote)
                         .foregroundStyle(.orange)
