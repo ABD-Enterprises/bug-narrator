@@ -718,6 +718,25 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    /// `::` is the IPv6 spelling of `0.0.0.0`: a connection to it reaches the
+    /// loopback interface, the same way a connection to `0.0.0.0` does. The
+    /// two spellings of "this machine" have to be trusted together — refusing
+    /// one of them is refusing an endpoint the user can reach.
+    func testTheIPv6UnspecifiedAddressIsThisMachineToo() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::"),
+            ":: reaches this machine, the same way 0.0.0.0 does"
+        )
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("0:0:0:0:0:0:0:0"),
+            "the unspecified address in its long form reaches this machine"
+        )
+        XCTAssertFalse(
+            SettingsStore.isPublicAddress("::"),
+            "the unspecified address is not a remote host"
+        )
+    }
+
     /// The multicast and broadcast addresses are not addressed to a host on
     /// the public internet either, so the app must not call them remote.
     func testTheMulticastAndBroadcastAddressesAreNotCalledRemote() {

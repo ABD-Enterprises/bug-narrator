@@ -173,6 +173,16 @@ final class IssueExportController: ObservableObject {
             ))
         }
 
+        // The export review sends the API key and the issue content to the AI
+        // provider endpoint, so a refused endpoint must not receive them. The
+        // extraction path has always checked this; the export path did not.
+        if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+            return .failure(IssueExportPreflightFailure(
+                error: .exportFailure(compatibilityIssue),
+                opensSettings: true
+            ))
+        }
+
         settingsStore.refreshExportSecretsForUserInitiatedAccess()
 
         do {

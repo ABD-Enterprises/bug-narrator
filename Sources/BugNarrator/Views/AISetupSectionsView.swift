@@ -139,7 +139,11 @@ struct AISetupSectionsView: View {
                         .foregroundStyle(appState.apiKeyValidationState.isFailure ? .red : .green)
                 }
 
-                if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue {
+                // The warning next to the field and this issue are the same
+                // sentence for a refused endpoint, so only one of them is
+                // rendered.
+                if let compatibilityIssue = settingsStore.aiProviderCompatibilityIssue,
+                   compatibilityIssue != settingsStore.aiBaseURLPlaintextWarning {
                     Text(compatibilityIssue)
                         .font(.footnote)
                         .foregroundStyle(.orange)

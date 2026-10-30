@@ -167,6 +167,37 @@ final class IssueExportControllerTests: XCTestCase {
         XCTAssertNil(harness.controller.pendingExportReview)
     }
 
+    /// The export review sends the API key and the issue content to the AI
+    /// provider endpoint, so a refused endpoint must not receive them. The
+    /// extraction path has always checked this; the export path did not, so a
+    /// base URL changed to a plaintext host after the extraction would put the
+    /// key on the wire in the clear.
+    func testPreflightRefusesWhenTheAIProviderEndpointIsRefused() throws {
+        let harness = try IssueExportControllerHarness()
+        defer { harness.cleanup() }
+
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.aiProvider = .openAICompatible
+        harness.settingsStore.openAIBaseURL = "http://nas.local/v1"
+
+        let session = harness.makeSession(issues: [harness.makeIssue(title: "App issue")])
+        try harness.transcriptStore.add(session)
+
+        let result = harness.controller.preflightIssueExport(from: session, to: .github, statusPhase: .idle)
+
+        guard case .failure(let failure) = result else {
+            return XCTFail("expected the export to be refused for a plaintext AI provider endpoint")
+        }
+        XCTAssertTrue(
+            failure.error.userMessage.contains("nas.local"),
+            "the refusal has to name the host: \(failure.error.userMessage)"
+        )
+        XCTAssertTrue(
+            failure.opensSettings,
+            "the fix is in Settings, so the refusal has to take the user there"
+        )
+    }
+
     func testJiraGroupingUsesPerIssueTargets() async throws {
         let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
@@ -365,6 +396,10 @@ private final class IssueExportControllerHarness {
 
         settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
         settingsStore.apiKey = "test-api-key"
+        // The export review sends the API key to the AI provider endpoint, so
+        // the provider has to be a usable one. The default provider is Local
+        // (Parakeet), which cannot extract issues at all.
+        settingsStore.aiProvider = .openAI
 
         transcriptStore = TranscriptStore(
             fileManager: fileManager,

@@ -648,6 +648,11 @@ final class SettingsStore: ObservableObject {
         guard inet_pton(AF_INET6, addressText, &address) == 1 else { return false }
 
         let bytes = withUnsafeBytes(of: &address) { Array($0) }
+        // :: — the unspecified address, the IPv6 spelling of 0.0.0.0. A
+        // connection to it reaches the loopback interface, the same way a
+        // connection to 0.0.0.0 does, so the two spellings of "this machine"
+        // have to be trusted together.
+        if bytes.allSatisfy({ $0 == 0 }) { return true }
         // ::1 — the loopback.
         if bytes == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1] { return true }
         // fe80::/10 — the link-local range.
@@ -711,9 +716,9 @@ final class SettingsStore: ObservableObject {
 
         guard let octets = canonicalDottedQuad(lowered) else { return false }
         // The unspecified, multicast and broadcast addresses are not a host on
-        // the public internet: 0.0.0.0 is this machine, and the other two are
-        // not addressed to one. Calling them remote would be a claim the app
-        // cannot make.
+        // the public internet: the 0.0.0.0/8 range means "this network" rather
+        // than a destination (RFC 1122), and the other two are not addressed to
+        // one host. Calling them remote would be a claim the app cannot make.
         if octets.0 == 0 { return false }
         if (224...239).contains(octets.0) { return false }
         if octets == (255, 255, 255, 255) { return false }
@@ -757,12 +762,13 @@ final class SettingsStore: ObservableObject {
     }
 
     /// The message for an endpoint that is refused over plaintext HTTP because
-    /// its name can be claimed by any device on the local network. It names the
+    /// its name is answered by the network rather than by the app. It names the
     /// fix, because the user is looking at a field they believe is correct.
     static func unqualifiedLocalHostPlaintextMessage(host: String, secret: String) -> String {
         "\(host) is not an address this app trusts for plaintext HTTP: a .local or single-word host "
-            + "name can be claimed by any device on the local network, so the traffic could be "
-            + "intercepted. Use the machine's IP address (for example 192.168.1.20), or https://. "
+            + "name is answered by the network rather than by the app, so it can point anywhere and "
+            + "the traffic could be intercepted. Use the machine's IP address (for example "
+            + "192.168.1.20), or https://. "
             + "Over plaintext HTTP your \(secret) would cross the network unencrypted."
     }
 
