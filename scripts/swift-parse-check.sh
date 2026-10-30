@@ -46,11 +46,15 @@ if [[ ! -d "Sources" ]]; then
   exit 0
 fi
 
-# Collect every Swift source file under Sources/.
+# Collect every Swift source file under Sources/ and Tests/. A syntax error
+# in a test file is a syntax error: the fast gate has to see it.
 SWIFT_FILES=()
-while IFS= read -r -d '' file; do
-  SWIFT_FILES+=("$file")
-done < <(find Sources -type f -name '*.swift' -print0)
+for directory in Sources Tests; do
+  [[ -d "$directory" ]] || continue
+  while IFS= read -r -d '' file; do
+    SWIFT_FILES+=("$file")
+  done < <(find "$directory" -type f -name '*.swift' -print0)
+done
 
 if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
   printf 'NOT RUN: no Swift source files found under Sources/\n' >"$STATUS_FILE"
