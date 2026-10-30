@@ -28,6 +28,52 @@ Windows test was green against an output macOS produced nowhere outside UTC.
 |---|---|
 | `transcript.golden.md` | The exact `transcript.md` the canonical session must export |
 | `summary.golden.md` | The shared `summary.md` subset both platforms emit identically today |
+| `plaintext-endpoint-hosts.json` | The hosts the two plaintext-endpoint classifiers have to agree about |
+| `plaintext-endpoint-urls.json` | The URLs the two ports have to refuse in the same way |
+
+## The plaintext-endpoint host table
+
+`plaintext-endpoint-hosts.json` holds the hosts the macOS and Windows copies
+of the plaintext-endpoint classifier have to agree about, and whether each
+one is trusted — that is, whether the app may send a secret to it over
+plaintext HTTP.
+
+The two ports each have their own copy of the classifier, and a copy is a
+copy that drifts: the macOS app read an IPv6 literal with a hex group longer
+than four digits by truncating it, the Windows port read a host written as a
+number in another notation after .NET had rewritten it, and the two ports
+answered differently about the same URL. A secret that one port refuses and
+the other trusts goes out in the clear on the port that trusts it.
+
+Each row names why the answer is what it is, so a disagreement is a claim
+about the rule rather than two different literals to re-type.
+
+`plaintext-endpoint-urls.json` holds the layer above it: the URLs the two
+ports have to refuse in the same way. The ports read the host out of a URL
+differently — Foundation takes the brackets off whatever is in them, .NET
+keeps them — so `http://[localhost]/` read as the reserved name on one
+port and as a bracketed name on the other. The table is read by both test
+suites through the refusal the user would see.
+
+Each row names the host as it was written as well as the answer, because the
+two layers can drift apart: a table of hosts alone cannot tell whether the
+ports read the same host out of the same URL. Both ports read the host out
+of the text the user wrote, so a URL Foundation cannot build a URL from —
+`http://::1:8080/v1`, an address written without brackets — is judged too.
+A port belongs to a name and not to an address, so an authority that carries
+more than one colon is an address and the whole of it is the host.
+
+The scheme is read out of the text as well, and the table says so: the app
+trims the value of `/` at both ends before it builds the URL from it, so
+`/http://example.com` is a plaintext URL to example.com and not a value the
+app refuses to read. A leading slash in the value is therefore a row of its
+own.
+
+One kind of URL is deliberately not a row: a URL with no host, such as
+`http:///v1`. Neither port acts on it — the macOS app falls back to the
+default provider address and the Windows port refuses the value outright —
+so the two ports have no common answer to pin, and a row would have to
+record one of them as the truth.
 
 ## The canonical session
 
