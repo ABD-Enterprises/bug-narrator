@@ -552,14 +552,33 @@ final class SettingsStoreTests: XCTestCase {
 
     /// The refusal for a host the app cannot check as local says so, instead of
     /// calling every refused host a remote one: a loopback address written in
-    /// another notation is not remote, it is simply not checkable.
-    func testTheRefusalNamesAHostTheAppCannotCheckAsLocal() {
-        let warning = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://134744072:1234/v1")
-        XCTAssertNotNil(warning)
+    /// another notation is not remote, it is simply not checkable. An address
+    /// the app can parse and finds to be public still is remote, and is called
+    /// that.
+    func testTheRefusalDistinguishesAPublicAddressFromAnUncheckableHost() {
+        let uncheckable = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://134744072:1234/v1")
+        XCTAssertNotNil(uncheckable)
         XCTAssertTrue(
-            warning?.contains("not an address this app can check as local") ?? false,
-            "expected the refusal to say the host is not checkable, got: \(warning ?? "nil")"
+            uncheckable?.contains("cannot check as a local address") ?? false,
+            "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
+        XCTAssertFalse(
+            uncheckable?.contains("remote host") ?? true,
+            "a host in another notation is not known to be remote, got: \(uncheckable ?? "nil")"
+        )
+
+        let publicAddress = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://8.8.8.8:1234/v1")
+        XCTAssertNotNil(publicAddress)
+        XCTAssertTrue(
+            publicAddress?.contains("remote host") ?? false,
+            "expected a parsed public address to be called remote, got: \(publicAddress ?? "nil")"
+        )
+    }
+
+    /// The empty host is not a numeric address literal.
+    func testTheEmptyHostIsNotAnAddressLiteral() {
+        XCTAssertFalse(SettingsStore.isNumericAddressLiteral(""))
+        XCTAssertFalse(SettingsStore.isPublicAddress(""))
     }
 
     func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {

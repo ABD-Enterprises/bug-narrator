@@ -586,6 +586,26 @@ final class SettingsStore: ObservableObject {
         return false
     }
 
+    /// Whether `host` is an address the app parsed and found to be somewhere
+    /// else — a public address, written the way an address is written.
+    ///
+    /// A host in another notation (`134744072`, `127.1`) is not parseable, so
+    /// it is neither a local nor a public address as far as the app is
+    /// concerned: the app cannot say where it points.
+    static func isPublicAddress(_ host: String) -> Bool {
+        let lowered = host
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+
+        let parts = lowered.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4,
+              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy({ $0.isNumber }) }),
+              parts.compactMap({ UInt8($0) }).count == 4 else {
+            return false
+        }
+        return !isLocalEndpointHost(host)
+    }
+
     /// Whether `host` is a name that resolves over mDNS rather than an address
     /// the app can check: a `.local` name, or a single-label name such as
     /// `lmstudio`. Any device on the local network can answer for such a name,
@@ -608,6 +628,7 @@ final class SettingsStore: ObservableObject {
     /// Whether `host` is a number written in a notation other than the dotted
     /// quad: decimal (`134744072`) or hexadecimal (`0x7f000001`).
     static func isNumericAddressLiteral(_ host: String) -> Bool {
+        guard !host.isEmpty else { return false }
         if host.allSatisfy({ $0.isNumber }) { return true }
         guard host.hasPrefix("0x") || host.hasPrefix("0X") else { return false }
         let digits = host.dropFirst(2)
@@ -641,9 +662,14 @@ final class SettingsStore: ObservableObject {
         if isUnqualifiedLocalName(host) {
             return unqualifiedLocalHostPlaintextMessage(host: host, secret: "API key and transcript text")
         }
-        return "This endpoint uses plaintext HTTP to a host that is not an address this app "
-            + "can check as local (\(host)). Your API key and transcript text would be sent "
-            + "unencrypted. Use https:// unless this is a trusted local endpoint."
+        if Self.isPublicAddress(host) {
+            return "This endpoint uses plaintext HTTP to a remote host (\(host)). "
+                + "Your API key and transcript text would be sent unencrypted. Use "
+                + "https:// unless this is a trusted local endpoint."
+        }
+        return "This endpoint uses plaintext HTTP to a host this app cannot check as a local "
+            + "address (\(host)). Your API key and transcript text would be sent unencrypted. "
+            + "Use https://, or point this at an address the app can check."
     }
 
     /// Warning to surface near the base-URL field for the active provider, or nil.
@@ -670,8 +696,11 @@ final class SettingsStore: ObservableObject {
         if Self.isUnqualifiedLocalName(host) {
             return Self.unqualifiedLocalHostPlaintextMessage(host: host, secret: "email and API token")
         }
-        return "This Jira URL uses plaintext HTTP to a host that is not an address this app "
-            + "can check as local (\(host)). "
+        if Self.isPublicAddress(host) {
+            return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
+        }
+        return "This Jira URL uses plaintext HTTP to a host this app cannot check as a local "
+            + "address (\(host)). "
             + "Your email and API token would be sent unencrypted. Use https:// "
             + "unless this is a trusted local server."
     }
