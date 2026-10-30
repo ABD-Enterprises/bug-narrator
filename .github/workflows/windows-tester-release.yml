@@ -126,17 +126,17 @@ jobs:
           # reports it as "Not Found (HTTP 404)". Any other failure must not be
           # read as "no tag", so it stops the release instead.
           tag_lookup=""
-          if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>&1)"; then
-            # Only GitHub's own answer, with its HTTP status, means the tag is
-            # absent: gh reports a missing tag as "gh: Not Found (HTTP 404)".
-            # The body and that message arrive on the same line, so the match
-            # is on the message and not on the start of a line. A body that
-            # merely carries a "status" field says nothing about the status
-            # the request got, and a failure that quotes someone else's 404 is
-            # not proof either, so both stop the release instead of reading as
-            # absence.
-            if ! printf '%s\n' "$tag_lookup" | grep -qE 'gh: [^"]*\(HTTP 404\)'; then
-              printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
+          tag_error="$(mktemp)"
+          trap 'rm -f "$tag_error"' EXIT
+          if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>"$tag_error")"; then
+            # gh writes the response body to stdout and its message to stderr.
+            # Only the message carries the HTTP status, so the body is never
+            # consulted: a body that quotes someone else's 404 says nothing
+            # about the status this request got. A missing tag is the one
+            # answer that means "no tag", and gh reports it as
+            # "gh: Not Found (HTTP 404)".
+            if ! grep -qE '^gh: .*\(HTTP 404\)$' "$tag_error"; then
+              printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$(cat "$tag_error")" >&2
               exit 1
             fi
             # The tag does not exist yet, which is the normal case for a first
@@ -231,6 +231,16 @@ jobs:
               exit 1
             fi
             gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            # The re-dispatch may also be what publishes the release: a release
+            # created as a draft stays a draft until it is edited, so the
+            # flags and the notes are refreshed here too.
+            edit_args=(release edit "$RELEASE_TAG"
+                       --repo "$GITHUB_REPOSITORY"
+                       --title "BugNarrator Windows tester $RELEASE_TAG"
+                       --notes-file "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md"
+                       --draft="$RELEASE_DRAFT"
+                       --prerelease="$RELEASE_PRERELEASE")
+            gh "${edit_args[@]}"
             exit 0
           fi
           # The tag is created at the commit that produced the binaries, never at the default branch.

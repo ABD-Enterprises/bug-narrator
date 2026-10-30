@@ -15,13 +15,17 @@
 # some other job in the same file still had one — which is exactly the
 # ungated release the gate exists to prevent.
 #
-# It also pins that the gate runs *before* the release is published, and that
-# it runs as a command: a comment that mentions the script is not a run of it,
-# and a gate that runs after the release cannot retract the release.
+# It also pins that the gate runs *before* the release is published, that it
+# runs as a command (a comment that mentions the script is not a run of it),
+# that the command is the gate and nothing else (a step that swallows the
+# gate's exit status would stay green when the gate fails), and that the step
+# can fail the job at all (continue-on-error or a condition would let the
+# release publish after the gate said no).
 #
 # It proves itself: a drifted name, a step that stopped running the gate, a
-# gate that runs too late and a check script with a baked-in name all have to
-# be rejected, or the check would be decoration.
+# gate that runs too late, a gate that cannot fail the job and a check script
+# with a baked-in name all have to be rejected, or the check would be
+# decoration.
 #
 # It runs as part of scripts/validate.sh, so a drifted name fails the gate
 # before a release is dispatched rather than during one.
@@ -71,24 +75,33 @@ read_values() {
 }
 
 # Prints one record per job of a workflow file:
-#   job|environment values|publishes|publish step|runs the gate|gate step|checked names
+#   job|environment values|publishes|publish step|runs the gate|gate step|checked names|cannot fail
 #
 # The environment values and the checked names are space separated lists. The
 # two step numbers are the index of the step that publishes the release and
-# the index of the step that runs the gate; 0 means "not in this job".
-#
-# Only a step's run command counts. A line that mentions the script in a
-# comment does not run it, and the order of the steps matters: the gate has to
-# run before the release exists.
+# the index of the step that runs the gate; 0 means "not in this job". The
+# last field says the gate step could not fail the job.
 parse_jobs() {
     local file="$1"
 
     awk '
         function flush() {
             if (job != "") {
-                printf "%s|%s|%d|%d|%d|%d|%s\n", job, envs, publishes, publish_step, gate, gate_step, gate_envs
+                printf "%s|%s|%d|%d|%d|%d|%s|%d\n", job, envs, publishes, publish_step, gate, gate_step, gate_envs, neutered
             }
-            job = ""; envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; step = 0
+            job = ""; envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; neutered = 0
+        }
+        # A step is judged when it ends: its attributes can sit before or
+        # after its run command.
+        function close_step() {
+            if (step_gate) {
+                if (step_conditional || (step_continue != "" && step_continue != "false")) {
+                    neutered = 1
+                }
+                if (gate == 0) { gate = 1; gate_step = step }
+            }
+            if (step_publish && publish_step == 0) { publishes = 1; publish_step = step }
+            step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0
         }
         # A command counts only when it runs the thing. A comment that names
         # the script does not run it, and a command that merely mentions it
@@ -98,32 +111,40 @@ parse_jobs() {
             sub(/^[[:space:]]*/, "", cmd)
             if (cmd ~ /^#/) { return }
             sub(/^(bash|sh|exec)[[:space:]]+/, "", cmd)
-            # The first one is the one that matters: the gate has to run
-            # before the release exists, and the release is published by the
-            # first step that creates it.
             # The command has to be the gate and nothing else. A command that
             # swallows the exit status of the gate — "|| true", "; true", a
             # trailing "&" — would leave the step green when the gate fails,
             # which is the one thing the gate exists to prevent.
-            if (gate_step == 0 && cmd ~ /^(\.\/)?scripts\/check-release-environment\.sh[[:space:]]*$/) {
-                gate = 1; gate_step = step
+            if (cmd ~ /^(\.\/)?scripts\/check-release-environment\.sh[[:space:]]*$/) {
+                step_gate = 1
             }
-            if (publish_step == 0 && (cmd ~ /"?release"?[[:space:],]+"?create/ || cmd ~ /"?release"?[[:space:],]+"?upload/)) {
-                publishes = 1; publish_step = step
+            # The release is published by creating or replacing it: the gh
+            # release commands, or the API behind them.
+            if (cmd ~ /"?release"?[[:space:],]+"?create/ || cmd ~ /"?release"?[[:space:],]+"?upload/ || cmd ~ /\/releases/) {
+                step_publish = 1
             }
         }
         /^jobs:[ \t]*$/ { injobs = 1; next }
-        injobs && /^[^ \t]/ { flush(); injobs = 0; next }
-        injobs && /^  [A-Za-z0-9_.-]+:[ \t]*$/ { flush(); job = $1; sub(/:$/, "", job); next }
+        injobs && /^[^ \t]/ { close_step(); flush(); injobs = 0; next }
+        injobs && /^  [A-Za-z0-9_.-]+:[ \t]*$/ { close_step(); flush(); job = $1; sub(/:$/, "", job); step = 0; next }
         injobs && job != "" {
-            if ($0 ~ /^      - /) { step++ }
+            if ($0 ~ /^      - /) { close_step(); step++ }
+
+            # The attributes of the step: a gate that cannot fail the job is
+            # not a gate.
+            if ($0 ~ /^        continue-on-error:[ \t]*/) {
+                value = $0; sub(/^        continue-on-error:[ \t]*/, "", value); step_continue = value
+            }
+            if ($0 ~ /^        if:[ \t]*/) { step_conditional = 1 }
 
             # A job-level environment: key sits at the job level indentation.
             if ($0 ~ /^    environment:[ \t]*[A-Za-z0-9._-]+/) {
                 value = $0; sub(/^    environment:[ \t]*/, "", value)
                 envs = (envs == "" ? value : envs " " value)
             }
-            if ($0 ~ /RELEASE_ENVIRONMENT:[ \t]*[A-Za-z0-9._-]+/) {
+            # The environment the gate checks: a real setting, not a comment
+            # that mentions one.
+            if ($0 !~ /^[[:space:]]*#/ && $0 ~ /RELEASE_ENVIRONMENT:[ \t]*[A-Za-z0-9._-]+/) {
                 value = $0; sub(/.*RELEASE_ENVIRONMENT:[ \t]*/, "", value)
                 gate_envs = (gate_envs == "" ? value : gate_envs " " value)
             }
@@ -146,7 +167,7 @@ parse_jobs() {
                 inrun = 0
             }
         }
-        END { flush() }
+        END { close_step(); flush() }
     ' "$file"
 }
 
@@ -208,13 +229,10 @@ check_tree() {
         fi
 
         local publishing=0
-        local gates=0
-        local job envs publishes publish_step gate gate_step gate_envs
-        while IFS='|' read -r job envs publishes publish_step gate gate_step gate_envs; do
+        local preflights=0
+        local job envs publishes publish_step gate gate_step gate_envs neutered
+        while IFS='|' read -r job envs publishes publish_step gate gate_step gate_envs neutered; do
             [[ -n "$job" ]] || continue
-            if [[ "$gate" == "1" ]]; then
-                gates=$((gates + 1))
-            fi
 
             # A job that names an environment has to name the gate's.
             if [[ -n "$envs" && "$envs" != "$gate_env" ]]; then
@@ -224,6 +242,15 @@ check_tree() {
             # A job that runs the gate has to name the environment it checks.
             if [[ "$gate" == "1" && " $gate_envs " != *" $gate_env "* ]]; then
                 fail "$workflow: job \"$job\" runs the environment gate without checking \"$gate_env\"."
+            fi
+
+            # A gate that cannot fail the job is not a gate.
+            if [[ "$neutered" == "1" ]]; then
+                fail "$workflow: job \"$job\" runs the environment gate in a step that cannot fail the job."
+            fi
+
+            if [[ "$gate" == "1" && -z "$envs" ]]; then
+                preflights=$((preflights + 1))
             fi
 
             if [[ "$publishes" != "1" ]]; then
@@ -242,7 +269,7 @@ check_tree() {
             fi
 
             # The gate has to run before the release exists: a gate that runs
-            # afterwards cannot retract what it should have stopped.
+            # after the release cannot retract what it should have stopped.
             if [[ "$gate_step" -ge "$publish_step" ]]; then
                 fail "$workflow: job \"$job\" publishes a release in step $publish_step, before the gate runs in step $gate_step."
             fi
@@ -253,9 +280,10 @@ check_tree() {
         fi
 
         # The preflight runs the gate too, so a broken environment is caught
-        # before a Windows runner is reserved.
-        if [[ "$gates" -lt 2 ]]; then
-            fail "$workflow runs the environment gate in $gates job(s); the preflight has to run it as well."
+        # before a Windows runner is reserved. The preflight is the job that
+        # runs the gate and declares no environment of its own.
+        if [[ "$preflights" -lt 1 ]]; then
+            fail "$workflow runs the environment gate only in the gated job; the preflight has to run it as well."
         fi
     done <<<"$workflows"
 }
@@ -322,7 +350,10 @@ def run_content(step):
 
 
 def publishes(step):
-    return any(re.search(r"release\"?[\s,]+\"?(create|upload)", command) for command in run_content(step))
+    return any(
+        re.search(r"release\"?[\s,]+\"?(create|upload)", command) or "/releases" in command
+        for command in run_content(step)
+    )
 
 
 head, marker, rest = text.partition("\njobs:\n")
@@ -331,7 +362,6 @@ if not marker:
     sys.exit(1)
 jobs = re.split(r"(?m)^(?=  [A-Za-z0-9_.-]+:[ \t]*$)", "jobs:\n" + rest)
 
-# The job that matters is the one that publishes the release.
 target = None
 for job_index, job in enumerate(jobs):
     steps = re.split(r"(?m)^(?=      - )", job)
@@ -353,8 +383,6 @@ if gate_index is None:
     sys.exit(1)
 
 if mutation == "mention" or mutation == "comment":
-    # Replace the command that invokes the script, wherever it sits: the run
-    # line of a step or a line inside a run block.
     replaced = False
     lines = steps[gate_index].split("\n")
     for line_index, line in enumerate(lines):
@@ -362,10 +390,7 @@ if mutation == "mention" or mutation == "comment":
         if stripped.startswith("#") or "check-release-environment.sh" not in stripped:
             continue
         indent = line[: len(line) - len(line.lstrip())]
-        if stripped.startswith("run:"):
-            prefix = indent + "run: "
-        else:
-            prefix = indent
+        prefix = indent + "run: " if stripped.startswith("run:") else indent
         if mutation == "mention":
             lines[line_index] = prefix + 'echo "see scripts/check-release-environment.sh"'
         else:
@@ -375,6 +400,20 @@ if mutation == "mention" or mutation == "comment":
     if not replaced:
         print("could not replace the gate command")
         sys.exit(1)
+    steps[gate_index] = "\n".join(lines)
+elif mutation == "continue-on-error":
+    lines = steps[gate_index].split("\n")
+    for line_index, line in enumerate(lines):
+        if line.strip().startswith("run:"):
+            lines.insert(line_index, "        continue-on-error: true")
+            break
+    steps[gate_index] = "\n".join(lines)
+elif mutation == "conditional":
+    lines = steps[gate_index].split("\n")
+    for line_index, line in enumerate(lines):
+        if line.strip().startswith("run:"):
+            lines.insert(line_index, "        if: false")
+            break
     steps[gate_index] = "\n".join(lines)
 elif mutation == "publish-before":
     early = '      - name: Publish GitHub Release\n        shell: bash\n        run: gh release create "$RELEASE_TAG"\n'
@@ -390,20 +429,6 @@ else:
 jobs[job_index] = "".join(steps)
 open(path, "w", encoding="utf-8").write(head + "\njobs:\n" + "".join(jobs))
 PYTHON
-}
-
-# Applies a self-test mutation and fails when it changed nothing: a mutation
-# that no longer matches the workflow's shape would otherwise look like a
-# check that accepted a broken tree.
-mutate() {
-    local file="$1"
-    shift
-    local before
-    before="$(cat "$file")"
-    sed -i.bak "$@" "$file"
-    if [[ "$before" == "$(cat "$file")" ]]; then
-        fail "the self-test could not apply its mutation to $file; the workflow's shape changed"
-    fi
 }
 
 # A name that no longer matches the job's environment has to be caught.
@@ -470,6 +495,20 @@ restore_workflow ".github/workflows/windows-tester-release.yml"
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" comment
 if (check_tree "$workspace") >/dev/null 2>&1; then
     fail 'the wiring check accepted a gate step that is only a comment'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A gate step that cannot fail the job has to be caught.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" continue-on-error
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a gate step that cannot fail the job'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A gate step that does not always run has to be caught.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" conditional
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a conditional gate step'
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
