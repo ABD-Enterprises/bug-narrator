@@ -8,7 +8,7 @@ Use this checklist before cutting a public test build or release candidate.
 
 - Regenerate the project with `xcodegen generate` if `project.yml` changed.
 - Run `./scripts/release_smoke_test.sh` and confirm its headless unit-test and Release-build checks pass before packaging a candidate build. Run the separately gated UI-test target only from a usable interactive window-server session or CI.
-- Review open Dependabot, CodeQL, and secret-scanning alerts. Fix patched findings and formally document any accepted exception with its exposure evidence before publishing.
+- Review open Dependabot, CodeQL, and secret-scanning alerts. Fix patched findings and formally document any accepted exception with its exposure evidence before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python, Actions and C# on every run — C# on a Windows runner — and Swift on the monthly schedule or on an on-demand run with `include_swift` enabled; the Swift path is new and has not completed an analysis yet. Confirm the workflow is enabled before reading its silence as a clean result: `gh api repos/ABD-Enterprises/bug-narrator/actions/workflows/codeql.yml --jq .state` must answer `active`. Name the file rather than the workflow, because GitHub's own default CodeQL workflow is also called `CodeQL`.
 - Build the app in the intended configuration and confirm the build succeeds.
 - Run `./scripts/build_dmg.sh` and confirm the DMG packaging step succeeds.
 - If the local Parakeet server changed, run `local-transcription/build_standalone.sh`; confirm its packaged generated-speech transcription succeeds and the command reaches `PUBLIC_RELEASE checks passed` before treating the artifact as publishable.
