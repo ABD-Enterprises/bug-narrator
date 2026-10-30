@@ -33,6 +33,30 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task StartRecordingAsync_WithAPlaintextRemoteProvider_RefusesToRecord()
+    {
+        // The transcript would be sent to the endpoint in the clear, so the
+        // recording is refused before any audio is captured (#1285). The macOS
+        // app refuses the session for the same reason.
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with
+        {
+            AiProvider = "openAICompatible",
+            AiProviderBaseUrl = "http://api.example.com/v1",
+        };
+
+        await harness.Service.StartRecordingAsync();
+
+        var state = harness.Service.CurrentState;
+        Assert.Equal(RecordingWorkflowState.Failed, state.WorkflowState);
+        Assert.Contains("api.example.com", state.StatusMessage);
+        Assert.Contains("API key and transcript text", state.StatusMessage);
+        Assert.Equal(RecoveryBlocker.ProviderNotConfigured, state.Blocker);
+        Assert.Null(harness.AudioRecorderService.LastRequest);
+        Assert.Equal(0, harness.TranscriptionClient.CallCount);
+    }
+
+    [Fact]
     public async Task Recovery_DoesNotReplaceRecordingPermissionGuidanceWithAnOlderPendingSession()
     {
         using var harness = new TestHarness();

@@ -256,6 +256,25 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         var settings = await settingsStore.LoadAsync(cancellationToken);
         var recordingSource = settings.EffectiveRecordingAudioSourceProfile;
 
+        // The transcript has to be able to reach a provider the app is willing
+        // to talk to. A plaintext remote endpoint would put the API key and the
+        // transcript text on the wire in the clear, so the recording is refused
+        // before any audio is captured - the macOS app refuses the session for
+        // the same reason (#1285).
+        if (settings.AiProviderPlaintextEndpointIssue is { } plaintextIssue)
+        {
+            diagnostics.Warning("recording", "recording refused because the AI provider endpoint uses plaintext HTTP");
+            PublishState(new RecordingControlState(
+                RecordingWorkflowState.Failed,
+                CanStart: true,
+                CanStop: false,
+                CanCaptureScreenshot: false,
+                plaintextIssue,
+                ActiveSession: null,
+                Blocker: RecoveryBlocker.ProviderNotConfigured));
+            return;
+        }
+
         // Product-spec "fail before transcription": with Local (Parakeet) the server must answer
         // before any audio is captured, or the session could never be transcribed (#1180).
         if (settings.UsesLocalTranscriptionServer
@@ -646,7 +665,11 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
                 request,
                 transcriptText: string.Empty,
                 transcriptionStatus: SessionTranscriptionStatus.NotConfigured,
-                transcriptionFailureMessage: null);
+                // The refusal explains itself: a session that cannot be
+                // transcribed because the endpoint would put the transcript text
+                // on the wire in the clear says so, instead of leaving the user
+                // to guess why no transcript arrived.
+                transcriptionFailureMessage: settings.AiProviderPlaintextEndpointIssue);
         }
 
         try

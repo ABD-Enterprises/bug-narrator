@@ -171,23 +171,38 @@ public static class OpenAiCompatibleEndpoint
 
     /// <summary>
     /// The message for an endpoint that is refused over plaintext HTTP because
-    /// its name can be claimed by any device on the local network. It names the
+    /// its name is answered by the network rather than by the app. It names the
     /// fix, because the user is looking at a field they believe is correct.
     /// Mirrors SettingsStore.unqualifiedLocalHostPlaintextMessage in the macOS app.
     /// </summary>
+    /// <remarks>
+    /// The message does not claim that mDNS answers the name: a <c>.local</c>
+    /// name is answered over mDNS, but a single-label name is answered through
+    /// the resolver's search list, which is not always mDNS. The risk is the
+    /// same either way - the app cannot check where the name points.
+    /// </remarks>
     public static string UnqualifiedLocalHostPlaintextMessage(string host, string secret) =>
         $"{host} is not an address this app trusts for plaintext HTTP: a .local or single-word host "
-        + "name can be claimed by any device on the local network, so the traffic could be "
-        + "intercepted. Use the machine's IP address (for example 192.168.1.20), or https://. "
-        + $"Over plaintext HTTP your {secret} would cross the network unencrypted.";
+        + "name is answered by the network rather than by the app, so it can point anywhere and the "
+        + "traffic could be intercepted. Use the machine's IP address (for example 192.168.1.20), "
+        + $"or https://. Over plaintext HTTP your {secret} would cross the network unencrypted.";
 
     /// <summary>
-    /// A user-facing warning when the configured base URL would transmit the API
-    /// key and transcript content to a non-local host over plaintext HTTP. Remote
-    /// HTTPS and local HTTP (loopback/private/link-local) return null so enterprise-proxy
-    /// and local-provider workflows are not nagged. Mirrors the macOS app (#472).
+    /// The refusal for a configured base URL that would transmit the API key and
+    /// transcript content to a non-local host over plaintext HTTP. Remote HTTPS
+    /// and local HTTP (loopback/private/link-local) return null so
+    /// enterprise-proxy and local-provider workflows are not nagged.
+    /// Mirrors the macOS app (#472).
     /// </summary>
-    public static string? PlaintextRemoteWarning(string? configuredBaseUrl)
+    /// <remarks>
+    /// This is the one answer the app gives about a plaintext endpoint. The
+    /// settings field shows it next to the base URL, and the compatibility issue
+    /// refuses the request with it, so the field and the gate cannot describe
+    /// the same host differently. It used to be a warning that nothing
+    /// consumed as a gate, so a mistyped scheme sent the API key and the
+    /// recording over the network in the clear (#1285).
+    /// </remarks>
+    public static string? PlaintextRemoteRefusal(string? configuredBaseUrl)
     {
         if (string.IsNullOrWhiteSpace(configuredBaseUrl))
         {

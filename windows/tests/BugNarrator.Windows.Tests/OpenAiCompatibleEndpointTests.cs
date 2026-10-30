@@ -36,9 +36,9 @@ public sealed class OpenAiCompatibleEndpointTests
     [InlineData("http://192.168.1.50:1234")]      // private network
     [InlineData("http://10.0.0.5:8080")]
     [InlineData("")]
-    public void PlaintextRemoteWarning_AllowsHttpsAndLocalHttp(string baseUrl)
+    public void PlaintextRemoteRefusal_AllowsHttpsAndLocalHttp(string baseUrl)
     {
-        Assert.Null(OpenAiCompatibleEndpoint.PlaintextRemoteWarning(baseUrl));
+        Assert.Null(OpenAiCompatibleEndpoint.PlaintextRemoteRefusal(baseUrl));
     }
 
     [Theory]
@@ -46,9 +46,9 @@ public sealed class OpenAiCompatibleEndpointTests
     [InlineData("http://203.0.113.10:8080")]
     [InlineData("http://lmstudio:1234")]          // single-label host
     [InlineData("http://nas.local:1234")]
-    public void PlaintextRemoteWarning_WarnsForPlaintextRemoteHost(string baseUrl)
+    public void PlaintextRemoteRefusal_WarnsForPlaintextRemoteHost(string baseUrl)
     {
-        Assert.NotNull(OpenAiCompatibleEndpoint.PlaintextRemoteWarning(baseUrl));
+        Assert.NotNull(OpenAiCompatibleEndpoint.PlaintextRemoteRefusal(baseUrl));
     }
 
     [Theory]
@@ -166,9 +166,9 @@ public sealed class OpenAiCompatibleEndpointTests
     /// another notation is not remote, it is simply not checkable.
     /// </summary>
     [Fact]
-    public void PlaintextRemoteWarning_NamesAHostTheAppCannotCheckAsLocal()
+    public void PlaintextRemoteRefusal_NamesAHostTheAppCannotCheckAsLocal()
     {
-        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://jira.example.com:1234/v1");
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteRefusal("http://jira.example.com:1234/v1");
 
         Assert.NotNull(warning);
         Assert.Contains("cannot check as a local address", warning, StringComparison.Ordinal);
@@ -183,9 +183,9 @@ public sealed class OpenAiCompatibleEndpointTests
     /// refused either way, which is the part that matters.
     /// </summary>
     [Fact]
-    public void PlaintextRemoteWarning_RefusesANumericAddressWrittenInAnotherNotation()
+    public void PlaintextRemoteRefusal_RefusesANumericAddressWrittenInAnotherNotation()
     {
-        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://134744072:1234/v1");
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteRefusal("http://134744072:1234/v1");
 
         Assert.NotNull(warning);
         Assert.Contains("remote host", warning, StringComparison.Ordinal);
@@ -197,9 +197,9 @@ public sealed class OpenAiCompatibleEndpointTests
     /// refusal says so and names what would cross the network in the clear.
     /// </summary>
     [Fact]
-    public void PlaintextRemoteWarning_CallsAPublicAddressRemote()
+    public void PlaintextRemoteRefusal_CallsAPublicAddressRemote()
     {
-        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://8.8.8.8:1234/v1");
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteRefusal("http://8.8.8.8:1234/v1");
 
         Assert.NotNull(warning);
         Assert.Contains("remote host", warning, StringComparison.Ordinal);
@@ -249,9 +249,9 @@ public sealed class OpenAiCompatibleEndpointTests
     /// that names the fix: point the setting at the machine's IP address.
     /// </summary>
     [Fact]
-    public void PlaintextRemoteWarning_ExplainsAClaimableLocalName()
+    public void PlaintextRemoteRefusal_ExplainsAClaimableLocalName()
     {
-        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://lmstudio:1234/v1");
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteRefusal("http://lmstudio:1234/v1");
 
         Assert.NotNull(warning);
         Assert.Contains("not an address this app trusts for plaintext HTTP", warning, StringComparison.Ordinal);
