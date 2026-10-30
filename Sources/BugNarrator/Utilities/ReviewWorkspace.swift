@@ -1,37 +1,6 @@
 import Foundation
 
 enum ReviewWorkspace {
-    static func availableTabs(for session: TranscriptSession) -> [ReviewWorkspaceTab] {
-        var tabs: [ReviewWorkspaceTab] = [.rawTranscript, .screenshots]
-
-        if let extraction = session.issueExtraction, !extraction.issues.isEmpty {
-            tabs.append(.extractedIssues)
-        }
-
-        if !session.summaryText.isEmpty || session.issueExtraction != nil {
-            tabs.append(.reviewSummary)
-        }
-
-        return tabs
-    }
-
-    static func clampedTab(_ selectedTab: ReviewWorkspaceTab, for session: TranscriptSession?) -> ReviewWorkspaceTab {
-        guard let session else {
-            return .rawTranscript
-        }
-
-        let availableTabs = availableTabs(for: session)
-        if availableTabs.contains(selectedTab) {
-            return selectedTab
-        }
-
-        if availableTabs.contains(.reviewSummary) {
-            return .reviewSummary
-        }
-
-        return .rawTranscript
-    }
-
     static func timelineEntries(
         for session: TranscriptSession,
         provider: AIProvider = .openAI

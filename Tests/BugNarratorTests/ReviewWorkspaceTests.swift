@@ -11,69 +11,6 @@ final class ReviewWorkspaceTests: XCTestCase {
         XCTAssertNil(normalizedOptionalReproductionStepText("  \n  "))
     }
 
-    func testAvailableTabsIncludeSummaryOnlyWhenSessionHasSummaryContent() {
-        let baseSession = makeSession(summary: "", extraction: nil)
-        let summarySession = makeSession(summary: "One summary line.", extraction: nil)
-        let extractionSession = makeSession(
-            summary: "",
-            extraction: IssueExtractionResult(summary: "", issues: [])
-        )
-        let extractionWithIssuesSession = makeSession(
-            summary: "",
-            extraction: IssueExtractionResult(
-                summary: "",
-                issues: [
-                    ExtractedIssue(
-                        title: "Export button missing",
-                        category: .bug,
-                        summary: "Missing export button on reports page.",
-                        evidenceExcerpt: "Export button is missing.",
-                        timestamp: 65
-                    )
-                ]
-            )
-        )
-
-        XCTAssertEqual(
-            ReviewWorkspace.availableTabs(for: baseSession),
-            [.rawTranscript, .screenshots]
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.availableTabs(for: summarySession),
-            [.rawTranscript, .screenshots, .reviewSummary]
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.availableTabs(for: extractionSession),
-            [.rawTranscript, .screenshots, .reviewSummary]
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.availableTabs(for: extractionWithIssuesSession),
-            [.rawTranscript, .screenshots, .extractedIssues, .reviewSummary]
-        )
-    }
-
-    func testClampedTabFallsBackToSummaryWhenReviewSummaryIsAvailable() {
-        let baseSession = makeSession(summary: "", extraction: nil)
-        let summarySession = makeSession(summary: "One summary line.", extraction: nil)
-
-        XCTAssertEqual(
-            ReviewWorkspace.clampedTab(.reviewSummary, for: baseSession),
-            .rawTranscript
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.clampedTab(.screenshots, for: baseSession),
-            .screenshots
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.clampedTab(.extractedIssues, for: summarySession),
-            .reviewSummary
-        )
-        XCTAssertEqual(
-            ReviewWorkspace.clampedTab(.reviewSummary, for: nil),
-            .rawTranscript
-        )
-    }
-
     func testTimelineEntriesCombineScreenshotAndLinkedMarkerAtSameTimestamp() {
         let screenshotID = UUID()
         let marker = SessionMarker(
