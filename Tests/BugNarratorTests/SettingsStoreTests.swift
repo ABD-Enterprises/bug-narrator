@@ -497,6 +497,45 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotNil(store.jiraBaseURLPlaintextWarning)
     }
 
+    /// The refusal for a plaintext remote Jira URL has to say what the user
+    /// loses if they accept it: the account email and the API token cross the
+    /// network in the clear. A refusal that only names the host says nothing
+    /// about the risk, and the two refusals differ in why the host was refused
+    /// — one the app knows to be remote, one it cannot check at all.
+    func testTheJiraRefusalNamesTheCredentialsItWouldSendInTheClear() {
+        let suiteName = "BugNarrator-JiraPlaintextMessageTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // A public address: the app parsed it and knows it is remote.
+        store.jiraBaseURL = "http://8.8.8.8:8080"
+        let remote = store.jiraBaseURLPlaintextWarning
+        XCTAssertNotNil(remote)
+        XCTAssertTrue(
+            remote?.contains("remote host") ?? false,
+            "expected a parsed public address to be called remote, got: \(remote ?? "nil")"
+        )
+        XCTAssertTrue(
+            remote?.contains("email and API token would be sent unencrypted") ?? false,
+            "expected the refusal to name the credentials at risk, got: \(remote ?? "nil")"
+        )
+
+        // A host in another notation: the app cannot say where it points.
+        store.jiraBaseURL = "http://134744072:8080"
+        let uncheckable = store.jiraBaseURLPlaintextWarning
+        XCTAssertNotNil(uncheckable)
+        XCTAssertTrue(
+            uncheckable?.contains("cannot check as a local address") ?? false,
+            "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
+        )
+        XCTAssertTrue(
+            uncheckable?.contains("email and API token would be sent unencrypted") ?? false,
+            "expected the refusal to name the credentials at risk, got: \(uncheckable ?? "nil")"
+        )
+    }
+
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
                       "192.168.0.1", "169.254.1.1", "::1", "app.localhost"] {

@@ -698,6 +698,8 @@ final class SettingsStore: ObservableObject {
         }
         if Self.isPublicAddress(host) {
             return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
+                + "Your email and API token would be sent unencrypted. Use https:// "
+                + "unless this is a trusted local server."
         }
         return "This Jira URL uses plaintext HTTP to a host this app cannot check as a local "
             + "address (\(host)). "
