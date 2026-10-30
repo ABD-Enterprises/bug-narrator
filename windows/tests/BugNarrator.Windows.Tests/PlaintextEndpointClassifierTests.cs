@@ -268,8 +268,17 @@ public sealed class PlaintextEndpointClassifierTests
         foreach (var entry in entries)
         {
             var url = entry.GetProperty("url").GetString() ?? string.Empty;
+            var host = entry.GetProperty("host").GetString() ?? string.Empty;
             var trusted = entry.GetProperty("trusted").GetBoolean();
             var note = entry.GetProperty("note").GetString() ?? string.Empty;
+
+            // The host is read out of the URL as it was written: Foundation
+            // takes the brackets off whatever is in them, and .NET keeps
+            // them, so the two ports would answer differently about the same
+            // URL.
+            Assert.True(
+                OpenAiCompatibleEndpoint.HostAsWritten(url) == host,
+                $"{url}: the host is read as it was written");
 
             // No refusal means the app may send a secret to that URL over
             // plaintext HTTP.

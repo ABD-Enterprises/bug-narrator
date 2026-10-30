@@ -610,12 +610,56 @@ final class SettingsStore: ObservableObject {
             return String(authority[...close])
         }
 
-        // A name cannot contain a colon, so the last one separates the port.
-        if let colon = authority.lastIndex(of: ":") {
+        // A name cannot contain a colon, so a single colon separates the
+        // port. More than one colon means the authority is not a name with a
+        // port: it is an address written without brackets, and the whole of
+        // it is the host. A port does not belong to an address, and reading
+        // the last colon as one would turn `::1:8080` into the loopback
+        // `::1` with a port, when the address it names is not the loopback.
+        if authority.filter({ $0 == ":" }).count == 1,
+           let colon = authority.lastIndex(of: ":") {
             authority = String(authority[..<colon])
         }
 
         return authority.isEmpty ? nil : authority
+    }
+
+    /// The host of `url` when it is a plaintext HTTP URL the app cannot check
+    /// as a local address, and nil when there is nothing to refuse.
+    static func plaintextHTTPHost(of url: URL) -> String? {
+        guard url.scheme?.lowercased() == "http" else { return nil }
+        let host = hostAsWritten(url) ?? url.host ?? ""
+        return isLocalEndpointHost(host) ? nil : host
+    }
+
+    /// The host of the URL as it was written, when it is a plaintext HTTP URL
+    /// the app cannot check as a local address, and nil when there is nothing
+    /// to refuse.
+    ///
+    /// The scheme and the host are read out of the text the user wrote, not
+    /// out of a URL Foundation built from it: Foundation takes the brackets
+    /// off whatever is in them, so `[localhost]` would read as the reserved
+    /// name and `[127.0.0.1]` as the loopback, and Foundation cannot build a
+    /// URL from every address a URL may carry. The Windows port reads the
+    /// host the same way, so the same URL cannot be trusted on one port and
+    /// refused on the other.
+    ///
+    /// A value that does not carry a scheme is judged by the URL the app
+    /// would use for it, because that is the URL it will actually send to.
+    static func plaintextHTTPHost(from rawValue: String, normalized: URL?) -> String? {
+        let text = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.contains("://") else {
+            guard let normalized else { return nil }
+            return plaintextHTTPHost(of: normalized)
+        }
+
+        guard let schemeRange = text.range(of: "://"),
+              text[..<schemeRange.lowerBound].lowercased() == "http",
+              let host = hostAsWritten(text),
+              !host.isEmpty else {
+            return nil
+        }
+        return isLocalEndpointHost(host) ? nil : host
     }
 
     /// The host without the brackets an IPv6 literal is written in, or nil
@@ -909,12 +953,12 @@ final class SettingsStore: ObservableObject {
         provider: AIProvider = .openAI
     ) -> String? {
         let url = normalizedOpenAIBaseURL(from: rawValue, provider: provider)
-        guard url.scheme?.lowercased() == "http" else { return nil }
-        // The host is read as it was written: Foundation takes the brackets
-        // off whatever is in them, so `[localhost]` would read as the
-        // reserved name and `[127.0.0.1]` as the loopback.
-        let host = hostAsWritten(url) ?? url.host ?? ""
-        guard !isLocalEndpointHost(host) else { return nil }
+        // The Parakeet provider ignores the typed value and uses its own
+        // address, so the typed value is not judged.
+        let host = provider == .parakeetLocal
+            ? plaintextHTTPHost(of: url)
+            : plaintextHTTPHost(from: rawValue, normalized: url)
+        guard let host else { return nil }
         return plaintextTransportRefusal(
             host: host,
             subject: "This endpoint",
@@ -938,15 +982,12 @@ final class SettingsStore: ObservableObject {
     /// link-local HTTP and remote HTTPS return nil. Reuses the host classifier from
     /// the AI base-URL guard (#472).
     var jiraBaseURLPlaintextWarning: String? {
-        guard let url = jiraBaseURLValue,
-              url.scheme?.lowercased() == "http" else {
-            return nil
-        }
         // The host is read as it was written: Foundation takes the brackets
         // off whatever is in them, so `[localhost]` would read as the
         // reserved name and `[127.0.0.1]` as the loopback.
-        let host = Self.hostAsWritten(url) ?? url.host ?? ""
-        guard !Self.isLocalEndpointHost(host) else { return nil }
+        guard let host = Self.plaintextHTTPHost(from: jiraBaseURL, normalized: jiraBaseURLValue) else {
+            return nil
+        }
         return Self.plaintextTransportRefusal(
             host: host,
             subject: "This Jira URL",

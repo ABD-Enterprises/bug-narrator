@@ -32,12 +32,12 @@ extension SettingsStore {
         }
 
         let url = SettingsStore.normalizedOpenAIBaseURL(from: openAIBaseURL, provider: aiProvider)
-        guard url.scheme?.lowercased() == "http" else { return nil }
         // The host is read as it was written: Foundation takes the brackets
         // off whatever is in them, so `[localhost]` would read as the
         // reserved name and `[127.0.0.1]` as the loopback.
-        let host = SettingsStore.hostAsWritten(url) ?? url.host ?? ""
-        guard !SettingsStore.isLocalEndpointHost(host) else { return nil }
+        guard let host = SettingsStore.plaintextHTTPHost(from: openAIBaseURL, normalized: url) else {
+            return nil
+        }
 
         return SettingsStore.plaintextTransportRefusal(
             host: host,

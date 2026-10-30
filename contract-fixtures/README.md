@@ -55,6 +55,14 @@ keeps them — so `http://[localhost]/` read as the reserved name on one
 port and as a bracketed name on the other. The table is read by both test
 suites through the refusal the user would see.
 
+Each row names the host as it was written as well as the answer, because the
+two layers can drift apart: a table of hosts alone cannot tell whether the
+ports read the same host out of the same URL. Both ports read the host out
+of the text the user wrote, so a URL Foundation cannot build a URL from —
+`http://::1:8080/v1`, an address written without brackets — is judged too.
+A port belongs to a name and not to an address, so an authority that carries
+more than one colon is an address and the whole of it is the host.
+
 ## The canonical session
 
 Fixed values so both platforms can build the same input:

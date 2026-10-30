@@ -128,10 +128,15 @@ public static class OpenAiCompatibleEndpoint
             return close > 1 ? authority[..(close + 1)] : null;
         }
 
-        // A name cannot contain a colon, so the last one separates the port.
-        var colon = authority.LastIndexOf(':');
-        if (colon >= 0)
+        // A name cannot contain a colon, so a single colon separates the
+        // port. More than one colon means the authority is not a name with a
+        // port: it is an address written without brackets, and the whole of
+        // it is the host. A port does not belong to an address, and reading
+        // the last colon as one would turn `::1:8080` into the loopback
+        // `::1` with a port, when the address it names is not the loopback.
+        if (authority.Count(character => character == ':') == 1)
         {
+            var colon = authority.LastIndexOf(':');
             authority = authority[..colon];
         }
 

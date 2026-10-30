@@ -607,6 +607,16 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(urls.isEmpty, "the shared URL table is empty")
 
         for entry in urls {
+            // The host is read out of the URL as it was written: Foundation
+            // takes the brackets off whatever is in them, and .NET keeps
+            // them, so the two ports would answer differently about the same
+            // URL.
+            XCTAssertEqual(
+                SettingsStore.hostAsWritten(entry.url),
+                entry.host,
+                "\(entry.url): the host is read as it was written"
+            )
+
             // No refusal means the app may send a secret to that URL over
             // plaintext HTTP.
             let refusal = SettingsStore.plaintextRemoteBaseURLWarning(from: entry.url)
@@ -2542,6 +2552,9 @@ final class SettingsStoreTests: XCTestCase {
 private struct PlaintextEndpointURLTableEntry: Decodable {
     /// The URL, as the app can be given it.
     let url: String
+
+    /// The host of the URL, as it was written.
+    let host: String
 
     /// Whether the app may send a secret to it over plaintext HTTP.
     let trusted: Bool
