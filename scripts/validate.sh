@@ -82,6 +82,18 @@ if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
   fi
 fi
 
+# The release environment gate and the `environment:` key of the release jobs
+# have to name the same environment: a drifted name would check one
+# environment while the release deployed to another. The check is required,
+# not optional, for the same reason as the one above.
+if [[ ! -x "$ROOT/scripts/check-release-environment-wiring.sh" ]]; then
+  printf 'FAIL: scripts/check-release-environment-wiring.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-release-environment-wiring.sh"; then
+  exit 1
+fi
+
 # Build the changed-files target list, or fall back to scanning the whole
 # tree when there is no base ref available (e.g. first push of a branch).
 #

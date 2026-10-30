@@ -13,12 +13,18 @@
 # otherwise be auto-created with no rules and the release would go out
 # ungated.
 #
-# The environment name and the repository come from the environment so the
-# same script serves both workflows.
+# The environment name is not defaulted. The caller has to name the environment
+# it deploys to, so a renamed environment can never be checked under the old
+# name while the job publishes into an environment with no protection rules.
+# `scripts/check-release-environment-wiring.sh` keeps the name this script is
+# given and the `environment:` key of the release job from drifting apart.
+#
+# The repository comes from the environment so the same script serves both
+# workflows.
 
 set -euo pipefail
 
-ENVIRONMENT="${RELEASE_ENVIRONMENT:-windows-release}"
+ENVIRONMENT="${RELEASE_ENVIRONMENT:-}"
 REPOSITORY="${GITHUB_REPOSITORY:-}"
 
 fail() {
@@ -26,6 +32,7 @@ fail() {
     exit 1
 }
 
+[[ -n "$ENVIRONMENT" ]] || fail "RELEASE_ENVIRONMENT is not set; cannot tell which environment gates the release."
 [[ -n "$REPOSITORY" ]] || fail "GITHUB_REPOSITORY is not set; cannot read the release environment."
 
 environment_api="repos/$REPOSITORY/environments/$ENVIRONMENT"
@@ -47,6 +54,30 @@ fi
 if [[ "$reviewers" == "0" ]]; then
     fail "The $ENVIRONMENT environment requires a reviewer but names none; refusing to publish."
 fi
+
+# The reviewer rule also carries prevent_self_review. It has to be declared:
+# an absent or null value leaves the platform default in force and nobody can
+# tell from the release log whether the requester may approve their own
+# release.
+#
+# This repository has one maintainer, so the approval can be self-issued and
+# the setting is reported rather than required to be true — requiring it would
+# leave every release unapprovable. When a second maintainer is added, turn
+# "Prevent self-review" on for the environment and this check reports it.
+if ! self_review="$(gh api "$environment_api" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .prevent_self_review] | join(",")' 2>&1)"; then
+    fail "The $ENVIRONMENT environment's self-review setting could not be read: $self_review"
+fi
+case "$self_review" in
+    true)
+        printf 'The %s environment blocks self-approval of the release.\n' "$ENVIRONMENT"
+        ;;
+    false)
+        printf 'NOTICE: the %s environment lets the requester approve their own release; this repository has one maintainer.\n' "$ENVIRONMENT"
+        ;;
+    *)
+        fail "The $ENVIRONMENT environment does not declare prevent_self_review (read \"$self_review\"); refusing to publish."
+        ;;
+esac
 
 if [[ "$rules" != *branch_policy* ]]; then
     fail "The $ENVIRONMENT environment does not restrict which branch may deploy; refusing to publish."

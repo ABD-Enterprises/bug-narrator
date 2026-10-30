@@ -60,6 +60,7 @@ jobs:
       - name: Confirm the release environment still gates the release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_ENVIRONMENT: windows-release
         run: bash scripts/check-release-environment.sh
 
       - name: Confirm the release runs from the main branch
@@ -221,6 +222,7 @@ jobs:
       - name: Confirm the release environment still gates the release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_ENVIRONMENT: windows-release
         run: bash scripts/check-release-environment.sh
 
       - name: Refuse a tag that already points at another commit
@@ -258,7 +260,11 @@ jobs:
             read -r tag_type tagged <<<"$tag_lookup"
             if [[ "$tag_type" == "tag" ]]; then
               # An annotated tag points at a tag object; peel it to the commit.
-              tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagged" --jq .object.sha)"
+              # A failed peel is not "no tag": it stops the release instead.
+              if ! tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tagged" --jq .object.sha 2>&1)"; then
+                printf '::error::Could not peel the annotated tag %s: %s\n' "$RELEASE_TAG" "$tagged" >&2
+                exit 1
+              fi
             fi
             if [[ "$tagged" != "$GITHUB_SHA" ]]; then
               printf '::error::Tag %s points at %s but this run built %s; refusing to publish it.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA" >&2
