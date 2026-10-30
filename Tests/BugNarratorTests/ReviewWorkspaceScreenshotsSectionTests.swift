@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-/// The review workspace's Screenshots gallery (#1270).
+/// The review workspace's Screenshots gallery (#1264).
 ///
 /// The gallery was rendered only while `session.issueExtraction == nil`, so
 /// running issue extraction removed the user's own captured evidence from the
