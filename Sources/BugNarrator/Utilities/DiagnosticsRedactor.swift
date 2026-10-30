@@ -23,7 +23,15 @@ enum DiagnosticsRedactor {
         makeTokenPattern(#"sk-[A-Za-z0-9_-]+"#),
         makeTokenPattern(#"github_pat_[A-Za-z0-9_]+"#),
         makeTokenPattern(#"gh[pousr]_[A-Za-z0-9]+"#, options: [.caseInsensitive]),
-        makeTokenPattern(#"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
+        makeTokenPattern(#"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive]),
+        // Jira and other Basic-authenticated services travel as
+        // "Basic <base64>", the way the Windows port already redacts them.
+        makeTokenPattern(#"Basic\s+[A-Za-z0-9+/=]{8,}"#, options: [.caseInsensitive]),
+        // An Atlassian API token carries a fixed ATATT3xFfGF0 prefix. It
+        // normally travels inside a Basic header, but a token pasted bare into
+        // a log line — a settings dump, a copied error — must not survive
+        // into a debug bundle either.
+        makeTokenPattern(#"ATATT3xFfGF0[A-Za-z0-9_\-=]{20,}"#)
     ].compactMap { $0 }
 
     static func sensitiveValues(in metadata: [String: String]) -> [String] {
