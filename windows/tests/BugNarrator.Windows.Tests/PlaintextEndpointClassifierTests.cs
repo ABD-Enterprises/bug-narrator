@@ -119,7 +119,52 @@ public sealed class PlaintextEndpointClassifierTests
     [InlineData("127.1")]
     [InlineData("2130706433")]
     [InlineData("::ffff:010.0.0.1")]
+    [InlineData("::ffff:127.000.000.001")]
     public void ANonCanonicalAddressIsNotTrusted(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
+    }
+
+    /// <summary>
+    /// A hex group is written with at most four digits. The macOS parser
+    /// silently truncated a longer one, so <c>0fe80::1</c> was read as
+    /// <c>fe80::1</c> and trusted there while this port refused it. Both ports
+    /// refuse the spelling now: an address has to be written the way an
+    /// address is written.
+    /// </summary>
+    [Theory]
+    [InlineData("::000000")]
+    [InlineData("0fe80::1")]
+    [InlineData("0c0a8::1")]
+    public void AnIPv6GroupLongerThanFourDigitsIsRefused(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
+    }
+
+    /// <summary>
+    /// The names the standards reserve for the loopback are the only ones that
+    /// are trusted. A name that only looks like one - a Debian convention, a
+    /// name under a name that looks reserved, a word that merely contains
+    /// "localhost" - is a name the network can answer with anything.
+    /// </summary>
+    [Theory]
+    [InlineData("localhost.localdomain")]
+    [InlineData("myhost.localhost.example.com")]
+    [InlineData("notlocalhost")]
+    public void ANameThatOnlyLooksLikeTheReservedOneIsRefused(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
+    }
+
+    /// <summary>
+    /// A string that only starts like a link-local address is not one. The
+    /// prefix is not a shortcut: the address has to parse.
+    /// </summary>
+    [Theory]
+    [InlineData("fe80:evil.example.com")]
+    [InlineData("fe80:1:2:3:4:5:6:7:8")]
+    [InlineData("fe80:")]
+    public void AStringThatOnlyLooksLikeALinkLocalAddressIsRefused(string host)
     {
         Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host), $"expected {host} not to be trusted");
     }

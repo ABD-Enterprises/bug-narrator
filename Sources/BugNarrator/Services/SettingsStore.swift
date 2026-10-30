@@ -652,6 +652,14 @@ final class SettingsStore: ObservableObject {
             return false
         }
 
+        // A hex group is written with at most four digits. The parser
+        // silently truncates a longer one, so `0fe80::1` would be read as
+        // `fe80::1` — an address the app did not check, and one the Windows
+        // port refuses outright. The resolver truncates it the same way, but
+        // an address has to be written the way an address is written, so the
+        // spelling is refused here too.
+        guard hasCanonicalIPv6Groups(addressText) else { return false }
+
         var address = in6_addr()
         guard inet_pton(AF_INET6, addressText, &address) == 1 else { return false }
 
@@ -673,6 +681,19 @@ final class SettingsStore: ObservableObject {
             return isTrustedIPv4(bytes[12], bytes[13])
         }
         return false
+    }
+
+    /// Whether every group of an IPv6 literal is written the way a group is
+    /// written: at most four hex digits.
+    ///
+    /// The IPv4 address a mapped literal carries in its last group is checked
+    /// on its own, so it does not count as a hex group here.
+    private static func hasCanonicalIPv6Groups(_ address: String) -> Bool {
+        for group in address.split(separator: ":", omittingEmptySubsequences: false) {
+            if group.contains(".") { continue }
+            if group.count > 4 { return false }
+        }
+        return true
     }
 
     /// The IPv4 address an IPv6 literal carries in its last group, if it has

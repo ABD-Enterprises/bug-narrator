@@ -757,6 +757,23 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// A hex group is written with at most four digits. The parser silently
+    /// truncates a longer one, so `0fe80::1` would be read as `fe80::1` — an
+    /// address the app did not check, and one the Windows port refuses
+    /// outright. An address has to be written the way an address is written.
+    func testAnIPv6GroupLongerThanFourDigitsIsRefused() {
+        for untrusted in [
+            "::000000",       // the unspecified address, written with a long group
+            "0fe80::1",       // the link-local address, written with a long group
+            "0c0a8::1"        // a private address, written with a long group
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the group is not written the way a group is written"
+            )
+        }
+    }
+
     /// The canonical spelling rule applies to the IPv4 address an IPv4-mapped
     /// IPv6 literal carries too. The mapped form is another way to write the
     /// same address, so a leading zero in it is the same ambiguity.

@@ -375,6 +375,35 @@ public static class OpenAiCompatibleEndpoint
         + $"or https://. Over plaintext HTTP your {secret} would cross the network unencrypted.";
 
     /// <summary>
+    /// The refusal to use a plaintext HTTP endpoint for a host the app cannot
+    /// check, in one sentence for one host.
+    /// </summary>
+    /// <remarks>
+    /// Every surface that refuses such a host builds its message here, so the
+    /// warning next to the setting and the refusal that blocks the request
+    /// cannot describe one host two different ways. Mirrors
+    /// <c>SettingsStore.plaintextTransportRefusal</c> in the macOS app.
+    /// </remarks>
+    public static string PlaintextTransportRefusal(string host, string subject, string secret, string localNoun)
+    {
+        if (IsUnqualifiedLocalName(host))
+        {
+            return UnqualifiedLocalHostPlaintextMessage(host, secret);
+        }
+
+        if (IsPublicAddress(host))
+        {
+            return $"{subject} uses plaintext HTTP to a remote host ({host}). "
+                + $"Your {secret} would be sent unencrypted. "
+                + $"Use https://, or configure a trusted local {localNoun}.";
+        }
+
+        return $"{subject} uses plaintext HTTP to a host this app cannot use as a local "
+            + $"address ({host}). Your {secret} would be sent unencrypted. "
+            + "Use https://, or point this at an address the app can check.";
+    }
+
+    /// <summary>
     /// A user-facing warning when the configured base URL would transmit the API
     /// key and transcript content to a non-local host over plaintext HTTP. Remote
     /// HTTPS and local HTTP (loopback/private/link-local) return null so enterprise-proxy
@@ -400,19 +429,12 @@ public static class OpenAiCompatibleEndpoint
 
         if (IsUnqualifiedLocalName(parsed.Host))
         {
-            return UnqualifiedLocalHostPlaintextMessage(parsed.Host, "API key and transcript text");
+            return PlaintextTransportRefusal(
+                parsed.Host, "This endpoint", "API key and transcript text", "endpoint");
         }
 
-        if (IsPublicAddress(parsed.Host))
-        {
-            return "This endpoint uses plaintext HTTP to a remote host "
-                + $"({parsed.Host}). Your API key and transcript text would be sent "
-                + "unencrypted. Use https:// unless this is a trusted local endpoint.";
-        }
-
-        return "This endpoint uses plaintext HTTP to a host this app cannot use as a local "
-            + $"address ({parsed.Host}). Your API key and transcript text would be sent "
-            + "unencrypted. Use https://, or point this at an address the app can check.";
+        return PlaintextTransportRefusal(
+            parsed.Host, "This endpoint", "API key and transcript text", "endpoint");
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)

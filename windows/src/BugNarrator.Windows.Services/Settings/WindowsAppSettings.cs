@@ -179,24 +179,11 @@ public sealed record WindowsAppSettings(
                 return null;
             }
 
-            if (OpenAiCompatibleEndpoint.IsUnqualifiedLocalName(parsed.Host))
-            {
-                return OpenAiCompatibleEndpoint.UnqualifiedLocalHostPlaintextMessage(
-                    parsed.Host, "email and API token");
-            }
-
-            if (OpenAiCompatibleEndpoint.IsPublicAddress(parsed.Host))
-            {
-                return "This Jira URL uses plaintext HTTP to a remote host "
-                    + $"({parsed.Host}). "
-                    + "Your email and API token would be sent unencrypted. Use https:// "
-                    + "unless this is a trusted local server.";
-            }
-
-            return "This Jira URL uses plaintext HTTP to a host this app cannot use as a local "
-                + $"address ({parsed.Host}). "
-                + "Your email and API token would be sent unencrypted. Use https:// "
-                + "unless this is a trusted local server.";
+            // The export gate builds the same sentence from the same helper,
+            // so the warning next to the field and the refusal that blocks the
+            // export cannot describe one host two different ways.
+            return OpenAiCompatibleEndpoint.PlaintextTransportRefusal(
+                parsed.Host, "This Jira URL", "email, API token and issue content", "server");
         }
     }
 

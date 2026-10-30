@@ -26,14 +26,34 @@ public sealed class JiraTransportPolicyTests : IDisposable
         var remote = remoteSettings.JiraBaseUrlSecurityWarning;
         Assert.NotNull(remote);
         Assert.Contains("remote host", remote, StringComparison.Ordinal);
-        Assert.Contains("email and API token would be sent unencrypted", remote, StringComparison.Ordinal);
+        Assert.Contains("email, API token and issue content would be sent unencrypted", remote, StringComparison.Ordinal);
 
         var uncheckableSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://jira.example.com:8080/jira" };
         var uncheckable = uncheckableSettings.JiraBaseUrlSecurityWarning;
         Assert.NotNull(uncheckable);
         Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
         Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
-        Assert.Contains("email and API token would be sent unencrypted", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("email, API token and issue content would be sent unencrypted", uncheckable, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// One host gets one answer. The refusal that blocks the export and the
+    /// warning shown next to the setting describe the same host, so they have
+    /// to be the same sentence.
+    /// </summary>
+    [Theory]
+    [InlineData("http://8.8.8.8:8080/jira")]
+    [InlineData("http://jira.example.com:8080/jira")]
+    [InlineData("http://nas.local:8080/jira")]
+    [InlineData("http://134744072:8080/jira")]
+    public void TheExportRefusalAndTheSettingsWarningAreTheSameSentence(string endpoint)
+    {
+        var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
+        var warning = settings.JiraBaseUrlSecurityWarning;
+        var refusal = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri(endpoint));
+        Assert.NotNull(warning);
+        Assert.NotNull(refusal);
+        Assert.Equal(refusal, warning);
     }
 
     /// <summary>
@@ -48,13 +68,13 @@ public sealed class JiraTransportPolicyTests : IDisposable
         var remote = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://8.8.8.8:8080/jira"));
         Assert.NotNull(remote);
         Assert.Contains("remote host", remote, StringComparison.Ordinal);
-        Assert.Contains("would cross the network unencrypted", remote, StringComparison.Ordinal);
+        Assert.Contains("would be sent unencrypted", remote, StringComparison.Ordinal);
 
         var uncheckable = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://jira.example.com:8080/jira"));
         Assert.NotNull(uncheckable);
         Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
         Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
-        Assert.Contains("would cross the network unencrypted", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("would be sent unencrypted", uncheckable, StringComparison.Ordinal);
     }
 
     private readonly string root = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));

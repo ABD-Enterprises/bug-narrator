@@ -12,24 +12,10 @@ public static class JiraEndpointTransportPolicy
 
         if (endpoint.Scheme == Uri.UriSchemeHttp && !OpenAiCompatibleEndpoint.IsLocalEndpointHost(endpoint.Host))
         {
-            if (OpenAiCompatibleEndpoint.IsUnqualifiedLocalName(endpoint.Host))
-            {
-                return OpenAiCompatibleEndpoint.UnqualifiedLocalHostPlaintextMessage(
-                    endpoint.Host, "Jira email, API token and issue content");
-            }
-
-            if (OpenAiCompatibleEndpoint.IsPublicAddress(endpoint.Host))
-            {
-                return "The Jira base URL uses plaintext HTTP to a remote host "
-                    + $"({endpoint.Host}). "
-                    + "Your Jira email, API token and issue content would cross the network unencrypted. "
-                    + "Use https://, or configure a trusted local endpoint in Settings.";
-            }
-
-            return "The Jira base URL uses plaintext HTTP to a host this app cannot use as a local "
-                + $"address ({endpoint.Host}). "
-                + "Your Jira email, API token and issue content would cross the network unencrypted. "
-                + "Use https://, or configure a trusted local endpoint in Settings.";
+            // The same sentence the warning next to the setting shows, built
+            // by the same helper: one host gets one answer.
+            return OpenAiCompatibleEndpoint.PlaintextTransportRefusal(
+                endpoint.Host, "This Jira URL", "email, API token and issue content", "server");
         }
 
         return null;
