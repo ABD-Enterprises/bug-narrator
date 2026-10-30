@@ -85,10 +85,19 @@ removes.
 
 ## Update Channel
 
-Installed copies check for updates by reading the repository's public
-`releases/latest` endpoint when the user picks **Check for Updates**. There is
-no appcast, no background polling, and no launch-time check — the read happens
-only on that explicit action.
+Installed copies check for updates by reading the repository's public releases
+list when the user picks **Check for Updates**. There is no appcast, no
+background polling, and no launch-time check — the read happens only on that
+explicit action.
+
+The list is searched for a release that actually carries this platform's app
+package: a `BugNarrator-*-macOS.dmg` on macOS, a `BugNarrator-windows-win-<arch>.zip`
+on Windows. The transcription server and the Windows tester publish their own
+releases, so the newest published release is not necessarily the newest app
+release; a release without the right package, a draft, a prerelease, a tag that
+is not a version, or a link that points off this repository is skipped. The
+search reads at most 20 pages of 30 and gives up after ten seconds — an
+incomplete search reports "could not check", never "you are up to date".
 
 The request is unauthenticated and carries no identifiers: no token, no install
 id, no version reporting. Nothing about the user is transmitted; the app reads
