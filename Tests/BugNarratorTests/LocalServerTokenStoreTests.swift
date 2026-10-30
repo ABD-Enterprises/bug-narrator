@@ -162,6 +162,14 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertEqual(LocalServerTokenStore.tokenFileName, fixture.tokenFileName)
         XCTAssertEqual(LocalServerTokenStore.environmentVariable, fixture.environmentVariable)
         XCTAssertEqual(LocalServerTokenStore.authorizationScheme, fixture.authorizationScheme)
+        XCTAssertEqual(LocalServerTokenStore.challengeHeader, fixture.challengeHeader)
+        XCTAssertEqual(LocalServerTokenStore.proofHeader, fixture.proofHeader)
+        // The three ports have to compute the same proof from the same
+        // inputs, or the app and the server would never agree on it.
+        XCTAssertEqual(
+            LocalServerTokenStore.proof(nonce: fixture.proofVector.nonce, token: fixture.proofVector.token),
+            fixture.proofVector.proof
+        )
 
         // The macOS directory is relative to the user's home directory, the
         // same convention the Python server and the Windows port use.
@@ -177,8 +185,17 @@ private struct LocalServerTokenContract: Decodable {
         let directoryRelativeToHome: String
     }
 
+    struct ProofVector: Decodable {
+        let token: String
+        let nonce: String
+        let proof: String
+    }
+
     let tokenFileName: String
     let environmentVariable: String
     let authorizationScheme: String
+    let challengeHeader: String
+    let proofHeader: String
+    let proofVector: ProofVector
     let macos: MacOS
 }

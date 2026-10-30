@@ -2,6 +2,14 @@
   "tokenFileName": "bugnarrator-transcription.token",
   "environmentVariable": "BUGNARRATOR_TRANSCRIPTION_TOKEN",
   "authorizationScheme": "Bearer",
+  "challengeHeader": "X-BugNarrator-Nonce",
+  "proofHeader": "X-BugNarrator-Proof",
+  "proofAlgorithm": "HMAC-SHA256",
+  "proofVector": {
+    "token": "s3cret-token-value",
+    "nonce": "the-nonce",
+    "proof": "09319c98fe682b6225a79c28488a15cc6dbc6d4f3609a649c5833e671f1f4aa7"
+  },
   "macos": {
     "directoryRelativeToHome": "Library/Application Support/BugNarrator/LocalTranscription"
   },

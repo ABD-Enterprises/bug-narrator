@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Security
 
 /// Where the managed local transcription server is installed.
@@ -34,6 +35,24 @@ enum LocalServerTokenStore {
 
     /// The authorization scheme the server expects.
     static let authorizationScheme = "Bearer"
+
+    /// The header a client sends when it asks the server to prove that it is
+    /// the server, and the header the answer carries.
+    static let challengeHeader = "X-BugNarrator-Nonce"
+    static let proofHeader = "X-BugNarrator-Proof"
+
+    /// The proof that a peer knows the token: an HMAC of the client's nonce,
+    /// keyed by the token.
+    ///
+    /// A listener that answers on the port but cannot read the token cannot
+    /// produce this, so the client can tell the server apart from it - and
+    /// the challenge that asks for it carries no token, so nothing secret
+    /// leaves the app before the peer has proved itself.
+    static func proof(nonce: String, token: String) -> String {
+        let key = SymmetricKey(data: Data(token.utf8))
+        let code = HMAC<SHA256>.authenticationCode(for: Data(nonce.utf8), using: key)
+        return code.map { String(format: "%02x", $0) }.joined()
+    }
 
     /// The token the app presents to the server, or why it has none.
     enum TokenOutcome: Equatable {

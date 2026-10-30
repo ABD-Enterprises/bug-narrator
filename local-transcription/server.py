@@ -19,6 +19,7 @@ import argparse
 import asyncio
 import contextlib
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import hmac
 import logging
 import os
@@ -33,7 +34,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
@@ -55,6 +56,15 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+
+# The header a client sends when it asks the server to prove that it is the
+# server, and the header the answer carries. The client sends a fresh random
+# nonce; the server answers with an HMAC of it, keyed by the token the two
+# sides share. A listener that answers on the port but cannot read the token
+# cannot produce the proof, so it cannot pass for the server - and the client
+# has not handed it the token either, because the challenge carries none.
+CHALLENGE_HEADER = "X-BugNarrator-Nonce"
+PROOF_HEADER = "X-BugNarrator-Proof"
 
 _model = None
 _model_name = None
@@ -225,6 +235,20 @@ def _authorization_failure(authorization: Optional[str]) -> Optional[tuple]:
     return None
 
 
+def proof_for_nonce(nonce: str) -> str:
+    """The proof that this process knows the token.
+
+    It is an HMAC of the client's nonce, keyed by the token, so only a peer
+    that can read the token can produce it, and it says nothing about the
+    token itself.
+    """
+    return hmac.new(
+        _auth_token.encode("utf-8"),
+        nonce.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
     """Reject every request that does not carry the server's bearer token.
 
@@ -276,6 +300,19 @@ def _scope_header(scope, name: bytes) -> Optional[str]:
     return None
 
 
+def _is_challenge(scope) -> bool:
+    """Whether the request asks the server to prove that it is the server.
+
+    A challenge is a health request that carries a nonce and no usable
+    token. It carries no token of its own, so nothing secret leaves the
+    client before the peer has proved it knows the token.
+    """
+    if scope.get("path") != "/health":
+        return False
+    nonce = _scope_header(scope, b"x-bugnarrator-nonce")
+    return bool(nonce and nonce.strip())
+
+
 def _capped_receive(receive, limit: int):
     """A receive channel that refuses to deliver more than `limit` bytes.
 
@@ -322,7 +359,7 @@ class _BearerTokenMiddleware:
             return
 
         failure = _authorization_failure(_scope_header(scope, b"authorization"))
-        if failure is not None:
+        if failure is not None and not _is_challenge(scope):
             await self._respond(scope, receive, send, failure[0], failure[1])
             return
 
@@ -433,21 +470,32 @@ def _load_model_in_background(model_name: Optional[str]) -> None:
     threading.Thread(target=load, name="model-preload", daemon=True).start()
 
 
-@app.get("/health", dependencies=[Depends(require_bearer_token)])
-async def health():
-    """Health check endpoint for BugNarrator to verify the server is running."""
+@app.get("/health")
+async def health(
+    challenge: Annotated[Optional[str], Header(alias=CHALLENGE_HEADER)] = None,
+):
+    """Health check endpoint for BugNarrator to verify the server is running.
+
+    The middleware has already refused a caller that carries neither the
+    token nor a challenge. A challenge is answered with a proof that only a
+    peer that knows the token can produce, so the client can tell the
+    server apart from a listener that merely answers on the port.
+    """
     if _model_load_state == "loaded":
         status = "ok"
     elif _model_load_state == "failed":
         status = "degraded"
     else:
         status = _model_load_state
-    return {
+    body = {
         "status": status,
         "model_loaded": _model is not None,
         "model_name": _model_name,
         "model_error": _model_load_error,
     }
+    if challenge and challenge.strip():
+        return JSONResponse(body, headers={PROOF_HEADER: proof_for_nonce(challenge.strip())})
+    return body
 
 
 @app.get("/v1/models", dependencies=[Depends(require_bearer_token)])

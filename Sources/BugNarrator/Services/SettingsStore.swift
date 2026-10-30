@@ -553,11 +553,18 @@ final class SettingsStore: ObservableObject {
         let modelError: String?
     }
 
-    static func localProviderHealthReport(data: Data?, response: URLResponse?) -> LocalProviderHealthReport {
+    static func localProviderHealthReport(data: Data?, response: URLResponse?, expectedProof: String?) -> LocalProviderHealthReport {
         guard let response = response as? HTTPURLResponse,
               response.statusCode == 200,
+              let expectedProof,
               let data,
               let health = try? JSONDecoder().decode(LocalProviderHealth.self, from: data) else {
+            return LocalProviderHealthReport(isHealthy: false, modelError: nil)
+        }
+        // The peer has to prove that it knows the token. A listener that
+        // answers the health check with the right body is still not the
+        // server, and the app must not upload the user's audio to it.
+        guard response.value(forHTTPHeaderField: LocalServerTokenStore.proofHeader) == expectedProof else {
             return LocalProviderHealthReport(isHealthy: false, modelError: nil)
         }
         // `model_loaded` has to be true as well: a stub that answers
@@ -567,8 +574,8 @@ final class SettingsStore: ObservableObject {
         return LocalProviderHealthReport(isHealthy: isHealthy, modelError: health.model_error)
     }
 
-    static func isHealthyLocalProvider(data: Data?, response: URLResponse?) -> Bool {
-        localProviderHealthReport(data: data, response: response).isHealthy
+    static func isHealthyLocalProvider(data: Data?, response: URLResponse?, expectedProof: String?) -> Bool {
+        localProviderHealthReport(data: data, response: response, expectedProof: expectedProof).isHealthy
     }
 
     private struct LocalProviderHealth: Decodable {
@@ -1048,6 +1055,8 @@ final class SettingsStore: ObservableObject {
         localProviderRequestID = requestID
         guard aiProvider == .parakeetLocal else {
             localProviderReachability = .unknown
+            localProviderModelError = nil
+            localProviderTokenProblem = nil
             lastLocalProviderReachabilityURL = nil
             return
         }
@@ -1063,21 +1072,27 @@ final class SettingsStore: ObservableObject {
         var request = URLRequest(url: url.appendingPathComponent("health"))
         request.timeoutInterval = 2
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        // The server checks the bearer token on every route, health included:
-        // a listener that cannot present the token is not the server, and must
-        // not be treated as one (#1270).
+        // The peer has to prove that it is the server before the app hands it
+        // anything. A listener that answers on the port is not the server,
+        // and the app must not learn its token from the first request it
+        // sends (#1270). So the challenge carries a fresh nonce and no token:
+        // the server answers with an HMAC of the nonce that only a peer that
+        // knows the token can produce, and the app sends the token on later
+        // requests only once that proof checks out.
+        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        request.setValue(nonce, forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
         // A token the app cannot present is remembered, so the message can
         // name the cause: the server is running and healthy, and it is the
         // token file that stops the app from talking to it.
         let tokenOutcome = LocalServerTokenStore.tokenOutcome(installDirectory: localServerInstallDirectory)
-        if case .ready(let token) = tokenOutcome {
-            request.setValue(
-                "\(LocalServerTokenStore.authorizationScheme) \(token)",
-                forHTTPHeaderField: "Authorization"
-            )
-        }
+        let expectedProof: String? = {
+            if case .ready(let token) = tokenOutcome {
+                return LocalServerTokenStore.proof(nonce: nonce, token: token)
+            }
+            return nil
+        }()
         localProviderTask = localProviderSession.dataTaskPublisher(for: request)
-            .map { Self.localProviderHealthReport(data: $0.data, response: $0.response) }
+            .map { Self.localProviderHealthReport(data: $0.data, response: $0.response, expectedProof: expectedProof) }
             .replaceError(with: LocalProviderHealthReport(isHealthy: false, modelError: nil))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] report in

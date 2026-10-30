@@ -1143,7 +1143,12 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertEqual(request.url?.path, "/health")
             requests += 1
             let code = requests == 1 ? 503 : 200
-            return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!,
+            // The peer has to prove that it is the server: the app only
+            // trusts a health answer that carries the proof (#1270).
+            let nonce = request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader) ?? ""
+            let token = LocalServerTokenStore.token(installDirectory: isolatedLocalServerInstallDirectory) ?? ""
+            let headers = [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(nonce: nonce, token: token)]
+            return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: headers)!,
                     Data(#"{"status":"ok","model_loaded":true}"#.utf8))
         }
         // The isolated store keeps the probe the test is about: its own
@@ -1238,12 +1243,24 @@ final class SettingsStoreTests: XCTestCase {
     func testParakeetHealthRequiresSuccessfulStructuredResponse() {
         let url = URL(string: "http://localhost:8422/health")!
         let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token")
         for status in [404, 500] {
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
-            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response, expectedProof: proof))
         }
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
-        XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: proof
+        ])
+        XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response, expectedProof: proof))
+        // A listener that answers the health check with the right body is
+        // still not the server: it cannot produce the proof, so the app must
+        // not hand it the user's audio (#1270).
+        let impostor = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: impostor, expectedProof: proof))
+        let wrongProof = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: "not-the-proof"
+        ])
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: wrongProof, expectedProof: proof))
         // A server that has not loaded its model is not ready: the app must not
         // hand the user's audio to it (#1270).
         for body in [
@@ -1252,31 +1269,72 @@ final class SettingsStoreTests: XCTestCase {
             #"{"status":"ok","model_loaded":false}"#,
             #"{"status":"error","model_loaded":true}"#
         ] {
-            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response))
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response, expectedProof: proof))
         }
     }
 
     func testParakeetHealthReportsTheServersOwnReasonWhenItCannotLoadItsModel() {
         let url = URL(string: "http://localhost:8422/health")!
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token")
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: proof
+        ])
 
         // A server that is running but has no model says why, so the app can
         // say something true instead of "could not reach the server".
         let degraded = Data(#"{"status":"degraded","model_loaded":false,"model_error":"model file missing"}"#.utf8)
-        let report = SettingsStore.localProviderHealthReport(data: degraded, response: response)
+        let report = SettingsStore.localProviderHealthReport(data: degraded, response: response, expectedProof: proof)
         XCTAssertFalse(report.isHealthy)
         XCTAssertEqual(report.modelError, "model file missing")
 
         // A healthy server has no error to report.
         let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
-        XCTAssertNil(SettingsStore.localProviderHealthReport(data: healthy, response: response).modelError)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: healthy, response: response, expectedProof: proof).modelError)
 
         // A server that is still loading its model is not an error.
         let loading = Data(#"{"status":"loading","model_loaded":false}"#.utf8)
-        XCTAssertNil(SettingsStore.localProviderHealthReport(data: loading, response: response).modelError)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: loading, response: response, expectedProof: proof).modelError)
 
         // A response that is not the server's health check says nothing.
-        XCTAssertNil(SettingsStore.localProviderHealthReport(data: nil, response: response).modelError)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: nil, response: response, expectedProof: proof).modelError)
+    }
+
+    /// The health check must not hand the token to whatever answers on the
+    /// port, and the peer has to prove that it is the server before the app
+    /// uploads anything to it (#1270).
+    func testTheHealthCheckCarriesNoTokenAndThePeerHasToProveItself() {
+        let suiteName = "BugNarrator-Challenge-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            MockURLProtocol.requestHandler = nil
+        }
+
+        var presentedAuthorization: String?
+        var presentedNonce: String?
+        MockURLProtocol.requestHandler = { request in
+            presentedAuthorization = request.value(forHTTPHeaderField: "Authorization")
+            presentedNonce = request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
+            // A listener that answers the health check with the right body is
+            // still not the server: it cannot produce the proof.
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
+        }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  usesTheStoresOwnReachabilityProbe: true)
+
+        let unreachable = expectation(description: "The listener cannot prove that it is the server")
+        unreachable.assertForOverFulfill = false
+        let observation = store.$localProviderReachability.dropFirst().sink { state in
+            if state == .unreachable { unreachable.fulfill() }
+        }
+        wait(for: [unreachable], timeout: 6)
+        observation.cancel()
+
+        XCTAssertNil(presentedAuthorization, "the challenge must not carry the token")
+        XCTAssertNotNil(presentedNonce, "the challenge has to carry a nonce")
+        XCTAssertEqual(store.localProviderReachability, .unreachable)
     }
 
     func testParakeetProviderReportsUnreachableServerBeforeRecordingStarts() {

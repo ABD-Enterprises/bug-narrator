@@ -1,5 +1,6 @@
+using System.Linq;
 using System.Net;
-using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
@@ -81,18 +82,38 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             timeout.CancelAfter(Timeout);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
-            // The server checks the bearer token on every route, health
-            // included: a listener that cannot present the token is not the
-            // server, and must not be treated as one (#1270).
+            // The peer has to prove that it is the server before the app hands
+            // it anything. A listener that answers on the port is not the
+            // server, and the app must not learn its token from the first
+            // request it sends (#1270). So the challenge carries a fresh
+            // nonce and no token: the server answers with an HMAC of the
+            // nonce that only a peer that knows the token can produce, and the
+            // app sends the token on later requests only once that proof
+            // checks out.
+            var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            request.Headers.TryAddWithoutValidation(LocalServerTokenStore.ChallengeHeader, nonce);
             var token = LocalServerTokenStore.Token(installDirectory);
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue(
-                    LocalServerTokenStore.AuthorizationScheme,
-                    token);
-            }
+            var expectedProof = string.IsNullOrWhiteSpace(token)
+                ? null
+                : LocalServerTokenStore.Proof(nonce, token);
             using var response = await httpClient.SendAsync(request, timeout.Token);
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            if (expectedProof is null)
+            {
+                return false;
+            }
+
+            // The peer has to prove that it knows the token. A listener that
+            // answers the health check with the right body is still not the
+            // server, and the app must not upload the user's audio to it.
+            var proof = response.Headers.TryGetValues(LocalServerTokenStore.ProofHeader, out var values)
+                ? values.FirstOrDefault()
+                : null;
+            if (!string.Equals(proof, expectedProof, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             return IsHealthy(response.StatusCode, body);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

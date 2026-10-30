@@ -685,7 +685,7 @@ class ServerAuthenticationTests(unittest.TestCase):
         self.addCleanup(setattr, server, "_auth_token", self._previous_token)
         self.addCleanup(setattr, server, "_max_upload_bytes", self._previous_max_upload_bytes)
 
-    def _request(self, url, token=None, data=None, method=None):
+    def _request(self, url, token=None, data=None, method=None, headers=None):
         import http.client
         from urllib.parse import urlsplit
 
@@ -693,7 +693,7 @@ class ServerAuthenticationTests(unittest.TestCase):
         path = parts.path or "/"
         if parts.query:
             path = f"{path}?{parts.query}"
-        headers = {}
+        headers = dict(headers or {})
         if token is not None:
             headers["Authorization"] = f"Bearer {token}"
         connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=30)
@@ -703,6 +703,56 @@ class ServerAuthenticationTests(unittest.TestCase):
             return response.status, response.read()
         finally:
             connection.close()
+
+    def test_the_health_check_answers_a_challenge_with_a_proof(self):
+        """The server has to prove that it is the server (#1270).
+
+        A listener that answers on the port is not the server, and the app
+        must not learn the token from the first request it sends. So the
+        challenge carries a nonce and no token, and the answer carries an
+        HMAC of the nonce that only a peer that knows the token can produce.
+        """
+        import http.client
+        from urllib.parse import urlsplit
+
+        token = "s3cret-token-value"
+        port = 8477
+        token_file = Path(self.enterContext(tempfile.TemporaryDirectory())) / "token"
+        self._serve(token, port, token_file)
+        base = f"http://127.0.0.1:{port}"
+        parts = urlsplit(base)
+
+        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=30)
+        try:
+            connection.request(
+                "GET",
+                "/health",
+                headers={server.CHALLENGE_HEADER: "the-nonce"},
+            )
+            response = connection.getresponse()
+            body = response.read()
+            proof = response.getheader(server.PROOF_HEADER)
+        finally:
+            connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertIsNotNone(proof)
+        # The proof is an HMAC of the nonce, keyed by the token: the same
+        # vector the two ports check themselves against.
+        self.assertEqual(
+            proof,
+            "09319c98fe682b6225a79c28488a15cc6dbc6d4f3609a649c5833e671f1f4aa7",
+        )
+        self.assertIn("model_loaded", json.loads(body))
+
+    def test_a_health_request_without_a_token_or_a_challenge_is_refused(self):
+        port = 8478
+        token_file = Path(self.enterContext(tempfile.TemporaryDirectory())) / "token"
+        self._serve("s3cret-token-value", port, token_file)
+
+        status, _ = self._request(f"http://127.0.0.1:{port}/health")
+
+        self.assertEqual(status, 401)
 
     def _serve(self, token, port, token_file, max_upload_mb=None):
         # `--lazy` keeps the test server from loading a real model: the tests
@@ -884,6 +934,18 @@ server.main()
         self.assertEqual(
             server.TOKEN_ENVIRONMENT_VARIABLE,
             fixture["environmentVariable"],
+        )
+        self.assertEqual(server.CHALLENGE_HEADER, fixture["challengeHeader"])
+        self.assertEqual(server.PROOF_HEADER, fixture["proofHeader"])
+        # The three ports have to compute the same proof from the same inputs,
+        # or the app and the server would never agree on it.
+        vector = fixture["proofVector"]
+        previous_token = server._auth_token
+        self.addCleanup(setattr, server, "_auth_token", previous_token)
+        server.configure_auth(vector["token"])
+        self.assertEqual(
+            server.proof_for_nonce(vector["nonce"]),
+            vector["proof"],
         )
 
         with patch.object(server.sys, "platform", "darwin"):

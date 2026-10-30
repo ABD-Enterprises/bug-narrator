@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
 
@@ -47,6 +49,32 @@ public static class LocalServerTokenStore
     /// <summary>The authorization scheme the server expects.</summary>
     public const string AuthorizationScheme = "Bearer";
 
+    /// <summary>
+    /// The header a client sends when it asks the server to prove that it is
+    /// the server, and the header the answer carries.
+    /// </summary>
+    public const string ChallengeHeader = "X-BugNarrator-Nonce";
+
+    /// <summary>The header the server's answer to a challenge carries.</summary>
+    public const string ProofHeader = "X-BugNarrator-Proof";
+
+    /// <summary>
+    /// The proof that a peer knows the token: an HMAC of the client's nonce,
+    /// keyed by the token.
+    /// </summary>
+    /// <remarks>
+    /// A listener that answers on the port but cannot read the token cannot
+    /// produce this, so the client can tell the server apart from it - and the
+    /// challenge that asks for it carries no token, so nothing secret leaves
+    /// the app before the peer has proved itself.
+    /// </remarks>
+    public static string Proof(string nonce, string token)
+    {
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(token));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(nonce));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
     public static string TokenFilePath(string installDirectory) =>
         Path.Combine(installDirectory, TokenFileName);
 
@@ -61,11 +89,45 @@ public static class LocalServerTokenStore
         var stored = StoredTokenAtPath(path);
         if (stored is not null)
         {
+            // The token file is written back, so a file an older build left
+            // with wider permissions is given the ones it is supposed to
+            // have. The macOS port does the same, and a token another
+            // account can read is not a secret. It is written back once per
+            // process: the health probe reads the token every couple of
+            // seconds, and rewriting the file that often is pointless work.
+            RepairOnce(path, stored);
             return stored;
         }
 
         var token = NewToken();
         return WriteToken(token, path) ? token : null;
+    }
+
+    private static readonly object RepairLock = new();
+    private static readonly HashSet<string> RepairedPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Write the token back once per process, so the file carries the
+    /// permissions of the directory it was created in.
+    /// </summary>
+    private static void RepairOnce(string path, string token)
+    {
+        lock (RepairLock)
+        {
+            if (!RepairedPaths.Add(path))
+            {
+                return;
+            }
+        }
+
+        if (!WriteToken(token, path))
+        {
+            // A file that could not be written is worth another try later.
+            lock (RepairLock)
+            {
+                RepairedPaths.Remove(path);
+            }
+        }
     }
 
     /// <summary>The stored token, without creating one.</summary>

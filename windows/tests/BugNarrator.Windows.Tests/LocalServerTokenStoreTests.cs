@@ -29,6 +29,21 @@ public sealed class LocalServerTokenStoreTests
         Assert.Equal(
             LocalServerTokenStore.AuthorizationScheme,
             fixture.GetProperty("authorizationScheme").GetString());
+        Assert.Equal(
+            LocalServerTokenStore.ChallengeHeader,
+            fixture.GetProperty("challengeHeader").GetString());
+        Assert.Equal(
+            LocalServerTokenStore.ProofHeader,
+            fixture.GetProperty("proofHeader").GetString());
+
+        // The three ports have to compute the same proof from the same
+        // inputs, or the app and the server would never agree on it.
+        var vector = fixture.GetProperty("proofVector");
+        Assert.Equal(
+            vector.GetProperty("proof").GetString(),
+            LocalServerTokenStore.Proof(
+                vector.GetProperty("nonce").GetString()!,
+                vector.GetProperty("token").GetString()!));
 
         var relativeDirectory = fixture
             .GetProperty("windows")

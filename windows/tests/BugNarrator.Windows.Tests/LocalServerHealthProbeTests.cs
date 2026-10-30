@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.IO;
 using System.Text;
@@ -45,7 +46,7 @@ public sealed class LocalServerHealthProbeTests : IDisposable
         var probe = Probe(new HttpClient(new FakeHandler(request =>
         {
             sent = request;
-            return Json("{\"status\":\"ok\",\"model_loaded\":true}");
+            return Proved(request, "{\"status\":\"ok\",\"model_loaded\":true}");
         })));
 
         Assert.True(await probe.IsReachableAsync("http://localhost:8422"));
@@ -54,22 +55,48 @@ public sealed class LocalServerHealthProbeTests : IDisposable
     }
 
     [Fact]
-    public async Task IsReachable_PresentsTheServerToken()
+    public async Task IsReachable_ChallengesThePeerWithoutHandingItTheToken()
     {
-        // The server checks the bearer token on every route, health included:
-        // a listener that cannot present it is not the server (#1270).
+        // The peer has to prove that it is the server before the app hands it
+        // anything: a listener that answers on the port must not learn the
+        // token from the first request the app sends (#1270).
         HttpRequestMessage? sent = null;
         var probe = Probe(new HttpClient(new FakeHandler(request =>
         {
             sent = request;
-            return Json("{\"status\":\"ok\",\"model_loaded\":true}");
+            return Proved(request, "{\"status\":\"ok\",\"model_loaded\":true}");
         })));
 
-        await probe.IsReachableAsync("http://localhost:8422");
+        Assert.True(await probe.IsReachableAsync("http://localhost:8422"));
 
-        Assert.NotNull(sent!.Headers.Authorization);
-        Assert.Equal(LocalServerTokenStore.AuthorizationScheme, sent.Headers.Authorization.Scheme);
-        Assert.False(string.IsNullOrWhiteSpace(sent.Headers.Authorization.Parameter));
+        Assert.Null(sent!.Headers.Authorization);
+        var nonce = sent.Headers.GetValues(LocalServerTokenStore.ChallengeHeader).Single();
+        Assert.False(string.IsNullOrWhiteSpace(nonce));
+    }
+
+    [Fact]
+    public async Task IsReachable_IsFalseWhenThePeerCannotProveItIsTheServer()
+    {
+        // A listener that answers the health check with the right body is
+        // still not the server: it cannot produce the proof, so the app must
+        // not upload the user's audio to it (#1270).
+        var probe = Probe(new HttpClient(new FakeHandler(request =>
+            Json("{\"status\":\"ok\",\"model_loaded\":true}"))));
+
+        Assert.False(await probe.IsReachableAsync("http://localhost:8422"));
+    }
+
+    [Fact]
+    public async Task IsReachable_IsFalseWhenThePeerProvesItWithTheWrongAnswer()
+    {
+        var probe = Probe(new HttpClient(new FakeHandler(request =>
+        {
+            var response = Json("{\"status\":\"ok\",\"model_loaded\":true}");
+            response.Headers.TryAddWithoutValidation(LocalServerTokenStore.ProofHeader, "not-the-proof");
+            return response;
+        })));
+
+        Assert.False(await probe.IsReachableAsync("http://localhost:8422"));
     }
 
     [Fact]
@@ -119,6 +146,21 @@ public sealed class LocalServerHealthProbeTests : IDisposable
 
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    /// <summary>
+    /// The answer the server gives to a challenge: the body and the proof
+    /// that it knows the token.
+    /// </summary>
+    private HttpResponseMessage Proved(HttpRequestMessage request, string body)
+    {
+        var nonce = request.Headers.GetValues(LocalServerTokenStore.ChallengeHeader).Single();
+        var token = LocalServerTokenStore.Token(installDirectory)!;
+        var response = Json(body);
+        response.Headers.TryAddWithoutValidation(
+            LocalServerTokenStore.ProofHeader,
+            LocalServerTokenStore.Proof(nonce, token));
+        return response;
+    }
 
     public void Dispose()
     {
