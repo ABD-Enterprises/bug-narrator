@@ -171,18 +171,12 @@ public sealed record WindowsAppSettings(
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(JiraBaseUrl)
-                || !Uri.TryCreate(JiraBaseUrl.Trim(), UriKind.Absolute, out var parsed)
-                || !string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            // The host is read as it was written: .NET rewrites a number
-            // written in another notation into the address it stands for, and
-            // the macOS port refuses those spellings.
-            var host = OpenAiCompatibleEndpoint.HostAsWritten(JiraBaseUrl);
-            if (host is null || OpenAiCompatibleEndpoint.IsLocalEndpointHost(host))
+            // The host is read as it was written, and a URL that .NET cannot
+            // parse is judged too: .NET rewrites a number written in another
+            // notation into the address it stands for, and the macOS port
+            // refuses those spellings.
+            var host = OpenAiCompatibleEndpoint.PlaintextHttpHost(JiraBaseUrl);
+            if (host is null)
             {
                 return null;
             }

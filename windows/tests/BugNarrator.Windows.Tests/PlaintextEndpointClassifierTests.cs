@@ -69,6 +69,23 @@ public sealed class PlaintextEndpointClassifierTests
     }
 
     /// <summary>
+    /// A bracket belongs to an IPv6 literal, so <c>http://[localhost]:1234/v1</c>
+    /// is not a URL .NET can parse - and a URL the app cannot parse must not
+    /// become a URL the app trusts. The macOS port refuses it, so the Windows
+    /// port refuses it too.
+    /// </summary>
+    [Theory]
+    [InlineData("http://[localhost]:1234/v1")]
+    [InlineData("http://[127.0.0.1]:1234/v1")]
+    public void ABracketedNameIsRefusedEvenThoughTheUrlDoesNotParse(string url)
+    {
+        var refusal = OpenAiCompatibleEndpoint.PlaintextRemoteWarning(url);
+
+        Assert.NotNull(refusal);
+        Assert.Contains("cannot use as a local address", refusal, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// A trailing dot makes a name absolute rather than different: a resolver
     /// answers the same name either way, so the two have to be classified the
     /// same way. An address is not a name, so <c>127.0.0.1.</c> stays refused.
@@ -228,6 +245,40 @@ public sealed class PlaintextEndpointClassifierTests
         // <root>/windows/tests/BugNarrator.Windows.Tests/<this file>
         var directory = Path.GetDirectoryName(sourceFilePath)!;
         return Path.GetFullPath(Path.Combine(directory, "..", "..", ".."));
+    }
+
+
+    /// <summary>
+    /// The two ports read the host out of a URL differently — Foundation takes
+    /// the brackets off whatever is in them, .NET keeps them — so the same URL
+    /// could be trusted on one port and refused on the other. The table of
+    /// URLs is shared, so a change to one port that the other does not follow
+    /// fails a build.
+    /// </summary>
+    [Fact]
+    public void TheRefusalAgreesWithTheSharedURLTable()
+    {
+        var path = Path.Combine(RepositoryRoot(), "contract-fixtures", "plaintext-endpoint-urls.json");
+        Assert.True(File.Exists(path), $"Missing contract fixture at {path}.");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var entries = document.RootElement.EnumerateArray().ToList();
+        Assert.NotEmpty(entries);
+
+        foreach (var entry in entries)
+        {
+            var url = entry.GetProperty("url").GetString() ?? string.Empty;
+            var trusted = entry.GetProperty("trusted").GetBoolean();
+            var note = entry.GetProperty("note").GetString() ?? string.Empty;
+
+            // No refusal means the app may send a secret to that URL over
+            // plaintext HTTP.
+            var refusal = OpenAiCompatibleEndpoint.PlaintextRemoteWarning(url);
+
+            Assert.True(
+                (refusal is null) == trusted,
+                $"{url}: {note}");
+        }
     }
 
 }

@@ -575,6 +575,49 @@ final class SettingsStore: ObservableObject {
         return isTrustedIPv4(octets.0, octets.1)
     }
 
+    /// The host of `url`, as it was written.
+    ///
+    /// Foundation's `URL.host` takes the brackets off whatever is in them, so
+    /// `[localhost]` reads as the reserved name and `[127.0.0.1]` reads as
+    /// the loopback — both of which the app would then trust. A bracket
+    /// belongs to an IPv6 literal and to nothing else, and the Windows port
+    /// reads the host the same way, so it is taken out of the URL text here
+    /// rather than out of the parsed host.
+    static func hostAsWritten(_ url: URL) -> String? {
+        hostAsWritten(url.absoluteString)
+    }
+
+    /// The host of `urlText`, as it was written.
+    static func hostAsWritten(_ urlText: String) -> String? {
+        let text = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let schemeRange = text.range(of: "://") else { return nil }
+        var authority = String(text[schemeRange.upperBound...])
+
+        if let end = authority.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) {
+            authority = String(authority[..<end])
+        }
+
+        // The user information comes before the host and is not part of it.
+        if let at = authority.lastIndex(of: "@") {
+            authority = String(authority[authority.index(after: at)...])
+        }
+
+        if authority.hasPrefix("[") {
+            // An IPv6 literal is written in brackets, and the port follows
+            // the closing bracket.
+            guard let close = authority.firstIndex(of: "]") else { return nil }
+            guard authority.distance(from: authority.startIndex, to: close) > 1 else { return nil }
+            return String(authority[...close])
+        }
+
+        // A name cannot contain a colon, so the last one separates the port.
+        if let colon = authority.lastIndex(of: ":") {
+            authority = String(authority[..<colon])
+        }
+
+        return authority.isEmpty ? nil : authority
+    }
+
     /// The host without the brackets an IPv6 literal is written in, or nil
     /// when the host is not one the app can check.
     ///
@@ -866,11 +909,12 @@ final class SettingsStore: ObservableObject {
         provider: AIProvider = .openAI
     ) -> String? {
         let url = normalizedOpenAIBaseURL(from: rawValue, provider: provider)
-        guard url.scheme?.lowercased() == "http",
-              let host = url.host,
-              !isLocalEndpointHost(host) else {
-            return nil
-        }
+        guard url.scheme?.lowercased() == "http" else { return nil }
+        // The host is read as it was written: Foundation takes the brackets
+        // off whatever is in them, so `[localhost]` would read as the
+        // reserved name and `[127.0.0.1]` as the loopback.
+        let host = hostAsWritten(url) ?? url.host ?? ""
+        guard !isLocalEndpointHost(host) else { return nil }
         return plaintextTransportRefusal(
             host: host,
             subject: "This endpoint",
@@ -895,11 +939,14 @@ final class SettingsStore: ObservableObject {
     /// the AI base-URL guard (#472).
     var jiraBaseURLPlaintextWarning: String? {
         guard let url = jiraBaseURLValue,
-              url.scheme?.lowercased() == "http",
-              let host = url.host,
-              !Self.isLocalEndpointHost(host) else {
+              url.scheme?.lowercased() == "http" else {
             return nil
         }
+        // The host is read as it was written: Foundation takes the brackets
+        // off whatever is in them, so `[localhost]` would read as the
+        // reserved name and `[127.0.0.1]` as the loopback.
+        let host = Self.hostAsWritten(url) ?? url.host ?? ""
+        guard !Self.isLocalEndpointHost(host) else { return nil }
         return Self.plaintextTransportRefusal(
             host: host,
             subject: "This Jira URL",

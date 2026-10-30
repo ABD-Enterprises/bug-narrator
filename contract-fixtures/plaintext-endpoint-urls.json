@@ -1,0 +1,16 @@
+[
+  { "url": "http://localhost:1234/v1", "trusted": true, "note": "the reserved name for the loopback" },
+  { "url": "http://127.0.0.1:1234/v1", "trusted": true, "note": "the loopback" },
+  { "url": "http://[::1]:1234/v1", "trusted": true, "note": "an IPv6 literal is written in brackets" },
+  { "url": "http://[fe80::1]:1234/v1", "trusted": true, "note": "a link-local literal in brackets" },
+  { "url": "http://192.168.1.10:1234/v1", "trusted": true, "note": "a private-range address is one the app can check" },
+  { "url": "http://[localhost]:1234/v1", "trusted": false, "note": "a bracket belongs to an IPv6 literal, not to a name" },
+  { "url": "http://[127.0.0.1]:1234/v1", "trusted": false, "note": "a bracket belongs to an IPv6 literal, not to an IPv4 address" },
+  { "url": "http://127.1:1234/v1", "trusted": false, "note": "a short form is not the address" },
+  { "url": "http://2130706433:1234/v1", "trusted": false, "note": "the loopback written as one number" },
+  { "url": "http://0x7f000001:1234/v1", "trusted": false, "note": "the loopback written in hexadecimal" },
+  { "url": "http://nas.local:1234/v1", "trusted": false, "note": "a .local name is answered over mDNS" },
+  { "url": "http://lmstudio:1234/v1", "trusted": false, "note": "a single-label name is answered by the resolver's search list" },
+  { "url": "http://user:pass@nas.local:1234/v1", "trusted": false, "note": "the user information is not part of the host" },
+  { "url": "http://8.8.8.8:1234/v1", "trusted": false, "note": "a public address" }
+]

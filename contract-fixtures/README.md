@@ -29,6 +29,7 @@ Windows test was green against an output macOS produced nowhere outside UTC.
 | `transcript.golden.md` | The exact `transcript.md` the canonical session must export |
 | `summary.golden.md` | The shared `summary.md` subset both platforms emit identically today |
 | `plaintext-endpoint-hosts.json` | The hosts the two plaintext-endpoint classifiers have to agree about |
+| `plaintext-endpoint-urls.json` | The URLs the two ports have to refuse in the same way |
 
 ## The plaintext-endpoint host table
 
@@ -46,6 +47,13 @@ the other trusts goes out in the clear on the port that trusts it.
 
 Each row names why the answer is what it is, so a disagreement is a claim
 about the rule rather than two different literals to re-type.
+
+`plaintext-endpoint-urls.json` holds the layer above it: the URLs the two
+ports have to refuse in the same way. The ports read the host out of a URL
+differently — Foundation takes the brackets off whatever is in them, .NET
+keeps them — so `http://[localhost]/` read as the reserved name on one
+port and as a bracketed name on the other. The table is read by both test
+suites through the refusal the user would see.
 
 ## The canonical session
 

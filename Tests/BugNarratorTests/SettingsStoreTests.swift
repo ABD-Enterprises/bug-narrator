@@ -583,6 +583,41 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// The two ports read the host out of a URL differently — Foundation takes
+    /// the brackets off whatever is in them, .NET keeps them — so the same URL
+    /// could be trusted on one port and refused on the other. The table of
+    /// URLs is shared, so a change to one port that the other does not follow
+    /// fails a build.
+    func testTheRefusalAgreesWithTheSharedURLTable() throws {
+        let fixturesDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // BugNarratorTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("contract-fixtures", isDirectory: true)
+        let fixtureURL = fixturesDirectory.appendingPathComponent("plaintext-endpoint-urls.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: fixtureURL.path),
+            "the shared URL table is missing: \(fixtureURL.path)"
+        )
+
+        let urls = try JSONDecoder().decode(
+            [PlaintextEndpointURLTableEntry].self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        XCTAssertFalse(urls.isEmpty, "the shared URL table is empty")
+
+        for entry in urls {
+            // No refusal means the app may send a secret to that URL over
+            // plaintext HTTP.
+            let refusal = SettingsStore.plaintextRemoteBaseURLWarning(from: entry.url)
+            XCTAssertEqual(
+                refusal == nil,
+                entry.trusted,
+                "\(entry.url): \(entry.note)"
+            )
+        }
+    }
+
     /// The trusted names are the ones the standards reserve for the loopback:
     /// `localhost` and the names under it. A name that merely *looks* like it
     /// points at this machine is not one of them.
@@ -2501,6 +2536,18 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+}
+
+/// One row of the shared URL table the two ports have to agree about.
+private struct PlaintextEndpointURLTableEntry: Decodable {
+    /// The URL, as the app can be given it.
+    let url: String
+
+    /// Whether the app may send a secret to it over plaintext HTTP.
+    let trusted: Bool
+
+    /// Why the answer is what it is.
+    let note: String
 }
 
 /// One row of the shared host table the two classifiers have to agree about.

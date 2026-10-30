@@ -501,32 +501,66 @@ public static class OpenAiCompatibleEndpoint
     /// </summary>
     public static string? PlaintextRemoteWarning(string? configuredBaseUrl)
     {
-        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(configuredBaseUrl.Trim(), UriKind.Absolute, out var parsed))
-        {
-            return null;
-        }
-
-        if (!string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        // The host is read as it was written: .NET rewrites a number written
-        // in another notation into the address it stands for, and the macOS
-        // port refuses those spellings.
-        var host = HostAsWritten(configuredBaseUrl);
-        if (host is null || IsLocalEndpointHost(host))
+        var host = PlaintextHttpHost(configuredBaseUrl);
+        if (host is null)
         {
             return null;
         }
 
         return PlaintextTransportRefusal(
             host, "This endpoint", "API key and transcript text", "endpoint");
+    }
+
+    /// <summary>
+    /// The host of <paramref name="configuredBaseUrl"/> when it is a plaintext
+    /// HTTP URL the app cannot check as a local address, and null when there
+    /// is nothing to refuse.
+    /// </summary>
+    /// <remarks>
+    /// The host is read as it was written: .NET rewrites a number written in
+    /// another notation into the address it stands for, and the macOS port
+    /// refuses those spellings, so the same URL cannot be trusted on one port
+    /// and refused on the other.
+    /// <para>
+    /// A URL that .NET cannot parse at all is still judged. <c>http://[localhost]
+    /// </c> is one, because a bracket belongs to an IPv6 literal and to nothing
+    /// else - and a secret must not go out to a host the app cannot check just
+    /// because the URL is malformed.
+    /// </para>
+    /// </remarks>
+    public static string? PlaintextHttpHost(string? configuredBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            return null;
+        }
+
+        var text = configuredBaseUrl.Trim();
+
+        if (Uri.TryCreate(text, UriKind.Absolute, out var parsed))
+        {
+            if (!string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            // A URL whose text does not yield a host is judged by the host
+            // .NET parsed, so the refusal is never silently dropped.
+            var host = HostAsWritten(text) ?? parsed.Host;
+            return host is null || IsLocalEndpointHost(host) ? null : host;
+        }
+
+        // The URL does not parse. The scheme and the host can still be read
+        // out of the text.
+        var schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd <= 0
+            || !string.Equals(text[..schemeEnd], Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var hostAsWritten = HostAsWritten(text);
+        return hostAsWritten is null || IsLocalEndpointHost(hostAsWritten) ? null : hostAsWritten;
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)
