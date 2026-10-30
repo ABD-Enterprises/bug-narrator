@@ -234,6 +234,11 @@ parse_jobs() {
         }
         /^jobs:[ \t]*$/ { injobs = 1; next }
         !injobs && /^permissions:[ \t]*$/ { workflow_perms = 1; next }
+        # "write-all" grants every scope, and a flow map spells the same
+        # permission on one line. Both give the workflow more than it can
+        # write, so both have to be recognised.
+        !injobs && /^permissions:[ \t]*["'"'"']?write-all["'"'"']?[ \t]*$/ { workflow_write = 1; next }
+        !injobs && /^permissions:[ \t]*\{.*contents:[ \t]*write/ { workflow_write = 1; next }
         workflow_perms && /^  contents:[ \t]*write[ \t]*$/ { workflow_write = 1; next }
         workflow_perms && /^[^ \t]/ { workflow_perms = 0 }
         injobs && /^[^ \t]/ { close_step(); flush(); injobs = 0; next }
@@ -267,6 +272,16 @@ parse_jobs() {
             # The permissions of the job. A job that does not declare any
             # inherits the workflow default.
             if ($0 ~ /^    permissions:[ \t]*$/) { job_has_perms = 1 }
+            # "write-all" grants every scope, and a flow map spells the same
+            # permission on one line. An empty map grants none, so the job
+            # declares its permissions and cannot write.
+            if ($0 ~ /^    permissions:[ \t]*["'"'"']?write-all["'"'"']?[ \t]*$/) {
+                job_has_perms = 1; job_write = 1
+            }
+            if ($0 ~ /^    permissions:[ \t]*\{[ \t]*\}[ \t]*$/) { job_has_perms = 1 }
+            if ($0 ~ /^    permissions:[ \t]*\{.*contents:[ \t]*write/) {
+                job_has_perms = 1; job_write = 1
+            }
             if ($0 ~ /^      contents:[ \t]*write[ \t]*$/) { job_write = 1 }
 
             # A job-level environment: key sits at the job level indentation.
@@ -892,6 +907,41 @@ restore_workflow ".github/workflows/windows-tester-release.yml"
 } >>"$workspace/.github/workflows/windows-tester-release.yml"
 if (check_tree "$workspace") >/dev/null 2>&1; then
     fail 'the wiring check accepted a publishing job that runs a repository script'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A job that can write to the repository has to be caught whatever spelling
+# its permissions use. "write-all" grants every scope, and a flow map spells
+# the same permission on one line; a check that reads only the two-line form
+# would judge such a job harmless.
+for permissions in "permissions: write-all" "permissions: { contents: write }"; do
+    {
+        printf '\n  permission-form-publisher:\n'
+        printf '    runs-on: ubuntu-latest\n'
+        printf '    %s\n' "$permissions"
+        printf '    steps:\n'
+        printf '      - name: Publish\n'
+        printf '        run: bash windows/scripts/publish.sh\n'
+    } >>"$workspace/.github/workflows/windows-tester-release.yml"
+    if (check_tree "$workspace") >/dev/null 2>&1; then
+        fail "the wiring check accepted a publishing job that writes with \"$permissions\""
+    fi
+    restore_workflow ".github/workflows/windows-tester-release.yml"
+done
+
+# An empty permissions map grants nothing, so a job that declares one cannot
+# write. It is still a job that has to be recognised as declaring its
+# permissions: the workflow default must not leak into it.
+{
+    printf '\n  empty-permissions-job:\n'
+    printf '    runs-on: ubuntu-latest\n'
+    printf '    permissions: {}\n'
+    printf '    steps:\n'
+    printf '      - name: Nothing\n'
+    printf '        run: echo hi\n'
+} >>"$workspace/.github/workflows/windows-tester-release.yml"
+if ! (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check rejected a job that declares an empty permissions map'
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
