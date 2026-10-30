@@ -56,6 +56,7 @@ jobs:
           fi
 
       - name: Confirm the release environment still gates the release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ENVIRONMENT: windows-release
@@ -104,6 +105,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Confirm the release environment still gates the release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ENVIRONMENT: windows-release
@@ -125,12 +127,13 @@ jobs:
           # read as "no tag", so it stops the release instead.
           tag_lookup=""
           if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>&1)"; then
-            # Only GitHub's own "Not Found" answer, or the body's exact
-            # "status":"404" field, means the tag is absent. A message that
-            # merely mentions a 404 — a proxy quoting an upstream error, say —
-            # is not proof that the tag does not exist, so it stops the release
-            # instead of reading as absence.
-            if [[ "$tag_lookup" != *'"status":"404"'* && ! "$tag_lookup" =~ gh:\ Not\ Found\ \(HTTP[[:space:]]404\) ]]; then
+            # Only GitHub's own answer, with its HTTP status, means the tag is
+            # absent: gh reports a missing tag as "gh: Not Found (HTTP 404)".
+            # A body that merely carries a "status" field says nothing about
+            # the status the request got, and a failure that quotes someone
+            # else's 404 is not proof either, so both stop the release instead
+            # of reading as absence.
+            if ! printf '%s\n' "$tag_lookup" | grep -qE '^gh: .*\(HTTP 404\)$'; then
               printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
               exit 1
             fi
