@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Local transcription server: a cancelled transcription now stops at the next window boundary and releases its memory instead of running to the end of the recording, the model can be unloaded after an idle period (`--idle-unload-seconds`), a configurable ceiling (`--max-memory-mb`) refuses a job with a clear error instead of driving the host into swap, and the window size is configurable (`--window-seconds`) (#1229).
 - [FIX] Local transcription bounds its memory on long recordings (#1229): uploads are streamed to disk in 1 MB pieces instead of read whole, each backend decodes one 120 s window at a time (ffmpeg seek windows on macOS, windowed WAV reads elsewhere), and the MLX Metal cache is released after every window and when a job finishes or fails, so peak resident memory no longer grows with recording length.
 - [INTERNAL] Agent files follow the fleet standard: `AGENTS.md` is the single copy of the agent rules, `CLAUDE.md` only imports it and `.agent/rules.md` points at it; `scripts/check-agent-rules-sync.sh` now checks that layout instead of identical bodies, and the old ORC adapter text is gone.
 - [SECURITY] The local transcription server's hash-locked builds (standalone, Windows x64 and Windows ARM64) move `certifi` from 2026.7.22 to 2026.10.19, which drops the emSign root CAs whose intermediate CA keys were compromised (GHSA-6q48-6c7w-9gw2, CWE-295, critical); no other pin changes.
