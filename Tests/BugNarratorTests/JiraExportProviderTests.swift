@@ -8,6 +8,238 @@ final class JiraExportProviderTests: XCTestCase {
         super.tearDown()
     }
 
+    func testAuthenticatedRequestRefusesPlaintextRemoteHost() async throws {
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        // A remote plaintext host would put the email, the API token and the
+        // issue content on the wire in the clear.
+        do {
+            _ = try await provider.authenticatedRequest(
+                url: URL(string: "http://jira.example.com/rest/api/3/issue")!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTFail("expected a plaintext remote host to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible(let message) = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("jira.example.com"))
+        }
+
+        // Remote HTTPS and local plaintext endpoints stay allowed.
+        for allowed in [
+            "https://acme.atlassian.net/rest/api/3/issue",
+            "http://localhost:8080/rest/api/3/issue",
+            "http://192.168.1.10/rest/api/3/issue"
+        ] {
+            let request = try await provider.authenticatedRequest(
+                url: URL(string: allowed)!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTAssertEqual(request.url?.absoluteString, allowed)
+        }
+    }
+
+    func testARedirectToAPlaintextRemoteHostIsRefused() throws {
+        // The guard looks at the request the app builds. A redirect is a
+        // second request it never sees, so the policy has to refuse it.
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(URL(string: "http://jira.example.com/rest/api/3/issue")),
+            "A redirect to a plaintext remote host would put the credentials and the issue content in the clear."
+        )
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "https://jira.example.com/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "http://localhost:8080/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "http://192.168.1.10/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(nil))
+    }
+
+    /// A redirect to a plaintext remote host is refused, and the reason is
+    /// recorded so the error can say what would have happened.
+    func testTheRefusalNamesTheReason() throws {
+        // The origin is checked first, so a plaintext host is only reached
+        // when the redirect stays on the origin it started at.
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "http://jira.example.com/rest/api/3/issue"),
+                from: URL(string: "http://jira.example.com/rest/api/3/issue")
+            ),
+            .plaintextRemoteHost
+        )
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "https://other.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            ),
+            .leavesTheOrigin
+        )
+        XCTAssertNil(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "https://jira.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            )
+        )
+    }
+
+    /// A redirect that leaves the origin the user configured would put the
+    /// account email, the API token and the issue content in the hands of a
+    /// host they never named - encrypted or not.
+    func testARedirectThatLeavesTheConfiguredOriginIsRefused() throws {
+        let original = URL(string: "https://jira.example.com/rest/api/3/issue")!
+
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://other.example.com/rest/api/3/issue"),
+                from: original
+            ),
+            "another host would get the credentials and the issue content."
+        )
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com:8443/rest/api/3/issue"),
+                from: original
+            ),
+            "another port is another origin."
+        )
+        XCTAssertTrue(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com/rest/api/3/issue/KEY-1"),
+                from: original
+            ),
+            "the same origin is fine."
+        )
+        XCTAssertTrue(
+            JiraTransportRedirectPolicy.mayFollow(
+                URL(string: "https://jira.example.com:443/rest/api/3/issue"),
+                from: original
+            ),
+            "the default port spelled out is the same origin."
+        )
+    }
+
+    /// The provider builds its own session, and that session is the one that
+    /// carries the credentials. A test that only calls the policy's static
+    /// helper cannot tell whether the policy is wired into that session at
+    /// all — dropping it leaves the helper test green — so this drives the
+    /// session the provider actually uses, through a real redirect.
+    func testTheProvidersOwnSessionRefusesARedirectThatLeavesTheConfiguredOrigin() async throws {
+        // The redirect target is a second server that is listening, so the
+        // test can see whether the session went there: a target that nothing
+        // listens on cannot tell a refused redirect from a failed one.
+        let target = try RedirectServer(location: "http://127.0.0.1/never")
+        target.serve()
+        defer { target.stop() }
+
+        // The target is on another port, so it is another origin: the
+        // credentials belong to the site the user configured.
+        let server = try RedirectServer(location: "http://127.0.0.1:\(target.port)/rest/api/3/search/jql")
+        server.serve()
+        defer { server.stop() }
+
+        // No session is injected: the provider builds the one the app uses,
+        // with the redirect policy on it.
+        let provider = JiraExportProvider()
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Checkout button broken",
+            evidenceExcerpt: "Checkout never enabled.",
+            timestamp: nil
+        )
+
+        do {
+            _ = try await provider.findOpenIssues(
+                matching: issue,
+                configuration: JiraExportConfiguration(
+                    baseURL: URL(string: "http://127.0.0.1:\(server.port)")!,
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    projectKey: "FM",
+                    issueType: "Task"
+                )
+            )
+            XCTFail("expected the redirect to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible(let message) = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("redirect"), message)
+            // The message has to name the reason the redirect was refused: a
+            // redirect to another host would have taken the credentials and
+            // the issue content there, encrypted or not.
+            XCTAssertTrue(
+                message.contains("another host"),
+                "the message has to say that the redirect pointed at another host: \(message)"
+            )
+        }
+
+        XCTAssertEqual(
+            server.requestCount,
+            1,
+            "the server that answered the request should have been asked once"
+        )
+        XCTAssertEqual(
+            target.requestCount,
+            0,
+            "the redirect target must never be requested: it would carry the credentials in the clear"
+        )
+    }
+
+    /// The server that answers the redirect stops listening when it is
+    /// stopped. A server that went on answering for the rest of the test run
+    /// would let one test's server answer another test's request, and would
+    /// keep the socket open for no reason.
+    func testTheRedirectServerStopsListeningWhenItIsStopped() throws {
+        let server = try RedirectServer(location: "http://plaintext-remote.invalid/")
+        server.serve()
+        defer { server.stop() }
+
+        XCTAssertTrue(
+            acceptsConnections(on: server.port),
+            "the server should be listening while it serves"
+        )
+
+        server.stop()
+
+        XCTAssertFalse(
+            acceptsConnections(on: server.port),
+            "the server should stop listening when it stops"
+        )
+    }
+
+    func testAPlaintextURLWithNoHostIsRefused() async throws {
+        // A URL with no host is a host the app cannot check, so it is refused
+        // like any other one it cannot vouch for. Refusing it is the point:
+        // a guard that fails open here would put the credentials on the wire
+        // for a host nobody can name.
+        let provider = JiraExportProvider(session: makeMockURLSession())
+
+        do {
+            _ = try await provider.authenticatedRequest(
+                url: URL(string: "http://")!,
+                httpMethod: "POST",
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                includesJSONContentType: true
+            )
+            XCTFail("expected a plaintext URL with no host to be refused")
+        } catch let error as AppError {
+            guard case .exportConfigurationIncompatible = error else {
+                return XCTFail("expected an incompatible-configuration error, got \(error)")
+            }
+        }
+
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(URL(string: "http://")),
+            "a redirect to a plaintext URL with no host must be refused too"
+        )
+    }
+
     func testMakeURLRequestIncludesBasicAuthAndProjectFields() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let screenshotURL = makeScreenshotFileURL(named: "modal-shot.png")

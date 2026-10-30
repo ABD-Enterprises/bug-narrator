@@ -518,7 +518,7 @@ final class SettingsStoreTests: XCTestCase {
             "expected a parsed public address to be called remote, got: \(remote ?? "nil")"
         )
         XCTAssertTrue(
-            remote?.contains("email and API token would be sent unencrypted") ?? false,
+            remote?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(remote ?? "nil")"
         )
 
@@ -531,9 +531,105 @@ final class SettingsStoreTests: XCTestCase {
             "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
         XCTAssertTrue(
-            uncheckable?.contains("email and API token would be sent unencrypted") ?? false,
+            uncheckable?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(uncheckable ?? "nil")"
         )
+    }
+
+    func testJiraBaseURLCompatibilityIssueBlocksOnlyPlaintextRemoteHost() {
+        let suiteName = "BugNarrator-JiraPlaintextCompatibilityTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for allowed in [
+            "https://acme.atlassian.net",   // remote HTTPS
+            "http://localhost:8080",         // loopback HTTP
+            "http://192.168.1.10",           // private network
+            "http://jira.localhost",         // loopback by name
+            "acme.atlassian.net",            // no scheme → defaults to https
+            ""
+        ] {
+            store.jiraBaseURL = allowed
+            XCTAssertNil(store.jiraBaseURLCompatibilityIssue, "expected no issue for \(allowed)")
+        }
+
+        store.jiraBaseURL = "http://jira.example.com"
+        let issue = store.jiraBaseURLCompatibilityIssue
+        XCTAssertNotNil(issue)
+        XCTAssertTrue(issue?.contains("jira.example.com") == true)
+        XCTAssertTrue(issue?.contains("https://") == true)
+    }
+
+    /// One host gets one answer. The refusal that blocks the export and the
+    /// warning shown next to the setting describe the same host, so they have
+    /// to be the same sentence: a user who reads one and acts on it must not
+    /// be told something different by the other.
+    func testTheExportRefusalAndTheSettingsWarningAreTheSameSentence() {
+        let suiteName = "BugNarrator-JiraPlaintextOneSentenceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for base in [
+            "http://jira.example.com",   // a name on the network
+            "http://8.8.8.8:8080",       // a parsed public address
+            "http://nas.local",          // a name the network answers over mDNS
+            "http://jira",               // a single-label name
+            "http://134744072",          // an address in another notation
+            "http://010.0.0.1"           // an address with a leading zero
+        ] {
+            store.jiraBaseURL = base
+            XCTAssertEqual(
+                store.jiraBaseURLCompatibilityIssue,
+                store.jiraBaseURLPlaintextWarning,
+                "expected one sentence for one host, got the refusal "
+                    + "\(store.jiraBaseURLCompatibilityIssue ?? "nil") and the warning "
+                    + "\(store.jiraBaseURLPlaintextWarning ?? "nil")"
+            )
+        }
+    }
+
+    /// One host gets one answer, on every surface that refuses it: the
+    /// warning next to the setting, the issue that blocks the export, and the
+    /// refusal the request builder raises.
+    func testEverySurfaceThatRefusesAHostSaysTheSameThing() async throws {
+        let suiteName = "BugNarrator-JiraPlaintextOneSurfaceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let provider = JiraExportProvider()
+
+        for endpoint in [
+            "http://8.8.8.8:8080/jira",
+            "http://jira.example.com:8080/jira",
+            "http://nas.local:8080/jira",
+            "http://134744072:8080/jira"
+        ] {
+            store.jiraBaseURL = endpoint
+            let warning = store.jiraBaseURLPlaintextWarning
+            XCTAssertNotNil(warning, "expected a refusal for \(endpoint)")
+            XCTAssertEqual(store.jiraBaseURLCompatibilityIssue, warning)
+
+            do {
+                _ = try await provider.authenticatedRequest(
+                    url: URL(string: endpoint)!,
+                    httpMethod: "POST",
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    includesJSONContentType: true
+                )
+                XCTFail("expected the request builder to refuse \(endpoint)")
+            } catch let error as AppError {
+                guard case .exportConfigurationIncompatible(let message) = error else {
+                    return XCTFail("expected an incompatible-configuration error, got \(error)")
+                }
+                XCTAssertEqual(message, warning)
+            }
+        }
     }
 
     func testIsLocalEndpointHostClassification() {

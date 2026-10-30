@@ -804,21 +804,24 @@ final class SettingsStore: ObservableObject {
     /// claim the app cannot make. Every refusal says what would cross the
     /// network, because that is the part the user acts on.
     static func plaintextTransportRefusal(
-        host: String,
+        host: String?,
         subject: String,
         secret: String,
         localNoun: String
     ) -> String {
-        if isUnqualifiedLocalName(host) {
+        if let host, isUnqualifiedLocalName(host) {
             return unqualifiedLocalHostPlaintextMessage(host: host, secret: secret)
         }
-        if isPublicAddress(host) {
+        if let host, isPublicAddress(host) {
             return "\(subject) uses plaintext HTTP to a remote host (\(host)). "
                 + "Your \(secret) would be sent unencrypted. "
                 + "Use https://, or configure a trusted local \(localNoun)."
         }
+        // A URL the app cannot even name is a host it cannot check, so it is
+        // refused like any other host it cannot vouch for.
+        let named = host.map { " (\($0))" } ?? ""
         return "\(subject) uses plaintext HTTP to a host this app cannot use as a local "
-            + "address (\(host)). Your \(secret) would be sent unencrypted. "
+            + "address\(named). Your \(secret) would be sent unencrypted. "
             + "Use https://, or point this at an address the app can check."
     }
 
@@ -868,9 +871,25 @@ final class SettingsStore: ObservableObject {
         return Self.plaintextTransportRefusal(
             host: host,
             subject: "This Jira URL",
-            secret: "email and API token",
+            secret: "email, API token and issue content",
             localNoun: "server"
         )
+    }
+
+    /// A blocking issue when the configured Jira base URL would put the account
+    /// email, the API token and the issue content on the wire in the clear.
+    ///
+    /// The AI provider path hard-gates the identical condition (#953): a remote
+    /// plaintext endpoint is a credential leak, not a preference, so warning
+    /// about it was never enough — something has to refuse. The Jira export
+    /// path consumes this instead of only showing `jiraBaseURLPlaintextWarning`.
+    ///
+    /// The refusal is the warning's own sentence. One host gets one answer, so
+    /// the message that blocks the export cannot describe a host differently
+    /// from the message shown next to the setting, and it cannot call a host
+    /// remote that the app has no way of placing.
+    var jiraBaseURLCompatibilityIssue: String? {
+        jiraBaseURLPlaintextWarning
     }
 
     var localProviderSetupCommand: String {

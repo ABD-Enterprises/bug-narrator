@@ -42,6 +42,23 @@ final class MenuBarStatusPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.preferredWidth, 420)
     }
 
+    func testExportConfigurationErrorUsesSettingsRecoveryAction() {
+        // An export that is refused because its configuration is unsafe has to
+        // point at the settings the user has to change.
+        for error in [
+            AppError.exportConfigurationMissing("The Jira site is not configured."),
+            AppError.exportConfigurationIncompatible("The Jira base URL uses plaintext HTTP to a remote host.")
+        ] {
+            let presentation = MenuBarStatusPresentation(
+                status: .error(error.userMessage),
+                currentError: error
+            )
+
+            XCTAssertEqual(presentation.recoveryAction, .exportConfiguration)
+            XCTAssertEqual(presentation.preferredWidth, 420)
+        }
+    }
+
     func testTranscribingStateExpandsWidthForLongRunningStatus() {
         let presentation = MenuBarStatusPresentation(
             status: .transcribing("Step 1 of 3: Uploading audio to OpenAI for transcription..."),
