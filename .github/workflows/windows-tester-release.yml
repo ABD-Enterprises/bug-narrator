@@ -125,7 +125,12 @@ jobs:
           # read as "no tag", so it stops the release instead.
           tag_lookup=""
           if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>&1)"; then
-            if [[ "$tag_lookup" != *'"status":"404"'* && "$tag_lookup" != *"HTTP 404"* ]]; then
+            # Only GitHub's own "Not Found" answer, or the body's exact
+            # "status":"404" field, means the tag is absent. A message that
+            # merely mentions a 404 — a proxy quoting an upstream error, say —
+            # is not proof that the tag does not exist, so it stops the release
+            # instead of reading as absence.
+            if [[ "$tag_lookup" != *'"status":"404"'* && ! "$tag_lookup" =~ gh:\ Not\ Found\ \(HTTP[[:space:]]404\) ]]; then
               printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
               exit 1
             fi
