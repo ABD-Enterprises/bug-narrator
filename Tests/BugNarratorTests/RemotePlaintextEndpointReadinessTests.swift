@@ -79,14 +79,36 @@ final class RemotePlaintextEndpointReadinessTests: XCTestCase {
             "http://127.0.0.1:8422",
             "http://192.168.1.50:1234/v1",
             "http://10.0.0.5:8080/v1",
-            "http://172.16.4.4:1234/v1",
-            "http://lmstudio:1234/v1",
-            "http://nas.local:1234/v1"
+            "http://172.16.4.4:1234/v1"
         ] {
             let store = makeStore(provider: .localCompatible, baseURL: baseURL)
             XCTAssertNil(
                 store.remotePlaintextEndpointIssue,
                 "\(baseURL) is the local-provider path this feature must not break."
+            )
+        }
+    }
+
+    /// A `.local` name or a single-label name is resolved over mDNS, which any
+    /// device on the local network can answer, so it is refused for plaintext
+    /// HTTP even though it looks local.
+    func testUnqualifiedLocalNamesAreRefused() {
+        for baseURL in [
+            "http://lmstudio:1234/v1",
+            "http://nas.local:1234/v1",
+            "http://myserver.local:8080/v1"
+        ] {
+            let store = makeStore(provider: .localCompatible, baseURL: baseURL)
+            let issue = store.remotePlaintextEndpointIssue
+
+            XCTAssertNotNil(issue, "\(baseURL) must not be trusted for plaintext HTTP.")
+            XCTAssertFalse(
+                store.aiProviderConfigurationIsReady,
+                "\(baseURL) must not be ready: the API key would cross the network in the clear."
+            )
+            XCTAssertTrue(
+                issue?.contains("192.168.1.20") ?? false,
+                "The message has to name the fix, because the user is looking at a field they believe is correct: \(issue ?? "")"
             )
         }
     }
