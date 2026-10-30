@@ -51,12 +51,21 @@ fi
 gate_output="$(mktemp)"
 trap 'rm -f "$gate_output"' EXIT
 
-if VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK=1 "$GATE" "bogus-nonexistent-ref" >"$gate_output" 2>&1; then
+# AI_VALIDATOR_BASE_REF takes precedence over the argument in validate.sh, so
+# it has to be cleared for the bogus ref to be the one the gate sees.
+if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK=1 \
+  "$GATE" "bogus-nonexistent-ref" >"$gate_output" 2>&1; then
   printf 'FAIL: validate.sh accepted a base ref that does not exist\n' >&2
   exit 1
 fi
 if grep -q 'no scannable changed files' "$gate_output"; then
   printf 'FAIL: validate.sh reported a clean scan for a base ref that does not exist\n' >&2
+  exit 1
+fi
+# The gate has to have failed for the right reason: an earlier failure would
+# make both assertions above vacuously true.
+if ! grep -q 'could not diff against' "$gate_output"; then
+  printf 'FAIL: validate.sh failed for an unrelated reason, not the diff check\n' >&2
   exit 1
 fi
 

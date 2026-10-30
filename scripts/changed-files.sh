@@ -22,7 +22,10 @@ cd "$ROOT"
 
 BASE_REF="${1:-}"
 if [[ -z "$BASE_REF" ]]; then
-  exit 0
+  # An empty base ref is not "nothing changed": it is a caller that did not
+  # supply one. Exit non-zero so it cannot be mistaken for an empty diff.
+  printf 'error: a base ref is required\n' >&2
+  exit 1
 fi
 
 # core.quotePath=false keeps non-ASCII paths printable. With the default
