@@ -16,5 +16,6 @@
   { "url": "http://::1/v1", "host": "::1", "trusted": true, "note": "the loopback, written without brackets" },
   { "url": "http://::1:8080/v1", "host": "::1:8080", "trusted": false, "note": "the whole authority is an address, and it is not the loopback" },
   { "url": "http://fe80::1:8080/v1", "host": "fe80::1:8080", "trusted": true, "note": "the whole authority is a link-local address" },
-  { "url": "http://fe80::1%en0/v1", "host": "fe80::1%en0", "trusted": true, "note": "a zone id names the interface, not another address" }
+  { "url": "http://fe80::1%en0/v1", "host": "fe80::1%en0", "trusted": true, "note": "a zone id names the interface, not another address" },
+  { "url": "/http://8.8.8.8/v1", "host": "8.8.8.8", "trusted": false, "note": "the value is trimmed of a leading slash, and the host is still a public address" }
 ]

@@ -648,13 +648,18 @@ final class SettingsStore: ObservableObject {
     /// would use for it, because that is the URL it will actually send to.
     static func plaintextHTTPHost(from rawValue: String, normalized: URL?) -> String? {
         let text = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.contains("://") else {
+        guard let schemeRange = text.range(of: "://") else {
             guard let normalized else { return nil }
             return plaintextHTTPHost(of: normalized)
         }
 
-        guard let schemeRange = text.range(of: "://"),
-              text[..<schemeRange.lowerBound].lowercased() == "http",
+        // The value is trimmed of "/" at both ends before the app builds the
+        // URL from it, so a leading "/" is not part of the scheme. Reading
+        // the scheme as "/http" would let a public plaintext host through.
+        let scheme = text[..<schemeRange.lowerBound]
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        guard scheme == "http",
               let host = hostAsWritten(text),
               !host.isEmpty else {
             return nil

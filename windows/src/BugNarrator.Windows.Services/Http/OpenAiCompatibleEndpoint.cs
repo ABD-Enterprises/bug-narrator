@@ -542,30 +542,33 @@ public static class OpenAiCompatibleEndpoint
 
         var text = configuredBaseUrl.Trim();
 
-        if (Uri.TryCreate(text, UriKind.Absolute, out var parsed))
+        Uri? parsed = null;
+        if (!Uri.TryCreate(text, UriKind.Absolute, out parsed))
         {
-            if (!string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            // A URL whose text does not yield a host is judged by the host
-            // .NET parsed, so the refusal is never silently dropped.
-            var host = HostAsWritten(text) ?? parsed.Host;
-            return host is null || IsLocalEndpointHost(host) ? null : host;
+            parsed = null;
         }
 
-        // The URL does not parse. The scheme and the host can still be read
-        // out of the text.
+        // The scheme is read out of the text the user wrote, because that is
+        // what the macOS port reads and because .NET does not always parse
+        // the text the way the user meant it: on Unix it reads
+        // "/http://example.com" as a file path. A leading "/" is not part of
+        // the scheme either - the macOS port trims the value of "/" at both
+        // ends before it builds the URL from it, and reading the scheme as
+        // "/http" would let a public plaintext host through on either port.
         var schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
-        if (schemeEnd <= 0
-            || !string.Equals(text[..schemeEnd], Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        var scheme = schemeEnd > 0
+            ? text[..schemeEnd].Trim('/')
+            : parsed?.Scheme;
+        if (scheme is null
+            || !string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var hostAsWritten = HostAsWritten(text);
-        return hostAsWritten is null || IsLocalEndpointHost(hostAsWritten) ? null : hostAsWritten;
+        // A URL whose text does not yield a host is judged by the host .NET
+        // parsed, so the refusal is never silently dropped.
+        var host = HostAsWritten(text) ?? parsed?.Host;
+        return host is null || IsLocalEndpointHost(host) ? null : host;
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)
