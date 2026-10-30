@@ -135,13 +135,18 @@ For broad public distribution outside your own Mac, you should use `Developer ID
 
 BugNarrator's canonical notarization identity is:
 
-- Apple ID: `abdeffenderfer@icloud.com`
-- Team ID: `2R4WAH4R53`
-- Local keychain profile: `BugNarratorNotary`
+- Apple ID: `<notary Apple ID>`
+- Team ID: `<team ID>`
+- Local keychain profile: `<notary profile name>`
+
+Those values are the defaults inside `scripts/build_dmg.sh`; this document
+deliberately does not repeat them, because it is committed to a public
+repository and `AGENTS.md` forbids copying the signing and notarization
+settings into docs. Read them from the script.
 
 Do not store the app-specific password in the repo. Keep it only in:
 
-- 1Password item `Apple Notarytool - BugNarratorNotary`
+- 1Password item `<password-manager item name>`
 - GitHub repository secret `APPLE_APP_SPECIFIC_PASSWORD`
 
 If the password is rotated, update both of those locations before the next release.
@@ -149,9 +154,9 @@ If the password is rotated, update both of those locations before the next relea
 First, store a notarization credential profile in your keychain:
 
 ```bash
-xcrun notarytool store-credentials BugNarratorNotary \
-  --apple-id abdeffenderfer@icloud.com \
-  --team-id 2R4WAH4R53 \
+xcrun notarytool store-credentials "<notary profile name>" \
+  --apple-id "<notary Apple ID>" \
+  --team-id "<team ID>" \
   --password YOUR_APP_SPECIFIC_PASSWORD
 ```
 
@@ -161,10 +166,10 @@ Then build, notarize, staple, and validate in one command:
 CODE_SIGNING_ALLOWED=YES \
 CODE_SIGN_STYLE=Automatic \
 CODE_SIGN_IDENTITY=\"Developer ID Application\" \
-DEVELOPMENT_TEAM=2R4WAH4R53 \
+DEVELOPMENT_TEAM="<team ID>" \
 ALLOW_PROVISIONING_UPDATES=YES \
 NOTARIZE=YES \
-NOTARY_PROFILE=BugNarratorNotary \
+NOTARY_PROFILE="<notary profile name>" \
 ./scripts/build_dmg.sh
 ```
 
@@ -178,7 +183,7 @@ Example signed-only internal build:
 ```bash
 CODE_SIGNING_ALLOWED=YES \
 CODE_SIGN_IDENTITY="Developer ID Application" \
-DEVELOPMENT_TEAM=2R4WAH4R53 \
+DEVELOPMENT_TEAM="<team ID>" \
 NOTARIZE=NO \
 ./scripts/build_dmg.sh
 ```
@@ -188,9 +193,9 @@ Example "try notarization, but keep the signed artifact if Apple blocks notariza
 ```bash
 CODE_SIGNING_ALLOWED=YES \
 CODE_SIGN_IDENTITY="Developer ID Application" \
-DEVELOPMENT_TEAM=2R4WAH4R53 \
+DEVELOPMENT_TEAM="<team ID>" \
 NOTARIZE=YES \
-NOTARY_PROFILE=BugNarratorNotary \
+NOTARY_PROFILE="<notary profile name>" \
 ALLOW_NOTARIZATION_FAILURE=YES \
 ./scripts/build_dmg.sh
 ```
@@ -212,15 +217,15 @@ Because BugNarrator targets macOS 14 or later, the shipped app now uses ScreenCa
 
 ## Example Public Release Command
 
-If your local Mac already has a `Developer ID Application` certificate and a `BugNarratorNotary` profile configured, this is the practical public-release command:
+If your local Mac already has a `Developer ID Application` certificate and a `<notary profile name>` profile configured, this is the practical public-release command:
 
 ```bash
 CODE_SIGNING_ALLOWED=YES \
 CODE_SIGN_IDENTITY="Developer ID Application" \
-DEVELOPMENT_TEAM=2R4WAH4R53 \
+DEVELOPMENT_TEAM="<team ID>" \
 ALLOW_PROVISIONING_UPDATES=YES \
 NOTARIZE=YES \
-NOTARY_PROFILE=BugNarratorNotary \
+NOTARY_PROFILE="<notary profile name>" \
 ./scripts/build_dmg.sh
 ```
 

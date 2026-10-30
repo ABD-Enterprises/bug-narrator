@@ -122,7 +122,7 @@ but the idle cost is the same either way.
 7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
 8. If you try to launch BugNarrator a second time, macOS should bring the existing BugNarrator instance forward instead of opening another menu bar copy.
 
-BugNarrator releases are signed with a `Developer ID Application` certificate (Team ID `2R4WAH4R53`), notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
+BugNarrator releases are signed with a `Developer ID Application` certificate, notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
 
 ## Quick Start
 

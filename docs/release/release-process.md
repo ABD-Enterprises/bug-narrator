@@ -55,9 +55,9 @@ gate verifies that entitlement is present after final signing.
 The build is not tied to this machine beyond credentials. Another Mac needs:
 
 - Xcode with the matching toolchain, and `DEVELOPER_DIR` pointed at it
-- the `Developer ID Application` certificate + private key for team `2R4WAH4R53`
+- the `Developer ID Application` certificate + private key for the team in `scripts/build_dmg.sh`
   imported into the login keychain
-- a `notarytool` keychain profile named `BugNarratorNotary`
+- a `notarytool` keychain profile named as in `scripts/build_dmg.sh`
 - `python3` (the script bootstraps its own `dmgbuild` virtualenv)
 - Python 3.12 and `ffmpeg` when building the standalone Parakeet server
 - network access for an uncached Parakeet model; packaged smoke testing allows up to 10 minutes for the initial preload
