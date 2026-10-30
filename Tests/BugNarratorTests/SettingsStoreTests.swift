@@ -544,8 +544,35 @@ final class SettingsStoreTests: XCTestCase {
         for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com",
                        // A `.local` or single-label name resolves over mDNS, so
                        // it is not an address the app can check.
-                       "myserver.local", "nas.local", "lmstudio"] {
+                       "myserver.local", "nas.local", "lmstudio",
+                       // An address written in another notation is not parsed as
+                       // an address either, so it is not trusted.
+                       "134744072", "0x7f000001"] {
             XCTAssertFalse(SettingsStore.isLocalEndpointHost(remote), "expected \(remote) to be remote")
+        }
+    }
+
+    /// The trusted names are the ones the standards reserve for the loopback:
+    /// `localhost` and the names under it. A name that merely *looks* like it
+    /// points at this machine is not one of them.
+    ///
+    /// `localhost.localdomain` is the obvious example. It is a Debian
+    /// convention that lives in `/etc/hosts`, not a reserved name: a resolver
+    /// on the network can answer it with any address it likes, so the app
+    /// cannot tell where it points and must not treat it as local.
+    func testOnlyTheReservedLocalhostNamesAreTrusted() {
+        for trusted in ["localhost", "app.localhost", "LOCALHOST", "App.LocalHost"] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: the standards reserve it for the loopback"
+            )
+        }
+
+        for untrusted in ["localhost.localdomain", "myhost.localhost.example.com", "notlocalhost"] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: it is not a reserved name"
+            )
         }
     }
 
