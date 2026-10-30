@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [INTERNAL] The first-run recording gating now says what it does on both ports. The rule that a missing AI provider leaves the user unable to *transcribe* was called `blocksRecording` on macOS and `BlocksRecording` on Windows, although recording was never gated by the provider on either platform: a session can be recorded and saved without one and waits for the provider. The rules are renamed to `blocksTranscription` / `BlocksTranscription`, and the parity matrix gains a row for the contract, which it did not track.
+
 - [SECURITY] The Windows HTTP layer no longer writes an unbounded server response into the log. The body of a failed request is read with a bound of 64 KiB, and the message that reaches the diagnostics log is cut to 2 KiB with its control characters replaced, so a server that answers with a huge or hostile body can neither fill the log file nor forge a log line. A successful response is still read in full, because the transcript, the extracted issues and the created issue are parsed out of it. The local transcription server's health probe reads its body with the same bound.
 
 - [SECURITY] Plaintext HTTP to a local provider is only allowed to an address the app can check. A `.local` name and a single-label name such as `lmstudio` are resolved over mDNS, which any device on the local network can answer, so a name that looks local could point anywhere and carry the API key and the recordings in the clear; Apple's `NSAllowsLocalNetworking` gives no protection for them either. The exemption now covers loopback, private-range and link-local addresses only, and the refusal names the fix — point the setting at the machine's IP address. The Windows port carries the same classifier and is tracked separately (#1268).
