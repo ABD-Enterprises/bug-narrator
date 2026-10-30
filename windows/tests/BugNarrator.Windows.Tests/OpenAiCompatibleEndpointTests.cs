@@ -147,10 +147,80 @@ public sealed class OpenAiCompatibleEndpointTests
     [Fact]
     public void PlaintextRemoteWarning_NamesAHostTheAppCannotCheckAsLocal()
     {
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://jira.example.com:1234/v1");
+
+        Assert.NotNull(warning);
+        Assert.Contains("cannot check as a local address", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", warning, StringComparison.Ordinal);
+        Assert.Contains("API key and transcript text would be sent unencrypted", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// .NET normalises a legacy IPv4 notation when it parses a URL, so a host
+    /// written as a single number arrives as the dotted quad it stands for. The
+    /// app then knows where it points and can call it remote. The address is
+    /// refused either way, which is the part that matters.
+    /// </summary>
+    [Fact]
+    public void PlaintextRemoteWarning_RefusesANumericAddressWrittenInAnotherNotation()
+    {
         var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://134744072:1234/v1");
 
         Assert.NotNull(warning);
-        Assert.Contains("not an address this app can check as local", warning, StringComparison.Ordinal);
+        Assert.Contains("remote host", warning, StringComparison.Ordinal);
+        Assert.Contains("API key and transcript text would be sent unencrypted", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// An address the app parsed and found to be public is remote, and the
+    /// refusal says so and names what would cross the network in the clear.
+    /// </summary>
+    [Fact]
+    public void PlaintextRemoteWarning_CallsAPublicAddressRemote()
+    {
+        var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://8.8.8.8:1234/v1");
+
+        Assert.NotNull(warning);
+        Assert.Contains("remote host", warning, StringComparison.Ordinal);
+        Assert.Contains("API key and transcript text would be sent unencrypted", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A public address is one the app could parse and found to be somewhere
+    /// else. A local address is not public, and a host in another notation is
+    /// not parseable at all, so the app cannot call it public either.
+    /// </summary>
+    [Theory]
+    [InlineData("8.8.8.8")]
+    [InlineData("203.0.113.10")]
+    [InlineData("172.32.0.1")]
+    public void IsPublicAddress_DetectsPublicAddresses(string host)
+    {
+        Assert.True(OpenAiCompatibleEndpoint.IsPublicAddress(host));
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("10.1.2.3")]
+    [InlineData("192.168.1.10")]
+    [InlineData("169.254.1.1")]
+    [InlineData("172.16.0.1")]
+    [InlineData("example.com")]
+    [InlineData("134744072")]   // an address in another notation: not parseable
+    [InlineData("999.1.1.1")]   // not an octet
+    [InlineData("")]
+    public void IsPublicAddress_RejectsLocalAndUnparseableHosts(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsPublicAddress(host));
+    }
+
+    /// <summary>
+    /// The empty host is not an address literal.
+    /// </summary>
+    [Fact]
+    public void IsNumericAddressLiteral_RejectsTheEmptyHost()
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsNumericAddressLiteral(string.Empty));
     }
 
     /// <summary>
