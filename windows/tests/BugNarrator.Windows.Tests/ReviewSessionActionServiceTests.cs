@@ -52,6 +52,24 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         Assert.False(Directory.Exists(saved.SessionDirectory));
     }
 
+    [Fact]
+    public async Task JiraExport_RefusesRemotePlaintextBeforeCallingTheExportService()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        settingsStore.JiraBaseUrl = "http://jira.example.com";
+        secretStore.Values[SecretKeys.JiraEmail] = "fixture@example.com";
+        secretStore.Values[SecretKeys.JiraApiToken] = "fixture-token";
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ExportSelectedIssuesToJiraAsync(session));
+        Assert.Contains("https://", failure.Message);
+        Assert.Equal(0, issueExportService.JiraCallCount);
+
+        settingsStore.JiraBaseUrl = "https://jira.example.com";
+        await service.ExportSelectedIssuesToJiraAsync(session);
+        Assert.Equal(1, issueExportService.JiraCallCount);
+    }
+
     private readonly FileCompletedSessionStore completedSessionStore;
     private readonly string rootDirectory;
     private readonly FakeIssueExportService issueExportService;
@@ -319,9 +337,12 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             JiraExportConfiguration configuration,
             CancellationToken cancellationToken = default)
         {
+            JiraCallCount++;
             IReadOnlyList<IssueExportResult> results = Array.Empty<IssueExportResult>();
             return Task.FromResult(results);
         }
+
+        public int JiraCallCount { get; private set; }
     }
 
     private sealed class FakeTranscriptionClient : ITranscriptionClient
@@ -398,6 +419,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private sealed class FakeWindowsAppSettingsStore : IWindowsAppSettingsStore
     {
         public string AiProvider { get; set; } = WindowsAiProviderProfile.Default.StorageValue;
+        public string JiraBaseUrl { get; set; } = "https://acme.atlassian.net/";
 
         public ValueTask<WindowsAppSettings> LoadAsync(CancellationToken cancellationToken = default)
         {
@@ -412,7 +434,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
                 GitHubRepositoryOwner: "acme",
                 GitHubRepositoryName: "bugnarrator",
                 GitHubDefaultLabels: "bug, triage",
-                JiraBaseUrl: "https://acme.atlassian.net/",
+                JiraBaseUrl: JiraBaseUrl,
                 JiraProjectKey: "BN",
                 JiraIssueType: "Task"));
         }
