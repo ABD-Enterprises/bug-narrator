@@ -576,6 +576,64 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// The IPv6 loopback and link-local addresses can be written in more than
+    /// one way, and the app has to recognise all of them: `0:0:0:0:0:0:0:1`
+    /// is the same address as `::1`, and `::ffff:127.0.0.1` is the loopback
+    /// written as an IPv4-mapped IPv6 address. Comparing the strings would
+    /// refuse a local endpoint the user can reach.
+    func testEverySpellingOfTheIPv6LocalAddressesIsTrusted() {
+        for trusted in [
+            "::1",
+            "0:0:0:0:0:0:0:1",
+            "::0001",
+            "fe80::1",
+            "fe80::1%en0",
+            "::ffff:127.0.0.1",
+            "::ffff:10.1.2.3"
+        ] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: it is a loopback or link-local address"
+            )
+        }
+
+        for untrusted in [
+            "::2",                       // another host on the internet
+            "::ffff:8.8.8.8",           // a public address, mapped
+            "2001:db8::1"               // a documentation address
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted"
+            )
+        }
+    }
+
+    /// `0.0.0.0` is this machine, not a remote host: a connection to it
+    /// reaches the loopback interface. Calling it remote would be a claim
+    /// the app cannot make, and refusing it would block a setup that works.
+    func testTheUnspecifiedAddressIsThisMachine() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("0.0.0.0"),
+            "0.0.0.0 reaches this machine"
+        )
+        XCTAssertFalse(
+            SettingsStore.isPublicAddress("0.0.0.0"),
+            "0.0.0.0 is not a remote host"
+        )
+    }
+
+    /// The multicast and broadcast addresses are not addressed to a host on
+    /// the public internet either, so the app must not call them remote.
+    func testTheMulticastAndBroadcastAddressesAreNotCalledRemote() {
+        for special in ["224.0.0.1", "239.255.255.250", "255.255.255.255"] {
+            XCTAssertFalse(
+                SettingsStore.isPublicAddress(special),
+                "expected \(special) not to be called a remote host"
+            )
+        }
+    }
+
     /// An address has to be spelled the way an address is written, because the
     /// app and the network have to read the host the same way.
     ///

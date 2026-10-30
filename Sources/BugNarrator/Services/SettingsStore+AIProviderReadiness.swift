@@ -38,14 +38,12 @@ extension SettingsStore {
             return nil
         }
 
-        if SettingsStore.isUnqualifiedLocalName(host) {
-            return SettingsStore.unqualifiedLocalHostPlaintextMessage(
-                host: host,
-                secret: "API key and recordings"
-            )
-        }
-        return "Use https:// for \(host), or point this at a local address. "
-            + "Over plaintext HTTP your API key and your recordings would cross the network unencrypted."
+        return SettingsStore.plaintextTransportRefusal(
+            host: host,
+            subject: "This endpoint",
+            secret: "API key and transcript text",
+            localNoun: "endpoint"
+        )
     }
 
     var aiProviderConfigurationIsReady: Bool {

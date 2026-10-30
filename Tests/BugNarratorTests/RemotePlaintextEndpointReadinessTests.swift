@@ -113,6 +113,28 @@ final class RemotePlaintextEndpointReadinessTests: XCTestCase {
         }
     }
 
+    /// The field the user types the URL into and the message that blocks the
+    /// request have to describe the same host the same way. The user is
+    /// looking at both on the same screen, and two different descriptions of
+    /// one host means one of them is wrong.
+    func testTheWarningAndTheBlockingIssueDescribeTheSameHostTheSameWay() {
+        for baseURL in [
+            "http://8.8.8.8/v1",         // a parsed public address
+            "http://134744072/v1",       // an address the app cannot parse
+            "http://nas.local:8080/v1"   // a name any device on the network can claim
+        ] {
+            let store = makeStore(provider: .openAICompatible, baseURL: baseURL)
+
+            XCTAssertNotNil(store.aiBaseURLPlaintextWarning, "expected a warning for \(baseURL)")
+            XCTAssertNotNil(store.remotePlaintextEndpointIssue, "expected a blocking issue for \(baseURL)")
+            XCTAssertEqual(
+                store.aiBaseURLPlaintextWarning,
+                store.remotePlaintextEndpointIssue,
+                "the field and the blocking message have to describe \(baseURL) the same way"
+            )
+        }
+    }
+
     func testRemoteHTTPSIsAllowed() {
         let store = makeStore(provider: .openAICompatible, baseURL: "https://api.example.com/v1")
         XCTAssertNil(store.remotePlaintextEndpointIssue)
