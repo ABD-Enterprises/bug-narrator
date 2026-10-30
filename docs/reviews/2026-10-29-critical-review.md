@@ -5,7 +5,7 @@
 **Status:** snapshot. `main` moved during and after the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. Two have moved: [P2-2](#p2-2--the-windows-jira-export-drops-the-base-urls-context-path-fixed-by-1245) was fixed by #1245, and [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) was partly fixed by #1239. Everything else was still open at the time of writing.
 **Scope:** whole repository — Swift macOS app (`Sources/BugNarrator`, 248 files / 36,455 LOC), tests (`Tests/`, 119 files / 26,323 LOC), Windows port (`windows/`, .NET 8 / WPF), local transcription server (`local-transcription/`, Python), CI/CD (`.github/workflows/`, 5 workflows), release automation (`scripts/`, 19 scripts), docs site (`site/`, Docusaurus).
 **Method:** five parallel read-only review passes (Swift security; Swift maintainability + UX; Python transcription server; Windows C# port; CI/CD + scripts + docs site + repo hygiene), plus independent line-by-line re-verification of every P0/P1 claim by the parent agent, plus live read-only GitHub API queries (`gh api`, `gh run list`, `gh release list`).
-**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*. Of the P2s, one (P2-2) has since been fixed; the other seven are open.
+**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*. Of the P2s, one (P2-2) has since been fixed and one (P2-6) is partly fixed; the other six are open.
 
 > **Status.** This is a point-in-time audit, committed as a reference for follow-up
 > work. It is not a product document and describes a snapshot at `c8c0070`; it
@@ -412,7 +412,7 @@ base='https://jira.example.com/jira/'     -> https://jira.example.com/jira/rest/
 base='https://acme.atlassian.net/'        -> https://acme.atlassian.net/rest/api/3/issue
 ```
 
-macOS got this right — `Sources/BugNarrator/Services/SettingsStore+Normalization.swift:16-21` trims trailing `/` and the URL is built with `appending(path:)`, which appends:
+macOS got this right — `Sources/BugNarrator/Services/SettingsStore+Normalization.swift:16-20` trims `/` from both ends and the URL is built with `appending(path:)`, which appends:
 
 ```swift
     var normalizedJiraBaseURL: String {
@@ -439,10 +439,9 @@ macOS got this right — `Sources/BugNarrator/Services/SettingsStore+Normalizati
     }
 ```
 
-It ships with regression tests in `windows/tests/BugNarrator.Windows.Tests/Export/IssueExportProviderTests.cs`. The approach differs slightly from the one this finding suggested (normalising inside `AppendPathSegment` rather than at base-URL normalization); the behaviour is the same, and the fix is the smaller change.
+It ships with regression tests in `windows/tests/BugNarrator.Windows.Tests/IssueExportProviderTests.cs`. The approach differs slightly from the one this finding suggested (normalising inside `AppendPathSegment` rather than at base-URL normalization); the behaviour is the same, and the fix is the smaller change.
 
 **Nothing further is required for this finding.** It is recorded here for traceability.
-
 
 ---
 
