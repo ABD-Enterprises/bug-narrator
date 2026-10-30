@@ -15,6 +15,11 @@
 # some other job in the same file still had one — which is exactly the
 # ungated release the gate exists to prevent.
 #
+# The environment the gate checks is taken from the gate step itself. A job
+# level `env:` applies to every step, but a step level `env:` wins over it,
+# so a decoy step elsewhere in the job must not be able to satisfy the check
+# for a gate step that checks something else.
+#
 # It also pins that the gate runs *before* the release is published, that it
 # runs as a command (a comment that mentions the script is not a run of it),
 # that the command is the gate and nothing else (a step that swallows the
@@ -25,7 +30,10 @@
 # It proves itself: a drifted name, a step that stopped running the gate, a
 # gate that runs too late, a gate that cannot fail the job and a check script
 # with a baked-in name all have to be rejected, or the check would be
-# decoration.
+# decoration. A publishing job that is not recognised as one — because it
+# publishes with `gh release edit`, with a line continued command, or with a
+# path split across quotes — has to be rejected too, or the guarantee would
+# only hold for the commands it happens to know.
 #
 # It runs as part of scripts/validate.sh, so a drifted name fails the gate
 # before a release is dispatched rather than during one.
@@ -75,12 +83,14 @@ read_values() {
 }
 
 # Prints one record per job of a workflow file:
-#   job|environment values|publishes|publish step|runs the gate|gate step|checked names|cannot fail
+#   job|environment values|job environment values|publishes|publish step|runs
+#   the gate|gate step|checked names|cannot fail
 #
 # The environment values and the checked names are space separated lists. The
-# two step numbers are the index of the step that publishes the release and
-# the index of the step that runs the gate; 0 means "not in this job". The
-# last field says the gate step could not fail the job.
+# three step numbers are the index of the step that publishes the release, the
+# index of the step that runs the gate and the index of the first step that
+# was judged to publish; 0 means "not in this job". The last field says the
+# gate step could not fail the job.
 parse_jobs() {
     local file="$1"
 
@@ -89,40 +99,91 @@ parse_jobs() {
             if (job != "") {
                 printf "%s|%s|%d|%d|%d|%d|%s|%d\n", job, envs, publishes, publish_step, gate, gate_step, gate_envs, neutered
             }
-            job = ""; envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; neutered = 0
-        }
-        # A step is judged when it ends: its attributes can sit before or
-        # after its run command.
-        function close_step() {
-            if (step_gate) {
-                if (step_conditional || (step_continue != "" && step_continue != "false")) {
-                    neutered = 1
-                }
-                if (gate == 0) { gate = 1; gate_step = step }
-            }
-            if (step_publish && publish_step == 0) { publishes = 1; publish_step = step }
-            step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0
+            job = ""; envs = ""; job_envs = ""; publishes = 0; publish_step = 0; gate = 0; gate_step = 0; gate_envs = ""; neutered = 0
+            pending_environment = 0
         }
         # A command counts only when it runs the thing. A comment that names
         # the script does not run it, and a command that merely mentions it
         # (an echo, a note) does not run it either.
-        function note_run(text) {
-            cmd = text
-            sub(/^[[:space:]]*/, "", cmd)
-            if (cmd ~ /^#/) { return }
+        function test_command(cmd,   c) {
             sub(/^(bash|sh|exec)[[:space:]]+/, "", cmd)
+            c = cmd
+            # Quotes are dropped so a path that is split across quotes is
+            # still one path, and whitespace is collapsed so a command that
+            # is split across lines is still one command.
+            gsub(/["'"'"']/, "", c)
+            gsub(/[[:space:]]+/, " ", c)
             # The command has to be the gate and nothing else. A command that
             # swallows the exit status of the gate — "|| true", "; true", a
             # trailing "&" — would leave the step green when the gate fails,
             # which is the one thing the gate exists to prevent.
-            if (cmd ~ /^(\.\/)?scripts\/check-release-environment\.sh[[:space:]]*$/) {
+            if (c ~ /^(\.\/)?scripts\/check-release-environment\.sh$/) {
                 step_gate = 1
             }
-            # The release is published by creating or replacing it: the gh
-            # release commands, or the API behind them.
-            if (cmd ~ /"?release"?[[:space:],]+"?create/ || cmd ~ /"?release"?[[:space:],]+"?upload/ || cmd ~ /\/releases/) {
+            # The release is published by creating it, by replacing its
+            # assets, or by editing a draft into a published release — and by
+            # the API behind those commands.
+            if (c ~ /(^|[^A-Za-z0-9_])release (create|upload|edit|publish)/) {
                 step_publish = 1
             }
+            if (c ~ /\/releases/) {
+                step_publish = 1
+            }
+        }
+        # The commands of a run block. A command that is continued on the
+        # next line is joined with it, so a release published by a line
+        # continued command is still recognised as one.
+        function classify(text,   n, i, line, cmd, pending, cont, parts) {
+            n = split(text, parts, "\n")
+            cmd = ""
+            pending = 0
+            for (i = 1; i <= n; i++) {
+                line = parts[i]
+                sub(/^[ \t]+/, "", line)
+                if (line == "") { continue }
+                if (line ~ /^#/) { continue }
+                cont = (line ~ /\\$/)
+                sub(/\\$/, "", line)
+                if (cmd == "") {
+                    cmd = line
+                } else if (pending) {
+                    cmd = cmd " " line
+                } else {
+                    test_command(cmd)
+                    cmd = line
+                }
+                pending = cont
+            }
+            if (cmd != "") { test_command(cmd) }
+        }
+        function flush_run() {
+            if (inrun) {
+                classify(run_text)
+            }
+            inrun = 0
+            run_text = ""
+        }
+        # A step is judged when it ends: its attributes can sit before or
+        # after its run command.
+        function close_step() {
+            flush_run()
+            if (step_gate) {
+                if (step_conditional || (step_continue != "" && step_continue != "false")) {
+                    neutered = 1
+                }
+                if (gate == 0) {
+                    gate = 1
+                    gate_step = step
+                    # The environment the gate checks is the one the gate
+                    # step itself sees: its own env, or the job env when the
+                    # step does not set one. A step level env wins over the
+                    # job level one, so a decoy step elsewhere in the job
+                    # cannot stand in for the gate step.
+                    gate_envs = (step_envs != "" ? step_envs : job_envs)
+                }
+            }
+            if (step_publish && publish_step == 0) { publishes = 1; publish_step = step }
+            step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0; step_envs = ""
         }
         /^jobs:[ \t]*$/ { injobs = 1; next }
         injobs && /^[^ \t]/ { close_step(); flush(); injobs = 0; next }
@@ -133,20 +194,41 @@ parse_jobs() {
             # The attributes of the step: a gate that cannot fail the job is
             # not a gate.
             if ($0 ~ /^        continue-on-error:[ \t]*/) {
-                value = $0; sub(/^        continue-on-error:[ \t]*/, "", value); step_continue = value
+                value = $0; sub(/^        continue-on-error:[ \t]*/, "", value)
+                # The value may be quoted; "false" means the same as false.
+                gsub(/["'"'"']/, "", value)
+                step_continue = value
             }
             if ($0 ~ /^        if:[ \t]*/) { step_conditional = 1 }
 
             # A job-level environment: key sits at the job level indentation.
+            # It is either the scalar form or the object form, where the name
+            # is on the next line.
             if ($0 ~ /^    environment:[ \t]*[A-Za-z0-9._-]+/) {
                 value = $0; sub(/^    environment:[ \t]*/, "", value)
                 envs = (envs == "" ? value : envs " " value)
+                pending_environment = 0
+            } else if ($0 ~ /^    environment:[ \t]*$/) {
+                pending_environment = 1
+            } else if (pending_environment && $0 ~ /^      name:[ \t]*[A-Za-z0-9._-]+/) {
+                value = $0; sub(/^      name:[ \t]*/, "", value)
+                envs = (envs == "" ? value : envs " " value)
+                pending_environment = 0
             }
+
             # The environment the gate checks: a real setting, not a comment
-            # that mentions one.
-            if ($0 !~ /^[[:space:]]*#/ && $0 ~ /RELEASE_ENVIRONMENT:[ \t]*[A-Za-z0-9._-]+/) {
-                value = $0; sub(/.*RELEASE_ENVIRONMENT:[ \t]*/, "", value)
-                gate_envs = (gate_envs == "" ? value : gate_envs " " value)
+            # that mentions one. The job level env applies to every step; a
+            # step level env applies to that step alone and wins over it.
+            if ($0 !~ /^[[:space:]]*#/ && $0 ~ /RELEASE_ENVIRONMENT:[ \t]*/) {
+                value = $0
+                sub(/.*RELEASE_ENVIRONMENT:[ \t]*/, "", value)
+                sub(/[ \t]*#.*$/, "", value)
+                sub(/[ \t]+$/, "", value)
+                if ($0 ~ /^      RELEASE_ENVIRONMENT:/) {
+                    if (job_envs == "") { job_envs = value }
+                } else {
+                    if (step_envs == "") { step_envs = value }
+                }
             }
 
             # A step'"'"'s run command, on one line or as a block.
@@ -154,14 +236,14 @@ parse_jobs() {
                 inrun = 1
                 runindent = index($0, "run:") - 1
                 rest = $0; sub(/^[[:space:]]*run:[ \t]*/, "", rest)
-                note_run(rest)
+                run_text = rest
                 next
             }
             if (inrun) {
                 if ($0 ~ /^[[:space:]]*$/) { next }
                 indent = match($0, /[^ \t]/) - 1
                 if (indent > runindent) {
-                    note_run($0)
+                    run_text = run_text "\n" $0
                     next
                 }
                 inrun = 0
@@ -199,13 +281,18 @@ check_tree() {
     done
 
     # Every workflow that runs the gate has to name the environment the same
-    # way, including any workflow added later.
+    # way, including any workflow added later. Only the workflow files
+    # themselves are listed: the copies this script makes of them while it
+    # proves itself are not workflows of the repository.
     local workflows=""
-    if ! workflows="$(grep -rlF -- "$CHECK_SCRIPT_NAME" "$workflow_dir" 2>&1)"; then
-        if [[ -z "$workflows" ]]; then
-            fail "no workflow runs $CHECK_SCRIPT_NAME; the release environment gate would never run."
+    if ! workflows="$(grep -rlF --include='*.yml' --include='*.yaml' -- "$CHECK_SCRIPT_NAME" "$workflow_dir" 2>&1)"; then
+        if [[ -n "$workflows" ]]; then
+            fail "could not list the workflows that run $CHECK_SCRIPT_NAME: $workflows"
         fi
-        fail "could not list the workflows that run $CHECK_SCRIPT_NAME: $workflows"
+        workflows=""
+    fi
+    if [[ -z "$workflows" ]]; then
+        fail "no workflow runs $CHECK_SCRIPT_NAME; the release environment gate would never run."
     fi
 
     while IFS= read -r workflow; do
@@ -240,7 +327,7 @@ check_tree() {
             fi
 
             # A job that runs the gate has to name the environment it checks.
-            if [[ "$gate" == "1" && " $gate_envs " != *" $gate_env "* ]]; then
+            if [[ "$gate" == "1" && "$gate_envs" != "$gate_env" ]]; then
                 fail "$workflow: job \"$job\" runs the environment gate without checking \"$gate_env\"."
             fi
 
@@ -325,6 +412,7 @@ def run_content(step):
     commands = []
     in_block = False
     indent = 0
+    pending = []
     for line in step.split("\n"):
         if not in_block:
             match = re.match(r"^(\s+)run:\s*(.*)$", line)
@@ -345,15 +433,37 @@ def run_content(step):
             continue
         if stripped.startswith("#"):
             continue
+        # A command continued on the next line is one command.
+        if stripped.endswith("\\"):
+            pending.append(stripped[:-1].strip())
+            continue
+        if pending:
+            pending.append(stripped)
+            commands.append(" ".join(pending))
+            pending = []
+            continue
         commands.append(stripped)
+    if pending:
+        commands.append(" ".join(pending))
     return commands
 
 
 def publishes(step):
-    return any(
-        re.search(r"release\"?[\s,]+\"?(create|upload)", command) or "/releases" in command
-        for command in run_content(step)
-    )
+    """Whether a step publishes a release.
+
+    The release is created, replaced or edited into a published release, by
+    the gh commands or by the API behind them. Quotes are dropped so a path
+    split across quotes is still one path, and whitespace is collapsed so a
+    command split across lines is still one command.
+    """
+    for command in run_content(step):
+        collapsed = re.sub(r"[\"']", "", command)
+        collapsed = re.sub(r"\s+", " ", collapsed)
+        if re.search(r"(^|[^A-Za-z0-9_])release (create|upload|edit|publish)", collapsed):
+            return True
+        if "/releases" in collapsed:
+            return True
+    return False
 
 
 head, marker, rest = text.partition("\njobs:\n")
@@ -408,6 +518,13 @@ elif mutation == "continue-on-error":
             lines.insert(line_index, "        continue-on-error: true")
             break
     steps[gate_index] = "\n".join(lines)
+elif mutation == "quoted-continue-on-error":
+    lines = steps[gate_index].split("\n")
+    for line_index, line in enumerate(lines):
+        if line.strip().startswith("run:"):
+            lines.insert(line_index, '        continue-on-error: "false"')
+            break
+    steps[gate_index] = "\n".join(lines)
 elif mutation == "conditional":
     lines = steps[gate_index].split("\n")
     for line_index, line in enumerate(lines):
@@ -415,6 +532,40 @@ elif mutation == "conditional":
             lines.insert(line_index, "        if: false")
             break
     steps[gate_index] = "\n".join(lines)
+elif mutation == "decoy-env":
+    lines = steps[gate_index].split("\n")
+    replaced = False
+    for line_index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("#") or "RELEASE_ENVIRONMENT:" not in stripped:
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        lines[line_index] = indent + "RELEASE_ENVIRONMENT: ${{ vars.RELEASE_ENV }}"
+        replaced = True
+        break
+    if not replaced:
+        print("could not find the environment of the gate step")
+        sys.exit(1)
+    steps[gate_index] = "\n".join(lines)
+    # A decoy step carries the name the gate is supposed to check, so the
+    # file still names exactly one environment.
+    decoy = (
+        "      - name: Decoy\n"
+        "        env:\n"
+        "          RELEASE_ENVIRONMENT: windows-release\n"
+        "        run: echo hi\n"
+    )
+    steps.insert(gate_index + 1, decoy)
+elif mutation == "environment-object-form":
+    job_text, count = re.subn(
+        r"(?m)^(    )environment:([ \t]*)([A-Za-z0-9._-]+)[ \t]*$",
+        r"\1environment:\n\1  name: \3",
+        jobs[job_index],
+    )
+    if count != 1:
+        print("could not rewrite the environment key")
+        sys.exit(1)
+    jobs[job_index] = job_text
 elif mutation == "publish-before":
     early = '      - name: Publish GitHub Release\n        shell: bash\n        run: gh release create "$RELEASE_TAG"\n'
     steps.insert(gate_index, early)
@@ -429,6 +580,25 @@ else:
 jobs[job_index] = "".join(steps)
 open(path, "w", encoding="utf-8").write(head + "\njobs:\n" + "".join(jobs))
 PYTHON
+}
+
+# Appends a job that publishes a release without declaring an environment.
+# The command is the only thing that differs between the cases, so the check
+# has to recognise every one of them as a publishing job.
+append_ungated_publisher() {
+    local file="$1"
+    local command="$2"
+    {
+        printf '\n  ungated-publisher:\n'
+        printf '    runs-on: ubuntu-latest\n'
+        printf '    permissions:\n'
+        printf '      contents: write\n'
+        printf '    steps:\n'
+        printf '      - name: Publish\n'
+        printf '        shell: bash\n'
+        printf '        run: |\n'
+        printf '          %s\n' "$command"
+    } >>"$file"
 }
 
 # A name that no longer matches the job's environment has to be caught.
@@ -512,6 +682,14 @@ if (check_tree "$workspace") >/dev/null 2>&1; then
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 
+# A gate step that checks a different environment, while a decoy step in the
+# same job carries the name the check is looking for, has to be caught.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" decoy-env
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a gate step that checks another environment'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
 # A release published before the gate runs has to be caught.
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" publish-before
 if (check_tree "$workspace") >/dev/null 2>&1; then
@@ -523,6 +701,52 @@ restore_workflow ".github/workflows/windows-tester-release.yml"
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" move-after-publish
 if (check_tree "$workspace") >/dev/null 2>&1; then
     fail 'the wiring check accepted a gate that runs after the release'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A publishing job that publishes a draft into a published release has to be
+# caught: it is a publishing job without an environment. The commands are
+# written as the shell would see them, so the dollar signs stay literal.
+# shellcheck disable=SC2016
+append_ungated_publisher "$workspace/.github/workflows/windows-tester-release.yml" \
+    'gh release edit "$RELEASE_TAG" --draft=false'
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a publishing job that publishes with gh release edit'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A publishing job whose release command is continued on the next line has to
+# be caught.
+# shellcheck disable=SC2016
+append_ungated_publisher "$workspace/.github/workflows/windows-tester-release.yml" \
+    'gh release \
+            create "$RELEASE_TAG"'
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a publishing job with a continued release command'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A publishing job whose release path is split across quotes has to be caught.
+# shellcheck disable=SC2016
+append_ungated_publisher "$workspace/.github/workflows/windows-tester-release.yml" \
+    'gh api "repos/$GITHUB_REPOSITORY"/"releases" --method POST'
+if (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check accepted a publishing job with a split release path'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# The object form of the environment key is valid, so it has to be accepted.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" environment-object-form
+if ! (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check rejected the object form of the environment key'
+fi
+restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# A quoted "false" is the same as false, so the gate step can still fail the
+# job and the workflow has to be accepted.
+mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" quoted-continue-on-error
+if ! (check_tree "$workspace") >/dev/null 2>&1; then
+    fail 'the wiring check rejected a quoted continue-on-error of false'
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
 

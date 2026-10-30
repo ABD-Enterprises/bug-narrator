@@ -243,6 +243,26 @@ jobs:
             gh "${edit_args[@]}"
             exit 0
           fi
+          # The tag is checked once more here. `gh release create --target` is
+          # ignored when the tag already exists, so a tag created between the
+          # guard step and this one would be published with its own commit
+          # instead of the one these binaries were built from.
+          tag_error="$(mktemp)"
+          trap 'rm -f "$tag_error"' EXIT
+          tagged=""
+          if ! tagged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha 2>"$tag_error")"; then
+            # A missing tag is the normal case for a first release. Any other
+            # failure has to stop the release rather than read as absence.
+            if ! grep -qE '^gh: .*\(HTTP 404\)$' "$tag_error"; then
+              printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$(cat "$tag_error")" >&2
+              exit 1
+            fi
+            tagged=""
+          fi
+          if [[ -n "$tagged" && "$tagged" != "$GITHUB_SHA" ]]; then
+            printf '::error::Tag %s points at %s but this run built %s; refusing to publish it.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA" >&2
+            exit 1
+          fi
           # The tag is created at the commit that produced the binaries, never at the default branch.
           args=(release create "$RELEASE_TAG" "${files[@]}"
                 --repo "$GITHUB_REPOSITORY"
