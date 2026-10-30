@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+import os
 from pathlib import Path
 import shutil
 import signal
@@ -16,6 +17,34 @@ import wave
 from unittest.mock import call, patch
 
 import server
+
+
+def _make_request(disconnected: bool = False):
+    """A minimal Starlette request for driving the route without a socket.
+
+    A connected request never delivers a message, so the route's disconnect
+    watcher keeps seeing a live client; a disconnected one reports the
+    disconnect on the first poll, the way uvicorn does when the peer closes
+    the connection (#1229).
+    """
+    from starlette.requests import Request
+
+    async def receive():
+        if disconnected:
+            return {"type": "http.disconnect"}
+        await asyncio.sleep(3600)
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/v1/audio/transcriptions",
+            "headers": [],
+            "query_string": b"",
+        },
+        receive,
+    )
 
 
 class ServerModelConfigurationTests(unittest.TestCase):
@@ -451,7 +480,13 @@ server._serve("127.0.0.1", {port})
 
         upload = UploadFile(io.BytesIO(b"\x00\x00\x00\x18ftypM4A "), filename="clip.m4a")
         with patch.object(server, "get_model", return_value=NeverCalled()):
-            response = asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
+            response = asyncio.run(
+                server.transcribe(
+                    request=_make_request(),
+                    file=upload,
+                    model="parakeet-tdt-0.6b-v3",
+                )
+            )
 
         body = json.loads(response.body)
         self.assertEqual(response.status_code, 400)
@@ -466,7 +501,7 @@ server._serve("127.0.0.1", {port})
         payload = b"\x00" * (3 * server._upload_piece_bytes + 17)
         seen = {}
 
-        def fake_run_inference(_model_id, path):
+        def fake_run_inference(_model_id, path, _cancel_event=None):
             seen["bytes"] = Path(path).read_bytes()
             return server._Transcription("ok", [])
 
@@ -482,7 +517,11 @@ server._serve("127.0.0.1", {port})
 
         with patch.object(server, "_run_inference", side_effect=fake_run_inference):
             response = asyncio.run(
-                server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3")
+                server.transcribe(
+                    request=_make_request(),
+                    file=upload,
+                    model="parakeet-tdt-0.6b-v3",
+                )
             )
 
         self.assertEqual(response.status_code, 200)
@@ -644,6 +683,269 @@ server._serve("127.0.0.1", {port})
             shared = next(line for line in runtime if line.startswith(pin))
             version = shared.split("==")[1]
             self.assertIn(f"{pin.split('[')[0].rstrip('=')}=={version}", contents)
+
+
+class ServerMemoryLifecycleTests(unittest.TestCase):
+    """The memory lifecycle the local server owes a long recording (#1229).
+
+    Peak memory must not grow with the recording, a cancelled or refused job must
+    give its memory back, and the operator must be able to bound both.
+    """
+
+    def tearDown(self):
+        server._model = None
+        server._model_name = None
+        server._idle_check_interval_seconds = 5.0
+        server.configure_window_seconds(120)
+        server.configure_memory_limits()
+
+    # ---- cancelling a job ----
+
+    def test_mlx_transcription_stops_at_a_window_boundary_when_the_client_disconnects(self):
+        class RecordingModel:
+            def __init__(self):
+                self.calls = 0
+
+            def transcribe(self, path, **kwargs):
+                self.calls += 1
+                return type("Result", (), {"text": "hello.", "sentences": []})()
+
+        cancel_event = threading.Event()
+        model = RecordingModel()
+        decoded = []
+
+        def decode(_path, start):
+            decoded.append(start)
+            cancel_event.set()  # the client goes away right after the first window
+            return "/tmp/window.wav"
+
+        with (
+            patch.object(server, "_decode_audio_window", side_effect=decode),
+            patch.object(server, "_release_accelerator_cache") as release,
+        ):
+            with self.assertRaises(server.TranscriptionCancelled):
+                server._transcribe_mlx(model, "/tmp/fixture.m4a", cancel_event)
+
+        # The job stops before the next window is decoded, and the cache is
+        # released on the way out.
+        self.assertEqual(decoded, [0])
+        self.assertEqual(model.calls, 1)
+        self.assertGreaterEqual(release.call_count, 2)
+
+    def test_onnx_transcription_stops_at_a_window_boundary_when_the_client_disconnects(self):
+        class NeverCalled:
+            def recognize(self, *args, **kwargs):
+                raise AssertionError("inference must not run after the client left")
+
+        cancel_event = threading.Event()
+        cancel_event.set()
+
+        with patch.object(server, "_wav_windows", return_value=[(b"", 16000, 0.0)]):
+            with self.assertRaises(server.TranscriptionCancelled):
+                server._transcribe_onnx(NeverCalled(), "/tmp/fixture.wav", cancel_event)
+
+    def test_the_route_reports_a_cancelled_job(self):
+        import io
+
+        from fastapi import UploadFile
+
+        def cancelled(_model_id, _path, _cancel_event):
+            raise server.TranscriptionCancelled("the client disconnected")
+
+        upload = UploadFile(io.BytesIO(b"\x00" * 16), filename="clip.m4a")
+        with patch.object(server, "_run_inference", side_effect=cancelled):
+            response = asyncio.run(
+                server.transcribe(
+                    request=_make_request(),
+                    file=upload,
+                    model="parakeet-tdt-0.6b-v3",
+                )
+            )
+
+        body = json.loads(response.body)
+        self.assertEqual(response.status_code, 499)
+        self.assertEqual(body["error"]["type"], "request_cancelled")
+        self.assertNotIn("Traceback", body["error"]["message"])
+
+    def test_the_watcher_cancels_the_job_when_the_client_disconnects(self):
+        cancel_event = threading.Event()
+
+        async def run():
+            await server._watch_for_disconnect(_make_request(disconnected=True), cancel_event)
+
+        asyncio.run(run())
+        self.assertTrue(cancel_event.is_set())
+
+    def test_the_watcher_leaves_a_connected_job_alone(self):
+        cancel_event = threading.Event()
+
+        async def run():
+            watcher = asyncio.create_task(
+                server._watch_for_disconnect(_make_request(), cancel_event)
+            )
+            try:
+                await asyncio.sleep(0.05)
+            finally:
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
+
+        asyncio.run(run())
+        self.assertFalse(cancel_event.is_set())
+
+    # ---- the memory ceiling ----
+
+    def test_the_memory_ceiling_is_off_by_default(self):
+        server.configure_memory_limits()
+        with patch.object(server, "_current_rss_bytes", return_value=64 * 1024 * 1024):
+            server._check_memory_ceiling("start of the job")
+
+    def test_the_memory_ceiling_refuses_the_job_with_a_clear_error(self):
+        server.configure_memory_limits(max_memory_mb=1)
+        with patch.object(server, "_current_rss_bytes", return_value=64 * 1024 * 1024):
+            with self.assertRaises(server.MemoryCeilingExceeded) as raised:
+                server._check_memory_ceiling("start of the job")
+
+        message = str(raised.exception)
+        self.assertIn("64 MB", message)
+        self.assertIn("1 MB", message)
+        self.assertIn("start of the job", message)
+
+    def test_the_route_refuses_a_job_above_the_memory_ceiling(self):
+        import io
+
+        from fastapi import UploadFile
+
+        server.configure_memory_limits(max_memory_mb=1)
+        upload = UploadFile(io.BytesIO(b"\x00" * 16), filename="clip.m4a")
+        with (
+            patch.object(server, "_current_rss_bytes", return_value=64 * 1024 * 1024),
+            patch.object(server, "_run_inference") as inference,
+        ):
+            response = asyncio.run(
+                server.transcribe(
+                    request=_make_request(),
+                    file=upload,
+                    model="parakeet-tdt-0.6b-v3",
+                )
+            )
+
+        body = json.loads(response.body)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(body["error"]["type"], "memory_limit_exceeded")
+        self.assertIn("--max-memory-mb", body["error"]["message"])
+        inference.assert_not_called()
+
+    # ---- the idle unload ----
+
+    def test_unloading_the_model_releases_it_and_its_cache(self):
+        server._model = object()
+        server._model_name = "mlx-community/parakeet-tdt-0.6b-v3"
+
+        with patch.object(server, "_release_accelerator_cache") as release:
+            unloaded = server._unload_model()
+
+        self.assertTrue(unloaded)
+        self.assertIsNone(server._model)
+        self.assertIsNone(server._model_name)
+        release.assert_called_once()
+
+    def test_unloading_a_model_that_is_not_loaded_does_nothing(self):
+        with patch.object(server, "_release_accelerator_cache") as release:
+            self.assertFalse(server._unload_model())
+
+        release.assert_not_called()
+
+    def test_the_idle_watchdog_unloads_the_model_after_the_idle_period(self):
+        server._model = object()
+        server._model_name = "mlx-community/parakeet-tdt-0.6b-v3"
+        server.configure_memory_limits(idle_unload_seconds=60)
+        server._idle_check_interval_seconds = 0.01
+
+        async def run():
+            watchdog = asyncio.create_task(server._idle_unload_watchdog())
+            try:
+                with patch.object(server, "_seconds_since_last_activity", return_value=3600):
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline and server._model is not None:
+                        await asyncio.sleep(0.01)
+            finally:
+                watchdog.cancel()
+                await asyncio.gather(watchdog, return_exceptions=True)
+
+        asyncio.run(run())
+
+        self.assertIsNone(server._model)
+        self.assertIsNone(server._model_name)
+
+    def test_the_idle_watchdog_leaves_the_model_alone_when_the_idle_unload_is_off(self):
+        server._model = object()
+        server._model_name = "mlx-community/parakeet-tdt-0.6b-v3"
+        server.configure_memory_limits(idle_unload_seconds=0)
+        server._idle_check_interval_seconds = 0.01
+
+        async def run():
+            watchdog = asyncio.create_task(server._idle_unload_watchdog())
+            try:
+                with patch.object(server, "_seconds_since_last_activity", return_value=3600):
+                    await asyncio.sleep(0.1)
+            finally:
+                watchdog.cancel()
+                await asyncio.gather(watchdog, return_exceptions=True)
+
+        asyncio.run(run())
+
+        self.assertIsNotNone(server._model)
+
+    # ---- the window size and the resident size ----
+
+    def test_the_window_size_is_configurable_and_never_shorter_than_a_second(self):
+        server.configure_window_seconds(30)
+        self.assertEqual(server._chunk_duration_seconds, 30)
+
+        server.configure_window_seconds(0)
+        self.assertEqual(server._chunk_duration_seconds, 1)
+
+    def test_the_configured_window_size_drives_the_decode_and_the_model(self):
+        server.configure_window_seconds(30)
+
+        class RecordingModel:
+            def __init__(self):
+                self.calls = []
+
+            def transcribe(self, path, **kwargs):
+                self.calls.append(kwargs)
+                return type("Result", (), {"text": "", "sentences": []})()
+
+        model = RecordingModel()
+        with (
+            patch.object(
+                server,
+                "_decode_audio_window",
+                side_effect=["/tmp/window.wav", None],
+            ) as decode,
+            patch.object(server, "_release_accelerator_cache"),
+        ):
+            server._transcribe_mlx(model, "/tmp/fixture.m4a")
+
+        self.assertEqual(
+            decode.call_args_list,
+            [call("/tmp/fixture.m4a", 0), call("/tmp/fixture.m4a", 30)],
+        )
+        self.assertEqual(model.calls, [{"chunk_duration": 30}])
+
+    def test_the_resident_size_helper_reads_a_positive_size(self):
+        rss = server._current_rss_bytes()
+
+        self.assertIsNotNone(rss)
+        self.assertGreater(rss, 0)
+
+    def test_the_health_endpoint_reports_the_process_and_its_memory(self):
+        response = asyncio.run(server.health())
+
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["pid"], os.getpid())
+        self.assertIsInstance(response["rss_mb"], int)
+        self.assertGreater(response["rss_mb"], 0)
 
 
 if __name__ == "__main__":
