@@ -99,15 +99,77 @@ protocol LatestReleaseFeeding: Sendable {
     func latestRelease() async throws -> LatestRelease
 }
 
-/// Reads the repository's public `releases/latest`. Unauthenticated and
-/// header-free on purpose: no token, no install id, nothing that identifies
-/// who asked.
+/// Reads the repository's public releases and finds the newest one that is
+/// actually a macOS app release.
+///
+/// The check used to read `releases/latest`, which is the most recent
+/// non-draft, non-prerelease release of any kind. The transcription server
+/// and the Windows tester publish their own releases, so the moment either of
+/// them published one, "Check for Updates" stopped working for every macOS
+/// user — and a tester release tagged `v1.2.0` would have been offered to
+/// everybody as the app. The Windows port already searches the release list
+/// for a published app package that matches the running architecture; this
+/// does the same for macOS.
+///
+/// Unauthenticated and header-free on purpose: no token, no install id,
+/// nothing that identifies who asked.
 struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
+    /// How many releases the search asks for per page.
+    static let pageSize = 30
+
+    /// How many pages the search may read before it gives up. The list is
+    /// ordered newest first, so this covers a long tail of releases.
+    static let maxPages = 20
+
+    /// How long the whole search may take, not just one request.
+    static let searchTimeout: TimeInterval = 10
+
+    /// Whether an asset belongs to a macOS app release.
+    ///
+    /// The app publishes `BugNarrator-macOS.dmg` and
+    /// `BugNarrator-v<version>-macOS.dmg`. The transcription server publishes
+    /// `bugnarrator-transcription-macos-arm64.dmg`, which is a different
+    /// release with its own cadence.
+    static func isMacOSAppPackage(_ name: String) -> Bool {
+        name.hasPrefix("BugNarrator-") && name.hasSuffix("-macOS.dmg")
+    }
+
+    /// Whether the whole tag is a version.
+    ///
+    /// `ReleaseVersion` reads a numeric prefix, which is right for a build's
+    /// own version but wrong for a release tag: `windows-tester-v1.2.0` would
+    /// otherwise parse as 1.2.0 and be offered to every user.
+    static func isVersionTag(_ tag: String) -> Bool {
+        var trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("v") || trimmed.hasPrefix("V") { trimmed.removeFirst() }
+
+        var core = trimmed
+        if let marker = trimmed.firstIndex(where: { $0 == "-" || $0 == "+" }) {
+            let suffix = trimmed[trimmed.index(after: marker)...]
+            if suffix.isEmpty { return false }
+            core = String(trimmed[..<marker])
+        }
+
+        let components = core.split(separator: ".", omittingEmptySubsequences: false)
+        guard (2...4).contains(components.count) else { return false }
+        return components.allSatisfy { component in
+            !component.isEmpty && component.allSatisfy { $0.isASCII && $0.isNumber }
+        }
+    }
+
+    /// Whether the link points at this repository's release page. A feed that
+    /// answered with a link somewhere else would send the user off the
+    /// project, so the link is checked rather than trusted.
+    static func isTrustedReleaseLink(_ url: URL, tag: String) -> Bool {
+        guard url.host == "github.com" else { return false }
+        return url.path == "/ABD-Enterprises/bug-narrator/releases/tag/\(tag)"
+    }
+
     private let endpoint: URL
     private let session: URLSession
 
     init(
-        endpoint: URL = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases/latest")!,
+        endpoint: URL = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases")!,
         session: URLSession? = nil
     ) {
         self.endpoint = endpoint
@@ -121,7 +183,64 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
     }
 
     func latestRelease() async throws -> LatestRelease {
-        var request = URLRequest(url: endpoint)
+        // Bound the whole search, not just each request. Never report
+        // up-to-date from an incomplete search.
+        let deadline = Date().addingTimeInterval(Self.searchTimeout)
+        var latest: LatestRelease?
+        var latestVersion: ReleaseVersion?
+
+        for page in 1...Self.maxPages {
+            guard Date() < deadline else {
+                throw AppError.networkFailure
+                    .asUpdateCheckFailure("the macOS app release search timed out")
+            }
+
+            let releases = try await fetchPage(page)
+            for release in releases {
+                guard !release.draft,
+                      !release.prerelease,
+                      release.assets.contains(where: {
+                          $0.state == "uploaded" && $0.size > 0 && Self.isMacOSAppPackage($0.name)
+                      }),
+                      Self.isVersionTag(release.tagName),
+                      let releaseURL = URL(string: release.htmlURL),
+                      Self.isTrustedReleaseLink(releaseURL, tag: release.tagName),
+                      let version = ReleaseVersion(release.tagName) else {
+                    continue
+                }
+
+                if latestVersion == nil || version > latestVersion! {
+                    latestVersion = version
+                    latest = LatestRelease(tag: release.tagName, releaseURL: releaseURL)
+                }
+            }
+
+            if releases.count < Self.pageSize {
+                guard let latest else {
+                    throw AppError.networkFailure
+                        .asUpdateCheckFailure("no compatible published macOS app release was found")
+                }
+                return latest
+            }
+        }
+
+        throw AppError.networkFailure
+            .asUpdateCheckFailure("the macOS app release search reached its limit; check the project releases")
+    }
+
+    private func fetchPage(_ page: Int) async throws -> [GitHubReleasePayload] {
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw AppError.networkFailure.asUpdateCheckFailure("the releases feed is unusable")
+        }
+        components.queryItems = [
+            URLQueryItem(name: "per_page", value: String(Self.pageSize)),
+            URLQueryItem(name: "page", value: String(page)),
+        ]
+        guard let url = components.url else {
+            throw AppError.networkFailure.asUpdateCheckFailure("the releases feed is unusable")
+        }
+
+        var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await session.data(for: request)
@@ -131,22 +250,51 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
                 .asUpdateCheckFailure("the releases feed answered \(code)")
         }
 
-        let payload = try JSONDecoder().decode(GitHubReleasePayload.self, from: data)
-        guard let releaseURL = URL(string: payload.htmlURL) else {
-            throw AppError.networkFailure.asUpdateCheckFailure("the releases feed returned an unusable link")
-        }
-
-        return LatestRelease(tag: payload.tagName, releaseURL: releaseURL)
+        return try JSONDecoder().decode([GitHubReleasePayload].self, from: data)
     }
 }
 
 private struct GitHubReleasePayload: Decodable {
     let tagName: String
     let htmlURL: String
+    let draft: Bool
+    let prerelease: Bool
+    let assets: [GitHubReleaseAsset]
 
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case htmlURL = "html_url"
+        case draft
+        case prerelease
+        case assets
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tagName = try container.decode(String.self, forKey: .tagName)
+        htmlURL = try container.decode(String.self, forKey: .htmlURL)
+        draft = try container.decodeIfPresent(Bool.self, forKey: .draft) ?? false
+        prerelease = try container.decodeIfPresent(Bool.self, forKey: .prerelease) ?? false
+        assets = try container.decodeIfPresent([GitHubReleaseAsset].self, forKey: .assets) ?? []
+    }
+}
+
+private struct GitHubReleaseAsset: Decodable {
+    let name: String
+    let state: String
+    let size: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case state
+        case size
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        state = try container.decodeIfPresent(String.self, forKey: .state) ?? ""
+        size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
     }
 }
 
