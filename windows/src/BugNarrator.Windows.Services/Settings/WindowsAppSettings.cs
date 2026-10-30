@@ -154,12 +154,38 @@ public sealed record WindowsAppSettings(
         IssueExtractionUnavailableReason ?? AiProviderCompatibilityIssue;
 
     /// <summary>
-    /// Non-blocking warning to surface near the base-URL field when the endpoint
-    /// would send the API key + transcript text over plaintext HTTP to a remote
-    /// host. Null for remote HTTPS and local HTTP. Mirrors the macOS app (#472).
+    /// The warning to surface near the base-URL field when the endpoint would
+    /// send the API key + transcript text over plaintext HTTP to a remote host.
+    /// Null for remote HTTPS and local HTTP. Mirrors the macOS app (#472).
     /// </summary>
-    public string? AiProviderBaseUrlSecurityWarning =>
-        OpenAiCompatibleEndpoint.PlaintextRemoteWarning(AiProviderBaseUrl);
+    /// <remarks>
+    /// It is the same refusal the compatibility issue blocks on, so the field
+    /// and the gate cannot describe one host differently.
+    /// </remarks>
+    public string? AiProviderBaseUrlSecurityWarning => AiProviderPlaintextEndpointIssue;
+
+    /// <summary>
+    /// The refusal for a plaintext AI provider endpoint: why the app will not put
+    /// the API key and the transcript text on the wire in the clear. Null when
+    /// the endpoint is one the app is willing to use.
+    /// </summary>
+    /// <remarks>
+    /// The Local (Parakeet) provider ignores the typed base URL and always talks
+    /// to the transcription server on this machine, so there is nothing to check
+    /// for it - the same exemption the macOS app makes.
+    /// </remarks>
+    public string? AiProviderPlaintextEndpointIssue
+    {
+        get
+        {
+            if (UsesLocalTranscriptionServer)
+            {
+                return null;
+            }
+
+            return OpenAiCompatibleEndpoint.PlaintextRemoteRefusal(AiProviderBaseUrl);
+        }
+    }
 
     /// <summary>
     /// Explanatory warning when the Jira base URL would send Basic-auth
@@ -209,6 +235,16 @@ public sealed record WindowsAppSettings(
     {
         get
         {
+            // Security first, ahead of every configuration check: a remote
+            // plaintext endpoint is not a preference, it is a credential and
+            // audio leak. Warning about it was not enough - nothing consumed
+            // the warning as a gate, so a mistyped scheme sent the API key and
+            // the recording over the network in the clear (#1285).
+            if (AiProviderPlaintextEndpointIssue is { } plaintextIssue)
+            {
+                return plaintextIssue;
+            }
+
             var profile = EffectiveAiProviderProfile;
             var hasBaseUrl = !string.IsNullOrWhiteSpace(AiProviderBaseUrl);
 
