@@ -101,7 +101,11 @@ parse_jobs() {
             # The first one is the one that matters: the gate has to run
             # before the release exists, and the release is published by the
             # first step that creates it.
-            if (gate_step == 0 && cmd ~ /^(\.\/)?scripts\/check-release-environment\.sh([[:space:]]|$)/) {
+            # The command has to be the gate and nothing else. A command that
+            # swallows the exit status of the gate — "|| true", "; true", a
+            # trailing "&" — would leave the step green when the gate fails,
+            # which is the one thing the gate exists to prevent.
+            if (gate_step == 0 && cmd ~ /^(\.\/)?scripts\/check-release-environment\.sh[[:space:]]*$/) {
                 gate = 1; gate_step = step
             }
             if (publish_step == 0 && (cmd ~ /"?release"?[[:space:],]+"?create/ || cmd ~ /"?release"?[[:space:],]+"?upload/)) {
@@ -204,9 +208,13 @@ check_tree() {
         fi
 
         local publishing=0
+        local gates=0
         local job envs publishes publish_step gate gate_step gate_envs
         while IFS='|' read -r job envs publishes publish_step gate gate_step gate_envs; do
             [[ -n "$job" ]] || continue
+            if [[ "$gate" == "1" ]]; then
+                gates=$((gates + 1))
+            fi
 
             # A job that names an environment has to name the gate's.
             if [[ -n "$envs" && "$envs" != "$gate_env" ]]; then
@@ -242,6 +250,12 @@ check_tree() {
 
         if [[ "$publishing" == "0" ]]; then
             fail "$workflow runs $CHECK_SCRIPT_NAME but no job publishes a release to compare against."
+        fi
+
+        # The preflight runs the gate too, so a broken environment is caught
+        # before a Windows runner is reserved.
+        if [[ "$gates" -lt 2 ]]; then
+            fail "$workflow runs the environment gate in $gates job(s); the preflight has to run it as well."
         fi
     done <<<"$workflows"
 }

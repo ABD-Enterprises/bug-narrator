@@ -48,7 +48,7 @@ fi
 # A required-reviewers rule with nobody in it gates nobody: a reviewer who
 # loses repository access can be dropped from the list, and an empty list
 # leaves the rule satisfied by no one at all.
-if ! reviewers="$(gh api "$environment_api" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length' 2>&1)"; then
+if ! reviewers="$(gh api "$environment_api" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]? | select(.reviewer != null and .reviewer.id != null)] | length' 2>&1)"; then
     fail "The $ENVIRONMENT environment's reviewer list could not be read: $reviewers"
 fi
 if [[ "$reviewers" == "0" ]]; then

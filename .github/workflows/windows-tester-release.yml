@@ -129,11 +129,13 @@ jobs:
           if ! tag_lookup="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha' 2>&1)"; then
             # Only GitHub's own answer, with its HTTP status, means the tag is
             # absent: gh reports a missing tag as "gh: Not Found (HTTP 404)".
-            # A body that merely carries a "status" field says nothing about
-            # the status the request got, and a failure that quotes someone
-            # else's 404 is not proof either, so both stop the release instead
-            # of reading as absence.
-            if ! printf '%s\n' "$tag_lookup" | grep -qE '^gh: .*\(HTTP 404\)$'; then
+            # The body and that message arrive on the same line, so the match
+            # is on the message and not on the start of a line. A body that
+            # merely carries a "status" field says nothing about the status
+            # the request got, and a failure that quotes someone else's 404 is
+            # not proof either, so both stop the release instead of reading as
+            # absence.
+            if ! printf '%s\n' "$tag_lookup" | grep -qE 'gh: [^"]*\(HTTP 404\)'; then
               printf '::error::Could not check whether tag %s already exists: %s\n' "$RELEASE_TAG" "$tag_lookup" >&2
               exit 1
             fi
@@ -204,7 +206,7 @@ jobs:
           retention-days: 14
 
       - name: Publish GitHub Release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DRAFT: ${{ inputs.draft }}
@@ -212,22 +214,34 @@ jobs:
           RELEASE_RUNTIME: ${{ inputs.runtime }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $args = @(
-            "release", "create", "$env:RELEASE_TAG",
-            "windows/artifacts/packages/BugNarrator-windows-$env:RELEASE_RUNTIME.zip",
-            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-signature.json",
-            "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-validation.json",
-            "--target", "$env:GITHUB_SHA",
-            "--title", "BugNarrator Windows tester $env:RELEASE_TAG",
-            "--notes-file", "windows/artifacts/validation/BugNarrator-windows-$env:RELEASE_RUNTIME-release-notes.md"
+          set -euo pipefail
+          files=(
+            "windows/artifacts/packages/BugNarrator-windows-$RELEASE_RUNTIME.zip"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-signature.json"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-validation.json"
+            "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md"
           )
-          if ("$env:RELEASE_DRAFT" -eq "true") {
-            $args += "--draft"
-          }
-          if ("$env:RELEASE_PRERELEASE" -eq "true") {
-            $args += "--prerelease"
-          }
-          gh @args
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-dispatch replaces the assets of the same tag (a repaired or
+            # re-signed build) — only when the tag still points at the commit
+            # these binaries were built from.
+            tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              printf '::error::Tag %s points at %s but this run built %s; refusing to replace its assets.\n' "$RELEASE_TAG" "$tagged" "$GITHUB_SHA"
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            exit 0
+          fi
+          # The tag is created at the commit that produced the binaries, never at the default branch.
+          args=(release create "$RELEASE_TAG" "${files[@]}"
+                --repo "$GITHUB_REPOSITORY"
+                --target "$GITHUB_SHA"
+                --title "BugNarrator Windows tester $RELEASE_TAG"
+                --notes-file "windows/artifacts/validation/BugNarrator-windows-$RELEASE_RUNTIME-release-notes.md")
+          [[ "$RELEASE_DRAFT" == "true" ]] && args+=(--draft)
+          [[ "$RELEASE_PRERELEASE" == "true" ]] && args+=(--prerelease)
+          gh "${args[@]}"
 
       - name: Remove decoded signing certificate
         if: always()
