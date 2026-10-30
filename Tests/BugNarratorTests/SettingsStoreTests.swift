@@ -609,6 +609,54 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// A zone id names the interface, not the address. The address is parsed
+    /// without it, so the comparison is not made against bytes the parser
+    /// filled in with an interface index.
+    func testAZoneIdDoesNotChangeTheAddress() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("fe80::1%en0"),
+            "a scoped link-local address is still a link-local address"
+        )
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("fe80::1%en0".replacingOccurrences(of: "fe80", with: "2001")),
+            "the zone id must not make a non-local address local"
+        )
+    }
+
+    /// A string that only starts like a link-local address is not one. The
+    /// prefix is not a shortcut: the address has to parse.
+    func testAStringThatOnlyLooksLikeALinkLocalAddressIsRefused() {
+        for untrusted in [
+            "fe80:evil.example.com",
+            "fe80:1:2:3:4:5:6:7:8",
+            "fe80:"
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: it is not an address"
+            )
+        }
+    }
+
+    /// The canonical spelling rule applies to the IPv4 address an IPv4-mapped
+    /// IPv6 literal carries too. The mapped form is another way to write the
+    /// same address, so a leading zero in it is the same ambiguity.
+    func testAMappedAddressHasToSpellItsIPv4AddressCanonically() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::ffff:127.0.0.1"),
+            "the canonical mapped form of the loopback is the loopback"
+        )
+        for untrusted in [
+            "::ffff:127.000.000.001",
+            "::ffff:010.0.0.1"
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the embedded address is not written canonically"
+            )
+        }
+    }
+
     /// `0.0.0.0` is this machine, not a remote host: a connection to it
     /// reaches the loopback interface. Calling it remote would be a claim
     /// the app cannot make, and refusing it would block a setup that works.

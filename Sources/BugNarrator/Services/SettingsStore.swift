@@ -587,10 +587,12 @@ final class SettingsStore: ObservableObject {
     private static func isReservedLocalhostName(_ host: String) -> Bool {
         if host == "localhost" { return true }
 
+        // The empty labels are the point: a name that starts or ends with a
+        // dot leaves one behind, and ".localhost" is not the reserved name.
         let labels = host.split(separator: ".", omittingEmptySubsequences: false)
         guard labels.count > 1 else { return false }
         guard labels.last.map(String.init) == "localhost" else { return false }
-        return labels.dropLast().allSatisfy { !$0.isEmpty && !$0.hasPrefix(".") }
+        return labels.dropLast().allSatisfy { !$0.isEmpty }
     }
 
     /// Whether the four octets are in a range that stays on the machine or the
@@ -615,13 +617,22 @@ final class SettingsStore: ObservableObject {
     /// — `0:0:0:0:0:0:0:1` is the same address as `::1` — so the address is
     /// parsed instead.
     private static func isIPv6LocalEndpointHost(_ host: String) -> Bool {
-        var address = in6_addr()
-        guard inet_pton(AF_INET6, host, &address) == 1 else {
-            // A zone id (`fe80::1%en0`) is not part of the address, so the
-            // parser refuses it. The link-local range is still recognised by
-            // its prefix.
-            return host.hasPrefix("fe80:")
+        // A zone id (`fe80::1%en0`) names the interface, not the address, so
+        // it is removed before the address is parsed. Darwin's parser accepts
+        // it and writes the interface index into the address bytes, which
+        // would corrupt the comparison.
+        let addressText = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+
+        // An address that carries an IPv4 address in its last group has to
+        // spell that address the way an address is written too. The mapped
+        // form is another way to write the same address, and a leading zero
+        // in it is the same ambiguity the canonical rule exists to remove.
+        if let embedded = embeddedIPv4Text(addressText), canonicalDottedQuad(embedded) == nil {
+            return false
         }
+
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, addressText, &address) == 1 else { return false }
 
         let bytes = withUnsafeBytes(of: &address) { Array($0) }
         // ::1 — the loopback.
@@ -633,6 +644,14 @@ final class SettingsStore: ObservableObject {
             return isTrustedIPv4(bytes[12], bytes[13])
         }
         return false
+    }
+
+    /// The IPv4 address an IPv6 literal carries in its last group, if it has
+    /// one.
+    private static func embeddedIPv4Text(_ address: String) -> String? {
+        guard address.contains(".") else { return nil }
+        let tail = address.split(separator: ":").last.map(String.init) ?? ""
+        return tail.contains(".") ? tail : nil
     }
 
     /// The four octets of `host`, when it is an IPv4 literal written the way an
