@@ -51,6 +51,17 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Confirm the release runs from the main branch
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          # A release must be built from the reviewed default branch, not from a
+          # branch someone dispatched by hand.
+          if [[ "$RELEASE_REF" != "refs/heads/main" ]]; then
+            printf '::error::Local transcription release must run from refs/heads/main, not %s.\n' "$RELEASE_REF"
+            exit 1
+          fi
+
       - name: Confirm the tag is in the server release namespace
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -185,6 +196,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [build]
     runs-on: ubuntu-latest
+    # A signed release waits for a human approval in this environment. The
+    # environment's deployment branch policy admits only refs/heads/main.
+    environment: windows-release
     # The only job that writes to the repository (the release and its tag).
     permissions:
       contents: write
