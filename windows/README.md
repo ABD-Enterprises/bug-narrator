@@ -32,6 +32,20 @@ This workspace targets:
 
 WPF restore, build, and launch validation must happen on Windows. This macOS workspace can prepare the project structure and non-Windows-specific files, but it cannot honestly validate the Windows UI project.
 
+## Update Checks
+
+The tray's Check for Updates action searches published, non-prerelease GitHub
+releases for `BugNarrator-windows-win-x64.zip` or
+`BugNarrator-windows-win-arm64.zip`, matching the running process architecture.
+It ignores macOS and transcription-server packages and understands both plain
+version tags and `windows-tester-v...` tags. This opens the matching repository
+release page; it does not download, install or sign anything automatically.
+
+The search is limited to 20 pages of 30 releases and ten seconds overall. A
+missing compatible package, failed request or incomplete search reports that
+the result could not be determined and offers the releases page, never a false
+up-to-date result.
+
 ## Intended Windows Commands
 Run these on a Windows machine with the .NET 8 SDK installed:
 

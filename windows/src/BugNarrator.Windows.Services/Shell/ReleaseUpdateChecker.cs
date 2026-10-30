@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace BugNarrator.Windows.Services.Shell;
 
@@ -138,7 +140,7 @@ public sealed record ReleaseUpdateOutcome(
     };
 }
 
-public sealed record LatestRelease(string Tag, string ReleaseUrl);
+public sealed record LatestRelease(string Tag, string ReleaseUrl, string? Version = null);
 
 public interface ILatestReleaseFeed
 {
@@ -146,52 +148,120 @@ public interface ILatestReleaseFeed
 }
 
 /// <summary>
-/// Reads the repository's public releases/latest. Unauthenticated and header-free beyond Accept
-/// on purpose: no token, no install id, nothing that identifies who asked (macOS GitHubLatestReleaseFeed).
+/// Searches public releases for a published app package matching this process architecture.
+/// App and transcription-server releases have independent cadences; releases/latest is not a Windows feed.
 /// </summary>
 public sealed class GitHubLatestReleaseFeed : ILatestReleaseFeed
 {
-    public const string Endpoint = "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases/latest";
+    public const string Endpoint = "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases";
+    public const int PageSize = 30;
+    public const int MaxPages = 20;
+    private static readonly Regex VersionTagPattern = new(
+        @"\A[vV]?(?<numeric>[0-9]+(?:\.[0-9]+){1,3})(?:[-+][0-9A-Za-z.-]+)?\z",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
     private readonly HttpClient httpClient;
+    private readonly string? assetName;
 
-    public GitHubLatestReleaseFeed(HttpClient? httpClient = null)
+    public GitHubLatestReleaseFeed(HttpClient? httpClient = null, Architecture? architecture = null)
     {
         this.httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        assetName = (architecture ?? RuntimeInformation.ProcessArchitecture) switch
+        {
+            Architecture.X64 => "BugNarrator-windows-win-x64.zip",
+            Architecture.Arm64 => "BugNarrator-windows-win-arm64.zip",
+            _ => null,
+        };
     }
 
     public async Task<LatestRelease> GetLatestReleaseAsync(CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, Endpoint);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        // GitHub rejects requests with no User-Agent; the product name carries nothing about the user.
-        request.Headers.UserAgent.ParseAdd("BugNarrator");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (assetName is null)
         {
-            throw new ReleaseFeedException($"the releases feed answered {(int)response.StatusCode}");
+            throw new ReleaseFeedException("no Windows app package supports this process architecture");
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var payload = await JsonSerializer.DeserializeAsync<GitHubReleasePayload>(stream, cancellationToken: cancellationToken);
-        if (payload is null || string.IsNullOrWhiteSpace(payload.TagName))
+        // Bound the whole search, not just each request. Never report UpToDate from an incomplete search.
+        using var search = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        search.CancelAfter(TimeSpan.FromSeconds(10));
+        LatestRelease? latest = null;
+        ReleaseVersion? latestVersion = null;
+        for (var page = 1; page <= MaxPages; page++)
         {
-            throw new ReleaseFeedException("the releases feed returned an unusable release");
+            search.Token.ThrowIfCancellationRequested();
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{Endpoint}?per_page={PageSize}&page={page}");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            request.Headers.UserAgent.ParseAdd("BugNarrator");
+            using var response = await httpClient.SendAsync(request, search.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ReleaseFeedException($"the releases feed answered {(int)response.StatusCode}");
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(search.Token);
+            var releases = await JsonSerializer.DeserializeAsync<List<GitHubReleasePayload?>>(stream, cancellationToken: search.Token)
+                ?? throw new ReleaseFeedException("the releases feed returned an unusable release list");
+            foreach (var release in releases)
+            {
+                if (release is null || release.Draft || release.Prerelease
+                    || !HasCompatiblePackage(release) || !TryVersionTag(release.TagName, out var versionTag)
+                    || !TrustedReleaseLink(release.HtmlUrl, release.TagName!))
+                {
+                    continue;
+                }
+
+                var version = ReleaseVersion.Parse(versionTag)!;
+                if (latestVersion is null || version > latestVersion)
+                {
+                    latestVersion = version;
+                    latest = new LatestRelease(release.TagName!, release.HtmlUrl!, versionTag);
+                }
+            }
+
+            if (releases.Count < PageSize)
+            {
+                return latest ?? throw new ReleaseFeedException("no compatible published Windows app release was found");
+            }
         }
 
-        if (!Uri.TryCreate(payload.HtmlUrl, UriKind.Absolute, out var releaseUrl)
-            || (releaseUrl.Scheme != Uri.UriSchemeHttps && releaseUrl.Scheme != Uri.UriSchemeHttp))
-        {
-            throw new ReleaseFeedException("the releases feed returned an unusable link");
-        }
-
-        return new LatestRelease(payload.TagName, releaseUrl.AbsoluteUri);
+        throw new ReleaseFeedException("the Windows app release search reached its limit; check the project releases");
     }
+
+    private bool HasCompatiblePackage(GitHubReleasePayload release) =>
+        release.Assets?.Any(asset => asset is not null && asset.Name == assetName
+            && asset.State == "uploaded" && asset.Size > 0) == true;
+
+    private static bool TryVersionTag(string? tag, out string versionTag)
+    {
+        versionTag = tag?.StartsWith("windows-tester-", StringComparison.Ordinal) == true
+            ? tag["windows-tester-".Length..] : tag ?? string.Empty;
+        if (versionTag.Length > 128)
+        {
+            return false;
+        }
+
+        var match = VersionTagPattern.Match(versionTag);
+        return match.Success && match.Groups["numeric"].Value.Split('.')
+            .All(component => int.TryParse(component, out _));
+    }
+
+    private static bool TrustedReleaseLink(string? value, string tag) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "github.com" && uri.IsDefaultPort
+        && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment)
+        && Uri.UnescapeDataString(uri.AbsolutePath) == $"/ABD-Enterprises/bug-narrator/releases/tag/{tag}";
 
     private sealed record GitHubReleasePayload(
         [property: JsonPropertyName("tag_name")] string? TagName,
-        [property: JsonPropertyName("html_url")] string? HtmlUrl);
+        [property: JsonPropertyName("html_url")] string? HtmlUrl,
+        [property: JsonPropertyName("draft")] bool Draft,
+        [property: JsonPropertyName("prerelease")] bool Prerelease,
+        [property: JsonPropertyName("assets")] IReadOnlyList<GitHubAssetPayload?>? Assets);
+
+    private sealed record GitHubAssetPayload(
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("size")] long Size);
 }
 
 public sealed class ReleaseFeedException(string message) : Exception(message);
@@ -248,7 +318,7 @@ public sealed class ReleaseUpdateChecker
             return ReleaseUpdateOutcome.Undetermined(exception.Message);
         }
 
-        var latestVersion = ReleaseVersion.Parse(latest.Tag);
+        var latestVersion = ReleaseVersion.Parse(latest.Version ?? latest.Tag);
         if (latestVersion is null)
         {
             return ReleaseUpdateOutcome.Undetermined($"the latest release tag '{latest.Tag}' is not a version");
