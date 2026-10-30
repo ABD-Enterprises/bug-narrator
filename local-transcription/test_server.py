@@ -649,8 +649,13 @@ server._serve("127.0.0.1", {port})
 class ServerLogLineTests(unittest.TestCase):
     """The request's own values must not be able to forge a log line."""
 
-    def test_control_characters_are_removed_from_a_logged_name(self):
-        self.assertEqual(server._log_safe("evil\r\nINFO forged", "audio"), "evilINFO forged")
+    def test_control_characters_are_escaped_in_a_logged_name(self):
+        # The characters around a newline are joined together when it is
+        # dropped, so the escape keeps the log honest about what arrived.
+        self.assertEqual(
+            server._log_safe("evil\r\nINFO forged", "audio"),
+            "evil\\r\\nINFO forged",
+        )
 
     def test_a_logged_name_keeps_its_readable_parts(self):
         self.assertEqual(server._log_safe("recording.m4a", "audio"), "recording.m4a")

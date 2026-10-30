@@ -255,15 +255,29 @@ def _log_safe(value: Optional[str], fallback: str = "") -> str:
 
     The filename and the model name both come from the request, so either can
     carry newlines and other control characters that would forge log lines.
-    Only printable characters are kept, and the result is short: a log line is
-    not a place for an unbounded string.
+
+    A control character is escaped rather than dropped. Dropping it would join
+    the text around it together, so "evil\r\nINFO forged" would still read as
+    "evilINFO forged" in the log - the forged line is gone, but what is left
+    looks like a word rather than like something that was smuggled in. The
+    result is also short: a log line is not a place for an unbounded string.
     """
     if value is None:
         return fallback
-    cleaned = "".join(character for character in value if character.isprintable()).strip()
+    # A value with nothing readable in it is not worth logging.
+    if not any(character.isprintable() for character in value):
+        return fallback
+    cleaned = "".join(_escape_control(character) for character in value).strip()
     if not cleaned:
         return fallback
     return cleaned[:120]
+
+
+def _escape_control(character: str) -> str:
+    """A control character, written so that it cannot break the log line."""
+    if character.isprintable():
+        return character
+    return character.encode("unicode_escape").decode("ascii")
 
 
 def _resolve_model_id(model: Optional[str]) -> str:
