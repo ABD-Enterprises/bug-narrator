@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Sockets;
+
 namespace BugNarrator.Windows.Services.Http;
 
 public static class OpenAiCompatibleEndpoint
@@ -43,34 +46,203 @@ public static class OpenAiCompatibleEndpoint
             return false;
         }
 
-        var lowered = host.ToLowerInvariant().Trim('[', ']');
+        var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
 
-        // `localhost` is reserved and always resolves to loopback.
-        if (lowered == "localhost" || lowered.EndsWith(".localhost", StringComparison.Ordinal))
+        if (IsReservedLocalhostName(lowered))
         {
             return true;
         }
 
-        // IPv6 loopback / link-local.
-        if (lowered == "::1" || lowered.StartsWith("fe80:", StringComparison.Ordinal))
+        if (IsIPv6LocalEndpointHost(lowered))
         {
             return true;
         }
 
-        if (TryParseDottedQuad(lowered, out var first, out var second))
+        if (TryParseDottedQuad(lowered, out var first, out var second, out var third, out var fourth))
         {
-            return first switch
+            // 0.0.0.0 is this machine. The rest of the 0.0.0.0/8 range is
+            // not: 0.0.0.5 does not reach this machine, it is refused with
+            // EHOSTUNREACH.
+            if (first == 0 && second == 0 && third == 0 && fourth == 0)
             {
-                127 => true,                       // loopback 127.0.0.0/8
-                10 => true,                        // private 10.0.0.0/8
-                192 when second == 168 => true,    // private 192.168.0.0/16
-                169 when second == 254 => true,    // link-local 169.254.0.0/16
-                172 when second >= 16 && second <= 31 => true, // private 172.16.0.0/12
-                _ => false,
-            };
+                return true;
+            }
+
+            return IsTrustedIPv4(first, second);
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// The host without the brackets an IPv6 literal is written in.
+    /// </summary>
+    /// <remarks>
+    /// Only an IPv6 literal carries brackets. <c>[localhost]</c> is not one,
+    /// and reading it as <c>localhost</c> would make the app trust a name it
+    /// cannot check - the brackets are part of the host, not decoration.
+    /// </remarks>
+    private static string WithoutIPv6Brackets(string host)
+    {
+        if (host.Length >= 2 && host[0] == '[' && host[^1] == ']' && host.Contains(':'))
+        {
+            return host[1..^1];
+        }
+
+        return host;
+    }
+
+    /// <summary>
+    /// The name <paramref name="host"/> refers to, with one trailing dot
+    /// removed.
+    /// </summary>
+    /// <remarks>
+    /// A trailing dot makes a name absolute rather than different: a resolver
+    /// looks up the same name either way, so the two have to be classified the
+    /// same way. It does not rescue an address literal - <c>127.0.0.1.</c> is
+    /// not the address any more, it is a name the app cannot check.
+    /// </remarks>
+    private static string NameForm(string host)
+    {
+        return host.EndsWith(".", StringComparison.Ordinal) ? host[..^1] : host;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="host"/> is one of the names the standards
+    /// reserve for the loopback: <c>localhost</c> itself, and a name under it.
+    /// </summary>
+    /// <remarks>
+    /// Every label has to be there. A name that only looks like a reserved one
+    /// - a leading dot, an empty label - is not one of them. A trailing dot
+    /// is: it makes the name absolute rather than different, and a resolver
+    /// answers a reserved name with the loopback address without ever putting
+    /// the question to the network (RFC 6761).
+    /// </remarks>
+    private static bool IsReservedLocalhostName(string host)
+    {
+        var name = NameForm(host);
+        if (name == "localhost")
+        {
+            return true;
+        }
+
+        if (!name.EndsWith(".localhost", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // The empty labels are the point: a name that starts or ends with a
+        // dot leaves one behind, and ".localhost" is not the reserved name.
+        var labels = name.Split('.');
+        return labels.Length > 1 && labels.All(label => label.Length > 0);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="host"/> is written as an IPv6 literal that
+    /// reaches this machine or the trusted local network.
+    /// </summary>
+    /// <remarks>
+    /// The address is parsed, not compared as a string: <c>::1</c> can be
+    /// written a dozen ways, and a comparison would refuse an endpoint the
+    /// user can reach.
+    /// </remarks>
+    private static bool IsIPv6LocalEndpointHost(string host)
+    {
+        // A host that is not written as an IPv6 literal is not one.
+        if (!host.Contains(':'))
+        {
+            return false;
+        }
+
+        // A zone id (`fe80::1%en0`) names the interface, not the address, so
+        // it is removed before the address is parsed.
+        var scope = host.IndexOf('%');
+        var text = scope >= 0 ? host[..scope] : host;
+
+        // An address that carries an IPv4 address in its last group has to
+        // spell that address the way an address is written too. The mapped
+        // form is another way to write the same address, and a leading zero
+        // in it is the same ambiguity the canonical rule exists to remove.
+        if (EmbeddedIPv4Text(text) is { } embedded && !TryParseDottedQuad(embedded, out _, out _))
+        {
+            return false;
+        }
+
+        if (!IPAddress.TryParse(text, out var address) ||
+            address.AddressFamily != AddressFamily.InterNetworkV6)
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+
+        // :: - the unspecified address, the IPv6 spelling of 0.0.0.0. A
+        // connection to it reaches the loopback interface, the same way a
+        // connection to 0.0.0.0 does, so the two spellings of "this machine"
+        // have to be trusted together.
+        if (bytes.All(value => value == 0))
+        {
+            return true;
+        }
+
+        // ::1 - the loopback.
+        if (bytes.Take(15).All(value => value == 0) && bytes[15] == 1)
+        {
+            return true;
+        }
+
+        // fe80::/10 - the link-local range.
+        if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80)
+        {
+            return true;
+        }
+
+        // ::ffff:a.b.c.d - an IPv4 address written as an IPv6 one.
+        if (bytes[0..10].All(value => value == 0) && bytes[10] == 0xff && bytes[11] == 0xff)
+        {
+            // ::ffff:0.0.0.0 is 0.0.0.0 written as an IPv6 address, so it is
+            // this machine the same way 0.0.0.0 is.
+            if (bytes[12] == 0 && bytes[13] == 0 && bytes[14] == 0 && bytes[15] == 0)
+            {
+                return true;
+            }
+
+            return IsTrustedIPv4(bytes[12], bytes[13]);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The IPv4 address an IPv6 literal carries in its last group, if it has
+    /// one.
+    /// </summary>
+    private static string? EmbeddedIPv4Text(string address)
+    {
+        if (!address.Contains('.'))
+        {
+            return null;
+        }
+
+        var tail = address.Split(':').LastOrDefault() ?? string.Empty;
+        return tail.Contains('.') ? tail : null;
+    }
+
+    /// <summary>
+    /// Whether an IPv4 address is one the app is willing to send a secret to
+    /// over plaintext HTTP.
+    /// </summary>
+    private static bool IsTrustedIPv4(byte first, byte second)
+    {
+        return first switch
+        {
+            127 => true,                                // loopback 127.0.0.0/8
+            10 => true,                                 // private 10.0.0.0/8
+            192 when second == 168 => true,             // private 192.168.0.0/16
+            169 when second == 254 => true,             // link-local 169.254.0.0/16
+            172 when second >= 16 && second <= 31 => true, // private 172.16.0.0/12
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -86,20 +258,30 @@ public static class OpenAiCompatibleEndpoint
     /// </remarks>
     public static bool IsPublicAddress(string host)
     {
-        var lowered = host.ToLowerInvariant().Trim('[', ']');
+        var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
 
-        var parts = lowered.Split('.');
-        if (parts.Length != 4)
+        if (!TryParseDottedQuad(lowered, out var first, out var second, out var third, out var fourth))
         {
             return false;
         }
 
-        foreach (var part in parts)
+        // The unspecified, multicast and broadcast addresses are not a host on
+        // the public internet: the 0.0.0.0/8 range means "this network" rather
+        // than a destination (RFC 1122), and the other two are not addressed to
+        // one host. Calling them remote would be a claim the app cannot make.
+        if (first == 0)
         {
-            if (part.Length == 0 || !part.All(char.IsAsciiDigit) || !byte.TryParse(part, out _))
-            {
-                return false;
-            }
+            return false;
+        }
+
+        if (first >= 224 && first <= 239)
+        {
+            return false;
+        }
+
+        if (first == 255 && second == 255 && third == 255 && fourth == 255)
+        {
+            return false;
         }
 
         return !IsLocalEndpointHost(host);
@@ -114,32 +296,37 @@ public static class OpenAiCompatibleEndpoint
     /// </summary>
     public static bool IsUnqualifiedLocalName(string host)
     {
-        var lowered = host.ToLowerInvariant().Trim('[', ']');
+        var lowered = WithoutIPv6Brackets(host.ToLowerInvariant());
 
-        if (lowered.Length == 0)
+        // A trailing dot makes the name absolute rather than different: a
+        // resolver answers the same name either way, so the two are the same
+        // host and have to be classified the same way.
+        var name = NameForm(lowered);
+
+        if (name.Length == 0)
         {
             return false;
         }
 
         // An IPv4 literal in another notation - `134744072`, `0x7f000001` - is
         // an address, not a name anybody can claim for it.
-        if (IsNumericAddressLiteral(lowered))
+        if (IsNumericAddressLiteral(name))
         {
             return false;
         }
 
         // `localhost` is reserved and always resolves to loopback.
-        if (lowered == "localhost" || lowered.EndsWith(".localhost", StringComparison.Ordinal))
+        if (IsReservedLocalhostName(name))
         {
             return false;
         }
 
-        if (lowered.EndsWith(".local", StringComparison.Ordinal))
+        if (name.EndsWith(".local", StringComparison.Ordinal))
         {
             return true;
         }
 
-        return !lowered.Contains('.') && !lowered.Contains(':');
+        return !name.Contains('.') && !name.Contains(':');
     }
 
     /// <summary>
@@ -171,15 +358,21 @@ public static class OpenAiCompatibleEndpoint
 
     /// <summary>
     /// The message for an endpoint that is refused over plaintext HTTP because
-    /// its name can be claimed by any device on the local network. It names the
+    /// its name is answered by the network rather than by the app. It names the
     /// fix, because the user is looking at a field they believe is correct.
     /// Mirrors SettingsStore.unqualifiedLocalHostPlaintextMessage in the macOS app.
     /// </summary>
+    /// <remarks>
+    /// The message does not claim that mDNS answers the name: a <c>.local</c>
+    /// name is answered over mDNS, but a single-label name is answered through
+    /// the resolver's search list, which is not always mDNS. The risk is the
+    /// same either way - the app cannot check where the name points.
+    /// </remarks>
     public static string UnqualifiedLocalHostPlaintextMessage(string host, string secret) =>
         $"{host} is not an address this app trusts for plaintext HTTP: a .local or single-word host "
-        + "name can be claimed by any device on the local network, so the traffic could be "
-        + "intercepted. Use the machine's IP address (for example 192.168.1.20), or https://. "
-        + $"Over plaintext HTTP your {secret} would cross the network unencrypted.";
+        + "name is answered by the network rather than by the app, so it can point anywhere and the "
+        + "traffic could be intercepted. Use the machine's IP address (for example 192.168.1.20), "
+        + $"or https://. Over plaintext HTTP your {secret} would cross the network unencrypted.";
 
     /// <summary>
     /// A user-facing warning when the configured base URL would transmit the API
@@ -217,7 +410,7 @@ public static class OpenAiCompatibleEndpoint
                 + "unencrypted. Use https:// unless this is a trusted local endpoint.";
         }
 
-        return "This endpoint uses plaintext HTTP to a host this app cannot check as a local "
+        return "This endpoint uses plaintext HTTP to a host this app cannot use as a local "
             + $"address ({parsed.Host}). Your API key and transcript text would be sent "
             + "unencrypted. Use https://, or point this at an address the app can check.";
     }
@@ -258,8 +451,31 @@ public static class OpenAiCompatibleEndpoint
     /// </remarks>
     private static bool TryParseDottedQuad(string host, out byte first, out byte second)
     {
+        return TryParseDottedQuad(host, out first, out second, out _, out _);
+    }
+
+    /// <summary>
+    /// The four octets of <paramref name="host"/>, when it is an IPv4 literal
+    /// written the way an address is written.
+    /// </summary>
+    /// <remarks>
+    /// The spelling has to be canonical, because the app and the network have
+    /// to read the host the same way. A leading zero (<c>010.0.0.1</c>) is a
+    /// different octet to a resolver that reads it as octal - eight, not ten -
+    /// and a trailing or leading dot (<c>127.0.0.1.</c>) turns the host into an
+    /// absolute DNS name that a resolver anywhere on the network can answer.
+    /// </remarks>
+    private static bool TryParseDottedQuad(
+        string host,
+        out byte first,
+        out byte second,
+        out byte third,
+        out byte fourth)
+    {
         first = 0;
         second = 0;
+        third = 0;
+        fourth = 0;
 
         var parts = host.Split('.');
         if (parts.Length != 4)
@@ -289,6 +505,8 @@ public static class OpenAiCompatibleEndpoint
 
         first = octets[0];
         second = octets[1];
+        third = octets[2];
+        fourth = octets[3];
         return true;
     }
 

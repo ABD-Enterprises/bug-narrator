@@ -193,7 +193,7 @@ public sealed record WindowsAppSettings(
                     + "unless this is a trusted local server.";
             }
 
-            return "This Jira URL uses plaintext HTTP to a host this app cannot check as a local "
+            return "This Jira URL uses plaintext HTTP to a host this app cannot use as a local "
                 + $"address ({parsed.Host}). "
                 + "Your email and API token would be sent unencrypted. Use https:// "
                 + "unless this is a trusted local server.";

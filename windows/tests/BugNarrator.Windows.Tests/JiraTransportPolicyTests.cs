@@ -31,7 +31,7 @@ public sealed class JiraTransportPolicyTests : IDisposable
         var uncheckableSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://jira.example.com:8080/jira" };
         var uncheckable = uncheckableSettings.JiraBaseUrlSecurityWarning;
         Assert.NotNull(uncheckable);
-        Assert.Contains("cannot check as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
         Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
         Assert.Contains("email and API token would be sent unencrypted", uncheckable, StringComparison.Ordinal);
     }
@@ -52,7 +52,7 @@ public sealed class JiraTransportPolicyTests : IDisposable
 
         var uncheckable = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://jira.example.com:8080/jira"));
         Assert.NotNull(uncheckable);
-        Assert.Contains("cannot check as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
         Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
         Assert.Contains("would cross the network unencrypted", uncheckable, StringComparison.Ordinal);
     }

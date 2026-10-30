@@ -26,7 +26,7 @@ public static class JiraEndpointTransportPolicy
                     + "Use https://, or configure a trusted local endpoint in Settings.";
             }
 
-            return "The Jira base URL uses plaintext HTTP to a host this app cannot check as a local "
+            return "The Jira base URL uses plaintext HTTP to a host this app cannot use as a local "
                 + $"address ({endpoint.Host}). "
                 + "Your Jira email, API token and issue content would cross the network unencrypted. "
                 + "Use https://, or configure a trusted local endpoint in Settings.";

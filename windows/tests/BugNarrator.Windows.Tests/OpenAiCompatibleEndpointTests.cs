@@ -171,7 +171,7 @@ public sealed class OpenAiCompatibleEndpointTests
         var warning = OpenAiCompatibleEndpoint.PlaintextRemoteWarning("http://jira.example.com:1234/v1");
 
         Assert.NotNull(warning);
-        Assert.Contains("cannot check as a local address", warning, StringComparison.Ordinal);
+        Assert.Contains("cannot use as a local address", warning, StringComparison.Ordinal);
         Assert.DoesNotContain("remote host", warning, StringComparison.Ordinal);
         Assert.Contains("API key and transcript text would be sent unencrypted", warning, StringComparison.Ordinal);
     }
