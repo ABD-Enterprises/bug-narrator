@@ -140,19 +140,23 @@ def read_token_file(path: Path) -> Optional[str]:
 
 
 def write_token_file(path: Path, token: str) -> None:
-    """Store `token` in `path`, readable by its owner only.
+    """Store `token` in `path`, protected so that only its owner can read it.
 
-    The file is created with owner-only permissions before the token is
-    written, so it is never briefly world-readable. The mode is set again
-    after the write: `O_CREAT` only applies the mode when it creates the
-    file, so a token file left at 0644 by an older build, a restored backup
-    or a copy would otherwise stay readable by everyone.
+    On POSIX the file is created with mode 0600, and the mode is repaired
+    *before* the token is written. `O_CREAT` only applies the mode when it
+    creates the file, so a token file left at 0644 by an older build, a
+    restored backup or a copy would otherwise be readable by everyone for as
+    long as it held the token.
+
+    Windows has no POSIX permission bits. There `os.chmod` only toggles the
+    read-only attribute, and the file's access is decided by the access
+    control list it inherits from the directory it is created in.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        os.chmod(path, 0o600)
         handle.write(token)
-    os.chmod(path, 0o600)
 
 
 def resolve_auth_token(

@@ -1126,7 +1126,44 @@ class ServerTokenFileAndChildProcessTests(unittest.TestCase):
             server.write_token_file(token_file, "s3cret-token-value")
 
             self.assertEqual(token_file.read_text(encoding="utf-8"), "s3cret-token-value")
-            self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
+            else:
+                # Windows has no POSIX permission bits, so there is no mode to
+                # repair: os.chmod only toggles the read-only attribute and
+                # the file's access is decided by the access control list it
+                # inherits from its directory. What the repair can be checked
+                # for there is that the file was not left read-only, which
+                # would keep the server from rewriting it.
+                self.assertTrue(token_file.stat().st_mode & stat.S_IWRITE)
+
+    def test_the_mode_is_repaired_before_the_token_is_written(self):
+        # The token must never sit in a file that everyone can read, not even
+        # for the moment between the write and the repair.
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            token_file.write_text("an-old-token", encoding="utf-8")
+            os.chmod(token_file, 0o644)
+
+            token_visible_when_repaired = []
+            real_chmod = os.chmod
+
+            def recording_chmod(path, mode, *args, **kwargs):
+                if os.fspath(path) == os.fspath(token_file):
+                    token_visible_when_repaired.append(
+                        "s3cret-token-value" in token_file.read_text(encoding="utf-8")
+                    )
+                return real_chmod(path, mode, *args, **kwargs)
+
+            with patch.object(server.os, "chmod", recording_chmod):
+                server.write_token_file(token_file, "s3cret-token-value")
+
+            self.assertTrue(token_visible_when_repaired, "the mode was never repaired")
+            self.assertEqual(
+                token_visible_when_repaired[0],
+                False,
+                "the mode must be repaired before the token is written",
+            )
 
     def test_the_token_is_not_handed_to_a_child_process(self):
         environment = dict(os.environ)
