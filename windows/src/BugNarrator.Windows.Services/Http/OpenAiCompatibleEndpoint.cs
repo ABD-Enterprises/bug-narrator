@@ -26,9 +26,15 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
-    /// Whether <paramref name="host"/> denotes a loopback / private / link-local /
-    /// .local endpoint, for which plaintext HTTP is acceptable because the traffic
+    /// Whether <paramref name="host"/> denotes a loopback / private / link-local
+    /// endpoint, for which plaintext HTTP is acceptable because the traffic
     /// stays on the machine or the trusted local network.
+    ///
+    /// A <c>.local</c> name and a single-label name such as <c>lmstudio</c> are
+    /// deliberately not trusted. Both are resolved over mDNS, which any device on
+    /// the local network can answer, so a name that looks local can point
+    /// anywhere. A local server is addressed by its IP address instead.
+    /// Mirrors SettingsStore.isLocalEndpointHost in the macOS app (#1268).
     /// </summary>
     public static bool IsLocalEndpointHost(string host)
     {
@@ -37,20 +43,10 @@ public static class OpenAiCompatibleEndpoint
             return false;
         }
 
-        var lowered = host.Trim().Trim('[', ']').ToLowerInvariant();
+        var lowered = host.ToLowerInvariant().Trim('[', ']');
 
+        // `localhost` is reserved and always resolves to loopback.
         if (lowered == "localhost" || lowered.EndsWith(".localhost", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (lowered.EndsWith(".local", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        // Single-label hostnames (e.g. "lmstudio") never resolve on public DNS.
-        if (!lowered.Contains('.') && !lowered.Contains(':'))
         {
             return true;
         }
@@ -61,11 +57,8 @@ public static class OpenAiCompatibleEndpoint
             return true;
         }
 
-        var parts = lowered.Split('.');
-        if (parts.Length == 4 && parts.All(part => byte.TryParse(part, out _)))
+        if (TryParseDottedQuad(lowered, out var first, out var second))
         {
-            var first = byte.Parse(parts[0]);
-            var second = byte.Parse(parts[1]);
             return first switch
             {
                 127 => true,                       // loopback 127.0.0.0/8
@@ -81,9 +74,80 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
+    /// Whether <paramref name="host"/> is a name that resolves over mDNS rather
+    /// than an address the app can check: a <c>.local</c> name, or a single-label
+    /// name such as <c>lmstudio</c>. Any device on the local network can answer
+    /// for such a name, so it is not a trusted endpoint even though it looks
+    /// local. Mirrors SettingsStore.isUnqualifiedLocalName in the macOS app.
+    /// </summary>
+    public static bool IsUnqualifiedLocalName(string host)
+    {
+        var lowered = host.ToLowerInvariant().Trim('[', ']');
+
+        if (lowered.Length == 0)
+        {
+            return false;
+        }
+
+        // An IPv4 literal in another notation - `134744072`, `0x7f000001` - is
+        // an address, not a name anybody can claim for it.
+        if (IsNumericAddressLiteral(lowered))
+        {
+            return false;
+        }
+
+        // `localhost` is reserved and always resolves to loopback.
+        if (lowered == "localhost" || lowered.EndsWith(".localhost", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (lowered.EndsWith(".local", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return !lowered.Contains('.') && !lowered.Contains(':');
+    }
+
+    /// <summary>
+    /// Whether <paramref name="host"/> is a number written in a notation other
+    /// than the dotted quad: decimal (<c>134744072</c>) or hexadecimal
+    /// (<c>0x7f000001</c>). Mirrors SettingsStore.isNumericAddressLiteral in
+    /// the macOS app.
+    /// </summary>
+    public static bool IsNumericAddressLiteral(string host)
+    {
+        if (host.All(char.IsAsciiDigit))
+        {
+            return true;
+        }
+
+        if (!host.StartsWith("0x", StringComparison.Ordinal) && !host.StartsWith("0X", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var digits = host[2..];
+        return digits.Length > 0 && digits.All(IsHexDigit);
+    }
+
+    /// <summary>
+    /// The message for an endpoint that is refused over plaintext HTTP because
+    /// its name can be claimed by any device on the local network. It names the
+    /// fix, because the user is looking at a field they believe is correct.
+    /// Mirrors SettingsStore.unqualifiedLocalHostPlaintextMessage in the macOS app.
+    /// </summary>
+    public static string UnqualifiedLocalHostPlaintextMessage(string host, string secret) =>
+        $"{host} is not an address this app trusts for plaintext HTTP: a .local or single-word host "
+        + "name can be claimed by any device on the local network, so the traffic could be "
+        + "intercepted. Use the machine's IP address (for example 192.168.1.20), or https://. "
+        + $"Over plaintext HTTP your {secret} would cross the network unencrypted.";
+
+    /// <summary>
     /// A user-facing warning when the configured base URL would transmit the API
     /// key and transcript content to a non-local host over plaintext HTTP. Remote
-    /// HTTPS and local HTTP (loopback/private/.local) return null so enterprise-proxy
+    /// HTTPS and local HTTP (loopback/private/link-local) return null so enterprise-proxy
     /// and local-provider workflows are not nagged. Mirrors the macOS app (#472).
     /// </summary>
     public static string? PlaintextRemoteWarning(string? configuredBaseUrl)
@@ -104,9 +168,14 @@ public static class OpenAiCompatibleEndpoint
             return null;
         }
 
-        return $"This endpoint uses plaintext HTTP to a remote host ({parsed.Host}). "
-            + "Your API key and transcript text would be sent unencrypted. Use "
-            + "https:// unless this is a trusted local endpoint.";
+        if (IsUnqualifiedLocalName(parsed.Host))
+        {
+            return UnqualifiedLocalHostPlaintextMessage(parsed.Host, "API key and transcript text");
+        }
+
+        return "This endpoint uses plaintext HTTP to a host that is not an address this app "
+            + $"can check as local ({parsed.Host}). Your API key and transcript text would be sent "
+            + "unencrypted. Use https:// unless this is a trusted local endpoint.";
     }
 
     private static Uri NormalizeBaseUri(string? configuredBaseUrl)
@@ -131,4 +200,44 @@ public static class OpenAiCompatibleEndpoint
         builder.Fragment = string.Empty;
         return builder.Uri;
     }
+
+    /// <summary>
+    /// Whether <paramref name="host"/> is a dotted-quad IPv4 literal, and if so
+    /// its first two octets. Only decimal digits count: <c>byte.TryParse</c>
+    /// would also accept a sign or surrounding whitespace, which the macOS
+    /// parser rejects.
+    /// </summary>
+    private static bool TryParseDottedQuad(string host, out byte first, out byte second)
+    {
+        first = 0;
+        second = 0;
+
+        var parts = host.Split('.');
+        if (parts.Length != 4)
+        {
+            return false;
+        }
+
+        var octets = new byte[4];
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var part = parts[index];
+            if (part.Length == 0 || !part.All(char.IsAsciiDigit))
+            {
+                return false;
+            }
+
+            if (!byte.TryParse(part, out octets[index]))
+            {
+                return false;
+            }
+        }
+
+        first = octets[0];
+        second = octets[1];
+        return true;
+    }
+
+    private static bool IsHexDigit(char value) =>
+        value is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
 }

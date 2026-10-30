@@ -24,7 +24,6 @@ public sealed class JiraTransportPolicyTests : IDisposable
     [InlineData("http://192.168.1.10/jira")]
     [InlineData("http://10.1.2.3/jira")]
     [InlineData("http://172.16.1.10/jira")]
-    [InlineData("http://jira.local/jira")]
     public void TrustedTransport_RemainsUsableForSettingsAndDirectRequests(string endpoint)
     {
         var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
@@ -40,6 +39,7 @@ public sealed class JiraTransportPolicyTests : IDisposable
     [InlineData("HTTP://jira.example.com/jira")]
     [InlineData("http://localhost.evil.example/jira")]
     [InlineData("http://192.169.1.10/jira")]
+    [InlineData("http://jira.local/jira")]
     [InlineData("ftp://jira.example.com/jira")]
     public async Task UnsafeTransport_IsRefusedEvenWhenBypassingSettings(string endpoint)
     {
