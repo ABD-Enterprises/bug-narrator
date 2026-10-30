@@ -143,10 +143,18 @@ extension JiraExportProvider {
             return
         }
 
+        // The refusal is built the same way the settings warning builds it, so
+        // the export path and the settings screen cannot describe one host
+        // differently. A host the app parsed and found to be public is a remote
+        // host; a host it could not parse is one it cannot check as a local
+        // address.
         throw AppError.exportConfigurationIncompatible(
-            "The Jira base URL uses plaintext HTTP to a remote host (\(host)). "
-            + "Your Jira email, API token and issue content would cross the network "
-            + "unencrypted. Use https://, or point this at a local address."
+            SettingsStore.plaintextTransportRefusal(
+                host: host,
+                subject: "This Jira URL",
+                secret: "email, API token and issue content",
+                localNoun: "server"
+            )
         )
     }
 

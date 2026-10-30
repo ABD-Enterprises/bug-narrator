@@ -518,7 +518,7 @@ final class SettingsStoreTests: XCTestCase {
             "expected a parsed public address to be called remote, got: \(remote ?? "nil")"
         )
         XCTAssertTrue(
-            remote?.contains("email and API token would be sent unencrypted") ?? false,
+            remote?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(remote ?? "nil")"
         )
 
@@ -531,7 +531,7 @@ final class SettingsStoreTests: XCTestCase {
             "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
         XCTAssertTrue(
-            uncheckable?.contains("email and API token would be sent unencrypted") ?? false,
+            uncheckable?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(uncheckable ?? "nil")"
         )
     }

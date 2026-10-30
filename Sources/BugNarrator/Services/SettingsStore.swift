@@ -868,7 +868,7 @@ final class SettingsStore: ObservableObject {
         return Self.plaintextTransportRefusal(
             host: host,
             subject: "This Jira URL",
-            secret: "email and API token",
+            secret: "email, API token and issue content",
             localNoun: "server"
         )
     }
