@@ -11,24 +11,68 @@ import Foundation
 /// would put the account email, the API token and the issue content in the
 /// hands of a host the user never named.
 final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
-    /// Whether a redirect to `url` may be followed.
+    /// Why a redirect may not be followed.
+    enum Refusal: Equatable {
+        /// The redirect pointed at another origin: another host, another
+        /// port or another scheme.
+        case leavesTheOrigin
+
+        /// The redirect pointed at a plaintext remote host, or at a plaintext
+        /// URL without a host.
+        case plaintextRemoteHost
+    }
+
+    /// The reason a redirect to `url` may not be followed, or nil when it may.
     ///
     /// A redirect that leaves the origin the request started at is refused:
     /// the credentials belong to the site the user configured and to nowhere
     /// else. A redirect that stays on the origin is fine, and so is one to a
-    /// local address over plaintext.
-    static func mayFollow(_ url: URL?, from original: URL? = nil) -> Bool {
-        guard let url else { return true }
+    /// local address over plaintext - but only when it stays on the origin
+    /// too, because the origin is what is checked first.
+    static func refusal(for url: URL?, from original: URL? = nil) -> Refusal? {
+        guard let url else { return nil }
 
         if let original, !sameOrigin(url, original) {
-            return false
+            return .leavesTheOrigin
         }
 
-        guard url.scheme?.lowercased() == "http" else { return true }
+        guard url.scheme?.lowercased() == "http" else { return nil }
         // A plaintext URL without a host is a host the app cannot check, so it
         // is refused like any other one it cannot vouch for.
-        guard let host = url.host else { return false }
-        return SettingsStore.isLocalEndpointHost(host)
+        guard let host = url.host else { return .plaintextRemoteHost }
+        return SettingsStore.isLocalEndpointHost(host) ? nil : .plaintextRemoteHost
+    }
+
+    /// Whether a redirect to `url` may be followed.
+    static func mayFollow(_ url: URL?, from original: URL? = nil) -> Bool {
+        refusal(for: url, from: original) == nil
+    }
+
+    /// Why the last redirect was refused, so the error can name the reason
+    /// instead of guessing at it.
+    private let refusalLock = NSLock()
+    private var recordedRefusal: Refusal?
+
+    var lastRefusal: Refusal? {
+        refusalLock.lock()
+        defer { refusalLock.unlock() }
+        return recordedRefusal
+    }
+
+    private func record(_ refusal: Refusal) {
+        refusalLock.lock()
+        defer { refusalLock.unlock() }
+        recordedRefusal = refusal
+    }
+
+    /// What the refusal means, in a sentence.
+    static func describe(_ refusal: Refusal) -> String {
+        switch refusal {
+        case .leavesTheOrigin:
+            return "it leaves the configured origin, so the credentials and the issue content would have gone to another host"
+        case .plaintextRemoteHost:
+            return "it points at a plaintext remote host, so the credentials and the issue content would have gone in the clear"
+        }
     }
 
     /// Whether two URLs name the same origin: the same scheme, the same host
@@ -57,10 +101,11 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        guard Self.mayFollow(request.url, from: task.originalRequest?.url) else {
+        if let refusal = Self.refusal(for: request.url, from: task.originalRequest?.url) {
+            record(refusal)
             DiagnosticsLogger(category: .export).error(
                 "export_redirect_refused",
-                "Refused a redirect to \(request.url?.absoluteString ?? "unknown"): it leaves the configured origin or would put the credentials and the issue content in the clear."
+                "Refused a redirect to \(request.url?.absoluteString ?? "unknown"): \(Self.describe(refusal))"
             )
             completionHandler(nil)
             return
@@ -213,20 +258,39 @@ extension JiraExportProvider {
             return .exportFailure("Jira rejected the issue payload: \(message)")
         }
 
-        // A redirect the app did not follow: either the policy refused it, or
-        // it pointed somewhere the transport rule would not allow. 300 counts
-        // as one: RFC 9110 lets it carry a Location header. The other 3xx
-        // codes are not redirects: 304 is a cached response, 305 is
-        // deprecated and 306 is unused.
-        if [300, 301, 302, 303, 307, 308].contains(statusCode) {
-            return .exportConfigurationIncompatible(
-                "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
-                + "A redirect to a plaintext remote host would send the account email, the API token "
-                + "and the issue content in the clear. Use the final https:// URL of your Jira site."
-            )
+        // A redirect the app did not follow: these are the statuses CFNetwork
+        // follows, so the app only sees one when its own policy refused it.
+        // 300 is not one of them - RFC 9110 lets it carry a Location header,
+        // but CFNetwork does not offer it to the session's delegate, so it
+        // arrives as an ordinary response. The other 3xx codes are not
+        // redirects either: 304 is a cached response, 305 is deprecated and
+        // 306 is unused.
+        if [301, 302, 303, 307, 308].contains(statusCode) {
+            return .exportConfigurationIncompatible(redirectRefusalMessage(statusCode: statusCode))
         }
 
         return .exportFailure("Jira returned \(statusCode): \(message)")
+    }
+
+    /// The message for a redirect the app refused, naming the reason it was
+    /// refused: a redirect to another host would have taken the credentials
+    /// and the issue content with it, encrypted or not.
+    private func redirectRefusalMessage(statusCode: Int) -> String {
+        let reason: String
+        switch redirectPolicy.lastRefusal {
+        case .leavesTheOrigin:
+            reason = "The redirect pointed at another host, so the account email, the API token "
+                + "and the issue content would have gone there."
+        case .plaintextRemoteHost:
+            reason = "The redirect pointed at a plaintext remote host, so the account email, the API "
+                + "token and the issue content would have gone in the clear."
+        case nil:
+            reason = "The redirect pointed somewhere BugNarrator does not send the account email, "
+                + "the API token and the issue content."
+        }
+        return "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
+            + reason
+            + " Use the final https:// URL of your Jira site."
     }
 
     private func decodeJiraMessage(from data: Data) -> String? {

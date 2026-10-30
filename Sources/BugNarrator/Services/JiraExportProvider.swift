@@ -2,6 +2,9 @@ import Foundation
 
 actor JiraExportProvider {
     let session: URLSession
+    /// The policy the session's delegate runs, so the provider can read why a
+    /// redirect was refused and say so.
+    let redirectPolicy: JiraTransportRedirectPolicy
     let receiptStore: any ExportReceiptStoring
     let retryConfiguration: ExportRetryConfiguration
     let logger = DiagnosticsLogger(category: .export)
@@ -12,18 +15,21 @@ actor JiraExportProvider {
         receiptStore: any ExportReceiptStoring = ExportReceiptStore(),
         retryConfiguration: ExportRetryConfiguration = .default
     ) {
+        let policy = JiraTransportRedirectPolicy()
+        self.redirectPolicy = policy
         if let session {
             self.session = session
         } else {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 60
             configuration.timeoutIntervalForResource = 90
-            // The delegate refuses a redirect to a plaintext remote host: the
-            // guard in `requireEncryptedTransport` sees the request the app
-            // builds, not the one a redirect would send.
+            // The delegate refuses a redirect that leaves the configured
+            // origin or that would go to a plaintext remote host: the guard
+            // in `requireEncryptedTransport` sees the request the app builds,
+            // not the one a redirect would send.
             self.session = URLSession(
                 configuration: configuration,
-                delegate: JiraTransportRedirectPolicy(),
+                delegate: policy,
                 delegateQueue: nil
             )
         }

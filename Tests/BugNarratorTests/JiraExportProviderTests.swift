@@ -59,6 +59,33 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(nil))
     }
 
+    /// A redirect to a plaintext remote host is refused, and the reason is
+    /// recorded so the error can say what would have happened.
+    func testTheRefusalNamesTheReason() throws {
+        // The origin is checked first, so a plaintext host is only reached
+        // when the redirect stays on the origin it started at.
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "http://jira.example.com/rest/api/3/issue"),
+                from: URL(string: "http://jira.example.com/rest/api/3/issue")
+            ),
+            .plaintextRemoteHost
+        )
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "https://other.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            ),
+            .leavesTheOrigin
+        )
+        XCTAssertNil(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "https://jira.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            )
+        )
+    }
+
     /// A redirect that leaves the origin the user configured would put the
     /// account email, the API token and the issue content in the hands of a
     /// host they never named - encrypted or not.
@@ -142,6 +169,13 @@ final class JiraExportProviderTests: XCTestCase {
                 return XCTFail("expected an incompatible-configuration error, got \(error)")
             }
             XCTAssertTrue(message.contains("redirect"), message)
+            // The message has to name the reason the redirect was refused: a
+            // redirect to another host would have taken the credentials and
+            // the issue content there, encrypted or not.
+            XCTAssertTrue(
+                message.contains("another host"),
+                "the message has to say that the redirect pointed at another host: \(message)"
+            )
         }
 
         XCTAssertEqual(
