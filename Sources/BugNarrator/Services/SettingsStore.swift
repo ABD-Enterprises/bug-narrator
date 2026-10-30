@@ -552,20 +552,23 @@ final class SettingsStore: ObservableObject {
         let model_loaded: Bool
     }
 
-    /// Whether `host` denotes a loopback / private / link-local / `.local`
-    /// endpoint. Plaintext HTTP to such a host is acceptable because the traffic
-    /// stays on the machine or the trusted local network; plaintext HTTP to any
-    /// other host would send the API key and transcript text over the public
+    /// Whether `host` denotes a loopback / private / link-local endpoint.
+    /// Plaintext HTTP to such a host is acceptable because the traffic stays on
+    /// the machine or the trusted local network; plaintext HTTP to any other
+    /// host would send the API key and transcript text over the public
     /// internet unencrypted.
+    ///
+    /// A `.local` name and a single-label name are deliberately not trusted.
+    /// Both are resolved over mDNS, which any device on the local network can
+    /// answer, so a name that looks local can point anywhere — and ATS offers
+    /// no protection for them either. A local server is addressed by its IP
+    /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
         let lowered = host
             .lowercased()
             .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
 
         if lowered == "localhost" || lowered.hasSuffix(".localhost") { return true }
-        if lowered.hasSuffix(".local") { return true }
-        // Single-label hostnames (e.g. "lmstudio") never resolve on public DNS.
-        if !lowered.contains(".") && !lowered.contains(":") { return true }
         // IPv6 loopback / link-local.
         if lowered == "::1" || lowered.hasPrefix("fe80:") { return true }
 
@@ -583,10 +586,38 @@ final class SettingsStore: ObservableObject {
         return false
     }
 
+    /// Whether `host` is a name that resolves over mDNS rather than an address
+    /// the app can check: a `.local` name, or a single-label name such as
+    /// `lmstudio`. Any device on the local network can answer for such a name,
+    /// so it is not a trusted endpoint even though it looks local.
+    static func isUnqualifiedLocalName(_ host: String) -> Bool {
+        let lowered = host
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+
+        guard !lowered.isEmpty else { return false }
+        // A decimal IPv4 literal is an address in another notation, not a name.
+        if lowered.allSatisfy({ $0.isNumber }) { return false }
+        // `localhost` is reserved and always resolves to loopback.
+        if lowered == "localhost" || lowered.hasSuffix(".localhost") { return false }
+        if lowered.hasSuffix(".local") { return true }
+        return !lowered.contains(".") && !lowered.contains(":")
+    }
+
+    /// The message for an endpoint that is refused over plaintext HTTP because
+    /// its name can be claimed by any device on the local network. It names the
+    /// fix, because the user is looking at a field they believe is correct.
+    static func unqualifiedLocalHostPlaintextMessage(host: String, secret: String) -> String {
+        "\(host) is not an address this app trusts for plaintext HTTP: a .local or single-word host "
+            + "name can be claimed by any device on the local network, so the traffic could be "
+            + "intercepted. Use the machine's IP address (for example 192.168.1.20), or https://. "
+            + "Over plaintext HTTP your \(secret) would cross the network unencrypted."
+    }
+
     /// A user-facing warning when the configured base URL would transmit the API
     /// key and transcript content to a non-local host over plaintext HTTP. Remote
-    /// HTTPS and local HTTP (loopback/private/`.local`) return `nil` so legitimate
-    /// enterprise-proxy and local-provider workflows are not nagged.
+    /// HTTPS and local HTTP (loopback/private/link-local) return `nil` so
+    /// legitimate enterprise-proxy and local-provider workflows are not nagged.
     static func plaintextRemoteBaseURLWarning(
         from rawValue: String,
         provider: AIProvider = .openAI
@@ -596,6 +627,9 @@ final class SettingsStore: ObservableObject {
               let host = url.host,
               !isLocalEndpointHost(host) else {
             return nil
+        }
+        if isUnqualifiedLocalName(host) {
+            return unqualifiedLocalHostPlaintextMessage(host: host, secret: "API key and transcript text")
         }
         return "This endpoint uses plaintext HTTP to a remote host (\(host)). "
             + "Your API key and transcript text would be sent unencrypted. Use "
@@ -614,7 +648,7 @@ final class SettingsStore: ObservableObject {
 
     /// Warning when the configured Jira base URL would send Basic-auth credentials
     /// (email + API token) over plaintext HTTP to a remote host. Loopback/private/
-    /// `.local` HTTP and remote HTTPS return nil. Reuses the host classifier from
+    /// link-local HTTP and remote HTTPS return nil. Reuses the host classifier from
     /// the AI base-URL guard (#472).
     var jiraBaseURLPlaintextWarning: String? {
         guard let url = jiraBaseURLValue,
@@ -622,6 +656,9 @@ final class SettingsStore: ObservableObject {
               let host = url.host,
               !Self.isLocalEndpointHost(host) else {
             return nil
+        }
+        if Self.isUnqualifiedLocalName(host) {
+            return Self.unqualifiedLocalHostPlaintextMessage(host: host, secret: "email and API token")
         }
         return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
             + "Your email and API token would be sent unencrypted. Use https:// "

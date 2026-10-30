@@ -463,9 +463,12 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://127.0.0.1:8422"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://192.168.1.50:1234"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://10.0.0.5:8080"))
-        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
-        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: ""))
+
+        // A name that any device on the local network can claim is not a
+        // trusted local endpoint, so it warns like a remote host does.
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
 
         // Plaintext HTTP to a public host must warn.
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://api.example.com/v1"))
@@ -496,11 +499,33 @@ final class SettingsStoreTests: XCTestCase {
 
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
-                      "192.168.0.1", "169.254.1.1", "myserver.local", "lmstudio", "::1"] {
+                      "192.168.0.1", "169.254.1.1", "::1", "app.localhost"] {
             XCTAssertTrue(SettingsStore.isLocalEndpointHost(local), "expected \(local) to be local")
         }
-        for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com"] {
+        for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com",
+                       // A `.local` or single-label name resolves over mDNS, so
+                       // it is not an address the app can check.
+                       "myserver.local", "nas.local", "lmstudio"] {
             XCTAssertFalse(SettingsStore.isLocalEndpointHost(remote), "expected \(remote) to be remote")
+        }
+    }
+
+    /// A `.local` name and a single-label name are resolved over mDNS, which any
+    /// device on the local network can answer, so they are the names the app
+    /// refuses for plaintext HTTP.
+    func testUnqualifiedLocalNamesAreRecognised() {
+        for unqualified in ["myserver.local", "nas.local", "lmstudio", "server"] {
+            XCTAssertTrue(
+                SettingsStore.isUnqualifiedLocalName(unqualified),
+                "expected \(unqualified) to be unqualified"
+            )
+        }
+        for qualified in ["api.openai.com", "8.8.8.8", "192.168.1.10", "::1", "fe80::1",
+                          "localhost", "app.localhost", "134744072", ""] {
+            XCTAssertFalse(
+                SettingsStore.isUnqualifiedLocalName(qualified),
+                "expected \(qualified) to be qualified"
+            )
         }
     }
 
