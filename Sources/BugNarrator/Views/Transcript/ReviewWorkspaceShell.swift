@@ -192,10 +192,15 @@ struct ReviewWorkspaceShell<
                 extractedIssuesSection()
             }
 
-            if session.issueExtraction == nil {
-                reviewSectionCard("Screenshots") {
-                    screenshotsSection()
-                }
+            // The Screenshots card is always shown. Hiding it once issue
+            // extraction ran made the user's own captured evidence unreachable
+            // from the review surface: the gallery had no other render site,
+            // so a session with screenshots and extracted issues showed none
+            // of them. An extracted issue that references a screenshot still
+            // shows it inline; the gallery marks which issues reference each
+            // screenshot rather than replacing them.
+            reviewSectionCard("Screenshots") {
+                screenshotsSection()
             }
 
             reviewSectionCard("Transcript Timeline") {
