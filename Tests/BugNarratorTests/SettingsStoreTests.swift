@@ -521,12 +521,45 @@ final class SettingsStoreTests: XCTestCase {
             )
         }
         for qualified in ["api.openai.com", "8.8.8.8", "192.168.1.10", "::1", "fe80::1",
-                          "localhost", "app.localhost", "134744072", ""] {
+                          "localhost", "app.localhost", "134744072", "0x7f000001", ""] {
             XCTAssertFalse(
                 SettingsStore.isUnqualifiedLocalName(qualified),
                 "expected \(qualified) to be qualified"
             )
         }
+    }
+
+    /// An IPv4 literal written in another notation is an address, not a name
+    /// that any device on the local network could answer for.
+    func testNumericAddressLiteralsAreNotTreatedAsNames() {
+        for literal in ["134744072", "0x7f000001", "0X08080808", "2130706433"] {
+            XCTAssertTrue(
+                SettingsStore.isNumericAddressLiteral(literal),
+                "expected \(literal) to be an address literal"
+            )
+            XCTAssertFalse(
+                SettingsStore.isUnqualifiedLocalName(literal),
+                "expected \(literal) not to be treated as a claimable name"
+            )
+        }
+        for name in ["lmstudio", "nas.local", "8.8.8.8", "example.com"] {
+            XCTAssertFalse(
+                SettingsStore.isNumericAddressLiteral(name),
+                "expected \(name) not to be an address literal"
+            )
+        }
+    }
+
+    /// The refusal for a host the app cannot check as local says so, instead of
+    /// calling every refused host a remote one: a loopback address written in
+    /// another notation is not remote, it is simply not checkable.
+    func testTheRefusalNamesAHostTheAppCannotCheckAsLocal() {
+        let warning = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://134744072:1234/v1")
+        XCTAssertNotNil(warning)
+        XCTAssertTrue(
+            warning?.contains("not an address this app can check as local") ?? false,
+            "expected the refusal to say the host is not checkable, got: \(warning ?? "nil")"
+        )
     }
 
     func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {

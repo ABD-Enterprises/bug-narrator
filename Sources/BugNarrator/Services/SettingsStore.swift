@@ -596,12 +596,22 @@ final class SettingsStore: ObservableObject {
             .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
 
         guard !lowered.isEmpty else { return false }
-        // A decimal IPv4 literal is an address in another notation, not a name.
-        if lowered.allSatisfy({ $0.isNumber }) { return false }
+        // An IPv4 literal in another notation — `134744072`, `0x7f000001` — is
+        // an address, not a name anybody can claim for it.
+        if isNumericAddressLiteral(lowered) { return false }
         // `localhost` is reserved and always resolves to loopback.
         if lowered == "localhost" || lowered.hasSuffix(".localhost") { return false }
         if lowered.hasSuffix(".local") { return true }
         return !lowered.contains(".") && !lowered.contains(":")
+    }
+
+    /// Whether `host` is a number written in a notation other than the dotted
+    /// quad: decimal (`134744072`) or hexadecimal (`0x7f000001`).
+    static func isNumericAddressLiteral(_ host: String) -> Bool {
+        if host.allSatisfy({ $0.isNumber }) { return true }
+        guard host.hasPrefix("0x") || host.hasPrefix("0X") else { return false }
+        let digits = host.dropFirst(2)
+        return !digits.isEmpty && digits.allSatisfy({ $0.isHexDigit })
     }
 
     /// The message for an endpoint that is refused over plaintext HTTP because
@@ -631,9 +641,9 @@ final class SettingsStore: ObservableObject {
         if isUnqualifiedLocalName(host) {
             return unqualifiedLocalHostPlaintextMessage(host: host, secret: "API key and transcript text")
         }
-        return "This endpoint uses plaintext HTTP to a remote host (\(host)). "
-            + "Your API key and transcript text would be sent unencrypted. Use "
-            + "https:// unless this is a trusted local endpoint."
+        return "This endpoint uses plaintext HTTP to a host that is not an address this app "
+            + "can check as local (\(host)). Your API key and transcript text would be sent "
+            + "unencrypted. Use https:// unless this is a trusted local endpoint."
     }
 
     /// Warning to surface near the base-URL field for the active provider, or nil.
@@ -660,7 +670,8 @@ final class SettingsStore: ObservableObject {
         if Self.isUnqualifiedLocalName(host) {
             return Self.unqualifiedLocalHostPlaintextMessage(host: host, secret: "email and API token")
         }
-        return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
+        return "This Jira URL uses plaintext HTTP to a host that is not an address this app "
+            + "can check as local (\(host)). "
             + "Your email and API token would be sent unencrypted. Use https:// "
             + "unless this is a trusted local server."
     }
