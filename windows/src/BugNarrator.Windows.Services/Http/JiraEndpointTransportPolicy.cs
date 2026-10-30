@@ -18,8 +18,16 @@ public static class JiraEndpointTransportPolicy
                     endpoint.Host, "Jira email, API token and issue content");
             }
 
-            return "The Jira base URL uses plaintext HTTP to a host that is not an address this app "
-                + $"can check as local ({endpoint.Host}). "
+            if (OpenAiCompatibleEndpoint.IsPublicAddress(endpoint.Host))
+            {
+                return "The Jira base URL uses plaintext HTTP to a remote host "
+                    + $"({endpoint.Host}). "
+                    + "Your Jira email, API token and issue content would cross the network unencrypted. "
+                    + "Use https://, or configure a trusted local endpoint in Settings.";
+            }
+
+            return "The Jira base URL uses plaintext HTTP to a host this app cannot check as a local "
+                + $"address ({endpoint.Host}). "
                 + "Your Jira email, API token and issue content would cross the network unencrypted. "
                 + "Use https://, or configure a trusted local endpoint in Settings.";
         }
