@@ -34,8 +34,9 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
+from starlette.requests import ClientDisconnect
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +44,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("bugnarrator-transcription")
 
-app = FastAPI(title="BugNarrator Local Transcription Server")
+
+@contextlib.asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """Keep the idle-unload watchdog running for as long as the server serves."""
+    watchdog = asyncio.create_task(_idle_unload_watchdog())
+    try:
+        yield
+    finally:
+        watchdog.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await watchdog
+
+
+app = FastAPI(title="BugNarrator Local Transcription Server", lifespan=_lifespan)
 
 _model = None
 _model_name = None
@@ -81,6 +95,207 @@ _transcription_failure_message = (
     "Local transcription failed. Check the local transcription server logs for details."
 )
 
+# ---------------------------------------------------------------------------
+# Memory lifecycle (#1229)
+#
+# The server's peak resident memory must not grow with the length of the
+# recording, and it must come back down when a job ends. Three knobs shape
+# that: the window size (how much audio is decoded at once), the memory
+# ceiling (when to refuse instead of swapping the host to death), and the
+# idle unload (when to give the model's memory back).
+# ---------------------------------------------------------------------------
+
+_model_lock = threading.Lock()
+_activity_lock = threading.Lock()
+
+# 0 means "no ceiling": the server never refuses a job on memory grounds.
+_max_memory_bytes = 0
+# 0 means "keep the model resident". That is the default because the app's
+# launchd service expects a warm server and the model is a small, fixed cost
+# next to a recording. `--idle-unload-seconds` trades that for a load on the
+# next request.
+_idle_unload_seconds = 0
+_last_activity_monotonic = time.monotonic()
+
+_idle_check_interval_seconds = 5.0
+_disconnect_poll_seconds = 0.5
+
+
+class TranscriptionCancelled(RuntimeError):
+    """The client went away mid-job: the work is abandoned and its memory released."""
+
+
+class MemoryCeilingExceeded(RuntimeError):
+    """The process went above the configured memory ceiling, so the job stops there."""
+
+
+def _current_rss_bytes() -> Optional[int]:
+    """This process's resident set size in bytes, or None when it cannot be read.
+
+    The stdlib exposes no cross-platform RSS call, so each platform is read
+    through its own tool. A read that fails returns None instead of raising: a
+    measurement problem must never turn into a failed transcription.
+    """
+    try:
+        if sys.platform == "darwin":
+            completed = subprocess.run(
+                ["ps", "-o", "rss=", "-p", str(os.getpid())],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            kilobytes = completed.stdout.strip()
+            return int(kilobytes) * 1024 if kilobytes else None
+        if sys.platform.startswith("linux"):
+            with open("/proc/self/statm", "r", encoding="ascii") as handle:
+                fields = handle.read().split()
+            return int(fields[1]) * os.sysconf("SC_PAGE_SIZE")
+        if sys.platform == "win32":
+            return _windows_working_set_bytes()
+    except Exception:
+        logger.debug("Could not read the resident set size", exc_info=True)
+    return None
+
+
+def _windows_working_set_bytes() -> Optional[int]:
+    """The Windows working set of this process, read through psapi."""
+    import ctypes
+    from ctypes import wintypes
+
+    class _ProcessMemoryCounters(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+        ]
+
+    counters = _ProcessMemoryCounters()
+    counters.cb = ctypes.sizeof(counters)
+    handle = ctypes.windll.kernel32.GetCurrentProcess()
+    ok = ctypes.windll.psapi.GetProcessMemoryInfo(
+        handle, ctypes.byref(counters), counters.cb
+    )
+    return int(counters.WorkingSetSize) if ok else None
+
+
+def _note_activity():
+    """Record that the server was busy, so the idle clock restarts."""
+    global _last_activity_monotonic
+    with _activity_lock:
+        _last_activity_monotonic = time.monotonic()
+
+
+def _seconds_since_last_activity() -> float:
+    with _activity_lock:
+        return time.monotonic() - _last_activity_monotonic
+
+
+def _check_cancelled(cancel_event: Optional[threading.Event]):
+    """Abandon the job when the client has gone away (#1229).
+
+    The app closes the connection when the user cancels a transcription; without
+    this check the server would keep decoding and transcribing a recording
+    nobody is waiting for, holding its memory for the rest of the job.
+    """
+    if cancel_event is not None and cancel_event.is_set():
+        raise TranscriptionCancelled("the client disconnected before the job finished")
+
+
+def _check_memory_ceiling(stage: str):
+    """Refuse to keep working above the configured ceiling (#1229).
+
+    A ceiling turns a host-wide swap storm into a local, explained refusal: the
+    job stops with a clear message instead of driving the whole machine into swap.
+    """
+    if not _max_memory_bytes:
+        return
+    rss = _current_rss_bytes()
+    if rss is None or rss <= _max_memory_bytes:
+        return
+    raise MemoryCeilingExceeded(
+        f"the local transcription server stopped this job at the {stage}: it is using "
+        f"{rss // (1024 * 1024)} MB, above the configured ceiling of "
+        f"{_max_memory_bytes // (1024 * 1024)} MB"
+    )
+
+
+def configure_window_seconds(seconds: int):
+    """Set how much audio is decoded and transcribed at a time."""
+    global _chunk_duration_seconds
+    _chunk_duration_seconds = max(1, int(seconds))
+
+
+def configure_memory_limits(max_memory_mb: int = 0, idle_unload_seconds: int = 0):
+    """Set the memory ceiling and the idle-unload period."""
+    global _max_memory_bytes, _idle_unload_seconds
+    _max_memory_bytes = max(0, int(max_memory_mb)) * 1024 * 1024
+    _idle_unload_seconds = max(0, int(idle_unload_seconds))
+
+
+def _unload_model() -> bool:
+    """Give the model's memory back to the system (#1229).
+
+    This runs on the inference thread, so it can never race a job that is using
+    the model, and it clears the accelerator cache so the freed buffers leave
+    the resident set instead of sitting in a pool.
+    """
+    global _model, _model_name
+    with _model_lock:
+        if _model is None:
+            return False
+        _model = None
+        _model_name = None
+    _release_accelerator_cache()
+    logger.info("Unloaded the transcription model and released its cached buffers.")
+    return True
+
+
+async def _idle_unload_watchdog():
+    """Unload the model once the server has been idle for the configured time.
+
+    The idle period is opt-in (`--idle-unload-seconds`): the default service
+    keeps the model warm the way the app's launchd service expects, and an
+    operator who wants the memory back pays the model load on the next request.
+    """
+    while True:
+        await asyncio.sleep(_idle_check_interval_seconds)
+        if _idle_unload_seconds <= 0:
+            continue
+        if _model is None:
+            continue
+        if _seconds_since_last_activity() < _idle_unload_seconds:
+            continue
+        unloaded = await asyncio.get_running_loop().run_in_executor(
+            _inference_executor, _unload_model
+        )
+        if unloaded:
+            logger.info(
+                f"Idle for {_idle_unload_seconds}s: unloaded the model to return "
+                "its memory to the system."
+            )
+
+
+async def _watch_for_disconnect(request: Request, cancel_event: threading.Event):
+    """Cancel the job when the client goes away (#1229)."""
+    while True:
+        try:
+            disconnected = await request.is_disconnected()
+        except Exception:
+            logger.debug("Could not read the connection state", exc_info=True)
+            return
+        if disconnected:
+            cancel_event.set()
+            logger.info("The client disconnected: cancelling the transcription job.")
+            return
+        await asyncio.sleep(_disconnect_poll_seconds)
+
 
 class _SignalPreservingServer(uvicorn.Server):
     """Keep process handlers installed while pinned Uvicorn 0.47 serves."""
@@ -105,8 +320,9 @@ def get_model(model_name: Optional[str] = None):
     """Lazy-load the Parakeet model. Keeps it warm after first load."""
     global _model, _model_name
     resolved_model_name = _resolve_model_id(model_name)
-    if _model is not None and _model_name == resolved_model_name:
-        return _model
+    with _model_lock:
+        if _model is not None and _model_name == resolved_model_name:
+            return _model
 
     logger.info(f"Loading model: {resolved_model_name} ({_backend})")
     start = time.time()
@@ -114,27 +330,32 @@ def get_model(model_name: Optional[str] = None):
     if _backend == "mlx":
         from parakeet_mlx import from_pretrained
 
-        _model = from_pretrained(resolved_model_name)
+        loaded = from_pretrained(resolved_model_name)
     else:
         import onnx_asr
 
-        _model = onnx_asr.load_model(
+        loaded = onnx_asr.load_model(
             _onnx_model_for(resolved_model_name),
             quantization=_onnx_quantization,
         ).with_timestamps()
-    _model_name = resolved_model_name
+    with _model_lock:
+        _model = loaded
+        _model_name = resolved_model_name
     elapsed = time.time() - start
     logger.info(f"Model loaded in {elapsed:.1f}s")
-    return _model
+    return loaded
 
 
 @app.get("/health")
 async def health():
     """Health check endpoint for BugNarrator to verify the server is running."""
+    rss = _current_rss_bytes()
     return {
         "status": "ok",
         "model_loaded": _model is not None,
         "model_name": _model_name,
+        "pid": os.getpid(),
+        "rss_mb": rss // (1024 * 1024) if rss is not None else None,
     }
 
 
@@ -155,6 +376,7 @@ async def list_models():
 
 @app.post("/v1/audio/transcriptions")
 async def transcribe(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form(None),
     response_format: str = Form("verbose_json"),
@@ -168,9 +390,15 @@ async def transcribe(
     Accepts the same multipart form fields as api.openai.com/v1/audio/transcriptions.
     Returns verbose_json format with segments containing start, end, text,
     and no_speech_prob fields that BugNarrator expects.
+
+    The job watches for the client going away, so a cancelled transcription
+    stops at the next window boundary and releases its memory instead of
+    running to the end of the recording (#1229).
     """
     suffix = Path(file.filename).suffix if file.filename else ".m4a"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    cancel_event = threading.Event()
+    watcher = asyncio.create_task(_watch_for_disconnect(request, cancel_event))
     try:
         # Stream the upload to disk in bounded pieces: a long recording must not be
         # held in memory as one buffer (#1229).
@@ -192,12 +420,16 @@ async def transcribe(
             f"with model {model_id} in {_chunk_duration_seconds}s chunks"
         )
         start = time.time()
+        _check_memory_ceiling("start of the job")
+        _note_activity()
         result = await asyncio.get_running_loop().run_in_executor(
             _inference_executor,
             _run_inference,
             model_id,
             tmp.name,
+            cancel_event,
         )
+        _note_activity()
 
         elapsed = time.time() - start
         logger.info(f"Transcription completed in {elapsed:.1f}s")
@@ -229,6 +461,18 @@ async def transcribe(
         else:
             return JSONResponse(content={"text": full_text})
 
+    except TranscriptionCancelled:
+        logger.info(
+            "Transcription cancelled: the client disconnected, and the job's "
+            "memory was released."
+        )
+        return _cancelled_response()
+    except MemoryCeilingExceeded as error:
+        logger.warning(f"Transcription refused on the memory ceiling: {error}")
+        return _memory_ceiling_response(error)
+    except ClientDisconnect:
+        logger.info("The client disconnected during the upload; the job was abandoned.")
+        return _cancelled_response()
     except UnsupportedAudioError as error:
         logger.warning(f"Rejected unsupported audio upload: {error}")
         return JSONResponse(
@@ -244,6 +488,8 @@ async def transcribe(
         logger.exception("Transcription failed")
         return _transcription_failure_response()
     finally:
+        watcher.cancel()
+        await asyncio.gather(watcher, return_exceptions=True)
         with contextlib.suppress(OSError):
             tmp.close()
         with contextlib.suppress(OSError):
@@ -440,15 +686,24 @@ def _group_sentences(tokens, timestamps, offset: float):
     return sentences
 
 
-def _transcribe_onnx(model, audio_path: str) -> _Transcription:
+def _transcribe_onnx(
+    model,
+    audio_path: str,
+    cancel_event: Optional[threading.Event] = None,
+) -> _Transcription:
     """Chunk at the same 120 s bound as the MLX path and stitch the results back together.
 
     Verified with parakeet-tdt-0.6b-v3 on onnx-asr 0.12: a 226 s recording in 120 s chunks
     came back complete (40/40 sentences, 41 timed segments) in 21 s on an ARM64 CPU.
-    Windows are read one at a time, so the whole recording is never in memory (#1229)."""
+    Windows are read one at a time, so the whole recording is never in memory (#1229).
+
+    The job stops at a window boundary when the client has gone away or when the
+    process has passed the memory ceiling (#1229)."""
     texts = []
     sentences = []
     for samples, rate, offset in _wav_windows(audio_path, _chunk_duration_seconds):
+        _check_cancelled(cancel_event)
+        _check_memory_ceiling("window boundary")
         result = model.recognize(samples, sample_rate=rate)
         if result.text.strip():
             texts.append(result.text.strip())
@@ -537,17 +792,26 @@ def _wav_data_size(path: str) -> int:
     return data_size
 
 
-def _transcribe_mlx(parakeet, audio_path: str) -> _Transcription:
+def _transcribe_mlx(
+    parakeet,
+    audio_path: str,
+    cancel_event: Optional[threading.Event] = None,
+) -> _Transcription:
     """Decode and transcribe one bounded window at a time, offsetting each window's
     sentence timestamps back into the full recording's timeline.
 
     The MLX cache is released after every window (peak stays at one window's working set)
-    and again when leaving, whether the job finished or failed (#1229)."""
+    and again when leaving, whether the job finished or failed (#1229).
+
+    The job stops at a window boundary when the client has gone away or when the
+    process has passed the memory ceiling (#1229)."""
     texts = []
     sentences = []
     index = 0
     try:
         while True:
+            _check_cancelled(cancel_event)
+            _check_memory_ceiling("window boundary")
             start = index * _chunk_duration_seconds
             window = _decode_audio_window(audio_path, start)
             if window is None:
@@ -578,18 +842,53 @@ def _transcribe_mlx(parakeet, audio_path: str) -> _Transcription:
     return _Transcription(" ".join(texts), sentences)
 
 
-def _transcribe_audio(parakeet, audio_path: str):
+def _transcribe_audio(
+    parakeet,
+    audio_path: str,
+    cancel_event: Optional[threading.Event] = None,
+):
     """Dispatch on the model object rather than the platform so a test double with
     a transcribe method exercises the MLX contract on any OS."""
     if hasattr(parakeet, "transcribe"):
-        return _transcribe_mlx(parakeet, audio_path)
+        return _transcribe_mlx(parakeet, audio_path, cancel_event)
 
-    return _transcribe_onnx(parakeet, audio_path)
+    return _transcribe_onnx(parakeet, audio_path, cancel_event)
 
 
-def _run_inference(model_id: str, audio_path: str):
+def _run_inference(
+    model_id: str,
+    audio_path: str,
+    cancel_event: Optional[threading.Event] = None,
+):
     """Load and use MLX on the dedicated inference thread."""
-    return _transcribe_audio(get_model(model_id), audio_path)
+    return _transcribe_audio(get_model(model_id), audio_path, cancel_event)
+
+
+def _cancelled_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=499,
+        content={
+            "error": {
+                "message": "The transcription was cancelled before it finished.",
+                "type": "request_cancelled",
+            }
+        },
+    )
+
+
+def _memory_ceiling_response(error: MemoryCeilingExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "message": (
+                    f"{error}. Raise --max-memory-mb, lower --window-seconds, or free "
+                    "memory and retry."
+                ),
+                "type": "memory_limit_exceeded",
+            }
+        },
+    )
 
 
 def _transcription_failure_response() -> JSONResponse:
@@ -662,8 +961,35 @@ def main():
         action="store_true",
         help="Load the model at startup instead of on first request",
     )
+    parser.add_argument(
+        "--window-seconds",
+        type=int,
+        default=120,
+        help="Seconds of audio decoded and transcribed at a time (default: 120). "
+        "A smaller window lowers the memory one window needs and the delay before "
+        "a cancelled job stops.",
+    )
+    parser.add_argument(
+        "--max-memory-mb",
+        type=int,
+        default=0,
+        help="Refuse a transcription once the server's resident memory passes this "
+        "ceiling, in MB (default: 0, no ceiling).",
+    )
+    parser.add_argument(
+        "--idle-unload-seconds",
+        type=int,
+        default=0,
+        help="Unload the model after this many idle seconds (default: 0, the model "
+        "stays resident). The next request then pays the model load again.",
+    )
     args = parser.parse_args()
     configure_default_model(args.model)
+    configure_window_seconds(args.window_seconds)
+    configure_memory_limits(
+        max_memory_mb=args.max_memory_mb,
+        idle_unload_seconds=args.idle_unload_seconds,
+    )
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
