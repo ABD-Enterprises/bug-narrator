@@ -45,17 +45,21 @@ SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
 RUFF_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/python-lint-status.txt"
 REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
 mkdir -p "$VALIDATION_ARTIFACT_DIR"
-rm -f \
-  "$SEMGREP_STATUS_FILE" \
-  "$SEMGREP_OUTPUT_FILE" \
-  "$LOCAL_TRANSCRIPTION_STATUS_FILE" \
-  "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" \
-  "$EFFORT_LEAK_STATUS_FILE" \
-  "$EFFORT_LEAK_OUTPUT_FILE" \
-  "$REPO_DOCS_STATUS_FILE" \
-  "$REPO_DOCS_OUTPUT_FILE" \
-  "$SHELLCHECK_STATUS_FILE" \
-  "$RUFF_STATUS_FILE"
+# The self-check runs this script a second time, and that inner run must not
+# clear the status files this run is about to write.
+if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
+  rm -f \
+    "$SEMGREP_STATUS_FILE" \
+    "$SEMGREP_OUTPUT_FILE" \
+    "$LOCAL_TRANSCRIPTION_STATUS_FILE" \
+    "$LOCAL_TRANSCRIPTION_OUTPUT_FILE" \
+    "$EFFORT_LEAK_STATUS_FILE" \
+    "$EFFORT_LEAK_OUTPUT_FILE" \
+    "$REPO_DOCS_STATUS_FILE" \
+    "$REPO_DOCS_OUTPUT_FILE" \
+    "$SHELLCHECK_STATUS_FILE" \
+    "$RUFF_STATUS_FILE"
+fi
 
 should_skip_semgrep_target() {
   local target="$1"
@@ -80,6 +84,8 @@ if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
   if ! "$ROOT/scripts/check-changed-files.sh"; then
     exit 1
   fi
+else
+  printf 'SKIPPED: changed-files self-check not run (VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK=1)\n'
 fi
 
 # Build the changed-files target list, or fall back to scanning the whole
