@@ -32,6 +32,7 @@ jobs:
     # The preflight validates the dispatch before a Windows runner is reserved;
     # it reads nothing from the repository.
     permissions:
+      actions: read
       contents: read
     steps:
       - name: Confirm the release runs from the main branch
@@ -42,6 +43,37 @@ jobs:
           # branch someone dispatched by hand.
           if [[ "$RELEASE_REF" != "refs/heads/main" ]]; then
             printf '::error::Windows tester release must run from refs/heads/main, not %s.\n' "$RELEASE_REF"
+            exit 1
+          fi
+
+      - name: Confirm the release environment still gates the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # A workflow that names an environment that does not exist makes
+          # GitHub create it with no protection rules, so the release would
+          # publish with no approval and no branch restriction. The gate has to
+          # fail closed when the environment is missing or unprotected.
+          if ! rules="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq '[.protection_rules[]?.type] | join(",")' 2>&1)"; then
+            printf '::error::The windows-release environment could not be read: %s\n' "$rules" >&2
+            exit 1
+          fi
+          if [[ "$rules" != *required_reviewers* ]]; then
+            printf '::error::The windows-release environment does not require a reviewer; refusing to publish.\n' >&2
+            exit 1
+          fi
+          if [[ "$rules" != *branch_policy* ]]; then
+            printf '::error::The windows-release environment does not restrict which branch may deploy; refusing to publish.\n' >&2
+            exit 1
+          fi
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release" --jq 'if .can_admins_bypass == false then "no" else "yes" end')" != "no" ]]; then
+            printf '::error::The windows-release environment lets administrators bypass its protection rules; refusing to publish.\n' >&2
+            exit 1
+          fi
+          policies="$(gh api "repos/$GITHUB_REPOSITORY/environments/windows-release/deployment-branch-policies" --jq '[.branch_policies[]? | "\(.type) \(.name)"] | join(" | ")')"
+          if [[ "$policies" != "branch main" ]]; then
+            printf '::error::The windows-release environment admits "%s", not exactly main; refusing to publish.\n' "$policies" >&2
             exit 1
           fi
 
