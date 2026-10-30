@@ -310,10 +310,11 @@ struct WelcomeView: View {
         "Skip setup?"
     }
 
-    /// Names only the steps that actually block recording, rather than warning
-    /// about every incomplete one — skipping the hotkey step costs nothing.
+    /// Names only the steps that actually block transcription, rather than
+    /// warning about every incomplete one — skipping the hotkey step costs
+    /// nothing.
     private var skipConfirmationMessage: String {
-        let blocking = OnboardingFlow.blockingIncompleteSteps(in: snapshot)
+        let blocking = OnboardingFlow.transcriptionBlockingIncompleteSteps(in: snapshot)
         guard !blocking.isEmpty else {
             return "You can reopen this tour any time from Help › Show Welcome Tour."
         }
@@ -375,7 +376,7 @@ struct WelcomeView: View {
     }
 
     private func skip() {
-        if OnboardingFlow.blockingIncompleteSteps(in: snapshot).isEmpty {
+        if OnboardingFlow.transcriptionBlockingIncompleteSteps(in: snapshot).isEmpty {
             finish()
         } else {
             showSkipConfirmation = true

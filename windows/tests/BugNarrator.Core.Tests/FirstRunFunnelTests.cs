@@ -69,10 +69,10 @@ public sealed class FirstRunFunnelTests
     }
 
     [Fact]
-    public void OnlyTheProviderStepBlocksRecording()
+    public void OnlyTheProviderStepBlocksTranscription()
     {
-        Assert.Equal([OnboardingStep.Provider], FirstRunFunnel.BlockingIncompleteSteps(Fresh));
-        Assert.Empty(FirstRunFunnel.BlockingIncompleteSteps(Fresh with { HasUsableAiProviderCredential = true }));
+        Assert.Equal([OnboardingStep.Provider], FirstRunFunnel.TranscriptionBlockingIncompleteSteps(Fresh));
+        Assert.Empty(FirstRunFunnel.TranscriptionBlockingIncompleteSteps(Fresh with { HasUsableAiProviderCredential = true }));
     }
 
     [Fact]

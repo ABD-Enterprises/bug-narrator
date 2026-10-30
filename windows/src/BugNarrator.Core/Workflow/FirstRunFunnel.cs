@@ -44,8 +44,12 @@ public static class FirstRunFunnel
         _ => throw new ArgumentOutOfRangeException(nameof(step), step, null),
     };
 
-    /// <summary>Whether skipping this step leaves the user unable to record. Only the provider step does.</summary>
-    public static bool BlocksRecording(OnboardingStep step) => step == OnboardingStep.Provider;
+    /// <summary>
+    /// Whether skipping this step leaves the user unable to transcribe. Only the provider step does.
+    /// Recording is never gated by the provider: a session can be recorded and saved without one,
+    /// and it waits for the provider instead.
+    /// </summary>
+    public static bool BlocksTranscription(OnboardingStep step) => step == OnboardingStep.Provider;
 
     public static bool IsComplete(OnboardingStep step, OnboardingSnapshot snapshot) => step switch
     {
@@ -74,11 +78,11 @@ public static class FirstRunFunnel
     public static bool IsFullyConfigured(OnboardingSnapshot snapshot) => FirstIncompleteStep(snapshot) is null;
 
     /// <summary>
-    /// Steps that still block recording if left undone — what a skip warning should name, rather
+    /// Steps that still block transcription if left undone — what a skip warning should name, rather
     /// than warning about every incomplete step.
     /// </summary>
-    public static IReadOnlyList<OnboardingStep> BlockingIncompleteSteps(OnboardingSnapshot snapshot) =>
-        Steps.Where(step => BlocksRecording(step) && !IsComplete(step, snapshot)).ToList();
+    public static IReadOnlyList<OnboardingStep> TranscriptionBlockingIncompleteSteps(OnboardingSnapshot snapshot) =>
+        Steps.Where(step => BlocksTranscription(step) && !IsComplete(step, snapshot)).ToList();
 
     /// <summary>
     /// Whether to present the welcome flow unprompted at startup. Three independent reasons not

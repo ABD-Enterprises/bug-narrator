@@ -246,20 +246,20 @@ final class OnboardingFlowTests: XCTestCase {
     // MARK: - Blocking vs recommended
 
     func testOnlyTheProviderStepBlocksRecording() {
-        XCTAssertTrue(OnboardingStep.provider.blocksRecording)
-        XCTAssertFalse(OnboardingStep.microphone.blocksRecording)
+        XCTAssertTrue(OnboardingStep.provider.blocksTranscription)
+        XCTAssertFalse(OnboardingStep.microphone.blocksTranscription)
         XCTAssertFalse(
-            OnboardingStep.hotkeys.blocksRecording,
+            OnboardingStep.hotkeys.blocksTranscription,
             "Hotkeys are opt-in by the 1.0.11 decision; not assigning them must never block recording."
         )
     }
 
     func testBlockingIncompleteStepsNamesOnlyTheProvider() {
-        XCTAssertEqual(OnboardingFlow.blockingIncompleteSteps(in: snapshot()), [.provider])
+        XCTAssertEqual(OnboardingFlow.transcriptionBlockingIncompleteSteps(in: snapshot()), [.provider])
 
         let providerDone = snapshot(credential: true)
         XCTAssertTrue(
-            OnboardingFlow.blockingIncompleteSteps(in: providerDone).isEmpty,
+            OnboardingFlow.transcriptionBlockingIncompleteSteps(in: providerDone).isEmpty,
             "With a usable provider, skipping the rest leaves recording available."
         )
     }

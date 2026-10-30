@@ -432,14 +432,14 @@ public sealed class WelcomeWindow : Window
 
     private async Task SkipAsync()
     {
-        var blocking = FirstRunFunnel.BlockingIncompleteSteps(Snapshot);
+        var blocking = FirstRunFunnel.TranscriptionBlockingIncompleteSteps(Snapshot);
         if (blocking.Count == 0)
         {
             await FinishAsync();
             return;
         }
 
-        // Names only the steps that actually block recording — skipping the hotkey step costs nothing.
+        // Names only the steps that actually block transcription — skipping the hotkey step costs nothing.
         var names = string.Join(", ", blocking.Select(FirstRunFunnel.Title));
         var message = $"BugNarrator cannot transcribe a recording until this is done: {names}. "
             + "You can finish it later in Settings, or reopen this tour from the tray menu's Show Welcome Tour.";

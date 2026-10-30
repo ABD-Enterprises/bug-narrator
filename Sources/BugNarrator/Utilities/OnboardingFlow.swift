@@ -21,11 +21,13 @@ enum OnboardingStep: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Whether skipping this step leaves the user unable to record.
+    /// Whether skipping this step leaves the user unable to transcribe.
     ///
-    /// Only the provider step does. This is what keeps the flow honest about
-    /// which steps are genuinely required versus merely recommended.
-    var blocksRecording: Bool {
+    /// Only the provider step does. Recording is never gated by the provider:
+    /// a session can be recorded and saved without one, and it waits for the
+    /// provider instead. This is what keeps the flow honest about which steps
+    /// are genuinely required versus merely recommended.
+    var blocksTranscription: Bool {
         self == .provider
     }
 }
@@ -148,9 +150,9 @@ enum OnboardingFlow {
         return shouldAutoShowChangelog ? .changelog : .none
     }
 
-    /// Steps that still block recording if left undone — what a skip warning
-    /// should name, rather than warning about every incomplete step.
-    static func blockingIncompleteSteps(in snapshot: OnboardingSnapshot) -> [OnboardingStep] {
-        OnboardingStep.allCases.filter { $0.blocksRecording && !isComplete($0, in: snapshot) }
+    /// Steps that still block transcription if left undone — what a skip
+    /// warning should name, rather than warning about every incomplete step.
+    static func transcriptionBlockingIncompleteSteps(in snapshot: OnboardingSnapshot) -> [OnboardingStep] {
+        OnboardingStep.allCases.filter { $0.blocksTranscription && !isComplete($0, in: snapshot) }
     }
 }
