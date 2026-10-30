@@ -70,6 +70,7 @@ final class JiraExportProviderTests: XCTestCase {
         // there.
         let server = try RedirectServer(location: "http://plaintext-remote.invalid/rest/api/3/search/jql")
         server.serve()
+        defer { server.stop() }
 
         // No session is injected: the provider builds the one the app uses,
         // with the redirect policy on it.
@@ -105,6 +106,28 @@ final class JiraExportProviderTests: XCTestCase {
             server.requestCount,
             1,
             "the redirect target must never be requested: it would carry the credentials in the clear"
+        )
+    }
+
+    /// The server that answers the redirect releases its port when it is
+    /// stopped. A server that went on answering for the rest of the test run
+    /// would let one test's server answer another test's request, and would
+    /// keep the socket open for no reason.
+    func testTheRedirectServerReleasesItsPortWhenItIsStopped() throws {
+        let server = try RedirectServer(location: "http://plaintext-remote.invalid/")
+        server.serve()
+        defer { server.stop() }
+
+        XCTAssertTrue(
+            acceptsConnections(on: server.port),
+            "the server should be listening while it serves"
+        )
+
+        server.stop()
+
+        XCTAssertFalse(
+            acceptsConnections(on: server.port),
+            "the port should be released when the server stops"
         )
     }
 

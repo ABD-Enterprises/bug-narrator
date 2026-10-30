@@ -39,11 +39,15 @@ final class MockURLProtocol: URLProtocol {
 /// asks the session's delegate whether such a redirect may be followed, so a
 /// test built on one cannot tell whether the policy is wired into the
 /// session at all.
+///
+/// The server listens on the loopback address only, on a port the system
+/// picks, and it answers until it is stopped.
 final class RedirectServer: @unchecked Sendable {
     private let descriptor: Int32
     private let queue = DispatchQueue(label: "BugNarrator.RedirectServer")
-    private let lock = NSLock()
-    private var answered = 0
+    private let state = RedirectServerState()
+    private let closeLock = NSLock()
+    private var isClosed = false
 
     /// The port the server listens on.
     let port: UInt16
@@ -99,38 +103,63 @@ final class RedirectServer: @unchecked Sendable {
             )
         }
 
+        // The socket does not block. The loop checks whether the server has
+        // been stopped between connections, so stopping it does not depend on
+        // a connection arriving.
+        let flags = fcntl(opened, F_GETFL, 0)
+        _ = fcntl(opened, F_SETFL, flags | O_NONBLOCK)
+
         descriptor = opened
         self.location = location
         port = UInt16(bigEndian: listening.sin_port)
     }
 
     deinit {
-        close(descriptor)
+        stop()
     }
 
     /// How many requests the server answered.
     var requestCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return answered
+        state.count
     }
 
-    /// Answers requests with a redirect to `location` until the test ends.
+    /// Answers requests with a redirect to `location` until the server is
+    /// stopped.
+    ///
+    /// The loop does not retain the server: it owns the counter and the
+    /// socket, and the server owns them in turn. A loop that retained the
+    /// server would keep the socket open for the rest of the test run, and
+    /// the port would go on answering after the test that opened it ended.
     func serve() {
-        queue.async { [descriptor, location] in
-            while true {
+        state.begin()
+        queue.async { [descriptor, location, state] in
+            while !state.isStopRequested {
                 let client = accept(descriptor, nil, nil)
-                guard client >= 0 else { return }
+                guard client >= 0 else {
+                    // No connection is waiting. The socket does not block, so
+                    // this is not a failure.
+                    Thread.sleep(forTimeInterval: 0.005)
+                    continue
+                }
                 defer { close(client) }
+
+                // A client that sends nothing must not hold the server: the
+                // read is given a moment and the connection is dropped after.
+                var timeout = timeval(tv_sec: 2, tv_usec: 0)
+                setsockopt(
+                    client,
+                    SOL_SOCKET,
+                    SO_RCVTIMEO,
+                    &timeout,
+                    socklen_t(MemoryLayout<timeval>.size)
+                )
 
                 var buffer = [UInt8](repeating: 0, count: 4096)
                 _ = buffer.withUnsafeMutableBytes { pointer in
                     read(client, pointer.baseAddress, pointer.count)
                 }
 
-                self.lock.lock()
-                self.answered += 1
-                self.lock.unlock()
+                state.record()
 
                 let response = "HTTP/1.1 307 Temporary Redirect\r\n"
                     + "Location: \(location)\r\n"
@@ -140,8 +169,104 @@ final class RedirectServer: @unchecked Sendable {
                     _ = write(client, pointer, strlen(pointer))
                 }
             }
+            state.markStopped()
         }
     }
+
+    /// Stops the server and releases the socket.
+    ///
+    /// The socket is closed once the loop that answers on it has stopped, so
+    /// the loop never accepts on a closed descriptor.
+    func stop() {
+        state.requestStop()
+        let deadline = Date().addingTimeInterval(2)
+        while !state.isStopped && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+        closeSocket()
+    }
+
+    private func closeSocket() {
+        closeLock.lock()
+        defer { closeLock.unlock() }
+        guard !isClosed else { return }
+        isClosed = true
+        close(descriptor)
+    }
+}
+
+/// What a `RedirectServer` has answered, and whether it should stop.
+///
+/// It is a separate object so that the serving loop does not have to retain
+/// the server it belongs to.
+private final class RedirectServerState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var answered = 0
+    private var stopRequested = false
+    private var stopped = true
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return answered
+    }
+
+    var isStopRequested: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopRequested
+    }
+
+    var isStopped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopped
+    }
+
+    func begin() {
+        lock.lock()
+        stopped = false
+        lock.unlock()
+    }
+
+    func record() {
+        lock.lock()
+        answered += 1
+        lock.unlock()
+    }
+
+    func requestStop() {
+        lock.lock()
+        stopRequested = true
+        lock.unlock()
+    }
+
+    func markStopped() {
+        lock.lock()
+        stopped = true
+        lock.unlock()
+    }
+}
+
+/// Whether something is listening on `port` right now.
+///
+/// The server binds to the loopback address on a port the system picks, so
+/// nothing outside the machine can reach it.
+func acceptsConnections(on port: UInt16) -> Bool {
+    let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+    defer { close(descriptor) }
+
+    var address = sockaddr_in()
+    address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+    address.sin_family = sa_family_t(AF_INET)
+    address.sin_port = port.bigEndian
+    address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+    let result = withUnsafePointer(to: &address) { pointer in
+        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    return result == 0
 }
 
 func makeMockURLSession() -> URLSession {
