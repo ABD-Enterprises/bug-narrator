@@ -246,11 +246,16 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
-    /// Whether <paramref name="host"/> is a dotted-quad IPv4 literal, and if so
-    /// its first two octets. Only decimal digits count: <c>byte.TryParse</c>
-    /// would also accept a sign or surrounding whitespace, which the macOS
-    /// parser rejects.
+    /// Whether <paramref name="host"/> is a dotted-quad IPv4 literal written the
+    /// way an address is written, and if so its first two octets.
     /// </summary>
+    /// <remarks>
+    /// Only decimal digits count: <c>byte.TryParse</c> would also accept a sign
+    /// or surrounding whitespace, which the macOS parser rejects. A leading
+    /// zero is rejected too, because it is another spelling of the same octet
+    /// rather than the octet itself: .NET reads <c>010.0.0.1</c> as eight, so
+    /// the app and the network would disagree about what the host is.
+    /// </remarks>
     private static bool TryParseDottedQuad(string host, out byte first, out byte second)
     {
         first = 0;
@@ -267,6 +272,11 @@ public static class OpenAiCompatibleEndpoint
         {
             var part = parts[index];
             if (part.Length == 0 || !part.All(char.IsAsciiDigit))
+            {
+                return false;
+            }
+
+            if (part.Length > 1 && part[0] == '0')
             {
                 return false;
             }

@@ -84,6 +84,27 @@ public sealed class OpenAiCompatibleEndpointTests
     }
 
     /// <summary>
+    /// An address has to be spelled the way an address is written, because the
+    /// app and the network have to read the host the same way. A leading zero
+    /// is a different octet to a resolver that reads it as octal, and a dot on
+    /// either end turns the host into an absolute DNS name a resolver anywhere
+    /// on the network can answer.
+    /// </summary>
+    [Theory]
+    [InlineData("010.0.0.1")]        // a leading zero
+    [InlineData("10.00.0.1")]
+    [InlineData("127.000.000.001")]
+    [InlineData("192.168.001.010")]
+    [InlineData("127.0.0.1.")]       // a trailing dot
+    [InlineData(".127.0.0.1")]       // a leading dot
+    [InlineData("127..0.1")]         // an empty part
+    [InlineData("127.0.0.256")]      // not an octet
+    public void IsLocalEndpointHost_RejectsAnAddressThatIsNotSpelledCanonically(string host)
+    {
+        Assert.False(OpenAiCompatibleEndpoint.IsLocalEndpointHost(host));
+    }
+
+    /// <summary>
     /// A <c>.local</c> name and a single-label name are resolved over mDNS, which
     /// any device on the local network can answer for, so neither is trusted for
     /// plaintext HTTP even though it looks local.
