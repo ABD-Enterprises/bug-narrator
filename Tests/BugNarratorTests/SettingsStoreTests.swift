@@ -1146,8 +1146,12 @@ final class SettingsStoreTests: XCTestCase {
             return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!,
                     Data(#"{"status":"ok","model_loaded":true}"#.utf8))
         }
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
-                                  localProviderSession: makeMockURLSession())
+        // The isolated store keeps the probe the test is about: its own
+        // health check over the mock session. The default probe refuses every
+        // host, which would stop the recovery this test is watching for.
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  usesTheStoresOwnReachabilityProbe: true)
         XCTAssertEqual(store.localProviderReachability, .unknown)
         let unavailable = expectation(description: "Server initially unavailable")
         let recovered = expectation(description: "Server becomes ready without another user action")

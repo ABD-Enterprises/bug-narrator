@@ -419,7 +419,10 @@ def _load_model_in_background(model_name: Optional[str]) -> None:
     _model_load_state = "loading"
 
     def load() -> None:
-        global _model_load_error
+        # Both names are module-level: without `global` here the assignment
+        # would create a local, and the server would report the model as
+        # "loading" for ever after a failure.
+        global _model_load_error, _model_load_state
         try:
             _inference_executor.submit(get_model, model_name).result()
         except Exception as exc:  # noqa: BLE001 - the server stays up and says why

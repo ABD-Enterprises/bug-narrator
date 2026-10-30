@@ -207,6 +207,29 @@ class ServerModelConfigurationTests(unittest.TestCase):
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
+    def test_a_failed_preload_reports_the_failure_to_the_health_check(self):
+        # The loader runs in a thread, and the state it sets has to reach the
+        # module. A local assignment in the loader would leave the server
+        # reporting "loading" for ever after a failure, so the app would wait
+        # for a model that is never going to arrive.
+        server._model_load_state = "not_loaded"
+        server._model_load_error = None
+        self.addCleanup(setattr, server, "_model_load_state", "not_loaded")
+        self.addCleanup(setattr, server, "_model_load_error", None)
+
+        with patch.object(server, "get_model", side_effect=RuntimeError("the model is missing")):
+            server._load_model_in_background("a-model")
+            deadline = time.time() + 5
+            while server._model_load_state != "failed" and time.time() < deadline:
+                time.sleep(0.02)
+
+        self.assertEqual(server._model_load_state, "failed")
+        self.assertIn("the model is missing", server._model_load_error)
+
+        health = asyncio.run(server.health())
+        self.assertEqual(health["status"], "degraded")
+        self.assertIn("the model is missing", health["model_error"])
+
     def test_model_load_and_transcription_share_the_inference_thread(self):
         class RecordingModel:
             def __init__(self):

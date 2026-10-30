@@ -79,14 +79,21 @@ func makeIsolatedSettingsStore(
     legacyDefaultsDomains: [String]? = nil,
     localProviderReachabilityProbe: ((URL) -> Bool)? = { _ in false },
     localProviderSession: URLSession = .shared,
-    localServerInstallDirectory: URL = isolatedLocalServerInstallDirectory
+    localServerInstallDirectory: URL = isolatedLocalServerInstallDirectory,
+    usesTheStoresOwnReachabilityProbe: Bool = false
 ) -> SettingsStore {
     SettingsStore(
         defaults: defaults,
         keychainService: keychainService,
         launchAtLoginService: launchAtLoginService,
         legacyDefaultsDomains: legacyDefaultsDomains,
-        localProviderReachabilityProbe: localProviderReachabilityProbe ?? { _ in false },
+        // The default refuses every host, so that an incidental test never
+        // polls for a server it is not about. A test that is about the probe
+        // itself asks for the store's own probe, which is the one that reads
+        // the health check over `localProviderSession`.
+        localProviderReachabilityProbe: usesTheStoresOwnReachabilityProbe
+            ? nil
+            : (localProviderReachabilityProbe ?? { _ in false }),
         localProviderSession: localProviderSession,
         localServerInstallDirectory: localServerInstallDirectory
     )

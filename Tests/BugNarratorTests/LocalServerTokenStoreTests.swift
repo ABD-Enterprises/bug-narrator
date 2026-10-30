@@ -42,6 +42,29 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), token)
     }
 
+    /// A token file that was already there with wider permissions must not
+    /// stay readable by anyone else once the token is replaced. The
+    /// replacement keeps the destination's metadata unless it is told
+    /// otherwise, so a file that an earlier version left at 0644 would keep
+    /// being world-readable.
+    func testAReplacedTokenFileIsOnlyReadableByItsOwner() throws {
+        let directory = makeInstallDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        FileManager.default.createFile(
+            atPath: url.path,
+            contents: Data("an-old-token".utf8),
+            attributes: [.posixPermissions: NSNumber(value: 0o644)]
+        )
+
+        XCTAssertTrue(LocalServerTokenStore.writeToken("a-new-token", at: url))
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let permissions = try XCTUnwrap(attributes[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(permissions.int16Value, 0o600)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "a-new-token")
+    }
+
     func testAStoredTokenIsReadBackUnchanged() throws {
         let directory = makeInstallDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

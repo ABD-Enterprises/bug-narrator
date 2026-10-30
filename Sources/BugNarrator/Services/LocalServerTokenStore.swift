@@ -91,8 +91,15 @@ enum LocalServerTokenStore {
             do {
                 try Data(token.utf8).write(to: temporary)
                 // The file is replaced in one step, so a reader never sees a
-                // missing or an empty token file.
-                _ = try manager.replaceItemAt(url, withItemAt: temporary)
+                // missing or an empty token file. The new file's metadata is
+                // the one that is kept: a token file that was already there
+                // with wider permissions would otherwise stay readable by
+                // everyone else.
+                _ = try manager.replaceItemAt(
+                    url,
+                    withItemAt: temporary,
+                    options: [.usingNewMetadataOnly]
+                )
             } catch {
                 try? manager.removeItem(at: temporary)
                 return false
