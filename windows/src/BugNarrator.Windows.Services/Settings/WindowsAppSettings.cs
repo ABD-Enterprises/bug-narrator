@@ -163,24 +163,29 @@ public sealed record WindowsAppSettings(
 
     /// <summary>
     /// Explanatory warning when the Jira base URL would send Basic-auth
-    /// credentials (email + API token) over plaintext HTTP to a remote host.
-    /// Null for remote HTTPS and local HTTP. Export also enforces the compatibility policy below.
+    /// credentials (email + API token) over plaintext HTTP to a host the app
+    /// cannot check as local. Null for remote HTTPS and local HTTP. Export also
+    /// enforces the compatibility policy below.
     /// </summary>
     public string? JiraBaseUrlSecurityWarning
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(JiraBaseUrl)
-                || !Uri.TryCreate(JiraBaseUrl.Trim(), UriKind.Absolute, out var parsed)
-                || !string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase)
-                || OpenAiCompatibleEndpoint.IsLocalEndpointHost(parsed.Host))
+            // The host is read as it was written, and a URL that .NET cannot
+            // parse is judged too: .NET rewrites a number written in another
+            // notation into the address it stands for, and the macOS port
+            // refuses those spellings.
+            var host = OpenAiCompatibleEndpoint.PlaintextHttpHost(JiraBaseUrl);
+            if (host is null)
             {
                 return null;
             }
 
-            return $"This Jira URL uses plaintext HTTP to a remote host ({parsed.Host}). "
-                + "Your email and API token would be sent unencrypted. Use https:// "
-                + "unless this is a trusted local server.";
+            // The export gate builds the same sentence from the same helper,
+            // so the warning next to the field and the refusal that blocks the
+            // export cannot describe one host two different ways.
+            return OpenAiCompatibleEndpoint.PlaintextTransportRefusal(
+                host, "This Jira URL", "email, API token and issue content", "server");
         }
     }
 
