@@ -8,14 +8,22 @@ final class FirstRunFunnelTests: XCTestCase {
     // MARK: - Recording without a provider
 
     /// The wall itself. Recording no longer depends on provider readiness; a
-    /// stop without one preserves the session for later transcription.
+    /// stop without one preserves the session for later transcription. The
+    /// provider is not an input to the decision at all, so it cannot gate the
+    /// start — every phase that allows work allows it.
     func testRecordingCanStartWithoutAConfiguredProvider() {
-        XCTAssertTrue(FirstRunFunnel.canStartRecording(phaseAllowsStart: true))
+        XCTAssertTrue(FirstRunFunnel.canStartRecording(phase: .idle))
+        XCTAssertTrue(FirstRunFunnel.canStartRecording(phase: .success))
+        XCTAssertTrue(FirstRunFunnel.canStartRecording(phase: .error))
     }
 
     func testRecordingStillCannotStartWhileBusy() {
         XCTAssertFalse(
-            FirstRunFunnel.canStartRecording(phaseAllowsStart: false),
+            FirstRunFunnel.canStartRecording(phase: .recording),
+            "Recording and transcribing phases must still block a new start."
+        )
+        XCTAssertFalse(
+            FirstRunFunnel.canStartRecording(phase: .transcribing),
             "Recording and transcribing phases must still block a new start."
         )
     }

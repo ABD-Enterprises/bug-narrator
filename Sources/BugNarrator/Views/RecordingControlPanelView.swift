@@ -210,16 +210,7 @@ struct RecordingControlPanelView: View {
     }
 
     private var canStartSession: Bool {
-        switch appState.status.phase {
-        case .idle, .success, .error:
-            // A provider is needed to transcribe, not to record (#959). A stop
-            // without one preserves the session as a retryable pending
-            // transcription, so blocking the start only cost the user the
-            // recording.
-            return FirstRunFunnel.canStartRecording(phaseAllowsStart: true)
-        case .recording, .transcribing:
-            return FirstRunFunnel.canStartRecording(phaseAllowsStart: false)
-        }
+        FirstRunFunnel.canStartRecording(phase: appState.status.phase)
     }
 
     private var startRecordingHint: String {

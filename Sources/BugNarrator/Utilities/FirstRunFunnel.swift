@@ -6,7 +6,7 @@ import Foundation
 /// reason `OnboardingFlow` exists, and the direct response to #918 where a
 /// view-only decision no test could reach shipped broken.
 enum FirstRunFunnel {
-    /// Whether a session may start.
+    /// Whether a session may start in the given phase.
     ///
     /// It used to require a configured AI provider, which walled off the
     /// product's entire first-run path behind a paid API key even though the
@@ -17,8 +17,16 @@ enum FirstRunFunnel {
     /// So the provider is required to *transcribe*, not to *record*. Blocking
     /// the recording bought nothing and cost every evaluator their first
     /// session.
-    static func canStartRecording(phaseAllowsStart: Bool) -> Bool {
-        phaseAllowsStart
+    ///
+    /// The provider is deliberately not an input here: it cannot gate the
+    /// start, so there is no provider condition left to get wrong.
+    static func canStartRecording(phase: AppStatus.Phase) -> Bool {
+        switch phase {
+        case .idle, .success, .error:
+            return true
+        case .recording, .transcribing:
+            return false
+        }
     }
 
     /// What the user is promised when they start without a provider, so the
