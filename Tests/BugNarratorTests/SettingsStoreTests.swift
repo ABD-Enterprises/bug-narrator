@@ -463,9 +463,12 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://127.0.0.1:8422"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://192.168.1.50:1234"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://10.0.0.5:8080"))
-        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
-        XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: ""))
+
+        // A name that any device on the local network can claim is not a
+        // trusted local endpoint, so it warns like a remote host does.
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
+        XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
 
         // Plaintext HTTP to a public host must warn.
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://api.example.com/v1"))
@@ -494,14 +497,433 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotNil(store.jiraBaseURLPlaintextWarning)
     }
 
+    /// The refusal for a plaintext remote Jira URL has to say what the user
+    /// loses if they accept it: the account email and the API token cross the
+    /// network in the clear. A refusal that only names the host says nothing
+    /// about the risk, and the two refusals differ in why the host was refused
+    /// — one the app knows to be remote, one it cannot check at all.
+    func testTheJiraRefusalNamesTheCredentialsItWouldSendInTheClear() {
+        let suiteName = "BugNarrator-JiraPlaintextMessageTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        // A public address: the app parsed it and knows it is remote.
+        store.jiraBaseURL = "http://8.8.8.8:8080"
+        let remote = store.jiraBaseURLPlaintextWarning
+        XCTAssertNotNil(remote)
+        XCTAssertTrue(
+            remote?.contains("remote host") ?? false,
+            "expected a parsed public address to be called remote, got: \(remote ?? "nil")"
+        )
+        XCTAssertTrue(
+            remote?.contains("email and API token would be sent unencrypted") ?? false,
+            "expected the refusal to name the credentials at risk, got: \(remote ?? "nil")"
+        )
+
+        // A host in another notation: the app cannot say where it points.
+        store.jiraBaseURL = "http://134744072:8080"
+        let uncheckable = store.jiraBaseURLPlaintextWarning
+        XCTAssertNotNil(uncheckable)
+        XCTAssertTrue(
+            uncheckable?.contains("cannot use as a local address") ?? false,
+            "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
+        )
+        XCTAssertTrue(
+            uncheckable?.contains("email and API token would be sent unencrypted") ?? false,
+            "expected the refusal to name the credentials at risk, got: \(uncheckable ?? "nil")"
+        )
+    }
+
     func testIsLocalEndpointHostClassification() {
         for local in ["localhost", "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1",
-                      "192.168.0.1", "169.254.1.1", "myserver.local", "lmstudio", "::1"] {
+                      "192.168.0.1", "169.254.1.1", "::1", "app.localhost"] {
             XCTAssertTrue(SettingsStore.isLocalEndpointHost(local), "expected \(local) to be local")
         }
-        for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com"] {
+        for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com",
+                       // A `.local` or single-label name resolves over mDNS, so
+                       // it is not an address the app can check.
+                       "myserver.local", "nas.local", "lmstudio",
+                       // An address written in another notation is not parsed as
+                       // an address either, so it is not trusted.
+                       "134744072", "0x7f000001"] {
             XCTAssertFalse(SettingsStore.isLocalEndpointHost(remote), "expected \(remote) to be remote")
         }
+    }
+
+    /// The trusted names are the ones the standards reserve for the loopback:
+    /// `localhost` and the names under it. A name that merely *looks* like it
+    /// points at this machine is not one of them.
+    ///
+    /// `localhost.localdomain` is the obvious example. It is a Debian
+    /// convention that lives in `/etc/hosts`, not a reserved name: a resolver
+    /// on the network can answer it with any address it likes, so the app
+    /// cannot tell where it points and must not treat it as local.
+    func testOnlyTheReservedLocalhostNamesAreTrusted() {
+        for trusted in ["localhost", "app.localhost", "LOCALHOST", "App.LocalHost"] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: the standards reserve it for the loopback"
+            )
+        }
+
+        for untrusted in ["localhost.localdomain", "myhost.localhost.example.com", "notlocalhost"] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: it is not a reserved name"
+            )
+        }
+    }
+
+    /// A trailing dot makes a name absolute rather than different: a resolver
+    /// answers the same name either way, so `nas.local.` is the same host as
+    /// `nas.local` and has to be classified the same way.
+    ///
+    /// The same is true of a reserved name: `localhost.` is the absolute form
+    /// of `localhost`, and a resolver answers it with the loopback address.
+    ///
+    /// An address is not a name. `127.0.0.1.` is not the address any more —
+    /// it is a name the app cannot check — so it stays refused.
+    func testATrailingDotDoesNotChangeWhichClassAHostIsIn() {
+        XCTAssertTrue(
+            SettingsStore.isUnqualifiedLocalName("nas.local."),
+            "a trailing dot does not make a claimable name a different host"
+        )
+        XCTAssertTrue(
+            SettingsStore.isUnqualifiedLocalName("lmstudio."),
+            "a trailing dot does not make a claimable name a different host"
+        )
+        XCTAssertFalse(
+            SettingsStore.isUnqualifiedLocalName("localhost."),
+            "localhost is reserved, however it is written"
+        )
+        for reserved in ["localhost.", "app.localhost."] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(reserved),
+                "expected \(reserved) to be trusted: it is the absolute form of a reserved name"
+            )
+        }
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("127.0.0.1."),
+            "a trailing dot turns an address into a name the app cannot check"
+        )
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("[localhost]"),
+            "brackets belong to an IPv6 literal; a bracketed name is not one"
+        )
+    }
+
+    /// `::ffff:0.0.0.0` is `0.0.0.0` written as an IPv6 address, so it reaches
+    /// this machine the same way `0.0.0.0` and `::ffff:127.0.0.1` do.
+    func testTheMappedUnspecifiedAddressIsThisMachineToo() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::ffff:0.0.0.0"),
+            "the mapped unspecified address reaches this machine"
+        )
+    }
+
+    /// The settings screen shows the refusal once. For a refused plaintext
+    /// endpoint the warning next to the base URL field and the compatibility
+    /// issue are the same sentence, so rendering both would show it twice.
+    func testTheSettingsScreenShowsTheRefusalOnce() {
+        let suiteName = "BugNarrator-SingleRefusal-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = "http://nas.local/v1"
+
+        XCTAssertNotNil(store.aiBaseURLPlaintextWarning)
+        XCTAssertNotNil(store.aiProviderCompatibilityIssue)
+        XCTAssertFalse(
+            store.shouldRenderCompatibilityIssue,
+            "the warning next to the field already says it"
+        )
+
+        // A different compatibility issue is a different sentence, so it is
+        // shown.
+        store.openAIBaseURL = "https://api.example.com/v1"
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = ""
+        XCTAssertNotNil(store.aiProviderCompatibilityIssue)
+        XCTAssertTrue(
+            store.shouldRenderCompatibilityIssue,
+            "a missing base URL is not the same sentence as the warning"
+        )
+    }
+
+    /// The refusal for a name the network answers has to say so. The message
+    /// used to claim that any device on the local network can claim the name,
+    /// which is only true for a `.local` name: a single-label name is answered
+    /// through the resolver's search list, which is not always mDNS.
+    func testTheNetworkAnsweredRefusalDoesNotClaimMdns() {
+        let suiteName = "BugNarrator-NetworkAnswered-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        store.aiProvider = .openAICompatible
+        store.openAIBaseURL = "http://lmstudio/v1"
+
+        let issue = store.aiProviderCompatibilityIssue
+
+        XCTAssertNotNil(issue)
+        XCTAssertTrue(
+            issue?.contains("answered by the network rather than by the app") ?? false,
+            "the refusal has to say who answers the name: \(issue ?? "nil")"
+        )
+        XCTAssertFalse(
+            issue?.contains("mDNS") ?? false,
+            "the refusal must not claim mDNS answers a single-label name: \(issue ?? "nil")"
+        )
+    }
+
+    /// A character is a number in more than one script. A name written in one
+    /// of them is a name, not an address.
+    func testOnlyASCIIDigitsAreAnAddressLiteral() {
+        XCTAssertFalse(
+            SettingsStore.isNumericAddressLiteral("\u{FF11}\u{FF12}\u{FF13}"),
+            "fullwidth digits are a name, not an address"
+        )
+        XCTAssertTrue(
+            SettingsStore.isNumericAddressLiteral("134744072"),
+            "an ASCII number is an address literal"
+        )
+    }
+
+    /// The IPv6 loopback and link-local addresses can be written in more than
+    /// one way, and the app has to recognise all of them: `0:0:0:0:0:0:0:1`
+    /// is the same address as `::1`, and `::ffff:127.0.0.1` is the loopback
+    /// written as an IPv4-mapped IPv6 address. Comparing the strings would
+    /// refuse a local endpoint the user can reach.
+    func testEverySpellingOfTheIPv6LocalAddressesIsTrusted() {
+        for trusted in [
+            "::1",
+            "0:0:0:0:0:0:0:1",
+            "::0001",
+            "fe80::1",
+            "fe80::1%en0",
+            "::ffff:127.0.0.1",
+            "::ffff:10.1.2.3"
+        ] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: it is a loopback or link-local address"
+            )
+        }
+
+        for untrusted in [
+            "::2",                       // another host on the internet
+            "::ffff:8.8.8.8",           // a public address, mapped
+            "2001:db8::1"               // a documentation address
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted"
+            )
+        }
+    }
+
+    /// A zone id names the interface, not the address. The address is parsed
+    /// without it, so the comparison is not made against bytes the parser
+    /// filled in with an interface index.
+    func testAZoneIdDoesNotChangeTheAddress() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("fe80::1%en0"),
+            "a scoped link-local address is still a link-local address"
+        )
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("fe80::1%en0".replacingOccurrences(of: "fe80", with: "2001")),
+            "the zone id must not make a non-local address local"
+        )
+    }
+
+    /// A string that only starts like a link-local address is not one. The
+    /// prefix is not a shortcut: the address has to parse.
+    func testAStringThatOnlyLooksLikeALinkLocalAddressIsRefused() {
+        for untrusted in [
+            "fe80:evil.example.com",
+            "fe80:1:2:3:4:5:6:7:8",
+            "fe80:"
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: it is not an address"
+            )
+        }
+    }
+
+    /// The canonical spelling rule applies to the IPv4 address an IPv4-mapped
+    /// IPv6 literal carries too. The mapped form is another way to write the
+    /// same address, so a leading zero in it is the same ambiguity.
+    func testAMappedAddressHasToSpellItsIPv4AddressCanonically() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::ffff:127.0.0.1"),
+            "the canonical mapped form of the loopback is the loopback"
+        )
+        for untrusted in [
+            "::ffff:127.000.000.001",
+            "::ffff:010.0.0.1"
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the embedded address is not written canonically"
+            )
+        }
+    }
+
+    /// `0.0.0.0` is this machine, not a remote host: a connection to it
+    /// reaches the loopback interface. Calling it remote would be a claim
+    /// the app cannot make, and refusing it would block a setup that works.
+    func testTheUnspecifiedAddressIsThisMachine() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("0.0.0.0"),
+            "0.0.0.0 reaches this machine"
+        )
+        XCTAssertFalse(
+            SettingsStore.isPublicAddress("0.0.0.0"),
+            "0.0.0.0 is not a remote host"
+        )
+    }
+
+    /// `::` is the IPv6 spelling of `0.0.0.0`: a connection to it reaches the
+    /// loopback interface, the same way a connection to `0.0.0.0` does. The
+    /// two spellings of "this machine" have to be trusted together — refusing
+    /// one of them is refusing an endpoint the user can reach.
+    func testTheIPv6UnspecifiedAddressIsThisMachineToo() {
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("::"),
+            ":: reaches this machine, the same way 0.0.0.0 does"
+        )
+        XCTAssertTrue(
+            SettingsStore.isLocalEndpointHost("0:0:0:0:0:0:0:0"),
+            "the unspecified address in its long form reaches this machine"
+        )
+        XCTAssertFalse(
+            SettingsStore.isPublicAddress("::"),
+            "the unspecified address is not a remote host"
+        )
+    }
+
+    /// The multicast and broadcast addresses are not addressed to a host on
+    /// the public internet either, so the app must not call them remote.
+    func testTheMulticastAndBroadcastAddressesAreNotCalledRemote() {
+        for special in ["224.0.0.1", "239.255.255.250", "255.255.255.255"] {
+            XCTAssertFalse(
+                SettingsStore.isPublicAddress(special),
+                "expected \(special) not to be called a remote host"
+            )
+        }
+    }
+
+    /// An address has to be spelled the way an address is written, because the
+    /// app and the network have to read the host the same way.
+    ///
+    /// A leading zero is a different octet to a resolver that reads it as
+    /// octal — `010.0.0.1` is eight to one reading and ten to another — and a
+    /// trailing dot turns the host into an absolute DNS name that a resolver
+    /// anywhere on the network can answer with any address it likes. A host
+    /// whose reading the app cannot pin down is not one it can call local.
+    func testOnlyACanonicalDottedQuadIsTrusted() {
+        for untrusted in [
+            "010.0.0.1",          // a leading zero
+            "10.00.0.1",
+            "127.000.000.001",
+            "192.168.001.010",
+            "127.0.0.1.",         // a trailing dot
+            ".127.0.0.1",         // a leading dot
+            "127..0.1",           // an empty part
+            "127.0.0.256",        // not an octet
+            "2130706433"          // one number, not four
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the app cannot pin down how it is read"
+            )
+        }
+
+        // The canonical spellings of the same addresses stay trusted.
+        for trusted in ["10.0.0.1", "127.0.0.1", "192.168.1.10"] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(trusted),
+                "expected \(trusted) to be trusted: it is an address written the way an address is written"
+            )
+        }
+    }
+
+    /// A `.local` name and a single-label name are resolved over mDNS, which any
+    /// device on the local network can answer, so they are the names the app
+    /// refuses for plaintext HTTP.
+    func testUnqualifiedLocalNamesAreRecognised() {
+        for unqualified in ["myserver.local", "nas.local", "lmstudio", "server"] {
+            XCTAssertTrue(
+                SettingsStore.isUnqualifiedLocalName(unqualified),
+                "expected \(unqualified) to be unqualified"
+            )
+        }
+        for qualified in ["api.openai.com", "8.8.8.8", "192.168.1.10", "::1", "fe80::1",
+                          "localhost", "app.localhost", "134744072", "0x7f000001", ""] {
+            XCTAssertFalse(
+                SettingsStore.isUnqualifiedLocalName(qualified),
+                "expected \(qualified) to be qualified"
+            )
+        }
+    }
+
+    /// An IPv4 literal written in another notation is an address, not a name
+    /// that any device on the local network could answer for.
+    func testNumericAddressLiteralsAreNotTreatedAsNames() {
+        for literal in ["134744072", "0x7f000001", "0X08080808", "2130706433"] {
+            XCTAssertTrue(
+                SettingsStore.isNumericAddressLiteral(literal),
+                "expected \(literal) to be an address literal"
+            )
+            XCTAssertFalse(
+                SettingsStore.isUnqualifiedLocalName(literal),
+                "expected \(literal) not to be treated as a claimable name"
+            )
+        }
+        for name in ["lmstudio", "nas.local", "8.8.8.8", "example.com"] {
+            XCTAssertFalse(
+                SettingsStore.isNumericAddressLiteral(name),
+                "expected \(name) not to be an address literal"
+            )
+        }
+    }
+
+    /// The refusal for a host the app cannot check as local says so, instead of
+    /// calling every refused host a remote one: a loopback address written in
+    /// another notation is not remote, it is simply not checkable. An address
+    /// the app can parse and finds to be public still is remote, and is called
+    /// that.
+    func testTheRefusalDistinguishesAPublicAddressFromAnUncheckableHost() {
+        let uncheckable = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://134744072:1234/v1")
+        XCTAssertNotNil(uncheckable)
+        XCTAssertTrue(
+            uncheckable?.contains("cannot use as a local address") ?? false,
+            "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
+        )
+        XCTAssertFalse(
+            uncheckable?.contains("remote host") ?? true,
+            "a host in another notation is not known to be remote, got: \(uncheckable ?? "nil")"
+        )
+
+        let publicAddress = SettingsStore.plaintextRemoteBaseURLWarning(from: "http://8.8.8.8:1234/v1")
+        XCTAssertNotNil(publicAddress)
+        XCTAssertTrue(
+            publicAddress?.contains("remote host") ?? false,
+            "expected a parsed public address to be called remote, got: \(publicAddress ?? "nil")"
+        )
+    }
+
+    /// The empty host is not a numeric address literal.
+    func testTheEmptyHostIsNotAnAddressLiteral() {
+        XCTAssertFalse(SettingsStore.isNumericAddressLiteral(""))
+        XCTAssertFalse(SettingsStore.isPublicAddress(""))
     }
 
     func testTranscriptionRequestUsesNormalizedTranscriptionSettings() {

@@ -1,4 +1,5 @@
 import Combine
+import Darwin
 import Foundation
 
 struct AIModelChoice: Identifiable, Equatable {
@@ -552,41 +553,279 @@ final class SettingsStore: ObservableObject {
         let model_loaded: Bool
     }
 
-    /// Whether `host` denotes a loopback / private / link-local / `.local`
-    /// endpoint. Plaintext HTTP to such a host is acceptable because the traffic
-    /// stays on the machine or the trusted local network; plaintext HTTP to any
-    /// other host would send the API key and transcript text over the public
+    /// Whether `host` denotes a loopback / private / link-local endpoint.
+    /// Plaintext HTTP to such a host is acceptable because the traffic stays on
+    /// the machine or the trusted local network; plaintext HTTP to any other
+    /// host would send the API key and transcript text over the public
     /// internet unencrypted.
+    ///
+    /// A `.local` name and a single-label name are deliberately not trusted.
+    /// Both are resolved over mDNS, which any device on the local network can
+    /// answer, so a name that looks local can point anywhere — and ATS offers
+    /// no protection for them either. A local server is addressed by its IP
+    /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
-        let lowered = host
-            .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let lowered = withoutIPv6Brackets(host.lowercased())
 
-        if lowered == "localhost" || lowered.hasSuffix(".localhost") { return true }
-        if lowered.hasSuffix(".local") { return true }
-        // Single-label hostnames (e.g. "lmstudio") never resolve on public DNS.
-        if !lowered.contains(".") && !lowered.contains(":") { return true }
-        // IPv6 loopback / link-local.
-        if lowered == "::1" || lowered.hasPrefix("fe80:") { return true }
+        if isReservedLocalhostName(lowered) { return true }
+        if isIPv6LocalEndpointHost(lowered) { return true }
 
-        let octets = lowered.split(separator: ".").compactMap { UInt8($0) }
-        if octets.count == 4, lowered.allSatisfy({ $0.isNumber || $0 == "." }) {
-            switch (octets[0], octets[1]) {
-            case (127, _): return true        // loopback 127.0.0.0/8
-            case (10, _): return true         // private 10.0.0.0/8
-            case (192, 168): return true      // private 192.168.0.0/16
-            case (169, 254): return true      // link-local 169.254.0.0/16
-            case (172, 16...31): return true  // private 172.16.0.0/12
-            default: return false
-            }
+        guard let octets = canonicalDottedQuad(lowered) else { return false }
+        if octets == (0, 0, 0, 0) { return true }  // this machine
+        return isTrustedIPv4(octets.0, octets.1)
+    }
+
+    /// The host without the brackets an IPv6 literal is written in.
+    ///
+    /// Only an IPv6 literal carries brackets. `[localhost]` is not one, and
+    /// reading it as `localhost` would make the app trust a name it cannot
+    /// check - the brackets are part of the host, not decoration.
+    private static func withoutIPv6Brackets(_ host: String) -> String {
+        guard host.hasPrefix("["), host.hasSuffix("]"), host.contains(":") else { return host }
+        return String(host.dropFirst().dropLast())
+    }
+
+    /// The name `host` refers to, with one trailing dot removed.
+    ///
+    /// A trailing dot makes a name absolute rather than different: a resolver
+    /// looks up the same name either way, so the two have to be classified the
+    /// same way. It does not rescue an address literal — `127.0.0.1.` is not
+    /// the address any more, it is a name the app cannot check, and a
+    /// resolver does not answer it at all.
+    private static func nameForm(of host: String) -> String {
+        host.hasSuffix(".") ? String(host.dropLast()) : host
+    }
+
+    /// Whether `host` is one of the names the standards reserve for the
+    /// loopback: `localhost` itself, and a name under it.
+    ///
+    /// Every label has to be there. A name that only looks like a reserved one
+    /// — a leading dot, an empty label — is not one of them. A trailing dot
+    /// is: it makes the name absolute rather than different, and a resolver
+    /// answers a reserved name with the loopback address without ever putting
+    /// the question to the network (RFC 6761).
+    private static func isReservedLocalhostName(_ host: String) -> Bool {
+        let name = nameForm(of: host)
+        if name == "localhost" { return true }
+
+        // The empty labels are the point: a name that starts or ends with a
+        // dot leaves one behind, and ".localhost" is not the reserved name.
+        let labels = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count > 1 else { return false }
+        guard labels.last.map(String.init) == "localhost" else { return false }
+        return labels.dropLast().allSatisfy { !$0.isEmpty }
+    }
+
+    /// Whether the four octets are in a range that stays on the machine or the
+    /// trusted local network.
+    private static func isTrustedIPv4(_ first: UInt8, _ second: UInt8) -> Bool {
+        switch (first, second) {
+        case (127, _): return true        // loopback 127.0.0.0/8
+        case (10, _): return true         // private 10.0.0.0/8
+        case (192, 168): return true      // private 192.168.0.0/16
+        case (169, 254): return true      // link-local 169.254.0.0/16
+        case (172, 16...31): return true  // private 172.16.0.0/12
+        default: return false
+        }
+    }
+
+    /// Whether `host` is an IPv6 address that stays on the machine or the
+    /// trusted local network.
+    ///
+    /// `::1` is the loopback, `fe80::/10` is the link-local range, and
+    /// `::ffff:127.0.0.1` is the loopback written as an IPv4-mapped IPv6
+    /// address. Comparing the strings would miss every other spelling of them
+    /// — `0:0:0:0:0:0:0:1` is the same address as `::1` — so the address is
+    /// parsed instead.
+    private static func isIPv6LocalEndpointHost(_ host: String) -> Bool {
+        // A zone id (`fe80::1%en0`) names the interface, not the address, so
+        // it is removed before the address is parsed. Darwin's parser accepts
+        // it and writes the interface index into the address bytes, which
+        // would corrupt the comparison.
+        let addressText = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+
+        // An address that carries an IPv4 address in its last group has to
+        // spell that address the way an address is written too. The mapped
+        // form is another way to write the same address, and a leading zero
+        // in it is the same ambiguity the canonical rule exists to remove.
+        if let embedded = embeddedIPv4Text(addressText), canonicalDottedQuad(embedded) == nil {
+            return false
+        }
+
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, addressText, &address) == 1 else { return false }
+
+        let bytes = withUnsafeBytes(of: &address) { Array($0) }
+        // :: — the unspecified address, the IPv6 spelling of 0.0.0.0. A
+        // connection to it reaches the loopback interface, the same way a
+        // connection to 0.0.0.0 does, so the two spellings of "this machine"
+        // have to be trusted together.
+        if bytes.allSatisfy({ $0 == 0 }) { return true }
+        // ::1 — the loopback.
+        if bytes == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1] { return true }
+        // fe80::/10 — the link-local range.
+        if bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80 { return true }
+        // ::ffff:a.b.c.d — an IPv4 address written as an IPv6 one.
+        if bytes[0..<10].allSatisfy({ $0 == 0 }) && bytes[10] == 0xff && bytes[11] == 0xff {
+            // ::ffff:0.0.0.0 is 0.0.0.0 written as an IPv6 address, so it is
+            // this machine the same way 0.0.0.0 is.
+            if bytes[12] == 0 && bytes[13] == 0 && bytes[14] == 0 && bytes[15] == 0 { return true }
+            return isTrustedIPv4(bytes[12], bytes[13])
         }
         return false
     }
 
+    /// The IPv4 address an IPv6 literal carries in its last group, if it has
+    /// one.
+    private static func embeddedIPv4Text(_ address: String) -> String? {
+        guard address.contains(".") else { return nil }
+        let tail = address.split(separator: ":").last.map(String.init) ?? ""
+        return tail.contains(".") ? tail : nil
+    }
+
+    /// The four octets of `host`, when it is an IPv4 literal written the way an
+    /// address is written.
+    ///
+    /// The spelling has to be canonical, because the app and the network have to
+    /// read the host the same way. A leading zero (`010.0.0.1`) is a different
+    /// octet to a resolver that reads it as octal — eight, not ten — and a
+    /// trailing or leading dot (`127.0.0.1.`) turns the host into an absolute
+    /// DNS name that a resolver anywhere on the network can answer. The app
+    /// cannot know which reading it will be handed, so it trusts none of them.
+    private static func canonicalDottedQuad(_ host: String) -> (UInt8, UInt8, UInt8, UInt8)? {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+
+        var octets: [UInt8] = []
+        octets.reserveCapacity(4)
+        for part in parts {
+            guard !part.isEmpty,
+                  part.count <= 3,
+                  part.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  // A leading zero is another spelling of the same octet, not
+                  // the octet itself.
+                  !(part.count > 1 && part.hasPrefix("0")),
+                  let value = UInt8(part)
+            else {
+                return nil
+            }
+            octets.append(value)
+        }
+        return (octets[0], octets[1], octets[2], octets[3])
+    }
+
+    /// Whether `host` is an address the app parsed and found to be somewhere
+    /// else — a public address, written the way an address is written.
+    ///
+    /// A host in another notation (`134744072`, `127.1`) is not parseable, so
+    /// it is neither a local nor a public address as far as the app is
+    /// concerned: the app cannot say where it points.
+    static func isPublicAddress(_ host: String) -> Bool {
+        let lowered = withoutIPv6Brackets(host.lowercased())
+
+        guard let octets = canonicalDottedQuad(lowered) else { return false }
+        // The unspecified, multicast and broadcast addresses are not a host on
+        // the public internet: the 0.0.0.0/8 range means "this network" rather
+        // than a destination (RFC 1122), and the other two are not addressed to
+        // one host. Calling them remote would be a claim the app cannot make.
+        if octets.0 == 0 { return false }
+        if (224...239).contains(octets.0) { return false }
+        if octets == (255, 255, 255, 255) { return false }
+        return !isLocalEndpointHost(host)
+    }
+
+    /// Whether `host` is a name that resolves over mDNS rather than an address
+    /// the app can check: a `.local` name, or a single-label name such as
+    /// `lmstudio`. Any device on the local network can answer for such a name,
+    /// so it is not a trusted endpoint even though it looks local.
+    static func isUnqualifiedLocalName(_ host: String) -> Bool {
+        let lowered = withoutIPv6Brackets(host.lowercased())
+        // A trailing dot makes the name absolute rather than different: a
+        // resolver answers the same name either way, so the two are the same
+        // host and have to be classified the same way.
+        let name = nameForm(of: lowered)
+
+        guard !name.isEmpty else { return false }
+        // An IPv4 literal in another notation — `134744072`, `0x7f000001` — is
+        // an address, not a name anybody can claim for it.
+        if isNumericAddressLiteral(name) { return false }
+        // `localhost` is reserved and always resolves to loopback.
+        if isReservedLocalhostName(name) { return false }
+        if name.hasSuffix(".local") { return true }
+        return !name.contains(".") && !name.contains(":")
+    }
+
+    /// Whether `host` is a number written in a notation other than the dotted
+    /// quad: decimal (`134744072`) or hexadecimal (`0x7f000001`).
+    static func isNumericAddressLiteral(_ host: String) -> Bool {
+        guard !host.isEmpty else { return false }
+        // Only ASCII digits count. A character is a number in more than one
+        // script, and a name written in one of them is a name, not an
+        // address.
+        if host.allSatisfy({ $0.isASCII && $0.isNumber }) { return true }
+        guard host.hasPrefix("0x") || host.hasPrefix("0X") else { return false }
+        let digits = host.dropFirst(2)
+        return !digits.isEmpty && digits.allSatisfy({ $0.isASCII && $0.isHexDigit })
+    }
+
+    /// Whether the settings screen has to render the compatibility issue.
+    ///
+    /// For a refused plaintext endpoint the warning next to the base URL field
+    /// and the compatibility issue are the same sentence, so the screen shows
+    /// it once. A different compatibility issue - a missing base URL, a model
+    /// the provider does not offer - is a different sentence and is shown.
+    var shouldRenderCompatibilityIssue: Bool {
+        guard let compatibilityIssue = aiProviderCompatibilityIssue else { return false }
+        return compatibilityIssue != aiBaseURLPlaintextWarning
+    }
+
+    /// The message for an endpoint that is refused over plaintext HTTP because
+    /// its name is answered by the network rather than by the app. It names the
+    /// fix, because the user is looking at a field they believe is correct.
+    static func unqualifiedLocalHostPlaintextMessage(host: String, secret: String) -> String {
+        "\(host) is not an address this app trusts for plaintext HTTP: a .local or single-word host "
+            + "name is answered by the network rather than by the app, so it can point anywhere and "
+            + "the traffic could be intercepted. Use the machine's IP address (for example "
+            + "192.168.1.20), or https://. "
+            + "Over plaintext HTTP your \(secret) would cross the network unencrypted."
+    }
+
+    /// The refusal for a plaintext request to a host the app will not send a
+    /// secret over.
+    ///
+    /// The wording follows what the app knows about the host, and every
+    /// surface uses this one answer, so the settings field and the message
+    /// that blocks the request cannot describe the same host differently.
+    ///
+    /// A name any device on the local network can claim is neither remote nor
+    /// checkable, and its refusal names the fix. A host the app parsed and
+    /// found to be public is a remote host. A host it could not parse is one
+    /// it cannot use as a local address — calling that one remote would be a
+    /// claim the app cannot make. Every refusal says what would cross the
+    /// network, because that is the part the user acts on.
+    static func plaintextTransportRefusal(
+        host: String,
+        subject: String,
+        secret: String,
+        localNoun: String
+    ) -> String {
+        if isUnqualifiedLocalName(host) {
+            return unqualifiedLocalHostPlaintextMessage(host: host, secret: secret)
+        }
+        if isPublicAddress(host) {
+            return "\(subject) uses plaintext HTTP to a remote host (\(host)). "
+                + "Your \(secret) would be sent unencrypted. "
+                + "Use https://, or configure a trusted local \(localNoun)."
+        }
+        return "\(subject) uses plaintext HTTP to a host this app cannot use as a local "
+            + "address (\(host)). Your \(secret) would be sent unencrypted. "
+            + "Use https://, or point this at an address the app can check."
+    }
+
     /// A user-facing warning when the configured base URL would transmit the API
     /// key and transcript content to a non-local host over plaintext HTTP. Remote
-    /// HTTPS and local HTTP (loopback/private/`.local`) return `nil` so legitimate
-    /// enterprise-proxy and local-provider workflows are not nagged.
+    /// HTTPS and local HTTP (loopback/private/link-local) return `nil` so
+    /// legitimate enterprise-proxy and local-provider workflows are not nagged.
     static func plaintextRemoteBaseURLWarning(
         from rawValue: String,
         provider: AIProvider = .openAI
@@ -597,9 +836,12 @@ final class SettingsStore: ObservableObject {
               !isLocalEndpointHost(host) else {
             return nil
         }
-        return "This endpoint uses plaintext HTTP to a remote host (\(host)). "
-            + "Your API key and transcript text would be sent unencrypted. Use "
-            + "https:// unless this is a trusted local endpoint."
+        return plaintextTransportRefusal(
+            host: host,
+            subject: "This endpoint",
+            secret: "API key and transcript text",
+            localNoun: "endpoint"
+        )
     }
 
     /// Warning to surface near the base-URL field for the active provider, or nil.
@@ -614,7 +856,7 @@ final class SettingsStore: ObservableObject {
 
     /// Warning when the configured Jira base URL would send Basic-auth credentials
     /// (email + API token) over plaintext HTTP to a remote host. Loopback/private/
-    /// `.local` HTTP and remote HTTPS return nil. Reuses the host classifier from
+    /// link-local HTTP and remote HTTPS return nil. Reuses the host classifier from
     /// the AI base-URL guard (#472).
     var jiraBaseURLPlaintextWarning: String? {
         guard let url = jiraBaseURLValue,
@@ -623,9 +865,12 @@ final class SettingsStore: ObservableObject {
               !Self.isLocalEndpointHost(host) else {
             return nil
         }
-        return "This Jira URL uses plaintext HTTP to a remote host (\(host)). "
-            + "Your email and API token would be sent unencrypted. Use https:// "
-            + "unless this is a trusted local server."
+        return Self.plaintextTransportRefusal(
+            host: host,
+            subject: "This Jira URL",
+            secret: "email and API token",
+            localNoun: "server"
+        )
     }
 
     var localProviderSetupCommand: String {
