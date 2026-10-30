@@ -110,7 +110,7 @@ The environment name is not defaulted in the script: each workflow passes the en
 3. Add release entries to `CHANGELOG.md`, then run `scripts/bump_version.sh` to archive them under the release version.
 4. Run `./scripts/release_smoke_test.sh`; this is the headless unit-test and Release-build gate. Confirm the separately gated UI-test target passes in CI or a usable interactive window-server session.
 5. Run `./scripts/accessibility_regression_check.sh`.
-6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python and Actions on every run, Swift on the monthly schedule or an on-demand run, and C# on Windows; confirm that workflow is enabled before reading its silence as a clean result.
+6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python, Actions and C# on every run — C# on a Windows runner — and Swift on the monthly schedule or on an on-demand run with `include_swift` enabled. Confirm the workflow is enabled before reading its silence as a clean result: `gh api repos/ABD-Enterprises/bug-narrator/actions/workflows/codeql.yml --jq .state` must answer `active`. Name the file rather than the workflow, because GitHub's own default CodeQL workflow is also called `CodeQL`.
 7. If the local server changed, run `local-transcription/build_standalone.sh`; its packaged speech transcription must pass.
 8. Run any targeted manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md).
 9. Generate or review the internal release summary seed before publishing.
@@ -141,8 +141,7 @@ These workflows support:
 - runtime guardrails validation
 - lightweight accessibility regression checks for the most accessibility-sensitive macOS surfaces
 - docs-site build validation
-- code scanning through `.github/workflows/codeql.yml`, which runs on a weekly and a monthly schedule and can be run on demand (including Swift analysis)
-- code scanning for non-macOS languages
+- code scanning through `.github/workflows/codeql.yml`, which runs on a weekly and a monthly schedule and can be run on demand; the Swift analysis is included on the monthly schedule and on an on-demand run with `include_swift` enabled, while the non-macOS languages are covered on every run
 
 They do not build, sign, notarize, or package the macOS app. Release packaging remains local-only.
 
