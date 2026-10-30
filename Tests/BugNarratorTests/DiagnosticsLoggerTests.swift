@@ -37,6 +37,33 @@ final class DiagnosticsLoggerTests: XCTestCase {
         XCTAssertTrue(atlassian.contains("<redacted>"))
     }
 
+    /// The word "Basic" starts ordinary prose as well as a credential header.
+    /// Redacting the prose hides the very error the user opened the bundle to
+    /// read, so only a match that decodes to `user:secret` is redacted.
+    func testFreeformRedactionLeavesProseThatMerelyStartsWithBasic() {
+        for prose in [
+            "Basic authentication failed",
+            "Basic authorization header missing",
+            "Basic credentials"
+        ] {
+            XCTAssertEqual(
+                DiagnosticsRedactor.sanitizeFreeformText(prose),
+                prose,
+                "the prose \"\(prose)\" is not a credential and has to survive"
+            )
+        }
+    }
+
+    /// A Basic credential is the base64 of `user:secret`, so a match that
+    /// decodes to one is redacted however it is written.
+    func testFreeformRedactionSanitizesAnyBasicCredential() {
+        let basic = DiagnosticsRedactor.sanitizeFreeformText(
+            "Authorization: Basic dXNlcjpwYXNzd29yZDEyMzQ1Njc4OTA="
+        )
+        XCTAssertFalse(basic.contains("dXNlcjpwYXNzd29yZDEyMzQ1Njc4OTA="))
+        XCTAssertTrue(basic.contains("<redacted>"))
+    }
+
     func testLoggerRedactsCredentialsFromMetadataAndMessage() async {
         BugNarratorDiagnostics.setDebugModeEnabled(true)
         let storageURL = FileManager.default.temporaryDirectory
