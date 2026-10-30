@@ -646,5 +646,28 @@ server._serve("127.0.0.1", {port})
             self.assertIn(f"{pin.split('[')[0].rstrip('=')}=={version}", contents)
 
 
+class ServerLogLineTests(unittest.TestCase):
+    """The request's own values must not be able to forge a log line."""
+
+    def test_control_characters_are_removed_from_a_logged_name(self):
+        self.assertEqual(server._log_safe("evil\r\nINFO forged", "audio"), "evilINFO forged")
+
+    def test_a_logged_name_keeps_its_readable_parts(self):
+        self.assertEqual(server._log_safe("recording.m4a", "audio"), "recording.m4a")
+
+    def test_an_empty_name_falls_back(self):
+        self.assertEqual(server._log_safe("", "audio"), "audio")
+        self.assertEqual(server._log_safe(None, "audio"), "audio")
+        self.assertEqual(server._log_safe("\r\n", "audio"), "audio")
+
+    def test_a_logged_name_is_bounded(self):
+        self.assertEqual(len(server._log_safe("x" * 5000, "audio")), 120)
+
+    def test_the_transcribe_route_logs_the_sanitised_name(self):
+        source = inspect.getsource(server)
+        self.assertIn("_log_safe(file.filename", source)
+        self.assertNotIn("f\"Transcribing {file.filename}", source)
+
+
 if __name__ == "__main__":
     unittest.main()
