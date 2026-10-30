@@ -19,9 +19,11 @@ import argparse
 import asyncio
 import contextlib
 from concurrent.futures import ThreadPoolExecutor
+import hmac
 import logging
 import os
 import platform
+import secrets
 import signal
 import subprocess
 import sys
@@ -34,7 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 logging.basicConfig(
@@ -80,6 +82,123 @@ _upload_piece_bytes = 1024 * 1024
 _transcription_failure_message = (
     "Local transcription failed. Check the local transcription server logs for details."
 )
+
+# The server is reachable by every process on the machine, so every route
+# requires a bearer token that only the desktop app knows (#1270). The token
+# lives in a per-user file so an app that started the server and an app that
+# found one already running agree on it.
+TOKEN_FILE_NAME = "bugnarrator-transcription.token"
+TOKEN_ENVIRONMENT_VARIABLE = "BUGNARRATOR_TRANSCRIPTION_TOKEN"
+DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+
+_auth_token: Optional[str] = None
+_max_upload_bytes = DEFAULT_MAX_UPLOAD_BYTES
+
+
+def default_token_file() -> Path:
+    """The per-user file that carries the token between the server and the app.
+
+    The path follows the same convention as the managed server install, so the
+    token sits next to the executable it belongs to on both platforms. The
+    contract fixture pins it; the desktop ports compute the same path.
+    """
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(base) / "BugNarrator" / "LocalTranscription" / TOKEN_FILE_NAME
+    return Path.home() / "Library" / "Application Support" / TOKEN_FILE_NAME
+
+
+def read_token_file(path: Path) -> Optional[str]:
+    """The token stored in `path`, or None when there is no usable token."""
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return value or None
+
+
+def write_token_file(path: Path, token: str) -> None:
+    """Store `token` in `path`, readable by its owner only.
+
+    The file is created with owner-only permissions before the token is
+    written, so it is never briefly world-readable.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(token)
+
+
+def resolve_auth_token(
+    token_file: Optional[Path] = None,
+    explicit_token: Optional[str] = None,
+    environment_token: Optional[str] = None,
+) -> str:
+    """Work out the token this server runs with, and record it.
+
+    The explicit token wins, then the environment, then a token already on
+    disk, and only then a fresh random one. The result is always written back
+    to the token file so a client that reads the file and a client that was
+    handed the token directly agree.
+    """
+    path = token_file or default_token_file()
+    candidates = (explicit_token, environment_token, read_token_file(path))
+    token = next((value.strip() for value in candidates if value and value.strip()), None)
+    if token is None:
+        token = secrets.token_urlsafe(32)
+    try:
+        write_token_file(path, token)
+    except OSError:
+        # An unwritable token file must not stop the server: it still refuses
+        # every request that does not carry the token.
+        logger.warning(f"Could not write the server token to {path}")
+    return token
+
+
+def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
+    """Reject every request that does not carry the server's bearer token.
+
+    Without this, any process on the machine could drive the model or, worse,
+    receive the user's microphone audio.
+    """
+    expected = _auth_token
+    if not expected:
+        raise HTTPException(status_code=503, detail="The server token is not configured")
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    prefix = "Bearer "
+    if not authorization.startswith(prefix):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    if not hmac.compare_digest(authorization[len(prefix):], expected):
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+
+def configure_auth(token: str, max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES) -> None:
+    """Install the token the routes check, and the upload ceiling."""
+    global _auth_token, _max_upload_bytes
+    _auth_token = token
+    _max_upload_bytes = max_upload_bytes
+
+
+def _reject_oversized_upload(request: Request) -> None:
+    """Refuse an upload whose declared length is already over the limit.
+
+    The length is a hint, not a promise, so the streaming loop enforces the
+    same ceiling. This check exists to reject an oversized upload before any
+    of it is written to disk.
+    """
+    declared = request.headers.get("content-length")
+    if declared is None:
+        return
+    try:
+        declared_bytes = int(declared)
+    except ValueError:
+        return
+    if declared_bytes > _max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"The upload exceeds the {_max_upload_bytes} byte limit",
+        )
 
 
 class _SignalPreservingServer(uvicorn.Server):
@@ -128,7 +247,7 @@ def get_model(model_name: Optional[str] = None):
     return _model
 
 
-@app.get("/health")
+@app.get("/health", dependencies=[Depends(require_bearer_token)])
 async def health():
     """Health check endpoint for BugNarrator to verify the server is running."""
     return {
@@ -138,7 +257,7 @@ async def health():
     }
 
 
-@app.get("/v1/models")
+@app.get("/v1/models", dependencies=[Depends(require_bearer_token)])
 async def list_models():
     """Minimal /v1/models endpoint so BugNarrator's 'Validate Connection' works."""
     return {
@@ -153,7 +272,10 @@ async def list_models():
     }
 
 
-@app.post("/v1/audio/transcriptions")
+@app.post(
+    "/v1/audio/transcriptions",
+    dependencies=[Depends(require_bearer_token), Depends(_reject_oversized_upload)],
+)
 async def transcribe(
     file: UploadFile = File(...),
     model: Optional[str] = Form(None),
@@ -179,8 +301,13 @@ async def transcribe(
             piece = await file.read(_upload_piece_bytes)
             if not piece:
                 break
-            tmp.write(piece)
             written += len(piece)
+            if written > _max_upload_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"The upload exceeds the {_max_upload_bytes} byte limit",
+                )
+            tmp.write(piece)
         tmp.flush()
         tmp.close()
 
@@ -240,6 +367,10 @@ async def transcribe(
                 }
             },
         )
+    except HTTPException:
+        # An upload that breaks the size limit is the client's mistake, not a
+        # transcription failure: report it as such instead of a generic error.
+        raise
     except Exception:
         logger.exception("Transcription failed")
         return _transcription_failure_response()
@@ -662,8 +793,28 @@ def main():
         action="store_true",
         help="Load the model at startup instead of on first request",
     )
+    parser.add_argument(
+        "--token-file",
+        default=None,
+        help="File that carries the bearer token the desktop app presents "
+        "(default: the per-user token file for this platform)",
+    )
+    parser.add_argument(
+        "--max-upload-mb",
+        type=int,
+        default=DEFAULT_MAX_UPLOAD_BYTES // (1024 * 1024),
+        help="Largest upload the server accepts, in megabytes "
+        "(default: %(default)s)",
+    )
     args = parser.parse_args()
     configure_default_model(args.model)
+
+    token_file = Path(args.token_file).expanduser() if args.token_file else default_token_file()
+    token = resolve_auth_token(
+        token_file=token_file,
+        environment_token=os.environ.get(TOKEN_ENVIRONMENT_VARIABLE),
+    )
+    configure_auth(token, max_upload_bytes=max(1, args.max_upload_mb) * 1024 * 1024)
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
@@ -677,6 +828,7 @@ def main():
     logger.info(
         f"Starting BugNarrator transcription server on {args.host}:{args.port}"
     )
+    logger.info(f"The bearer token is stored in {token_file}")
     _serve(args.host, args.port)
 
 

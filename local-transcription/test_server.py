@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+import os
 from pathlib import Path
 import shutil
 import signal
@@ -644,6 +645,222 @@ server._serve("127.0.0.1", {port})
             shared = next(line for line in runtime if line.startswith(pin))
             version = shared.split("==")[1]
             self.assertIn(f"{pin.split('[')[0].rstrip('=')}=={version}", contents)
+
+
+class ServerAuthenticationTests(unittest.TestCase):
+    """Every route refuses a request that does not carry the server's token (#1270).
+
+    Without the token any process on the machine could drive the model and
+    receive the user's microphone audio, and a rogue listener that grabbed the
+    port first looked like a healthy server.
+    """
+
+    def setUp(self):
+        self._previous_token = server._auth_token
+        self._previous_max_upload_bytes = server._max_upload_bytes
+        self.addCleanup(setattr, server, "_auth_token", self._previous_token)
+        self.addCleanup(setattr, server, "_max_upload_bytes", self._previous_max_upload_bytes)
+
+    def _request(self, url, token=None, data=None, method=None):
+        import urllib.error
+        import urllib.request
+
+        request = urllib.request.Request(url, data=data, method=method)
+        if token is not None:
+            request.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read()
+
+    def _serve(self, token, port, token_file):
+        script = f"""
+import sys
+sys.argv = ["server", "--host", "127.0.0.1", "--port", "{port}", "--token-file", r"{token_file}"]
+import server
+server.main()
+"""
+        environment = dict(os.environ)
+        environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
+        environment["PYTHONUNBUFFERED"] = "1"
+        creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        process = subprocess.Popen(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).parent,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=environment,
+            creationflags=creation_flags,
+        )
+        self.addCleanup(self._stop, process)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                self.fail("the transcription server exited before accepting connections")
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                    return process
+            except OSError:
+                time.sleep(0.05)
+        self.fail("the transcription server did not start within 20 seconds")
+
+    @staticmethod
+    def _stop(process):
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+    def test_every_route_refuses_a_request_without_the_token(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = str(Path(directory) / server.TOKEN_FILE_NAME)
+            self._serve("s3cret-token-value", port, token_file)
+            base = f"http://127.0.0.1:{port}"
+
+            status, _ = self._request(f"{base}/health")
+            self.assertEqual(status, 401)
+
+            status, _ = self._request(f"{base}/v1/models")
+            self.assertEqual(status, 401)
+
+            status, _ = self._request(
+                f"{base}/v1/audio/transcriptions",
+                data=b"--x\r\n\r\n",
+                method="POST",
+            )
+            self.assertEqual(status, 401)
+
+    def test_a_wrong_token_is_refused(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = str(Path(directory) / server.TOKEN_FILE_NAME)
+            self._serve("s3cret-token-value", port, token_file)
+
+            status, _ = self._request(
+                f"http://127.0.0.1:{port}/health",
+                token="not-the-token",
+            )
+            self.assertEqual(status, 401)
+
+    def test_the_right_token_is_accepted(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = str(Path(directory) / server.TOKEN_FILE_NAME)
+            self._serve("s3cret-token-value", port, token_file)
+            base = f"http://127.0.0.1:{port}"
+
+            status, body = self._request(f"{base}/health", token="s3cret-token-value")
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)["status"], "ok")
+
+            status, body = self._request(f"{base}/v1/models", token="s3cret-token-value")
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)["data"][0]["owned_by"], "local")
+
+    def test_a_token_without_the_bearer_prefix_is_refused(self):
+        server.configure_auth("s3cret-token-value")
+        with self.assertRaises(server.HTTPException) as raised:
+            server.require_bearer_token(authorization="s3cret-token-value")
+        self.assertEqual(raised.exception.status_code, 401)
+
+    def test_an_empty_token_is_refused(self):
+        server.configure_auth("s3cret-token-value")
+        with self.assertRaises(server.HTTPException) as raised:
+            server.require_bearer_token(authorization="")
+        self.assertEqual(raised.exception.status_code, 401)
+
+    def test_the_token_is_stored_for_its_owner_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            server.write_token_file(token_file, "s3cret-token-value")
+
+            self.assertEqual(token_file.read_text(encoding="utf-8"), "s3cret-token-value")
+            if os.name != "nt":
+                self.assertEqual(token_file.stat().st_mode & 0o777, 0o600)
+
+    def test_the_environment_token_wins_over_the_token_on_disk(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            server.write_token_file(token_file, "the-old-token")
+
+            resolved = server.resolve_auth_token(
+                token_file=token_file,
+                environment_token="the-new-token",
+            )
+
+            self.assertEqual(resolved, "the-new-token")
+            # The file keeps the effective token so a client that only reads the
+            # file agrees with the server.
+            self.assertEqual(server.read_token_file(token_file), "the-new-token")
+
+    def test_a_token_on_disk_is_reused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            server.write_token_file(token_file, "the-token-on-disk")
+
+            resolved = server.resolve_auth_token(token_file=token_file)
+
+            self.assertEqual(resolved, "the-token-on-disk")
+
+    def test_a_missing_token_yields_a_fresh_random_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+
+            resolved = server.resolve_auth_token(token_file=token_file)
+
+            self.assertTrue(resolved)
+            self.assertGreaterEqual(len(resolved), 32)
+            self.assertNotEqual(resolved, server.resolve_auth_token(token_file=Path(directory) / "other"))
+            self.assertEqual(server.read_token_file(token_file), resolved)
+
+    def test_the_default_token_file_follows_the_platform_convention(self):
+        with patch.object(server.sys, "platform", "win32"), patch.dict(
+            os.environ, {"LOCALAPPDATA": "/tmp/localappdata"}
+        ):
+            self.assertEqual(
+                server.default_token_file(),
+                Path("/tmp/localappdata/BugNarrator/LocalTranscription") / server.TOKEN_FILE_NAME,
+            )
+        with patch.object(server.sys, "platform", "darwin"):
+            self.assertEqual(
+                server.default_token_file(),
+                Path.home() / "Library" / "Application Support" / server.TOKEN_FILE_NAME,
+            )
+
+    def test_an_oversized_upload_is_refused_before_it_is_written(self):
+        class FakeRequest:
+            def __init__(self, headers):
+                self.headers = headers
+
+        server.configure_auth("s3cret-token-value", max_upload_bytes=1024)
+
+        with self.assertRaises(server.HTTPException) as raised:
+            server._reject_oversized_upload(FakeRequest({"content-length": "2048"}))
+        self.assertEqual(raised.exception.status_code, 413)
+
+        # A body that declares less than the limit is not refused on its word.
+        server._reject_oversized_upload(FakeRequest({"content-length": "512"}))
+        server._reject_oversized_upload(FakeRequest({}))
+
+    def test_the_streaming_loop_enforces_the_upload_cap(self):
+        import io
+
+        from fastapi import UploadFile
+
+        payload = b"\x00" * (2 * server._upload_piece_bytes + 17)
+        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a")
+        server.configure_auth("s3cret-token-value", max_upload_bytes=1024)
+
+        with self.assertRaises(server.HTTPException) as raised:
+            asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
+        self.assertEqual(raised.exception.status_code, 413)
 
 
 if __name__ == "__main__":
