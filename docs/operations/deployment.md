@@ -19,7 +19,7 @@ There is no hosted backend deployment at this time. Deployment therefore means p
    - `./scripts/release_smoke_test.sh`
    - any focused manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md)
 2. Confirm the separately gated UI tests pass in CI or a usable interactive window-server session; the release smoke script remains headless
-3. Review Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding
+3. Review Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python and Actions on every run, Swift on the monthly schedule or an on-demand run, and C# on Windows; confirm that workflow is enabled before reading its silence as a clean result
 4. If the local transcription server changed, build and behavior-test it with `local-transcription/build_standalone.sh`
 5. Build the DMG with `./scripts/build_dmg.sh`
 6. For public distribution, Developer ID sign and notarize both artifact families; staple the app and DMG
@@ -51,7 +51,7 @@ The app DMGs are produced by `scripts/build_dmg.sh`; the server DMGs are produce
 The repo now includes lightweight GitHub workflow support for non-release automation:
 
 - `.github/workflows/ci.yml`
-- `.github/workflows/codeql.yml`
+- `.github/workflows/codeql.yml` (code scanning, enabled; weekly and monthly schedules plus an on-demand run)
 
 The production release path remains locally controlled and documented. GitHub Actions do not compile, sign, notarize, or package the macOS app.
 

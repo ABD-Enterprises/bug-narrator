@@ -110,7 +110,7 @@ The environment name is not defaulted in the script: each workflow passes the en
 3. Add release entries to `CHANGELOG.md`, then run `scripts/bump_version.sh` to archive them under the release version.
 4. Run `./scripts/release_smoke_test.sh`; this is the headless unit-test and Release-build gate. Confirm the separately gated UI-test target passes in CI or a usable interactive window-server session.
 5. Run `./scripts/accessibility_regression_check.sh`.
-6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing.
+6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python and Actions on every run, Swift on the monthly schedule or an on-demand run, and C# on Windows; confirm that workflow is enabled before reading its silence as a clean result.
 7. If the local server changed, run `local-transcription/build_standalone.sh`; its packaged speech transcription must pass.
 8. Run any targeted manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md).
 9. Generate or review the internal release summary seed before publishing.
@@ -141,6 +141,7 @@ These workflows support:
 - runtime guardrails validation
 - lightweight accessibility regression checks for the most accessibility-sensitive macOS surfaces
 - docs-site build validation
+- code scanning through `.github/workflows/codeql.yml`, which runs on a weekly and a monthly schedule and can be run on demand (including Swift analysis)
 - code scanning for non-macOS languages
 
 They do not build, sign, notarize, or package the macOS app. Release packaging remains local-only.
