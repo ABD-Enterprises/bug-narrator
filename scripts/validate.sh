@@ -261,10 +261,12 @@ fi
 # the changelog archive have to agree. Only the release-time scripts checked
 # that, so the drift was found at release time rather than on the push that
 # caused it — and CI reported green while the version contract was broken.
-if [[ -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
-  if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
-    exit 1
-  fi
+if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-version-consistency-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
+  exit 1
 fi
 
 if [[ -x "$ROOT/scripts/check_version_consistency.sh" ]]; then
