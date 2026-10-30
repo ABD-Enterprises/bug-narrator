@@ -18,7 +18,14 @@ actor JiraExportProvider {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 60
             configuration.timeoutIntervalForResource = 90
-            self.session = URLSession(configuration: configuration)
+            // The delegate refuses a redirect to a plaintext remote host: the
+            // guard in `requireEncryptedTransport` sees the request the app
+            // builds, not the one a redirect would send.
+            self.session = URLSession(
+                configuration: configuration,
+                delegate: JiraTransportRedirectPolicy(),
+                delegateQueue: nil
+            )
         }
         self.receiptStore = receiptStore
         self.retryConfiguration = retryConfiguration

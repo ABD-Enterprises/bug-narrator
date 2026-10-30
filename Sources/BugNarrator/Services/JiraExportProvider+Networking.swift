@@ -1,5 +1,47 @@
 import Foundation
 
+/// Refuses a redirect that would move a request to a plaintext remote host.
+///
+/// `requireEncryptedTransport` looks at the URL of the request it builds. A
+/// redirect is a second request that the guard never sees, and CFNetwork
+/// follows redirects on its own: an `https` base URL that answers with a 307
+/// to an `http` URL would put the issue content on the wire in cleartext,
+/// with the Basic-auth credentials attached.
+final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
+    /// Whether a redirect to `url` may be followed.
+    ///
+    /// A redirect to plaintext HTTP at a remote host would send the Basic-auth
+    /// credentials and the issue content in the clear. A redirect that stays
+    /// on https, or that goes to a local address, is fine.
+    static func mayFollow(_ url: URL?) -> Bool {
+        guard let url,
+              url.scheme?.lowercased() == "http",
+              let host = url.host else {
+            return true
+        }
+        return SettingsStore.isLocalEndpointHost(host)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard Self.mayFollow(request.url) else {
+            DiagnosticsLogger(category: .export).error(
+                "export_redirect_refused",
+                "Refused a redirect to a plaintext remote host: \(request.url?.host ?? "unknown")"
+            )
+            completionHandler(nil)
+            return
+        }
+
+        completionHandler(request)
+    }
+}
+
 extension JiraExportProvider {
     func decodeJiraPayload<T: Decodable>(
         _ type: T.Type,
@@ -90,9 +132,10 @@ extension JiraExportProvider {
     }
 
     /// Refuses a request that would send Basic-auth credentials over plaintext
-    /// HTTP to a host outside the machine. Loopback, private-range and `.local`
-    /// endpoints stay allowed: that traffic never leaves the machine or the
-    /// trusted local network.
+    /// HTTP to a host outside the machine. Loopback, private-range and
+    /// link-local addresses stay allowed: that traffic never leaves the
+    /// machine or the trusted local network. A name the app cannot check — a
+    /// `.local` name, a single-label name, a numeric address — is not local.
     private static func requireEncryptedTransport(_ url: URL) throws {
         guard url.scheme?.lowercased() == "http",
               let host = url.host,
@@ -131,6 +174,16 @@ extension JiraExportProvider {
 
         if statusCode == 400 {
             return .exportFailure("Jira rejected the issue payload: \(message)")
+        }
+
+        // A redirect the app did not follow: either the policy refused it, or
+        // it pointed somewhere the transport rule would not allow.
+        if (300..<400).contains(statusCode) {
+            return .exportConfigurationIncompatible(
+                "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
+                + "A redirect to a plaintext remote host would send the credentials and the issue "
+                + "content in the clear. Use the final https:// URL of your Jira site."
+            )
         }
 
         return .exportFailure("Jira returned \(statusCode): \(message)")

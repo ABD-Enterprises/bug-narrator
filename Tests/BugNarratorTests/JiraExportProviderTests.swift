@@ -46,6 +46,19 @@ final class JiraExportProviderTests: XCTestCase {
         }
     }
 
+    func testARedirectToAPlaintextRemoteHostIsRefused() throws {
+        // The guard looks at the request the app builds. A redirect is a
+        // second request it never sees, so the policy has to refuse it.
+        XCTAssertFalse(
+            JiraTransportRedirectPolicy.mayFollow(URL(string: "http://jira.example.com/rest/api/3/issue")),
+            "A redirect to a plaintext remote host would put the credentials and the issue content in the clear."
+        )
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "https://jira.example.com/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "http://localhost:8080/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(URL(string: "http://192.168.1.10/rest/api/3/issue")))
+        XCTAssertTrue(JiraTransportRedirectPolicy.mayFollow(nil))
+    }
+
     func testMakeURLRequestIncludesBasicAuthAndProjectFields() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let screenshotURL = makeScreenshotFileURL(named: "modal-shot.png")

@@ -283,7 +283,8 @@ final class IssueExportControllerTests: XCTestCase {
         XCTAssertEqual(context.destination, .jira)
     }
 
-    func testPendingReviewMutationAndCancel() async throws {        let harness = try IssueExportControllerHarness()
+    func testPendingReviewMutationAndCancel() async throws {
+        let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
 
         harness.settingsStore.githubToken = "fixture-github-token"
