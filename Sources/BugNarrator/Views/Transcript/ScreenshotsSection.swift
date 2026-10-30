@@ -20,11 +20,14 @@ extension TranscriptView {
 
     func screenshotTimelineRow(_ screenshot: SessionScreenshot, index: Int, session: TranscriptSession, availableWidth: CGFloat) -> some View {
         let linkedMarker = screenshot.associatedMarkerID.flatMap { session.marker(with: $0) }
+        let referencingIssues = session.issueExtraction?.issues.filter {
+            $0.relatedScreenshotIDs.contains(screenshot.id)
+        } ?? []
 
         return VStack(alignment: .leading, spacing: 10) {
             if availableWidth < 420 {
                 VStack(alignment: .leading, spacing: 10) {
-                    screenshotMetadataBlock(screenshot, index: index, linkedMarker: linkedMarker)
+                    screenshotMetadataBlock(screenshot, index: index, linkedMarker: linkedMarker, referencingIssues: referencingIssues)
 
                     Button("Open Screenshot") {
                         appState.openScreenshot(screenshot)
@@ -34,7 +37,7 @@ extension TranscriptView {
                 }
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    screenshotMetadataBlock(screenshot, index: index, linkedMarker: linkedMarker)
+                    screenshotMetadataBlock(screenshot, index: index, linkedMarker: linkedMarker, referencingIssues: referencingIssues)
 
                     Spacer()
 
@@ -60,7 +63,12 @@ extension TranscriptView {
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    func screenshotMetadataBlock(_ screenshot: SessionScreenshot, index: Int, linkedMarker: SessionMarker?) -> some View {
+    func screenshotMetadataBlock(
+        _ screenshot: SessionScreenshot,
+        index: Int,
+        linkedMarker: SessionMarker?,
+        referencingIssues: [ExtractedIssue] = []
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("Screenshot")
@@ -78,6 +86,19 @@ extension TranscriptView {
                 if let linkedMarker {
                     metadataChip(label: linkedMarker.title, systemImage: "mappin.and.ellipse")
                 }
+            }
+
+            // An issue that references this screenshot shows it inline as
+            // well. Naming the issue here says which one, so the gallery
+            // explains the duplication instead of looking like a stray copy.
+            if !referencingIssues.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(referencingIssues) { issue in
+                        metadataChip(label: issue.title, systemImage: "exclamationmark.bubble")
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Referenced by \(referencingIssues.count) extracted issue\(referencingIssues.count == 1 ? "" : "s")")
             }
         }
     }
