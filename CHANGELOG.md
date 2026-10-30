@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] The update-check parity matrix documents Windows-specific package selection and search limits instead of incorrectly claiming both ports still use the same latest-release endpoint.
 - [FIX] Windows update checks search published releases for an uploaded app package matching the running x64 or ARM64 process, ignoring macOS and transcription-server releases, drafts and prereleases. Windows tester tags compare correctly; links stay on this repository, and missing packages or incomplete searches report an unknown result rather than claiming the app is up to date.
 - [SECURITY] Windows encrypts saved session metadata, transcripts, review summaries and recording drafts using AES-GCM with per-file keys wrapped by current-user DPAPI. Legacy plaintext/BOM sessions remain readable and upgrade on save, including retained draft notes; explicit exports remain plaintext. Encryption failures do not fall back to plaintext writes.
 - [FIX] Windows Jira exports preserve configured context paths, with or without a trailing slash, in both issue-creation requests and returned issue links.
