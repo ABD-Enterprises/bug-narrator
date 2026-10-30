@@ -576,14 +576,15 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
-    /// The IPv6 loopback and link-local addresses can be written in more than
-    /// one way, and the app has to recognise all of them: `0:0:0:0:0:0:0:1`
-    /// is the same address as `::1`, and `::ffff:127.0.0.1` is the loopback
-    /// written as an IPv4-mapped IPv6 address. Comparing the strings would
-    /// refuse a local endpoint the user can reach.
-    /// A trailing dot makes the name absolute rather than different: a
-    /// resolver answers the same name either way, so `nas.local.` is the same
-    /// host as `nas.local` and has to be classified the same way.
+    /// A trailing dot makes a name absolute rather than different: a resolver
+    /// answers the same name either way, so `nas.local.` is the same host as
+    /// `nas.local` and has to be classified the same way.
+    ///
+    /// The same is true of a reserved name: `localhost.` is the absolute form
+    /// of `localhost`, and a resolver answers it with the loopback address.
+    ///
+    /// An address is not a name. `127.0.0.1.` is not the address any more —
+    /// it is a name the app cannot check — so it stays refused.
     func testATrailingDotDoesNotChangeWhichClassAHostIsIn() {
         XCTAssertTrue(
             SettingsStore.isUnqualifiedLocalName("nas.local."),
@@ -596,6 +597,16 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(
             SettingsStore.isUnqualifiedLocalName("localhost."),
             "localhost is reserved, however it is written"
+        )
+        for reserved in ["localhost.", "app.localhost."] {
+            XCTAssertTrue(
+                SettingsStore.isLocalEndpointHost(reserved),
+                "expected \(reserved) to be trusted: it is the absolute form of a reserved name"
+            )
+        }
+        XCTAssertFalse(
+            SettingsStore.isLocalEndpointHost("127.0.0.1."),
+            "a trailing dot turns an address into a name the app cannot check"
         )
     }
 
@@ -612,6 +623,11 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+    /// The IPv6 loopback and link-local addresses can be written in more than
+    /// one way, and the app has to recognise all of them: `0:0:0:0:0:0:0:1`
+    /// is the same address as `::1`, and `::ffff:127.0.0.1` is the loopback
+    /// written as an IPv4-mapped IPv6 address. Comparing the strings would
+    /// refuse a local endpoint the user can reach.
     func testEverySpellingOfTheIPv6LocalAddressesIsTrusted() {
         for trusted in [
             "::1",

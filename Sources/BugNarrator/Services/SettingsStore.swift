@@ -577,19 +577,32 @@ final class SettingsStore: ObservableObject {
         return isTrustedIPv4(octets.0, octets.1)
     }
 
+    /// The name `host` refers to, with one trailing dot removed.
+    ///
+    /// A trailing dot makes a name absolute rather than different: a resolver
+    /// looks up the same name either way, so the two have to be classified the
+    /// same way. It does not rescue an address literal — `127.0.0.1.` is not
+    /// the address any more, it is a name the app cannot check, and a
+    /// resolver does not answer it at all.
+    private static func nameForm(of host: String) -> String {
+        host.hasSuffix(".") ? String(host.dropLast()) : host
+    }
+
     /// Whether `host` is one of the names the standards reserve for the
     /// loopback: `localhost` itself, and a name under it.
     ///
     /// Every label has to be there. A name that only looks like a reserved one
-    /// — a leading dot, an empty label — is not one of them, and a trailing
-    /// dot is not either: it turns the host into an absolute DNS name that a
-    /// resolver anywhere on the network can answer with any address it likes.
+    /// — a leading dot, an empty label — is not one of them. A trailing dot
+    /// is: it makes the name absolute rather than different, and a resolver
+    /// answers a reserved name with the loopback address without ever putting
+    /// the question to the network (RFC 6761).
     private static func isReservedLocalhostName(_ host: String) -> Bool {
-        if host == "localhost" { return true }
+        let name = nameForm(of: host)
+        if name == "localhost" { return true }
 
         // The empty labels are the point: a name that starts or ends with a
         // dot leaves one behind, and ".localhost" is not the reserved name.
-        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        let labels = name.split(separator: ".", omittingEmptySubsequences: false)
         guard labels.count > 1 else { return false }
         guard labels.last.map(String.init) == "localhost" else { return false }
         return labels.dropLast().allSatisfy { !$0.isEmpty }
@@ -718,7 +731,7 @@ final class SettingsStore: ObservableObject {
         // A trailing dot makes the name absolute rather than different: a
         // resolver answers the same name either way, so the two are the same
         // host and have to be classified the same way.
-        let name = lowered.hasSuffix(".") ? String(lowered.dropLast()) : lowered
+        let name = nameForm(of: lowered)
 
         guard !name.isEmpty else { return false }
         // An IPv4 literal in another notation — `134744072`, `0x7f000001` — is
