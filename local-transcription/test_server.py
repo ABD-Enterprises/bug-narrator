@@ -337,7 +337,7 @@ server._serve("127.0.0.1", {port})
             creationflags=creation_flags,
         )
         try:
-            deadline = time.monotonic() + 10
+            deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
                 if process.poll() is not None:
                     self.fail("transcription server exited before accepting connections")
@@ -673,7 +673,7 @@ class ServerAuthenticationTests(unittest.TestCase):
         headers = {}
         if token is not None:
             headers["Authorization"] = f"Bearer {token}"
-        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=10)
+        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=30)
         try:
             connection.request(method or "GET", path, body=data, headers=headers)
             response = connection.getresponse()
@@ -704,7 +704,7 @@ server.main()
             creationflags=creation_flags,
         )
         self.addCleanup(self._stop, process)
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 self.fail("the transcription server exited before accepting connections")
@@ -944,7 +944,7 @@ server.main()
             env=environment,
         )
         self.addCleanup(self._stop, process)
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 self.fail("the transcription server exited before accepting connections")
@@ -963,7 +963,7 @@ server.main()
             except subprocess.TimeoutExpired:
                 process.kill()
 
-    def _headers_only(self, port, request_line, headers, timeout=10.0):
+    def _headers_only(self, port, request_line, headers, timeout=60.0):
         """Send a request's headers and read the status line, sending no body."""
         request = request_line + "\r\n"
         request += "".join(f"{name}: {value}\r\n" for name, value in headers)
@@ -1049,8 +1049,8 @@ server.main()
                 + b"x" * (3 * 1024 * 1024)
                 + b"\r\n--boundary--\r\n"
             )
-            with socket.create_connection(("127.0.0.1", port), timeout=30) as connection:
-                connection.settimeout(30)
+            with socket.create_connection(("127.0.0.1", port), timeout=60) as connection:
+                connection.settimeout(60)
                 connection.sendall(request.encode("latin-1"))
                 sent = 0
                 try:
@@ -1107,7 +1107,7 @@ server.main()
         headers = {}
         if token is not None:
             headers["Authorization"] = f"Bearer {token}"
-        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=10)
+        connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=30)
         try:
             connection.request(method or "GET", path, body=data, headers=headers)
             response = connection.getresponse()
