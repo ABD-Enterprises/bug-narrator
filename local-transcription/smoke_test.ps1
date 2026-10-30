@@ -67,10 +67,15 @@ $token = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 $env:BUGNARRATOR_TRANSCRIPTION_TOKEN = $token
 $headers = @{ Authorization = "Bearer $token" }
 
+# The token file is the server's own, inside the scratch directory: the default
+# one belongs to the developer's own install, and the server would overwrite it
+# with the smoke token.
+$tokenPath = Join-Path $smokeRoot "token"
+
 # Started the way the app starts it: in its own (hidden) console, stderr to a file. A hidden
 # console — not CreateNoWindow — is what lets the graceful Ctrl+C reach the server later.
 $server = Start-Process -FilePath (Resolve-Path $ServerBinary).Path `
-    -ArgumentList "--host 127.0.0.1 --port $Port --preload" `
+    -ArgumentList "--host 127.0.0.1 --port $Port --preload --token-file $tokenPath" `
     -WindowStyle Hidden -RedirectStandardError $serverLog -PassThru
 Log "server pid $($server.Id) on port $Port"
 # PyInstaller onefile runs the real interpreter as a child of the bootloader; a stop must take

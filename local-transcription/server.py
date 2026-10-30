@@ -142,21 +142,31 @@ def read_token_file(path: Path) -> Optional[str]:
 def write_token_file(path: Path, token: str) -> None:
     """Store `token` in `path`, protected so that only its owner can read it.
 
-    On POSIX the file is created with mode 0600, and the mode is repaired
-    *before* the token is written. `O_CREAT` only applies the mode when it
-    creates the file, so a token file left at 0644 by an older build, a
-    restored backup or a copy would otherwise be readable by everyone for as
-    long as it held the token.
+    The token is written to a temporary file next to it and moved into place
+    in one step. That way a reader never sees a missing or an empty token
+    file, the token never sits in a file anyone else can read, and a failure
+    never leaves an empty file where the token was.
 
-    Windows has no POSIX permission bits. There `os.chmod` only toggles the
-    read-only attribute, and the file's access is decided by the access
-    control list it inherits from the directory it is created in.
+    On POSIX the temporary file is created with mode 0600. Windows has no
+    POSIX permission bits: there `os.chmod` only toggles the read-only
+    attribute, and the file's access is decided by the access control list
+    it inherits from the directory it is created in.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        os.chmod(path, 0o600)
-        handle.write(token)
+    descriptor, temporary = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+    )
+    try:
+        os.chmod(temporary, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write(token)
+        os.replace(temporary, path)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
 
 
 def resolve_auth_token(
@@ -175,12 +185,19 @@ def resolve_auth_token(
     candidates = (explicit_token, environment_token, read_token_file(path))
     token = next((value.strip() for value in candidates if value and value.strip()), None)
     if token is None:
+        # A token nobody else can find is a server nobody can talk to: the
+        # client reads it from the file, so a file that cannot be written
+        # leaves the local provider dead. Fail here rather than run with a
+        # token no client will ever present.
         token = secrets.token_urlsafe(32)
+        write_token_file(path, token)
+        return token
     try:
         write_token_file(path, token)
     except OSError:
-        # An unwritable token file must not stop the server: it still refuses
-        # every request that does not carry the token.
+        # The client was handed this token directly, so an unwritable file
+        # does not stop the server: it still refuses every request that does
+        # not carry the token.
         logger.warning(f"Could not write the server token to {path}")
     return token
 
@@ -198,11 +215,12 @@ def _authorization_failure(authorization: Optional[str]) -> Optional[tuple]:
         return (503, "The server token is not configured")
     if not authorization:
         return (401, "Missing Authorization header")
-    prefix = "Bearer "
-    if not authorization.startswith(prefix):
+    # The scheme is case-insensitive (RFC 7235), so `bearer` is as good as
+    # `Bearer`. The token itself is compared as it was given.
+    scheme, separator, presented = authorization.partition(" ")
+    if separator != " " or scheme.lower() != "bearer":
         return (401, "Invalid Authorization header")
-    presented = authorization[len(prefix):].encode("utf-8")
-    if not hmac.compare_digest(presented, _auth_token.encode("utf-8")):
+    if not hmac.compare_digest(presented.encode("utf-8"), _auth_token.encode("utf-8")):
         return (401, "Invalid bearer token")
     return None
 

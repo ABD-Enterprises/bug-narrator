@@ -29,9 +29,16 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
 
     private readonly HttpClient httpClient;
 
-    public LocalServerHealthProbe(HttpClient? httpClient = null)
+    /// <summary>
+    /// Where the token file lives. The directory the app installs into, unless
+    /// a caller says otherwise.
+    /// </summary>
+    private readonly string installDirectory;
+
+    public LocalServerHealthProbe(HttpClient? httpClient = null, string? installDirectory = null)
     {
         this.httpClient = httpClient ?? new HttpClient { Timeout = Timeout };
+        this.installDirectory = installDirectory ?? LocalServerPaths.DefaultInstallDirectory;
     }
 
     public static bool IsHealthy(HttpStatusCode status, string? body)
@@ -77,7 +84,7 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             // The server checks the bearer token on every route, health
             // included: a listener that cannot present the token is not the
             // server, and must not be treated as one (#1270).
-            var token = LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory);
+            var token = LocalServerTokenStore.Token(installDirectory);
             if (!string.IsNullOrWhiteSpace(token))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue(

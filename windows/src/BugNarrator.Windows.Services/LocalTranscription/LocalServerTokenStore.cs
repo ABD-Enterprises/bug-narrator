@@ -114,12 +114,32 @@ public static class LocalServerTokenStore
                 Directory.CreateDirectory(directory);
             }
 
-            if (File.Exists(path))
+            // The token goes into a temporary file that is moved into place
+            // in one step, so a reader never sees a missing or an empty token
+            // file.
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
             {
-                File.Delete(path);
+                File.WriteAllText(temporary, token);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temporary))
+                    {
+                        File.Delete(temporary);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
             }
 
-            File.WriteAllText(path, token);
             return true;
         }
         catch (IOException)

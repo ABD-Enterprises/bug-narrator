@@ -1117,7 +1117,7 @@ server.main()
 
 
 class ServerTokenFileAndChildProcessTests(unittest.TestCase):
-    def test_the_token_file_mode_is_repaired_when_it_is_rewritten(self):
+    def test_the_token_file_is_replaced_with_one_only_its_owner_can_read(self):
         with tempfile.TemporaryDirectory() as directory:
             token_file = Path(directory) / server.TOKEN_FILE_NAME
             token_file.write_text("an-old-token", encoding="utf-8")
@@ -1130,39 +1130,82 @@ class ServerTokenFileAndChildProcessTests(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
             else:
                 # Windows has no POSIX permission bits, so there is no mode to
-                # repair: os.chmod only toggles the read-only attribute and
-                # the file's access is decided by the access control list it
-                # inherits from its directory. What the repair can be checked
-                # for there is that the file was not left read-only, which
-                # would keep the server from rewriting it.
+                # set: os.chmod only toggles the read-only attribute and the
+                # file's access is decided by the access control list it
+                # inherits from its directory. What can be checked there is
+                # that the file was not left read-only, which would keep the
+                # server from rewriting it.
                 self.assertTrue(token_file.stat().st_mode & stat.S_IWRITE)
 
-    def test_the_mode_is_repaired_before_the_token_is_written(self):
-        # The token must never sit in a file that everyone can read, not even
-        # for the moment between the write and the repair.
+    def test_the_token_is_written_into_a_file_only_its_owner_can_read(self):
+        # The token must not sit in a file that everyone can read, not even for
+        # the moment between the write and the file taking its place.
         with tempfile.TemporaryDirectory() as directory:
             token_file = Path(directory) / server.TOKEN_FILE_NAME
-            token_file.write_text("an-old-token", encoding="utf-8")
-            os.chmod(token_file, 0o644)
 
-            token_visible_when_repaired = []
-            real_chmod = os.chmod
+            modes = []
+            real_replace = os.replace
 
-            def recording_chmod(path, mode, *args, **kwargs):
-                if os.fspath(path) == os.fspath(token_file):
-                    token_visible_when_repaired.append(
-                        "s3cret-token-value" in token_file.read_text(encoding="utf-8")
-                    )
-                return real_chmod(path, mode, *args, **kwargs)
+            def recording_replace(source, destination):
+                modes.append(os.stat(source).st_mode & 0o777)
+                return real_replace(source, destination)
 
-            with patch.object(server.os, "chmod", recording_chmod):
+            with patch.object(server.os, "replace", recording_replace):
                 server.write_token_file(token_file, "s3cret-token-value")
 
-            self.assertTrue(token_visible_when_repaired, "the mode was never repaired")
             self.assertEqual(
-                token_visible_when_repaired[0],
-                False,
-                "the mode must be repaired before the token is written",
+                len(modes), 1, "the token file was not replaced in one step"
+            )
+            if os.name != "nt":
+                self.assertEqual(
+                    modes[0], 0o600, "the token was written into a file anyone else can read"
+                )
+            else:
+                self.assertTrue(
+                    modes[0] & stat.S_IWRITE, "the token file was left read-only"
+                )
+
+    def test_the_token_file_is_never_left_empty_by_a_failed_write(self):
+        # A failure while the token is written must not empty the file the
+        # token was in: a client that reads an empty file mints a new token,
+        # and the server keeps the old one.
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            server.write_token_file(token_file, "s3cret-token-value")
+
+            with patch.object(server.os, "replace", side_effect=OSError("no space left")):
+                with self.assertRaises(OSError):
+                    server.write_token_file(token_file, "another-token")
+
+            self.assertEqual(
+                token_file.read_text(encoding="utf-8"), "s3cret-token-value"
+            )
+
+    def test_a_token_that_cannot_be_stored_stops_the_server(self):
+        # A token no client can find is a server nobody can talk to, so the
+        # server refuses to start rather than run with one.
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+
+            with patch.object(server.tempfile, "mkstemp", side_effect=OSError("read-only")):
+                with self.assertRaises(OSError):
+                    server.resolve_auth_token(token_file=token_file)
+
+    def test_the_authorization_scheme_is_case_insensitive(self):
+        # RFC 7235: the scheme is case-insensitive, so `bearer` is as good as
+        # `Bearer`. The token itself is compared as it was given.
+        server.configure_auth("s3cret-token-value")
+
+        for accepted in ("Bearer s3cret-token-value", "bearer s3cret-token-value"):
+            self.assertIsNone(
+                server._authorization_failure(accepted),
+                f"expected {accepted!r} to be accepted",
+            )
+
+        for refused in ("Basic s3cret-token-value", "Bearer wrong-token", "Bearer"):
+            self.assertIsNotNone(
+                server._authorization_failure(refused),
+                f"expected {refused!r} to be refused",
             )
 
     def test_the_token_is_not_handed_to_a_child_process(self):

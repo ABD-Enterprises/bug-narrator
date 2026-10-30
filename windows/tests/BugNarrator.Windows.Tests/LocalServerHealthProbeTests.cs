@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO;
 using System.Text;
 using BugNarrator.Windows.Services.LocalTranscription;
 using Xunit;
@@ -6,8 +7,21 @@ using Xunit;
 namespace BugNarrator.Windows.Tests;
 
 /// <summary>WIN-038 (#1180): the Parakeet readiness probe, same rule as macOS isHealthyLocalProvider.</summary>
-public sealed class LocalServerHealthProbeTests
+public sealed class LocalServerHealthProbeTests : IDisposable
 {
+    /// <summary>
+    /// The probe reads the token from the install directory, and reading a
+    /// token that is not there creates one. A test must not leave that in the
+    /// user's own configuration directory, so it gets a scratch one.
+    /// </summary>
+    private readonly string installDirectory = Path.Combine(
+        Path.GetTempPath(),
+        "BugNarrator.Windows.Tests",
+        Guid.NewGuid().ToString("N"));
+
+    private LocalServerHealthProbe Probe(HttpClient? client = null) =>
+        new(client, installDirectory);
+
     [Theory]
     [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\",\"model_loaded\":true,\"model\":\"parakeet-tdt-0.6b-v3\"}", true)]
     [InlineData(HttpStatusCode.OK, "{\"status\":\"ok\"}", false)]
@@ -28,7 +42,7 @@ public sealed class LocalServerHealthProbeTests
     public async Task IsReachable_AsksTheHealthEndpointUncached()
     {
         HttpRequestMessage? sent = null;
-        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(request =>
+        var probe = Probe(new HttpClient(new FakeHandler(request =>
         {
             sent = request;
             return Json("{\"status\":\"ok\",\"model_loaded\":true}");
@@ -45,7 +59,7 @@ public sealed class LocalServerHealthProbeTests
         // The server checks the bearer token on every route, health included:
         // a listener that cannot present it is not the server (#1270).
         HttpRequestMessage? sent = null;
-        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(request =>
+        var probe = Probe(new HttpClient(new FakeHandler(request =>
         {
             sent = request;
             return Json("{\"status\":\"ok\",\"model_loaded\":true}");
@@ -61,7 +75,7 @@ public sealed class LocalServerHealthProbeTests
     [Fact]
     public async Task IsReachable_IsFalseOnANonOkAnswer()
     {
-        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError))));
+        var probe = Probe(new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError))));
 
         Assert.False(await probe.IsReachableAsync("http://localhost:8422/"));
     }
@@ -69,7 +83,7 @@ public sealed class LocalServerHealthProbeTests
     [Fact]
     public async Task IsReachable_IsFalseWhenTheConnectionIsRefused()
     {
-        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(_ => throw new HttpRequestException("connection refused"))));
+        var probe = Probe(new HttpClient(new FakeHandler(_ => throw new HttpRequestException("connection refused"))));
 
         Assert.False(await probe.IsReachableAsync("http://localhost:8422"));
     }
@@ -77,7 +91,7 @@ public sealed class LocalServerHealthProbeTests
     [Fact]
     public async Task IsReachable_IsFalseAfterTheTwoSecondTimeout()
     {
-        var probe = new LocalServerHealthProbe(new HttpClient(new SlowHandler()));
+        var probe = Probe(new HttpClient(new SlowHandler()));
         var started = DateTimeOffset.UtcNow;
 
         Assert.False(await probe.IsReachableAsync("http://localhost:8422"));
@@ -89,7 +103,7 @@ public sealed class LocalServerHealthProbeTests
     {
         // A closed loopback port: the real transport path, not a fake handler.
         var listener = new TcpListenerHolder();
-        var probe = new LocalServerHealthProbe();
+        var probe = Probe();
 
         Assert.False(await probe.IsReachableAsync($"http://127.0.0.1:{listener.ClosedPort}"));
     }
@@ -98,13 +112,21 @@ public sealed class LocalServerHealthProbeTests
     public async Task IsReachable_PropagatesTheCallersCancellation()
     {
         using var cancellation = new CancellationTokenSource();
-        var probe = new LocalServerHealthProbe(new HttpClient(new FakeHandler(_ => { cancellation.Cancel(); throw new OperationCanceledException(cancellation.Token); })));
+        var probe = Probe(new HttpClient(new FakeHandler(_ => { cancellation.Cancel(); throw new OperationCanceledException(cancellation.Token); })));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => probe.IsReachableAsync("http://localhost:8422", cancellation.Token));
     }
 
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    public void Dispose()
+    {
+        if (Directory.Exists(installDirectory))
+        {
+            Directory.Delete(installDirectory, recursive: true);
+        }
+    }
 
     private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {

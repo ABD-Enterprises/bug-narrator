@@ -55,7 +55,12 @@ say -r 175 -o "$AUDIO_PATH" \
 TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export BUGNARRATOR_TRANSCRIPTION_TOKEN="$TOKEN"
 
-"$SERVER_BINARY" --host 127.0.0.1 --port "$PORT" --preload \
+# The token file is the server's own, inside the scratch directory: the
+# default one belongs to the developer's own install, and the server would
+# overwrite it with the smoke token.
+TOKEN_PATH="$SMOKE_ROOT/token"
+
+"$SERVER_BINARY" --host 127.0.0.1 --port "$PORT" --preload --token-file "$TOKEN_PATH" \
     >"$SERVER_LOG_PATH" 2>&1 &
 SERVER_PID="$!"
 

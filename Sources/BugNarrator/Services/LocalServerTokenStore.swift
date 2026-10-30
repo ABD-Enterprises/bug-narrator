@@ -63,8 +63,10 @@ enum LocalServerTokenStore {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// Store the token for its owner only. The file is created with owner-only
-    /// permissions so the token is never briefly readable by anyone else.
+    /// Store the token for its owner only. The token is written into a
+    /// temporary file that only its owner can read and moved into place in one
+    /// step, so a reader never sees a missing or an empty token file, and the
+    /// token is never readable by anyone else.
     @discardableResult
     static func writeToken(_ token: String, at url: URL) -> Bool {
         let manager = FileManager.default
@@ -73,13 +75,29 @@ enum LocalServerTokenStore {
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            // createFile leaves an existing file alone, so replace it.
-            try? manager.removeItem(at: url)
-            return manager.createFile(
-                atPath: url.path,
-                contents: Data(token.utf8),
+            // The temporary file is created owner-only and empty, and the
+            // token is written into it afterwards: `createFile` applies the
+            // mode after it has written, so the token would otherwise sit in
+            // a file anyone else could read.
+            let temporary = url.deletingLastPathComponent()
+                .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
+            guard manager.createFile(
+                atPath: temporary.path,
+                contents: nil,
                 attributes: [.posixPermissions: NSNumber(value: 0o600)]
-            )
+            ) else {
+                return false
+            }
+            do {
+                try Data(token.utf8).write(to: temporary)
+                // The file is replaced in one step, so a reader never sees a
+                // missing or an empty token file.
+                _ = try manager.replaceItemAt(url, withItemAt: temporary)
+            } catch {
+                try? manager.removeItem(at: temporary)
+                return false
+            }
+            return true
         } catch {
             return false
         }
