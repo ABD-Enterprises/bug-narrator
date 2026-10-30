@@ -2,10 +2,10 @@
 
 **Date:** 2026-10-29
 **Commit reviewed:** `c8c0070` (local `main`, fast-forwarded from `4981148`; upstream `origin/main` was 3 commits ahead on fetch)
-**Status:** snapshot. `main` moved during the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. See [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) for the one finding that changed.
+**Status:** snapshot. `main` moved during and after the review; findings are checked against the commit named above, and any finding affected by a later commit is called out in place. Two have moved: [P2-2](#p2-2--the-windows-jira-export-drops-the-base-urls-context-path-fixed-by-1245) was fixed by #1245, and [P2-6](#p2-6--the-local-transcription-server-has-no-admission-control-on-upload-size) was partly fixed by #1239. Everything else was still open at the time of writing.
 **Scope:** whole repository — Swift macOS app (`Sources/BugNarrator`, 248 files / 36,455 LOC), tests (`Tests/`, 119 files / 26,323 LOC), Windows port (`windows/`, .NET 8 / WPF), local transcription server (`local-transcription/`, Python), CI/CD (`.github/workflows/`, 5 workflows), release automation (`scripts/`, 19 scripts), docs site (`site/`, Docusaurus).
 **Method:** five parallel read-only review passes (Swift security; Swift maintainability + UX; Python transcription server; Windows C# port; CI/CD + scripts + docs site + repo hygiene), plus independent line-by-line re-verification of every P0/P1 claim by the parent agent, plus live read-only GitHub API queries (`gh api`, `gh run list`, `gh release list`).
-**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*.
+**Verdict:** **FAIL** — 6 confirmed P1 findings, 8 P2, 11 P3. Nothing found that is an actively exploitable remote compromise; the failures are concentrated in *ungated credential transport*, *ungated local services*, and *release/CI controls that report success without doing the work*. Of the P2s, one (P2-2) has since been fixed; the other seven are open.
 
 > **Status.** This is a point-in-time audit, committed as a reference for follow-up
 > work. It is not a product document and describes a snapshot at `c8c0070`; it
@@ -387,12 +387,13 @@ Current state is benign: `releases/latest` is `v1.1.0`.
 
 ---
 
-### P2-2 · The Windows Jira export drops the base URL's context path
+### P2-2 · The Windows Jira export drops the base URL's context path (fixed by #1245)
 
 **Area:** Windows port
+**Status:** **fixed** — see below.
 **Evidence**
 
-`windows/src/BugNarrator.Windows.Services/Settings/WindowsAppSettings.cs:258-261` normalizes without adding a trailing slash:
+At the reviewed commit, `windows/src/BugNarrator.Windows.Services/Settings/WindowsAppSettings.cs:258-261` normalized without adding a trailing slash:
 
 ```csharp
     public string NormalizedJiraBaseUrl =>
@@ -401,7 +402,7 @@ Current state is benign: `releases/latest` is `v1.1.0`.
             : JiraBaseUrl.Trim();
 ```
 
-`windows/src/BugNarrator.Windows.Services/Export/JiraExportProvider.cs:402` then resolves the path with `AppendPathSegment`, which uses `new Uri(baseUri, relativePath)` — RFC 3986 relative resolution, which **replaces** the last path segment rather than appending to it.
+`windows/src/BugNarrator.Windows.Services/Export/JiraExportProvider.cs:402` then resolved the path with `AppendPathSegment`, which used `new Uri(baseUri, relativePath)` — RFC 3986 relative resolution, which **replaces** the last path segment rather than appending to it.
 
 Confirmed by RFC 3986 resolution:
 
@@ -411,7 +412,7 @@ base='https://jira.example.com/jira/'     -> https://jira.example.com/jira/rest/
 base='https://acme.atlassian.net/'        -> https://acme.atlassian.net/rest/api/3/issue
 ```
 
-macOS gets this right — `Sources/BugNarrator/Services/SettingsStore+Normalization.swift:16-21` trims trailing `/` and the URL is built with `appending(path:)`, which appends:
+macOS got this right — `Sources/BugNarrator/Services/SettingsStore+Normalization.swift:16-21` trims trailing `/` and the URL is built with `appending(path:)`, which appends:
 
 ```swift
     var normalizedJiraBaseURL: String {
@@ -426,6 +427,22 @@ macOS gets this right — `Sources/BugNarrator/Services/SettingsStore+Normalizat
 **Impact:** Jira export is broken on Windows for every context-path Jira Server deployment; works on macOS. A real cross-platform divergence in a shipped feature.
 
 **Fix:** in `WindowsAppSettings.NormalizedJiraBaseUrl`, append a trailing `/` when the URL has a non-empty path (and keep `AppendPathSegment` for the relative path). Add a test that mirrors the macOS normalization test: `https://jira.example.com/jira` → `https://jira.example.com/jira/rest/api/3/issue`.
+
+**Update — fixed by #1245.** `0d078b2` ("fix(windows): preserve Jira export context paths") landed on `main` after this review was written, and fixes exactly this. `AppendPathSegment` now treats the configured path as a directory:
+
+```csharp
+    public static Uri AppendPathSegment(this Uri baseUri, string relativePath)
+    {
+        // Treat the configured context path as a directory, even without a trailing slash.
+        var directoryUri = new Uri(baseUri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
+        return new Uri(directoryUri, relativePath);
+    }
+```
+
+It ships with regression tests in `windows/tests/BugNarrator.Windows.Tests/Export/IssueExportProviderTests.cs`. The approach differs slightly from the one this finding suggested (normalising inside `AppendPathSegment` rather than at base-URL normalization); the behaviour is the same, and the fix is the smaller change.
+
+**Nothing further is required for this finding.** It is recorded here for traceability.
+
 
 ---
 
@@ -730,6 +747,6 @@ Recorded so a future reviewer does not re-investigate them.
 | 7 | P1-3 Windows at-rest parity | ~2-3 days | The largest single piece of work; decide port-vs-document first. |
 | 8 | P1-6 Release workflow guards | ~1 h | Environment, ref constraint, namespace regex, `--target`. |
 | 9 | P2-1 Update checker asset filter | ~1 h | Mirrors logic that already exists in `LocalTranscriptionManager`. |
-| 10 | P2-2 Windows Jira context path | ~30 min | Small, self-contained, user-visible break. |
+| 10 | ~~P2-2 Windows Jira context path~~ | — | **Done** — fixed by #1245 (`0d078b2`) with regression tests. |
 | 11 | P2-4 Screenshots section | ~30 min | User-visible regression, one `if`. |
 | 12 | P2-7 Dead model + identity function | ~30 min | Pure deletion; removes a misleading decision point. |
