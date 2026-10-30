@@ -40,7 +40,7 @@ You need:
 4. Enter the required API key or base URL, or leave the key blank for `Local (Parakeet)`.
 5. Optionally validate the key or connection.
 
-BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs BugNarrator needs. `Local (Parakeet)` transcribes on this Mac through `http://localhost:8422`, does not use an API key, and does not upload audio. BugNarrator and that local server share a private access token, so no other program on the Mac can send it audio or use it for transcription.
+BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs BugNarrator needs. `Local (Parakeet)` transcribes on this Mac through `http://localhost:8422`, does not use an API key, and does not upload audio. BugNarrator and that local server share a private access token, so no process that cannot read the user's own token file can drive the model or receive the recording.
 
 `Local (Parakeet)` is transcription-only. Review summary and issue extraction still require an OpenAI-compatible chat provider.
 

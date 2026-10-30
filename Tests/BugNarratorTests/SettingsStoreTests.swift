@@ -1165,6 +1165,62 @@ final class SettingsStoreTests: XCTestCase {
         store.aiProvider = .openAI
     }
 
+    /// A token file that cannot be secured leaves the server running and
+    /// healthy while the app sends no token, so the message has to name that
+    /// cause: the user is told the server could not be reached and looks for
+    /// a server that is there all along.
+    func testTheUnreachableMessageNamesATokenFileItCannotSecure() throws {
+        let suiteName = "BugNarrator-TokenProblem-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarratorTests-TokenProblem-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let tokenURL = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        FileManager.default.createFile(
+            atPath: tokenURL.path,
+            contents: Data("an-old-token".utf8),
+            attributes: [.posixPermissions: NSNumber(value: 0o644)]
+        )
+        // A directory that cannot be written to is a file that cannot be
+        // replaced, so the repair fails.
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o500)],
+            ofItemAtPath: directory.path
+        )
+        addTeardownBlock {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o700)],
+                ofItemAtPath: directory.path
+            )
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        // The server is running and refuses the request, because the app
+        // sends no token.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+             Data())
+        }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  localServerInstallDirectory: directory,
+                                  usesTheStoresOwnReachabilityProbe: true)
+
+        let unreachable = expectation(description: "The server refuses the request without the token")
+        let observation = store.$localProviderReachability.dropFirst().sink { state in
+            if state == .unreachable { unreachable.fulfill() }
+        }
+        wait(for: [unreachable], timeout: 6)
+        observation.cancel()
+
+        XCTAssertTrue(
+            store.localProviderUnreachableMessage.contains("token file"),
+            store.localProviderUnreachableMessage
+        )
+    }
+
     func testParakeetReadinessRecoversAtTheSameURL() {
         let suiteName = "BugNarrator-ReadinessRecovery-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

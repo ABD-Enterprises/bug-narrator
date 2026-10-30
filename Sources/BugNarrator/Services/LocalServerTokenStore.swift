@@ -35,6 +35,32 @@ enum LocalServerTokenStore {
     /// The authorization scheme the server expects.
     static let authorizationScheme = "Bearer"
 
+    /// The token the app presents to the server, or why it has none.
+    enum TokenOutcome: Equatable {
+        case ready(String)
+        case unavailable(TokenUnavailable)
+    }
+
+    /// Why the app cannot present a token to the server.
+    enum TokenUnavailable: Equatable, Sendable {
+        /// The token file is there but is readable by more than its owner,
+        /// and it could not be given the permissions it needs.
+        case fileIsTooReadable
+
+        /// The token could not be written at all.
+        case couldNotBeStored
+
+        /// What the user is told about it.
+        var explanation: String {
+            switch self {
+            case .fileIsTooReadable:
+                return "The access token file could not be secured, so BugNarrator did not send it."
+            case .couldNotBeStored:
+                return "The access token file could not be written, so BugNarrator did not send it."
+            }
+        }
+    }
+
     static func tokenFileURL(installDirectory: URL) -> URL {
         installDirectory.appendingPathComponent(tokenFileName)
     }
@@ -43,6 +69,21 @@ enum LocalServerTokenStore {
     /// is none yet. Returns nil when the token cannot be stored, in which case
     /// the server refuses every request and the app must not talk to it.
     static func token(installDirectory: URL) -> String? {
+        switch tokenOutcome(installDirectory: installDirectory) {
+        case .ready(let token):
+            return token
+        case .unavailable:
+            return nil
+        }
+    }
+
+    /// The token to present to the server, and why there is none when there
+    /// is none.
+    ///
+    /// The reason matters to the user: a token file that could not be secured
+    /// leaves the server running and healthy while the app sends no token,
+    /// so "the server could not be reached" would name the wrong cause.
+    static func tokenOutcome(installDirectory: URL) -> TokenOutcome {
         let url = tokenFileURL(installDirectory: installDirectory)
         if let stored = storedToken(at: url) {
             // A token file that an older build left readable by anyone else
@@ -51,13 +92,17 @@ enum LocalServerTokenStore {
             // account can read is not a secret, so a file that cannot be
             // repaired is a file the app must not use.
             if !isReadableOnlyByItsOwner(url) {
-                guard writeToken(stored, at: url) else { return nil }
+                guard writeToken(stored, at: url) else {
+                    return .unavailable(.fileIsTooReadable)
+                }
             }
-            return stored
+            return .ready(stored)
         }
         let token = newToken()
-        guard writeToken(token, at: url) else { return nil }
-        return token
+        guard writeToken(token, at: url) else {
+            return .unavailable(.couldNotBeStored)
+        }
+        return .ready(token)
     }
 
     /// Whether the file at `url` can be read by its owner and nobody else.

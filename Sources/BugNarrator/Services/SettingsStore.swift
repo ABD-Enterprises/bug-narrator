@@ -42,6 +42,10 @@ final class SettingsStore: ObservableObject {
     /// Why the local server said it is not usable, when it said so. The server
     /// stays up when it cannot load its model, so "unreachable" would be a lie.
     @Published private(set) var localProviderModelError: String?
+    /// Why the app cannot present the local server its access token, when it
+    /// cannot. The server then refuses every request, so without this the
+    /// user is told the server could not be reached.
+    @Published private(set) var localProviderTokenProblem: LocalServerTokenStore.TokenUnavailable?
 
     @Published var openAIBaseURL: String = "" {
         didSet {
@@ -909,6 +913,8 @@ final class SettingsStore: ObservableObject {
         let reported: String
         if let modelError = localProviderModelError, !modelError.isEmpty {
             reported = " The server is running but could not load its model: \(modelError)."
+        } else if let tokenProblem = localProviderTokenProblem {
+            reported = " \(tokenProblem.explanation)"
         } else {
             reported = ""
         }
@@ -1060,7 +1066,11 @@ final class SettingsStore: ObservableObject {
         // The server checks the bearer token on every route, health included:
         // a listener that cannot present the token is not the server, and must
         // not be treated as one (#1270).
-        if let token = LocalServerTokenStore.token(installDirectory: localServerInstallDirectory) {
+        // A token the app cannot present is remembered, so the message can
+        // name the cause: the server is running and healthy, and it is the
+        // token file that stops the app from talking to it.
+        let tokenOutcome = LocalServerTokenStore.tokenOutcome(installDirectory: localServerInstallDirectory)
+        if case .ready(let token) = tokenOutcome {
             request.setValue(
                 "\(LocalServerTokenStore.authorizationScheme) \(token)",
                 forHTTPHeaderField: "Authorization"
@@ -1075,6 +1085,10 @@ final class SettingsStore: ObservableObject {
                       self.aiProvider == .parakeetLocal else { return }
                 self.localProviderTask = nil
                 self.localProviderModelError = report.modelError
+                self.localProviderTokenProblem = {
+                    if case .unavailable(let reason) = tokenOutcome { return reason }
+                    return nil
+                }()
                 let result: LocalProviderReachability = report.isHealthy ? .reachable : .unreachable
                 if self.localProviderReachability != result {
                     self.localProviderReachability = result

@@ -88,6 +88,42 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertEqual(permissions.int16Value, 0o600)
     }
 
+    /// A token file that cannot be given the permissions it needs is not a
+    /// token the app may use, and the app has to say why: the server is
+    /// running and healthy while the app sends no token, so "the server could
+    /// not be reached" would name the wrong cause.
+    func testAFileThatCannotBeRepairedSaysWhy() throws {
+        let directory = makeInstallDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        FileManager.default.createFile(
+            atPath: url.path,
+            contents: Data("an-old-token".utf8),
+            attributes: [.posixPermissions: NSNumber(value: 0o644)]
+        )
+        // A directory that cannot be written to is a file that cannot be
+        // replaced, so the repair fails.
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o500)],
+            ofItemAtPath: directory.path
+        )
+        addTeardownBlock {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o700)],
+                ofItemAtPath: directory.path
+            )
+        }
+
+        XCTAssertEqual(
+            LocalServerTokenStore.tokenOutcome(installDirectory: directory),
+            .unavailable(.fileIsTooReadable)
+        )
+        XCTAssertNil(LocalServerTokenStore.token(installDirectory: directory))
+        XCTAssertTrue(
+            LocalServerTokenStore.TokenUnavailable.fileIsTooReadable.explanation.contains("token file")
+        )
+    }
+
     func testAStoredTokenIsReadBackUnchanged() throws {
         let directory = makeInstallDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
