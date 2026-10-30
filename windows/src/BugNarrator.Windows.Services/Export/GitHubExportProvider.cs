@@ -60,7 +60,7 @@ public sealed class GitHubExportProvider
                 request,
                 "GitHub",
                 cancellationToken);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseBody = await ReadBodyAsync(response, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -308,6 +308,18 @@ public sealed class GitHubExportProvider
             : failureMessage;
     }
 
+    /// <summary>
+    /// Reads the response body. A successful body is read in full because the
+    /// created issue is parsed out of it; a failed body is read with a bound,
+    /// because it ends up in an error message that is written to the log.
+    /// </summary>
+    private static Task<string> ReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        return response.IsSuccessStatusCode
+            ? response.Content.ReadAsStringAsync(cancellationToken)
+            : ResponseBodyReader.ReadErrorBodyAsync(response, cancellationToken);
+    }
+
     private static string? TryReadMessage(string responseBody)
     {
         if (string.IsNullOrWhiteSpace(responseBody))
@@ -319,7 +331,7 @@ public sealed class GitHubExportProvider
         {
             using var document = JsonDocument.Parse(responseBody);
             return document.RootElement.TryGetProperty("message", out var messageElement)
-                ? messageElement.GetString()?.Trim()
+                ? ResponseBodyReader.ToLoggableMessage(messageElement.GetString())
                 : null;
         }
         catch

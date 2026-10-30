@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [SECURITY] The Windows HTTP layer no longer writes an unbounded server response into the log. The body of a failed request is read with a bound of 64 KiB, and the message that reaches the diagnostics log is cut to 2 KiB with its control characters replaced, so a server that answers with a huge or hostile body can neither fill the log file nor forge a log line. A successful response is still read in full, because the transcript, the extracted issues and the created issue are parsed out of it. The local transcription server's health probe reads its body with the same bound.
+
 - [SECURITY] Plaintext HTTP to a local provider is only allowed to an address the app can check. A `.local` name and a single-label name such as `lmstudio` are resolved over mDNS, which any device on the local network can answer, so a name that looks local could point anywhere and carry the API key and the recordings in the clear; Apple's `NSAllowsLocalNetworking` gives no protection for them either. The exemption now covers loopback, private-range and link-local addresses only, and the refusal names the fix — point the setting at the machine's IP address. The Windows port carries the same classifier and is tracked separately (#1268).
 
 - [SECURITY] Exported bundles are no longer world-readable. The bundle directory is created owner-only (`0700`) and the files inside it — the transcript, the review summary, the manifest, the copied screenshots, and the privacy and debug exports — are written owner-only (`0600`) instead of taking the exporting user's umask. A bundle exported to the Desktop or Downloads of a shared Mac can no longer be read by the other local accounts. The in-app library is unaffected.

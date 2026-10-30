@@ -145,7 +145,7 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             message,
             "AI provider transcription",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ReadBodyAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(BuildFailureMessage(response.StatusCode, responseBody));
@@ -184,11 +184,23 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             message,
             "AI provider validation",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ReadBodyAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(BuildFailureMessage(response.StatusCode, responseBody));
         }
+    }
+
+    /// <summary>
+    /// Reads the response body. A successful body is read in full because the
+    /// transcript is parsed out of it; a failed body is read with a bound,
+    /// because it ends up in an error message that is written to the log.
+    /// </summary>
+    private static Task<string> ReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        return response.IsSuccessStatusCode
+            ? response.Content.ReadAsStringAsync(cancellationToken)
+            : ResponseBodyReader.ReadErrorBodyAsync(response, cancellationToken);
     }
 
     private static string BuildFailureMessage(System.Net.HttpStatusCode statusCode, string responseBody)
@@ -204,7 +216,7 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
                     var message = messageElement.GetString();
                     if (!string.IsNullOrWhiteSpace(message))
                     {
-                        return message.Trim();
+                        return ResponseBodyReader.ToLoggableMessage(message);
                     }
                 }
             }
