@@ -92,7 +92,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
             request,
             "AI provider issue extraction",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ReadBodyAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             diagnostics.Warning(
@@ -186,6 +186,19 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
         return string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>
+    /// Reads the response body. A successful body is read in full because the
+    /// extracted issues are parsed out of it; a failed body is read with a
+    /// bound, because it ends up in an error message that is written to the
+    /// log.
+    /// </summary>
+    private static Task<string> ReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        return response.IsSuccessStatusCode
+            ? response.Content.ReadAsStringAsync(cancellationToken)
+            : ResponseBodyReader.ReadErrorBodyAsync(response, cancellationToken);
+    }
+
     private static string BuildFailureMessage(HttpStatusCode statusCode, string responseBody)
     {
         var apiMessage = TryReadApiMessage(responseBody);
@@ -215,7 +228,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
             if (document.RootElement.TryGetProperty("error", out var errorElement)
                 && errorElement.TryGetProperty("message", out var messageElement))
             {
-                return messageElement.GetString()?.Trim();
+                return ResponseBodyReader.ToLoggableMessage(messageElement.GetString());
             }
         }
         catch

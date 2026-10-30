@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BugNarrator.Windows.Services.Http;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
 
@@ -68,7 +69,10 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
             using var response = await httpClient.SendAsync(request, timeout.Token);
-            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            // The health document is a small JSON object. The body is read
+            // with a bound so a server that answers with a huge body cannot
+            // make the app hold all of it in memory.
+            var body = await ResponseBodyReader.ReadErrorBodyAsync(response, timeout.Token);
             return IsHealthy(response.StatusCode, body);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
