@@ -50,6 +50,8 @@ jobs:
   release-preflight:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # No recorded run (dispatch only); the job runs four short shell checks.
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -114,6 +116,10 @@ jobs:
             runner: windows-11-arm
             lock: requirements-windows-arm64.lock
     runs-on: ${{ matrix.runner }}
+    # Measured 2026-10-31 over the last 6 successful runs: at most 9.4 min of running
+    # time (arm64; x64 at most 4.7). The smoke test downloads the model weights on a
+    # cache miss, and two failed runs hung for 17 to 19 min, which this limit ends.
+    timeout-minutes: 30
     env:
       ASSET: bugnarrator-transcription-windows-${{ matrix.arch }}
       OUTPUT_DIR: ${{ github.workspace }}\dist\local-transcription
@@ -209,6 +215,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [build]
     runs-on: ubuntu-latest
+    # No recorded run (dispatch only). The limit counts running time only; the wait
+    # for the environment approval happens before the job starts.
+    timeout-minutes: 10
     # A signed release waits for a human approval in this environment. The
     # environment's deployment branch policy admits only refs/heads/main.
     environment: windows-release

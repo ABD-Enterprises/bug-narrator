@@ -36,6 +36,8 @@ concurrency:
 jobs:
   release-preflight:
     runs-on: ubuntu-latest
+    # No recorded run (dispatch only); the job runs four short shell checks.
+    timeout-minutes: 10
     # The preflight validates the dispatch before a Windows runner is reserved.
     permissions:
       actions: read
@@ -93,6 +95,10 @@ jobs:
   signed-windows-tester-release:
     needs: release-preflight
     runs-on: windows-latest
+    # No recorded run (dispatch only). The unsigned Windows build and test in ci.yml
+    # takes at most 4.6 min; this job adds signing, packaging and the release upload.
+    # The limit counts running time only; the environment approval wait is before it.
+    timeout-minutes: 30
     # A signed release waits for a human approval in this environment. The
     # environment's deployment branch policy admits only refs/heads/main.
     environment: windows-release
