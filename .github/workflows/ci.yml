@@ -28,6 +28,8 @@ permissions:
 jobs:
   detect-ci-changes:
     runs-on: ubuntu-latest
+    # Measured 2026-10-31 over the last 48 successful runs: at most 3.0 min of running time.
+    timeout-minutes: 10
     outputs:
       docs_changed: ${{ steps.changes.outputs.docs_changed }}
       swift_changed: ${{ steps.changes.outputs.swift_changed }}
@@ -93,6 +95,8 @@ jobs:
 
   runtime-guardrails:
     runs-on: ubuntu-latest
+    # Measured 2026-10-31 over the last 47 successful runs: at most 2.2 min of running time.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -149,6 +153,8 @@ jobs:
       - runtime-guardrails
     if: needs.detect-ci-changes.outputs.docs_changed == 'true'
     runs-on: ubuntu-latest
+    # Measured 2026-10-31 over the last 13 successful runs: at most 1.1 min of running time.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -301,6 +307,8 @@ jobs:
   board-audit:
     runs-on: ubuntu-latest
     continue-on-error: true
+    # Measured 2026-10-31 over the last 48 successful runs: at most 1.9 min of running time.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -323,6 +331,8 @@ jobs:
       - macos-build-and-test
       - windows-build-and-test
     runs-on: ubuntu-latest
+    # Measured 2026-10-31 over the last 43 successful runs: at most 1.8 min of running time.
+    timeout-minutes: 10
     steps:
       - name: Verify no required job failed
         env:
@@ -356,6 +366,9 @@ jobs:
     if: needs.detect-ci-changes.outputs.windows_changed == 'true'
     # GitHub-hosted: the self-hosted fleet has no Windows runner (#921).
     runs-on: windows-latest
+    # Measured 2026-10-31 over the last 19 successful runs: at most 4.6 min of running
+    # time (median 1.5); a cold NuGet restore on a hosted Windows runner is the slow case.
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

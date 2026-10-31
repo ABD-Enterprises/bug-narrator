@@ -24,6 +24,8 @@ jobs:
   languages:
     name: Select languages
     runs-on: ubuntu-latest
+    # The job runs one shell step; every recorded run finished in under a minute.
+    timeout-minutes: 10
     outputs:
       list: ${{ steps.select.outputs.list }}
     steps:
@@ -58,6 +60,12 @@ jobs:
     name: Analyze (${{ matrix.language }})
     needs: languages
     runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || matrix.language == 'csharp' && 'windows-latest' || 'ubuntu-latest' }}
+    # Measured 2026-10-31 over the last 8 completed runs: actions, python and
+    # javascript-typescript finish in about 1 min and csharp in at most 4 min, so
+    # 15 min covers them. Swift builds the Xcode project first: its successful
+    # runs took 18 and 23 min, and one failure ran for 71 min before it was
+    # noticed, which is what this limit ends.
+    timeout-minutes: ${{ matrix.language == 'swift' && 60 || 15 }}
     permissions:
       security-events: write
       actions: read
