@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [SECURITY] The docs site pins `joi` 17.13.9 (was 17.13.8) through its `overrides`, clearing GHSA-4528-x5fx-h6hg (quadratic-time split in `string().email({ multiple: true })`, high). The remaining `npm audit` finding, `minimatch` 3.1.5 (GHSA-g3hv-75wg-m249, moderate), has no fixed release before 11.0.1, a different major that the site's dependencies do not accept, so it is left as is.
 - [SECURITY] The docs site's dependency overrides move `qs` to 6.16.1 and `serialize-javascript` to 7.1.3, the first releases that close two Dependabot alerts against the Docusaurus build (`site/package-lock.json`); the `deepmerge` alert against the same build has no fixed release yet and stays open.
 - [INTERNAL] Every workflow job has a `timeout-minutes` sized from its recorded run times, so a hung job ends instead of holding a runner: 10 min for the short Linux jobs, 15 for the Windows build and the non-Swift CodeQL languages, 30 for the Windows server and tester release builds, and 60 for the Swift CodeQL analysis (one failed run had held a macOS runner for 71 min).
 - [INTERNAL] Regenerates the fleet-core block of `AGENTS.md` to the current fleet standard (brew-sync `fleet-agent-docs.py`); the repository-specific rules below the markers are unchanged.
