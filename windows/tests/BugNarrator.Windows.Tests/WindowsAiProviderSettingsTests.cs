@@ -81,7 +81,7 @@ public sealed class WindowsAiProviderSettingsTests
 
         Assert.Equal(WindowsAiProvider.ParakeetLocal, profile.Provider);
         Assert.Equal("Local (Parakeet)", profile.DisplayName);
-        Assert.Equal("http://localhost:8422", profile.BaseUrlPlaceholder);
+        Assert.Equal("http://127.0.0.1:8422", profile.BaseUrlPlaceholder);
         Assert.False(profile.RequiresCredential);
         Assert.False(profile.SupportsIssueExtraction);
         Assert.All(
@@ -132,10 +132,13 @@ public sealed class WindowsAiProviderSettingsTests
             LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory),
             credential);
         Assert.Equal("parakeet-tdt-0.6b-v3", settings.EffectiveTranscriptionModel);
-        Assert.Equal("http://localhost:8422", settings.EffectiveAiProviderBaseUrl);
+        Assert.Equal("http://127.0.0.1:8422", settings.EffectiveAiProviderBaseUrl);
+        Assert.Equal(
+            "http://127.0.0.1:8422",
+            (settings with { AiProviderBaseUrl = "http://localhost:8422" }).EffectiveAiProviderBaseUrl);
         // A base URL left over from a previously selected provider never redirects Parakeet.
         Assert.Equal(
-            "http://localhost:8422",
+            "http://127.0.0.1:8422",
             (settings with { AiProviderBaseUrl = "https://gateway.example.com/openai" }).EffectiveAiProviderBaseUrl);
 
         // Extraction is refused with the macOS guidance, even when a key happens to be saved.

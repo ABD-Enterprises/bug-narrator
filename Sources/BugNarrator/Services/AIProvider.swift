@@ -43,7 +43,7 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
         case .localCompatible:
             return "http://localhost:1234/v1"
         case .parakeetLocal:
-            return "http://localhost:8422"
+            return "http://127.0.0.1:8422"
         }
     }
 

@@ -1,5 +1,7 @@
 import asyncio
 import inspect
+import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -710,7 +712,8 @@ class ServerAuthenticationTests(unittest.TestCase):
         A listener that answers on the port is not the server, and the app
         must not learn the token from the first request it sends. So the
         challenge carries a nonce and no token, and the answer carries an
-        HMAC of the nonce that only a peer that knows the token can produce.
+        HMAC of the nonce and bound authority that only a peer knowing the
+        token can produce.
         """
         import http.client
         from urllib.parse import urlsplit
@@ -737,13 +740,83 @@ class ServerAuthenticationTests(unittest.TestCase):
 
         self.assertEqual(response.status, 200)
         self.assertIsNotNone(proof)
-        # The proof is an HMAC of the nonce, keyed by the token: the same
-        # vector the two ports check themselves against.
+        # Bind the proof to the configured endpoint, not the request Host header.
         self.assertEqual(
             proof,
-            "09319c98fe682b6225a79c28488a15cc6dbc6d4f3609a649c5833e671f1f4aa7",
+            hmac.new(token.encode(), f"the-nonce\n127.0.0.1:{port}".encode(), hashlib.sha256).hexdigest(),
         )
         self.assertIn("model_loaded", json.loads(body))
+
+    def test_health_proof_is_bound_to_the_server_and_cannot_be_relayed(self):
+        import http.client
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        token = "s3cret-token-value"
+        nonce = "relay-test-nonce"
+        ports = []
+        for _ in range(2):
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                ports.append(listener.getsockname()[1])
+            token_file = Path(self.enterContext(tempfile.TemporaryDirectory())) / "token"
+            self._serve(token, ports[-1], token_file)
+
+        def challenge(port):
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+            try:
+                # A forged Host must not change the server's bound authority.
+                connection.request("GET", "/health", headers={
+                    server.CHALLENGE_HEADER: nonce, "Host": "relay.invalid:9999",
+                })
+                response = connection.getresponse()
+                body = response.read()
+                self.assertEqual(response.status, 200)
+                return body, response.getheader(server.PROOF_HEADER)
+            finally:
+                connection.close()
+
+        proofs = [challenge(port)[1] for port in ports]
+        self.assertNotEqual(*proofs)
+        for port, proof in zip(ports, proofs):
+            expected = hmac.new(
+                token.encode(), f"{nonce}\n127.0.0.1:{port}".encode(), hashlib.sha256,
+            ).hexdigest()
+            self.assertEqual(proof, expected)
+
+        class Relay(BaseHTTPRequestHandler):
+            def do_GET(self):
+                connection = http.client.HTTPConnection("127.0.0.1", ports[0], timeout=30)
+                try:
+                    connection.request("GET", self.path, headers={
+                        server.CHALLENGE_HEADER: self.headers[server.CHALLENGE_HEADER],
+                    })
+                    upstream = connection.getresponse()
+                    body = upstream.read()
+                    self.send_response(upstream.status)
+                    self.send_header(server.PROOF_HEADER, upstream.getheader(server.PROOF_HEADER))
+                    self.end_headers()
+                    self.wfile.write(body)
+                finally:
+                    connection.close()
+
+            def log_message(self, *_args):
+                pass
+
+        relay = HTTPServer(("127.0.0.1", 0), Relay)
+        thread = threading.Thread(target=relay.serve_forever, daemon=True)
+        thread.start()
+        try:
+            relay_port = relay.server_address[1]
+            _, relayed_proof = challenge(relay_port)
+            self.assertEqual(relayed_proof, proofs[0])
+            expected_for_relay = hmac.new(
+                token.encode(), f"{nonce}\n127.0.0.1:{relay_port}".encode(), hashlib.sha256,
+            ).hexdigest()
+            self.assertNotEqual(relayed_proof, expected_for_relay)
+        finally:
+            relay.shutdown()
+            relay.server_close()
+            thread.join()
 
     def test_a_health_request_without_a_token_or_a_challenge_is_refused(self):
         port = 8478
@@ -926,6 +999,21 @@ server.main()
                 / server.TOKEN_FILE_NAME,
             )
 
+    def test_proof_differs_for_each_configured_bind_authority(self):
+        self.addCleanup(setattr, server, "_auth_token", server._auth_token)
+        self.addCleanup(setattr, server, "_auth_authority", server._auth_authority)
+        proofs = []
+        for authority in ["127.0.0.1:8422", "127.0.0.1:8423", "localhost:8422", "[::1]:8422"]:
+            server.configure_auth("token", authority=authority)
+            proof = server.proof_for_nonce("nonce")
+            self.assertEqual(proof, hmac.new(
+                b"token", f"nonce\n{authority}".encode(), hashlib.sha256,
+            ).hexdigest())
+            proofs.append(proof)
+        self.assertEqual(len(set(proofs)), len(proofs))
+        server.configure_auth("token", authority="LOCALHOST:8422")
+        self.assertEqual(server.proof_for_nonce("nonce"), proofs[2])
+
     def test_the_token_path_matches_the_shared_contract_fixture(self):
         fixture = json.loads(
             (Path(__file__).parent.parent / "contract-fixtures" / "local-server-token.json").read_text()
@@ -942,7 +1030,8 @@ server.main()
         vector = fixture["proofVector"]
         previous_token = server._auth_token
         self.addCleanup(setattr, server, "_auth_token", previous_token)
-        server.configure_auth(vector["token"])
+        self.addCleanup(setattr, server, "_auth_authority", server._auth_authority)
+        server.configure_auth(vector["token"], authority=vector["authority"])
         self.assertEqual(
             server.proof_for_nonce(vector["nonce"]),
             vector["proof"],

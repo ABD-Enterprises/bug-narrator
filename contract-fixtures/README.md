@@ -203,3 +203,15 @@ It intentionally does **not** pin:
 
 Those unpinned fields are also called out in `docs/architecture/parity-matrix.md`, so the fixture
 is narrowing the contract consciously rather than pretending the rest of the file matches.
+
+## Local server token proof
+
+`local-server-token.json` pins the shared token paths, headers and proof vector
+for Python, Swift and C#. The proof is lowercase hexadecimal HMAC-SHA256, keyed
+by the UTF-8 token, over the UTF-8 message `nonce + "\n" + authority`.
+Authority is the lowercase host followed by an explicit `:port` (IPv6 hosts use
+brackets). The server uses its configured `--host` and `--port`, never the
+request's Host header. Clients use the host in the URL they connect to and its
+explicit port, defaulting to 80 for HTTP and 443 for HTTPS. This prevents a
+listener at a different authority from relaying a challenge to obtain a usable
+proof. The challenge sends no bearer token.

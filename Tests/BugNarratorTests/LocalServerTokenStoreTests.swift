@@ -65,7 +65,7 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "a-new-token")
     }
 
-    /// A token file that an older build left readable by everyone else is
+    /// A token file that is readable by everyone else is
     /// repaired when the app reads it: the token is written back with the
     /// permissions it is supposed to have. The server rewrites the file at
     /// every start as well, but the app should not leave a secret lying
@@ -143,6 +143,24 @@ final class LocalServerTokenStoreTests: XCTestCase {
         XCTAssertNotEqual(token, LocalServerTokenStore.newToken())
     }
 
+    func testProofIsBoundToAuthority() {
+        let proof = LocalServerTokenStore.proof(nonce: "nonce", token: "token", authority: "127.0.0.1:8422")
+        for authority in ["localhost:8422", "[::1]:8422", "127.0.0.1:8423"] {
+            XCTAssertNotEqual(proof, LocalServerTokenStore.proof(nonce: "nonce", token: "token", authority: authority))
+        }
+    }
+
+    func testAuthorityUsesLowercaseURLHostAndExplicitPort() {
+        for (url, authority) in [
+            ("http://LOCALHOST:8422/health", "localhost:8422"),
+            ("http://EXAMPLE.com/health", "example.com:80"),
+            ("https://EXAMPLE.com/health", "example.com:443"),
+            ("http://[::1]:8422/health", "[::1]:8422")
+        ] {
+            XCTAssertEqual(LocalServerTokenStore.authority(for: URL(string: url)!), authority)
+        }
+    }
+
     /// The path, the file name and the environment variable are shared with the
     /// Windows port and the Python server through a committed fixture.
     func testTheTokenPathMatchesTheSharedContractFixture() throws {
@@ -167,7 +185,7 @@ final class LocalServerTokenStoreTests: XCTestCase {
         // The three ports have to compute the same proof from the same
         // inputs, or the app and the server would never agree on it.
         XCTAssertEqual(
-            LocalServerTokenStore.proof(nonce: fixture.proofVector.nonce, token: fixture.proofVector.token),
+            LocalServerTokenStore.proof(nonce: fixture.proofVector.nonce, token: fixture.proofVector.token, authority: fixture.proofVector.authority),
             fixture.proofVector.proof
         )
 
@@ -188,6 +206,7 @@ private struct LocalServerTokenContract: Decodable {
     struct ProofVector: Decodable {
         let token: String
         let nonce: String
+        let authority: String
         let proof: String
     }
 

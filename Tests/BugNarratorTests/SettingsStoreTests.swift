@@ -452,7 +452,7 @@ final class SettingsStoreTests: XCTestCase {
                 from: "localhost:8422",
                 provider: .parakeetLocal
             ).absoluteString,
-            "http://localhost:8422"
+            "http://127.0.0.1:8422"
         )
     }
 
@@ -1088,8 +1088,20 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
         XCTAssertEqual(store.transcriptionRequest.model, "parakeet-tdt-0.6b-v3")
-        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://localhost:8422")
+        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://127.0.0.1:8422")
         XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "parakeet-tdt-0.6b-v3")
+    }
+
+    func testParakeetProviderUsesLiteralLoopbackForPersistedOldDefault() {
+        let suiteName = "BugNarrator-ParakeetOldDefault-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
+        defaults.set("http://localhost:8422", forKey: "settings.openAIBaseURL")
+
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://127.0.0.1:8422")
+        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://127.0.0.1:8422")
     }
 
     func testOpenAIProviderUsesCuratedTranscriptionModelChoices() {
@@ -1227,7 +1239,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(store.aiProviderCompatibilityIssue)
         XCTAssertTrue(store.hasUsableAIProviderCredential)
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
-        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:8422")
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://127.0.0.1:8422")
         // The local server checks a bearer token on every route, so the
         // credential the app presents is that token rather than an empty
         // string (#1270).
@@ -1255,7 +1267,7 @@ final class SettingsStoreTests: XCTestCase {
             // trusts a health answer that carries the proof (#1270).
             let nonce = request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader) ?? ""
             let token = LocalServerTokenStore.token(installDirectory: isolatedLocalServerInstallDirectory) ?? ""
-            let headers = [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(nonce: nonce, token: token)]
+            let headers = [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: request.url!))]
             return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: headers)!,
                     Data(#"{"status":"ok","model_loaded":true}"#.utf8))
         }
@@ -1280,8 +1292,7 @@ final class SettingsStoreTests: XCTestCase {
 
     /// A token file that cannot be secured leaves the server running and
     /// healthy while the app sends no token, so the message has to name that
-    /// cause: the user is told the server could not be reached and looks for
-    /// a server that is there all along.
+    /// cause rather than sending the user looking for a server that is there.
     func testTheUnreachableMessageNamesATokenFileItCannotSecure() throws {
         let suiteName = "BugNarrator-TokenProblem-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1328,9 +1339,9 @@ final class SettingsStoreTests: XCTestCase {
         wait(for: [unreachable], timeout: 6)
         observation.cancel()
 
-        XCTAssertTrue(
-            store.localProviderUnreachableMessage.contains("token file"),
-            store.localProviderUnreachableMessage
+        XCTAssertEqual(
+            store.localProviderUnreachableMessage,
+            "BugNarrator cannot use the local transcription server's token file. The access token file could not be secured, so BugNarrator did not send it. The server may already be running; fix the token file, or choose another provider."
         )
     }
 
@@ -1351,7 +1362,7 @@ final class SettingsStoreTests: XCTestCase {
     func testParakeetHealthRequiresSuccessfulStructuredResponse() {
         let url = URL(string: "http://localhost:8422/health")!
         let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
-        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token")
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token", authority: LocalServerTokenStore.authority(for: url))
         for status in [404, 500] {
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
             XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response, expectedProof: proof))
@@ -1369,6 +1380,13 @@ final class SettingsStoreTests: XCTestCase {
             LocalServerTokenStore.proofHeader: "not-the-proof"
         ])
         XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: wrongProof, expectedProof: proof))
+        let relayedProof = LocalServerTokenStore.proof(
+            nonce: "the-nonce", token: "the-token", authority: "127.0.0.1:8422"
+        )
+        let relay = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: relayedProof
+        ])
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: relay, expectedProof: proof))
         // A server that has not loaded its model is not ready: the app must not
         // hand the user's audio to it (#1270).
         for body in [
@@ -1383,7 +1401,7 @@ final class SettingsStoreTests: XCTestCase {
 
     func testParakeetHealthReportsTheServersOwnReasonWhenItCannotLoadItsModel() {
         let url = URL(string: "http://localhost:8422/health")!
-        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token")
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token", authority: LocalServerTokenStore.authority(for: url))
         let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
             LocalServerTokenStore.proofHeader: proof
         ])
@@ -1461,7 +1479,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "BugNarrator could not reach the local transcription server at http://localhost:8422. Install and start the local server in AI Engines settings, or choose another provider."
+            "BugNarrator could not reach the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
         )
     }
 

@@ -247,7 +247,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Equal(RecordingWorkflowState.Failed, state.WorkflowState);
         Assert.Equal(BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe.UnreachableMessage, state.StatusMessage);
         Assert.Equal(RecoveryDestination.Settings, state.Blocker!.Destination);
-        Assert.Equal("http://localhost:8422", harness.LocalServerHealthProbe.LastBaseUrl);
+        Assert.Equal("http://127.0.0.1:8422", harness.LocalServerHealthProbe.LastBaseUrl);
         Assert.Null(harness.MicrophonePreflightService.LastDeviceNumber); // never got as far as the microphone
         Assert.Empty(await harness.CompletedSessionStore.GetAllAsync());
     }

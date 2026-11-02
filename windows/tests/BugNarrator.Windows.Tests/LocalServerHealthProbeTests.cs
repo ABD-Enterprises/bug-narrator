@@ -100,6 +100,23 @@ public sealed class LocalServerHealthProbeTests : IDisposable
     }
 
     [Fact]
+    public async Task IsReachable_RejectsAProofRelayedFromAnotherAuthority()
+    {
+        var probe = Probe(new HttpClient(new FakeHandler(request =>
+        {
+            var nonce = request.Headers.GetValues(LocalServerTokenStore.ChallengeHeader).Single();
+            var token = LocalServerTokenStore.Token(installDirectory)!;
+            var response = Json("{\"status\":\"ok\",\"model_loaded\":true}");
+            response.Headers.TryAddWithoutValidation(
+                LocalServerTokenStore.ProofHeader,
+                LocalServerTokenStore.Proof(nonce, token, "127.0.0.1:8422"));
+            return response;
+        })));
+
+        Assert.False(await probe.IsReachableAsync("http://localhost:8422"));
+    }
+
+    [Fact]
     public async Task IsReachable_IsFalseOnANonOkAnswer()
     {
         var probe = Probe(new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError))));
@@ -158,7 +175,7 @@ public sealed class LocalServerHealthProbeTests : IDisposable
         var response = Json(body);
         response.Headers.TryAddWithoutValidation(
             LocalServerTokenStore.ProofHeader,
-            LocalServerTokenStore.Proof(nonce, token));
+            LocalServerTokenStore.Proof(nonce, token, LocalServerTokenStore.Authority(request.RequestUri!)));
         return response;
     }
 

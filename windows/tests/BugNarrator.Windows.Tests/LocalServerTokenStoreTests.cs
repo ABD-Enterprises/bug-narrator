@@ -15,6 +15,27 @@ namespace BugNarrator.Windows.Tests;
 /// </remarks>
 public sealed class LocalServerTokenStoreTests
 {
+    [Theory]
+    [InlineData("localhost:8422")]
+    [InlineData("[::1]:8422")]
+    [InlineData("127.0.0.1:8423")]
+    public void Proof_IsBoundToAuthority(string authority)
+    {
+        Assert.NotEqual(
+            LocalServerTokenStore.Proof("nonce", "token", "127.0.0.1:8422"),
+            LocalServerTokenStore.Proof("nonce", "token", authority));
+    }
+
+    [Theory]
+    [InlineData("http://LOCALHOST:8422/health", "localhost:8422")]
+    [InlineData("http://EXAMPLE.com/health", "example.com:80")]
+    [InlineData("https://EXAMPLE.com/health", "example.com:443")]
+    [InlineData("http://[::1]:8422/health", "[::1]:8422")]
+    public void Authority_UsesLowercaseUrlHostAndExplicitPort(string url, string authority)
+    {
+        Assert.Equal(authority, LocalServerTokenStore.Authority(new Uri(url)));
+    }
+
     [Fact]
     public void TheTokenPathMatchesTheSharedContractFixture()
     {
@@ -43,7 +64,8 @@ public sealed class LocalServerTokenStoreTests
             vector.GetProperty("proof").GetString(),
             LocalServerTokenStore.Proof(
                 vector.GetProperty("nonce").GetString()!,
-                vector.GetProperty("token").GetString()!));
+                vector.GetProperty("token").GetString()!,
+                vector.GetProperty("authority").GetString()!));
 
         var relativeDirectory = fixture
             .GetProperty("windows")

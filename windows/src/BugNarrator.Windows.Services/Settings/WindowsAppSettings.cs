@@ -214,7 +214,7 @@ public sealed record WindowsAppSettings(
                 WindowsAiProvider.LocalCompatible when EffectiveIssueExtractionModel == Default.IssueExtractionModel =>
                     "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider.",
                 // Parakeet ignores the typed base URL and model on macOS (SettingsStore+AIProviderReadiness);
-                // the base URL defaults to localhost:8422 and the model is pinned, so nothing to check here.
+                // the base URL defaults to 127.0.0.1:8422 and the model is pinned, so nothing to check here.
                 _ => null,
             };
         }

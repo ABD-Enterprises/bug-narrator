@@ -87,15 +87,15 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             // server, and the app must not learn its token from the first
             // request it sends (#1270). So the challenge carries a fresh
             // nonce and no token: the server answers with an HMAC of the
-            // nonce that only a peer that knows the token can produce, and the
-            // app sends the token on later requests only once that proof
+            // nonce and authority that only a peer knowing the token can produce.
+            // The app sends the token on later requests only once that proof
             // checks out.
             var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
             request.Headers.TryAddWithoutValidation(LocalServerTokenStore.ChallengeHeader, nonce);
             var token = LocalServerTokenStore.Token(installDirectory);
             var expectedProof = string.IsNullOrWhiteSpace(token)
                 ? null
-                : LocalServerTokenStore.Proof(nonce, token);
+                : LocalServerTokenStore.Proof(nonce, token, LocalServerTokenStore.Authority(url));
             using var response = await httpClient.SendAsync(request, timeout.Token);
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
             if (expectedProof is null)

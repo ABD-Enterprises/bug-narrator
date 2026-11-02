@@ -1045,11 +1045,12 @@ final class SettingsStore: ObservableObject {
     }
 
     var localProviderUnreachableMessage: String {
+        if let tokenProblem = localProviderTokenProblem {
+            return "BugNarrator cannot use the local transcription server's token file. \(tokenProblem.explanation) The server may already be running; fix the token file, or choose another provider."
+        }
         let reported: String
         if let modelError = localProviderModelError, !modelError.isEmpty {
             reported = " The server is running but could not load its model: \(modelError)."
-        } else if let tokenProblem = localProviderTokenProblem {
-            reported = " \(tokenProblem.explanation)"
         } else {
             reported = ""
         }
@@ -1204,8 +1205,8 @@ final class SettingsStore: ObservableObject {
         // anything. A listener that answers on the port is not the server,
         // and the app must not learn its token from the first request it
         // sends (#1270). So the challenge carries a fresh nonce and no token:
-        // the server answers with an HMAC of the nonce that only a peer that
-        // knows the token can produce, and the app sends the token on later
+        // the server answers with an HMAC of the nonce and authority that only
+        // a peer knowing the token can produce, and the app sends it on later
         // requests only once that proof checks out.
         let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         request.setValue(nonce, forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
@@ -1215,7 +1216,7 @@ final class SettingsStore: ObservableObject {
         let tokenOutcome = LocalServerTokenStore.tokenOutcome(installDirectory: localServerInstallDirectory)
         let expectedProof: String? = {
             if case .ready(let token) = tokenOutcome {
-                return LocalServerTokenStore.proof(nonce: nonce, token: token)
+                return LocalServerTokenStore.proof(nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: url))
             }
             return nil
         }()

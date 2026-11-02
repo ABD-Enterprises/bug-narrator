@@ -59,8 +59,9 @@ app = FastAPI(
 
 # The header a client sends when it asks the server to prove that it is the
 # server, and the header the answer carries. The client sends a fresh random
-# nonce; the server answers with an HMAC of it, keyed by the token the two
-# sides share. A listener that answers on the port but cannot read the token
+# nonce; the server answers with an HMAC of it and its bound authority,
+# keyed by the token the two sides share. A listener that answers on the
+# port but cannot read the token
 # cannot produce the proof, so it cannot pass for the server - and the client
 # has not handed it the token either, because the challenge carries none.
 CHALLENGE_HEADER = "X-BugNarrator-Nonce"
@@ -111,6 +112,7 @@ TOKEN_ENVIRONMENT_VARIABLE = "BUGNARRATOR_TRANSCRIPTION_TOKEN"
 DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 
 _auth_token: Optional[str] = None
+_auth_authority = "127.0.0.1:8422"
 _max_upload_bytes = DEFAULT_MAX_UPLOAD_BYTES
 # not_loaded | loading | loaded | failed. The health check reports it, so a
 # client can tell "the server is still starting" from "the server cannot
@@ -238,13 +240,12 @@ def _authorization_failure(authorization: Optional[str]) -> Optional[tuple]:
 def proof_for_nonce(nonce: str) -> str:
     """The proof that this process knows the token.
 
-    It is an HMAC of the client's nonce, keyed by the token, so only a peer
-    that can read the token can produce it, and it says nothing about the
-    token itself.
+    It is an HMAC of nonce + newline + the configured bind authority, keyed
+    by the token. A relay on another authority cannot reuse this proof.
     """
     return hmac.new(
         _auth_token.encode("utf-8"),
-        nonce.encode("utf-8"),
+        f"{nonce}\n{_auth_authority}".encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
 
@@ -260,10 +261,14 @@ def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
         raise HTTPException(status_code=failure[0], detail=failure[1])
 
 
-def configure_auth(token: str, max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES) -> None:
-    """Install the token the routes check, and the upload ceiling."""
-    global _auth_token, _max_upload_bytes
+def configure_auth(
+    token: str, max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES,
+    authority: str = "127.0.0.1:8422",
+) -> None:
+    """Install the token, configured bind authority, and upload ceiling."""
+    global _auth_token, _max_upload_bytes, _auth_authority
     _auth_token = token
+    _auth_authority = authority.lower()
     _max_upload_bytes = max_upload_bytes
 
 
@@ -1077,7 +1082,13 @@ def main():
         token_file=token_file,
         environment_token=os.environ.get(TOKEN_ENVIRONMENT_VARIABLE),
     )
-    configure_auth(token, max_upload_bytes=max(1, args.max_upload_mb) * 1024 * 1024)
+    host = args.host.lower()
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    configure_auth(
+        token, max_upload_bytes=max(1, args.max_upload_mb) * 1024 * 1024,
+        authority=f"{host}:{args.port}",
+    )
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)

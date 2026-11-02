@@ -2,7 +2,7 @@
 
 Status: proposed (WIN-035, #1169). Design first; no code ships from this ticket.
 Depends on WIN-034 (#1168), which already gives Windows the transcription-only
-`Local (Parakeet)` provider profile, the `http://localhost:8422` base URL, the
+`Local (Parakeet)` provider profile, the `http://127.0.0.1:8422` base URL, the
 `parakeet-tdt-0.6b-v3` model pin, and the "handles transcription only" rule.
 
 This note reads the macOS managed-server implementation and proposes the

@@ -41,17 +41,24 @@ enum LocalServerTokenStore {
     static let challengeHeader = "X-BugNarrator-Nonce"
     static let proofHeader = "X-BugNarrator-Proof"
 
-    /// The proof that a peer knows the token: an HMAC of the client's nonce,
-    /// keyed by the token.
+    /// The endpoint-bound proof: HMAC-SHA256 of nonce + newline + authority,
+    /// keyed by the token. Authority is the lowercase URL host and explicit port.
     ///
     /// A listener that answers on the port but cannot read the token cannot
     /// produce this, so the client can tell the server apart from it - and
     /// the challenge that asks for it carries no token, so nothing secret
     /// leaves the app before the peer has proved itself.
-    static func proof(nonce: String, token: String) -> String {
+    static func proof(nonce: String, token: String, authority: String) -> String {
         let key = SymmetricKey(data: Data(token.utf8))
-        let code = HMAC<SHA256>.authenticationCode(for: Data(nonce.utf8), using: key)
+        let code = HMAC<SHA256>.authenticationCode(for: Data("\(nonce)\n\(authority)".utf8), using: key)
         return code.map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func authority(for url: URL) -> String {
+        var host = url.host?.lowercased() ?? ""
+        if host.contains(":") && !host.hasPrefix("[") { host = "[\(host)]" }
+        let port = url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80)
+        return "\(host):\(port)"
     }
 
     /// The token the app presents to the server, or why it has none.
@@ -105,7 +112,7 @@ enum LocalServerTokenStore {
     static func tokenOutcome(installDirectory: URL) -> TokenOutcome {
         let url = tokenFileURL(installDirectory: installDirectory)
         if let stored = storedToken(at: url) {
-            // A token file that an older build left readable by anyone else
+            // A token file that is readable by anyone else
             // is repaired when the app reads it: the token is written back
             // with the permissions it is supposed to have. A token another
             // account can read is not a secret, so a file that cannot be

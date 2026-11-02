@@ -727,7 +727,7 @@ final class AppStateTests: XCTestCase {
             [LocalServerTokenStore.storedToken(installDirectory: harness.localServerInstallDirectory) ?? ""]
         )
         XCTAssertEqual(requestedModels, ["parakeet-tdt-0.6b-v3"])
-        XCTAssertEqual(requestedBaseURLs.map(\.absoluteString), ["http://localhost:8422"])
+        XCTAssertEqual(requestedBaseURLs.map(\.absoluteString), ["http://127.0.0.1:8422"])
         XCTAssertEqual(harness.transcriptStore.sessions.first?.transcript, "Local transcript")
     }
 

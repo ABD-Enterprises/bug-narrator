@@ -59,8 +59,8 @@ public static class LocalServerTokenStore
     public const string ProofHeader = "X-BugNarrator-Proof";
 
     /// <summary>
-    /// The proof that a peer knows the token: an HMAC of the client's nonce,
-    /// keyed by the token.
+    /// The endpoint-bound proof: HMAC-SHA256 of nonce + newline + authority,
+    /// keyed by the token. Authority is the lowercase URL host and explicit port.
     /// </summary>
     /// <remarks>
     /// A listener that answers on the port but cannot read the token cannot
@@ -68,12 +68,15 @@ public static class LocalServerTokenStore
     /// challenge that asks for it carries no token, so nothing secret leaves
     /// the app before the peer has proved itself.
     /// </remarks>
-    public static string Proof(string nonce, string token)
+    public static string Proof(string nonce, string token, string authority)
     {
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(token));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(nonce));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(nonce + "\n" + authority));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
+
+    public static string Authority(Uri url) =>
+        $"{url.Host.ToLowerInvariant()}:{url.Port}";
 
     public static string TokenFilePath(string installDirectory) =>
         Path.Combine(installDirectory, TokenFileName);
@@ -89,8 +92,8 @@ public static class LocalServerTokenStore
         var stored = StoredTokenAtPath(path);
         if (stored is not null)
         {
-            // The token file is written back, so a file an older build left
-            // with wider permissions is given the ones it is supposed to
+            // The token file is written back, so a file with wider
+            // permissions is given the ones it is supposed to
             // have. The macOS port does the same, and a token another
             // account can read is not a secret. It is written back once per
             // process: the health probe reads the token every couple of
