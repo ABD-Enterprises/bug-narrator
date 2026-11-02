@@ -153,7 +153,7 @@ extension JiraExportProvider {
             ]
         )
 
-        return authenticatedRequest(
+        return try authenticatedRequest(
             url: url,
             httpMethod: "GET",
             email: configuration.email,
@@ -178,7 +178,7 @@ extension JiraExportProvider {
             url = configuration.baseURL.appending(path: "rest/api/3/project/\(projectKey)")
         }
 
-        return authenticatedRequest(
+        return try authenticatedRequest(
             url: url,
             httpMethod: "GET",
             email: configuration.email,
@@ -201,7 +201,7 @@ extension JiraExportProvider {
             ]
         )
 
-        return authenticatedRequest(
+        return try authenticatedRequest(
             url: url,
             httpMethod: "GET",
             email: configuration.email,
