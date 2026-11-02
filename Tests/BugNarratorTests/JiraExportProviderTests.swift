@@ -111,6 +111,19 @@ final class JiraExportProviderTests: XCTestCase {
         )
     }
 
+    /// The refusal is logged without the path, query, fragment or userinfo of
+    /// the redirect address: a login redirect can carry a secret in any of them.
+    func testTheRefusalLogLineCarriesOnlySchemeHostAndPort() throws {
+        let url = URL(string: "https://user:pa55w0rd-secret@login.example.com:8443/sso/path-secret?token=query-secret#fragment-secret")
+        let message = JiraTransportRedirectPolicy.refusalLogMessage(for: url, refusal: .leavesTheOrigin)
+
+        XCTAssertTrue(message.contains("https://login.example.com:8443"))
+        for secret in ["pa55w0rd-secret", "user:", "path-secret", "query-secret", "fragment-secret", "token="] {
+            XCTAssertFalse(message.contains(secret), "the log line must not contain \(secret): \(message)")
+        }
+        XCTAssertEqual(JiraTransportRedirectPolicy.loggableOrigin(nil), "unknown")
+    }
+
     /// A redirect that leaves the origin the user configured would put the
     /// account email, the API token and the issue content in the hands of a
     /// host they never named - encrypted or not.

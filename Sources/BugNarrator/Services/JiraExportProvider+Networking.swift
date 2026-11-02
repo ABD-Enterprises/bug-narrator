@@ -100,6 +100,21 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate, @unch
         }
     }
 
+    /// The redirect target as it may appear in diagnostics: scheme, host and
+    /// port only. A redirect to a login page can carry a secret in the path,
+    /// the query, a fragment or userinfo, and the log cleaner does not strip
+    /// those, so none of them is ever logged.
+    static func loggableOrigin(_ url: URL?) -> String {
+        guard let url, let scheme = url.scheme, let host = url.host else { return "unknown" }
+        let hostText = host.contains(":") ? "[\(host)]" : host
+        let portText = url.port.map { ":\($0)" } ?? ""
+        return "\(scheme.lowercased())://\(hostText)\(portText)"
+    }
+
+    static func refusalLogMessage(for url: URL?, refusal: Refusal) -> String {
+        "Refused a redirect to \(loggableOrigin(url)): \(describe(refusal))"
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -111,7 +126,7 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate, @unch
             record(refusal)
             DiagnosticsLogger(category: .export).error(
                 "export_redirect_refused",
-                "Refused a redirect to \(request.url?.absoluteString ?? "unknown"): \(Self.describe(refusal))"
+                Self.refusalLogMessage(for: request.url, refusal: refusal)
             )
             completionHandler(nil)
             return
