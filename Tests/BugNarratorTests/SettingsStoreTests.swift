@@ -648,6 +648,82 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    /// The two ports have their own copy of the classifier, and they have to
+    /// agree: the same host has to be trusted on both, or the same secret
+    /// goes out in the clear on one of them. The table is shared, so a change
+    /// to one port that the other does not follow fails a build.
+    func testTheClassifierAgreesWithTheSharedHostTable() throws {
+        let fixturesDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // BugNarratorTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("contract-fixtures", isDirectory: true)
+        let fixtureURL = fixturesDirectory.appendingPathComponent("plaintext-endpoint-hosts.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: fixtureURL.path),
+            "the shared host table is missing: \(fixtureURL.path)"
+        )
+
+        let hosts = try JSONDecoder().decode(
+            [PlaintextEndpointHostTableEntry].self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        XCTAssertFalse(hosts.isEmpty, "the shared host table is empty")
+
+        for entry in hosts {
+            XCTAssertEqual(
+                SettingsStore.isLocalEndpointHost(entry.host),
+                entry.trusted,
+                "\(entry.host): \(entry.note)"
+            )
+        }
+    }
+
+    /// The two ports read the host out of a URL differently — Foundation takes
+    /// the brackets off whatever is in them, .NET keeps them — so the same URL
+    /// could be trusted on one port and refused on the other. The table of
+    /// URLs is shared, so a change to one port that the other does not follow
+    /// fails a build.
+    func testTheRefusalAgreesWithTheSharedURLTable() throws {
+        let fixturesDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // BugNarratorTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("contract-fixtures", isDirectory: true)
+        let fixtureURL = fixturesDirectory.appendingPathComponent("plaintext-endpoint-urls.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: fixtureURL.path),
+            "the shared URL table is missing: \(fixtureURL.path)"
+        )
+
+        let urls = try JSONDecoder().decode(
+            [PlaintextEndpointURLTableEntry].self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        XCTAssertFalse(urls.isEmpty, "the shared URL table is empty")
+
+        for entry in urls {
+            // The host is read out of the URL as it was written: Foundation
+            // takes the brackets off whatever is in them, and .NET keeps
+            // them, so the two ports would answer differently about the same
+            // URL.
+            XCTAssertEqual(
+                SettingsStore.hostAsWritten(entry.url),
+                entry.host,
+                "\(entry.url): the host is read as it was written"
+            )
+
+            // No refusal means the app may send a secret to that URL over
+            // plaintext HTTP.
+            let refusal = SettingsStore.plaintextRemoteBaseURLWarning(from: entry.url)
+            XCTAssertEqual(
+                refusal == nil,
+                entry.trusted,
+                "\(entry.url): \(entry.note)"
+            )
+        }
+    }
+
     /// The trusted names are the ones the standards reserve for the loopback:
     /// `localhost` and the names under it. A name that merely *looks* like it
     /// points at this machine is not one of them.
@@ -849,6 +925,38 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertFalse(
                 SettingsStore.isLocalEndpointHost(untrusted),
                 "expected \(untrusted) not to be trusted: it is not an address"
+            )
+        }
+    }
+
+    /// A hex group is written with at most four digits. The parser silently
+    /// truncates a longer one, so `0fe80::1` would be read as `fe80::1` — an
+    /// address the app did not check, and one the Windows port refuses
+    /// outright. An address has to be written the way an address is written.
+    func testAnIPv6GroupLongerThanFourDigitsIsRefused() {
+        for untrusted in [
+            "::000000",       // the unspecified address, written with a long group
+            "0fe80::1",       // the link-local address, written with a long group
+            "0c0a8::1"        // a private address, written with a long group
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: the group is not written the way a group is written"
+            )
+        }
+    }
+
+    /// A host that starts with a zone id has nothing before it, and the text
+    /// after the `%` is not an address the app checked.
+    func testAHostThatOnlyHasAZoneIdIsRefused() {
+        for untrusted in [
+            "%::",          // the unspecified address, after an empty host
+            "%::1",         // the loopback, after an empty host
+            "%fe80::1"      // the link-local address, after an empty host
+        ] {
+            XCTAssertFalse(
+                SettingsStore.isLocalEndpointHost(untrusted),
+                "expected \(untrusted) not to be trusted: there is no host before the zone id"
             )
         }
     }
@@ -2534,4 +2642,31 @@ final class SettingsStoreTests: XCTestCase {
         )
     }
 
+}
+
+/// One row of the shared URL table the two ports have to agree about.
+private struct PlaintextEndpointURLTableEntry: Decodable {
+    /// The URL, as the app can be given it.
+    let url: String
+
+    /// The host of the URL, as it was written.
+    let host: String
+
+    /// Whether the app may send a secret to it over plaintext HTTP.
+    let trusted: Bool
+
+    /// Why the answer is what it is.
+    let note: String
+}
+
+/// One row of the shared host table the two classifiers have to agree about.
+private struct PlaintextEndpointHostTableEntry: Decodable {
+    /// The host, as the app can be given it.
+    let host: String
+
+    /// Whether the app may send a secret to it over plaintext HTTP.
+    let trusted: Bool
+
+    /// Why the answer is what it is.
+    let note: String
 }

@@ -13,6 +13,90 @@ namespace BugNarrator.Windows.Tests;
 
 public sealed class JiraTransportPolicyTests : IDisposable
 {
+    /// <summary>
+    /// The refusal for a plaintext remote Jira URL has to say what the user
+    /// loses if they accept it: the account email and the API token cross the
+    /// network in the clear. The two refusals differ in why the host was refused
+    /// - one the app knows to be remote, one it cannot check at all.
+    /// </summary>
+    [Fact]
+    public void JiraBaseUrlSecurityWarning_NamesTheCredentialsItWouldSendInTheClear()
+    {
+        var remoteSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://8.8.8.8:8080/jira" };
+        var remote = remoteSettings.JiraBaseUrlSecurityWarning;
+        Assert.NotNull(remote);
+        Assert.Contains("remote host", remote, StringComparison.Ordinal);
+        Assert.Contains("email, API token and issue content would be sent unencrypted", remote, StringComparison.Ordinal);
+
+        var uncheckableSettings = WindowsAppSettings.Default with { JiraBaseUrl = "http://jira.example.com:8080/jira" };
+        var uncheckable = uncheckableSettings.JiraBaseUrlSecurityWarning;
+        Assert.NotNull(uncheckable);
+        Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("email, API token and issue content would be sent unencrypted", uncheckable, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// One host gets one answer. The refusal that blocks the export and the
+    /// warning shown next to the setting describe the same host, so they have
+    /// to be the same sentence.
+    /// </summary>
+    [Theory]
+    [InlineData("http://8.8.8.8:8080/jira")]
+    [InlineData("http://jira.example.com:8080/jira")]
+    [InlineData("http://nas.local:8080/jira")]
+    [InlineData("http://134744072:8080/jira")]
+    public void TheExportRefusalAndTheSettingsWarningAreTheSameSentence(string endpoint)
+    {
+        var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
+        var warning = settings.JiraBaseUrlSecurityWarning;
+        var refusal = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri(endpoint));
+        Assert.NotNull(warning);
+        Assert.NotNull(refusal);
+        Assert.Equal(refusal, warning);
+    }
+
+    /// <summary>
+    /// .NET rewrites a host that is a number written in another notation into
+    /// the address it stands for, so the host has to be read as it was
+    /// written. The macOS port refuses these spellings, so the Windows port
+    /// has to refuse them too: the same URL cannot be trusted on one port and
+    /// refused on the other.
+    /// </summary>
+    [Theory]
+    [InlineData("http://127.1:8080/jira")]
+    [InlineData("http://2130706433:8080/jira")]
+    [InlineData("http://0x7f000001:8080/jira")]
+    public void ANonCanonicalAddressIsRefusedByTheExportGate(string endpoint)
+    {
+        var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
+
+        Assert.NotNull(settings.JiraBaseUrlCompatibilityIssue);
+        Assert.NotNull(settings.JiraBaseUrlSecurityWarning);
+        Assert.Equal(settings.JiraBaseUrlCompatibilityIssue, settings.JiraBaseUrlSecurityWarning);
+    }
+
+    /// <summary>
+    /// The export gate refuses the same hosts as the settings warning and says
+    /// why: a host the app parsed and found to be public is remote, a host it
+    /// cannot parse is one it cannot check. Both refusals name what would cross
+    /// the network in the clear.
+    /// </summary>
+    [Fact]
+    public void CompatibilityIssue_NamesTheCredentialsItWouldSendInTheClear()
+    {
+        var remote = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://8.8.8.8:8080/jira"));
+        Assert.NotNull(remote);
+        Assert.Contains("remote host", remote, StringComparison.Ordinal);
+        Assert.Contains("would be sent unencrypted", remote, StringComparison.Ordinal);
+
+        var uncheckable = JiraEndpointTransportPolicy.CompatibilityIssue(new Uri("http://jira.example.com:8080/jira"));
+        Assert.NotNull(uncheckable);
+        Assert.Contains("cannot use as a local address", uncheckable, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote host", uncheckable, StringComparison.Ordinal);
+        Assert.Contains("would be sent unencrypted", uncheckable, StringComparison.Ordinal);
+    }
+
     private readonly string root = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));
     private WindowsDiagnostics Diagnostics => new(new AppStoragePaths(root, Path.Combine(root, "Sessions"), Path.Combine(root, "Logs")));
 
@@ -24,7 +108,6 @@ public sealed class JiraTransportPolicyTests : IDisposable
     [InlineData("http://192.168.1.10/jira")]
     [InlineData("http://10.1.2.3/jira")]
     [InlineData("http://172.16.1.10/jira")]
-    [InlineData("http://jira.local/jira")]
     public void TrustedTransport_RemainsUsableForSettingsAndDirectRequests(string endpoint)
     {
         var settings = WindowsAppSettings.Default with { JiraBaseUrl = endpoint };
@@ -40,6 +123,7 @@ public sealed class JiraTransportPolicyTests : IDisposable
     [InlineData("HTTP://jira.example.com/jira")]
     [InlineData("http://localhost.evil.example/jira")]
     [InlineData("http://192.169.1.10/jira")]
+    [InlineData("http://jira.local/jira")]
     [InlineData("ftp://jira.example.com/jira")]
     public async Task UnsafeTransport_IsRefusedEvenWhenBypassingSettings(string endpoint)
     {

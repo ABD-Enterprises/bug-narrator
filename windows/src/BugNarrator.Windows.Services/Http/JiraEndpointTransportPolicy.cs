@@ -10,11 +10,17 @@ public static class JiraEndpointTransportPolicy
             return "The Jira base URL must be an absolute HTTP or HTTPS URL. Update it in Settings.";
         }
 
-        if (endpoint.Scheme == Uri.UriSchemeHttp && !OpenAiCompatibleEndpoint.IsLocalEndpointHost(endpoint.Host))
+        // The host is read as it was written: .NET rewrites a number written
+        // in another notation into the address it stands for, and the macOS
+        // port refuses those spellings.
+        var host = OpenAiCompatibleEndpoint.HostAsWritten(endpoint) ?? endpoint.Host;
+
+        if (endpoint.Scheme == Uri.UriSchemeHttp && !OpenAiCompatibleEndpoint.IsLocalEndpointHost(host))
         {
-            return $"The Jira base URL uses plaintext HTTP to a remote host ({endpoint.Host}). "
-                + "Your Jira email, API token and issue content would cross the network unencrypted. "
-                + "Use https://, or configure a trusted local endpoint in Settings.";
+            // The same sentence the warning next to the setting shows, built
+            // by the same helper: one host gets one answer.
+            return OpenAiCompatibleEndpoint.PlaintextTransportRefusal(
+                host, "This Jira URL", "email, API token and issue content", "server");
         }
 
         return null;

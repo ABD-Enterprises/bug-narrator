@@ -565,7 +565,7 @@ final class SettingsStore: ObservableObject {
     /// no protection for them either. A local server is addressed by its IP
     /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
         if isReservedLocalhostName(lowered) { return true }
         if isIPv6LocalEndpointHost(lowered) { return true }
@@ -575,14 +575,114 @@ final class SettingsStore: ObservableObject {
         return isTrustedIPv4(octets.0, octets.1)
     }
 
-    /// The host without the brackets an IPv6 literal is written in.
+    /// The host of `url`, as it was written.
     ///
-    /// Only an IPv6 literal carries brackets. `[localhost]` is not one, and
-    /// reading it as `localhost` would make the app trust a name it cannot
-    /// check - the brackets are part of the host, not decoration.
-    private static func withoutIPv6Brackets(_ host: String) -> String {
-        guard host.hasPrefix("["), host.hasSuffix("]"), host.contains(":") else { return host }
-        return String(host.dropFirst().dropLast())
+    /// Foundation's `URL.host` takes the brackets off whatever is in them, so
+    /// `[localhost]` reads as the reserved name and `[127.0.0.1]` reads as
+    /// the loopback — both of which the app would then trust. A bracket
+    /// belongs to an IPv6 literal and to nothing else, and the Windows port
+    /// reads the host the same way, so it is taken out of the URL text here
+    /// rather than out of the parsed host.
+    static func hostAsWritten(_ url: URL) -> String? {
+        hostAsWritten(url.absoluteString)
+    }
+
+    /// The host of `urlText`, as it was written.
+    static func hostAsWritten(_ urlText: String) -> String? {
+        let text = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let schemeRange = text.range(of: "://") else { return nil }
+        var authority = String(text[schemeRange.upperBound...])
+
+        if let end = authority.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) {
+            authority = String(authority[..<end])
+        }
+
+        // The user information comes before the host and is not part of it.
+        if let at = authority.lastIndex(of: "@") {
+            authority = String(authority[authority.index(after: at)...])
+        }
+
+        if authority.hasPrefix("[") {
+            // An IPv6 literal is written in brackets, and the port follows
+            // the closing bracket.
+            guard let close = authority.firstIndex(of: "]") else { return nil }
+            guard authority.distance(from: authority.startIndex, to: close) > 1 else { return nil }
+            return String(authority[...close])
+        }
+
+        // A name cannot contain a colon, so a single colon separates the
+        // port. More than one colon means the authority is not a name with a
+        // port: it is an address written without brackets, and the whole of
+        // it is the host. A port does not belong to an address, and reading
+        // the last colon as one would turn `::1:8080` into the loopback
+        // `::1` with a port, when the address it names is not the loopback.
+        if authority.filter({ $0 == ":" }).count == 1,
+           let colon = authority.lastIndex(of: ":") {
+            authority = String(authority[..<colon])
+        }
+
+        return authority.isEmpty ? nil : authority
+    }
+
+    /// The host of `url` when it is a plaintext HTTP URL the app cannot check
+    /// as a local address, and nil when there is nothing to refuse.
+    static func plaintextHTTPHost(of url: URL) -> String? {
+        guard url.scheme?.lowercased() == "http" else { return nil }
+        let host = hostAsWritten(url) ?? url.host ?? ""
+        return isLocalEndpointHost(host) ? nil : host
+    }
+
+    /// The host of the URL as it was written, when it is a plaintext HTTP URL
+    /// the app cannot check as a local address, and nil when there is nothing
+    /// to refuse.
+    ///
+    /// The scheme and the host are read out of the text the user wrote, not
+    /// out of a URL Foundation built from it: Foundation takes the brackets
+    /// off whatever is in them, so `[localhost]` would read as the reserved
+    /// name and `[127.0.0.1]` as the loopback, and Foundation cannot build a
+    /// URL from every address a URL may carry. The Windows port reads the
+    /// host the same way, so the same URL cannot be trusted on one port and
+    /// refused on the other.
+    ///
+    /// A value that does not carry a scheme is judged by the URL the app
+    /// would use for it, because that is the URL it will actually send to.
+    static func plaintextHTTPHost(from rawValue: String, normalized: URL?) -> String? {
+        let text = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let schemeRange = text.range(of: "://") else {
+            guard let normalized else { return nil }
+            return plaintextHTTPHost(of: normalized)
+        }
+
+        // The value is trimmed of "/" at both ends before the app builds the
+        // URL from it, so a leading "/" is not part of the scheme. Reading
+        // the scheme as "/http" would let a public plaintext host through.
+        let scheme = text[..<schemeRange.lowerBound]
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        guard scheme == "http",
+              let host = hostAsWritten(text),
+              !host.isEmpty else {
+            return nil
+        }
+        return isLocalEndpointHost(host) ? nil : host
+    }
+
+    /// The host without the brackets an IPv6 literal is written in, or nil
+    /// when the host is not one the app can check.
+    ///
+    /// A bracket belongs to an IPv6 literal and to nothing else, and the
+    /// literal is the whole host: one pair of brackets around an address,
+    /// with nothing after it. `[localhost]` is not a literal, and reading it
+    /// as `localhost` would make the app trust a name it cannot check - the
+    /// brackets are part of the host, not decoration. `[[::1]]` is not a
+    /// literal either, and neither is `[::1]:8080`: a port does not belong to
+    /// the host.
+    private static func withoutIPv6Brackets(_ host: String) -> String? {
+        guard host.contains("[") || host.contains("]") else { return host }
+        guard host.hasPrefix("["), host.hasSuffix("]") else { return nil }
+        let inner = String(host.dropFirst().dropLast())
+        guard !inner.contains("["), !inner.contains("]"), inner.contains(":") else { return nil }
+        return inner
     }
 
     /// The name `host` refers to, with one trailing dot removed.
@@ -642,7 +742,13 @@ final class SettingsStore: ObservableObject {
         // it is removed before the address is parsed. Darwin's parser accepts
         // it and writes the interface index into the address bytes, which
         // would corrupt the comparison.
-        let addressText = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+        // The empty leading component matters: a host that starts with `%`
+        // has nothing before the zone id, and dropping the empty piece would
+        // leave the text after it to be read as the address.
+        let addressText = host
+            .split(separator: "%", maxSplits: 1, omittingEmptySubsequences: false)
+            .first
+            .map(String.init) ?? host
 
         // An address that carries an IPv4 address in its last group has to
         // spell that address the way an address is written too. The mapped
@@ -651,6 +757,14 @@ final class SettingsStore: ObservableObject {
         if let embedded = embeddedIPv4Text(addressText), canonicalDottedQuad(embedded) == nil {
             return false
         }
+
+        // A hex group is written with at most four digits. The parser
+        // silently truncates a longer one, so `0fe80::1` would be read as
+        // `fe80::1` — an address the app did not check, and one the Windows
+        // port refuses outright. The resolver truncates it the same way, but
+        // an address has to be written the way an address is written, so the
+        // spelling is refused here too.
+        guard hasCanonicalIPv6Groups(addressText) else { return false }
 
         var address = in6_addr()
         guard inet_pton(AF_INET6, addressText, &address) == 1 else { return false }
@@ -673,6 +787,19 @@ final class SettingsStore: ObservableObject {
             return isTrustedIPv4(bytes[12], bytes[13])
         }
         return false
+    }
+
+    /// Whether every group of an IPv6 literal is written the way a group is
+    /// written: at most four hex digits.
+    ///
+    /// The IPv4 address a mapped literal carries in its last group is checked
+    /// on its own, so it does not count as a hex group here.
+    private static func hasCanonicalIPv6Groups(_ address: String) -> Bool {
+        for group in address.split(separator: ":", omittingEmptySubsequences: false) {
+            if group.contains(".") { continue }
+            if group.count > 4 { return false }
+        }
+        return true
     }
 
     /// The IPv4 address an IPv6 literal carries in its last group, if it has
@@ -721,7 +848,7 @@ final class SettingsStore: ObservableObject {
     /// it is neither a local nor a public address as far as the app is
     /// concerned: the app cannot say where it points.
     static func isPublicAddress(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
         guard let octets = canonicalDottedQuad(lowered) else { return false }
         // The unspecified, multicast and broadcast addresses are not a host on
@@ -739,7 +866,7 @@ final class SettingsStore: ObservableObject {
     /// `lmstudio`. Any device on the local network can answer for such a name,
     /// so it is not a trusted endpoint even though it looks local.
     static func isUnqualifiedLocalName(_ host: String) -> Bool {
-        let lowered = withoutIPv6Brackets(host.lowercased())
+        guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
         // A trailing dot makes the name absolute rather than different: a
         // resolver answers the same name either way, so the two are the same
         // host and have to be classified the same way.
@@ -785,7 +912,7 @@ final class SettingsStore: ObservableObject {
     static func unqualifiedLocalHostPlaintextMessage(host: String, secret: String) -> String {
         "\(host) is not an address this app trusts for plaintext HTTP: a .local or single-word host "
             + "name is answered by the network rather than by the app, so it can point anywhere and "
-            + "the traffic could be intercepted. Use the machine's IP address (for example "
+            + "the traffic could be intercepted. Use that host's IP address (for example "
             + "192.168.1.20), or https://. "
             + "Over plaintext HTTP your \(secret) would cross the network unencrypted."
     }
@@ -834,11 +961,12 @@ final class SettingsStore: ObservableObject {
         provider: AIProvider = .openAI
     ) -> String? {
         let url = normalizedOpenAIBaseURL(from: rawValue, provider: provider)
-        guard url.scheme?.lowercased() == "http",
-              let host = url.host,
-              !isLocalEndpointHost(host) else {
-            return nil
-        }
+        // The Parakeet provider ignores the typed value and uses its own
+        // address, so the typed value is not judged.
+        let host = provider == .parakeetLocal
+            ? plaintextHTTPHost(of: url)
+            : plaintextHTTPHost(from: rawValue, normalized: url)
+        guard let host else { return nil }
         return plaintextTransportRefusal(
             host: host,
             subject: "This endpoint",
@@ -862,10 +990,10 @@ final class SettingsStore: ObservableObject {
     /// link-local HTTP and remote HTTPS return nil. Reuses the host classifier from
     /// the AI base-URL guard (#472).
     var jiraBaseURLPlaintextWarning: String? {
-        guard let url = jiraBaseURLValue,
-              url.scheme?.lowercased() == "http",
-              let host = url.host,
-              !Self.isLocalEndpointHost(host) else {
+        // The host is read as it was written: Foundation takes the brackets
+        // off whatever is in them, so `[localhost]` would read as the
+        // reserved name and `[127.0.0.1]` as the loopback.
+        guard let host = Self.plaintextHTTPHost(from: jiraBaseURL, normalized: jiraBaseURLValue) else {
             return nil
         }
         return Self.plaintextTransportRefusal(
