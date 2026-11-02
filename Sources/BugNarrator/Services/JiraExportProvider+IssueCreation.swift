@@ -83,7 +83,7 @@ extension JiraExportProvider {
         exportFingerprint: String? = nil
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/issue")
-        var request = authenticatedRequest(
+        var request = try authenticatedRequest(
             url: endpoint,
             httpMethod: "POST",
             email: configuration.email,

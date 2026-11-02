@@ -129,7 +129,7 @@ final class AppErrorPresenter {
             transcriptionLogger.error(.appError, message, metadata: metadata)
         case .screenshotCaptureFailure:
             screenshotLogger.error(.appError, message, metadata: metadata)
-        case .exportConfigurationMissing, .exportFailure:
+        case .exportConfigurationMissing, .exportConfigurationIncompatible, .exportFailure:
             exportLogger.error(.appError, message, metadata: metadata)
         case .storageFailure:
             sessionLibraryLogger.error(.appError, message, metadata: metadata)
@@ -159,7 +159,7 @@ final class AppErrorPresenter {
 
     private func shouldOpenSettingsWindowAfterPresenting(_ error: AppError) -> Bool {
         switch error {
-        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey, .exportConfigurationMissing:
+        case .missingAPIKey, .invalidAPIKey, .revokedAPIKey, .exportConfigurationMissing, .exportConfigurationIncompatible:
             return true
         default:
             return false
@@ -210,6 +210,8 @@ final class AppErrorPresenter {
             return "screenshot_capture_failure"
         case .exportConfigurationMissing:
             return "export_configuration_missing"
+        case .exportConfigurationIncompatible:
+            return "export_configuration_incompatible"
         case .exportFailure:
             return "export_failure"
         case .storageFailure:

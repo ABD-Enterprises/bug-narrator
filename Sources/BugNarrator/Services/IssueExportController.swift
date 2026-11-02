@@ -187,9 +187,12 @@ final class IssueExportController: ObservableObject {
         } catch {
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             let opensSettings: Bool
-            if case .exportConfigurationMissing = appError {
+            switch appError {
+            case .exportConfigurationMissing, .exportConfigurationIncompatible:
+                // Both are fixed in Settings: a missing field, or a base URL
+                // that would carry the credentials in the clear.
                 opensSettings = true
-            } else {
+            default:
                 opensSettings = false
             }
 
@@ -434,6 +437,12 @@ final class IssueExportController: ObservableObject {
                 throw AppError.exportConfigurationMissing(
                     "Jira export requires a base URL, email, and API token."
                 )
+            }
+            // A plaintext remote Jira URL would put the account email, the API
+            // token and the issue content on the wire in the clear. Refuse it
+            // here, before any request is made, and point the user at Settings.
+            if let compatibilityIssue = settingsStore.jiraBaseURLCompatibilityIssue {
+                throw AppError.exportConfigurationIncompatible(compatibilityIssue)
             }
         }
     }
