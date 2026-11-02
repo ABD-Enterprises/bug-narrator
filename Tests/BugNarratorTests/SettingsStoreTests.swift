@@ -1222,7 +1222,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
-    func testParakeetProviderCanUseSafeDefaultBaseURLWithoutAPIKey() {
+    @MainActor
+    func testParakeetProviderCanUseSafeDefaultBaseURLWithoutAPIKey() async throws {
         let suiteName = "BugNarrator-SettingsParakeet-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -1243,12 +1244,66 @@ final class SettingsStoreTests: XCTestCase {
         // The local server checks a bearer token on every route, so the
         // credential the app presents is that token rather than an empty
         // string (#1270).
-        let credential = store.aiProviderCredentialForUserInitiatedAccess()
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+        let credential = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
         XCTAssertFalse(credential?.isEmpty ?? true)
         XCTAssertEqual(
             credential,
             LocalServerTokenStore.storedToken(installDirectory: isolatedLocalServerInstallDirectory)
         )
+    }
+
+    @MainActor
+    func testLocalCredentialAccessRequiresFreshHealthProof() async throws {
+        let name = "BugNarrator-CredentialProof-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        let session = makeMockURLSession()
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: directory)
+            session.invalidateAndCancel()
+            MockURLProtocol.requestHandler = nil
+        }
+        var suppliesProof = false
+        var challengeCount = 0
+        MockURLProtocol.requestHandler = { request in
+            challengeCount += 1
+            XCTAssertEqual(request.url?.path, "/health")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertNil(request.httpBody)
+            let nonce = try XCTUnwrap(request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader))
+            let token = try XCTUnwrap(LocalServerTokenStore.storedToken(installDirectory: directory))
+            let headers = suppliesProof ? [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(
+                nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: request.url!)
+            )] : [:]
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: headers)!,
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
+        }
+        let store = makeIsolatedSettingsStore(
+            defaults: defaults, localProviderSession: session,
+            localServerInstallDirectory: directory, usesTheStoresOwnReachabilityProbe: true
+        )
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+        do {
+            _ = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+            XCTFail("A healthy listener without proof must not receive a credential")
+        } catch {
+            XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify") == true)
+        }
+        suppliesProof = true
+        let credential = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+        XCTAssertEqual(credential, LocalServerTokenStore.storedToken(installDirectory: directory))
+        XCTAssertFalse(credential?.isEmpty ?? true)
+        let previousChallenges = challengeCount
+        suppliesProof = false
+        do {
+            _ = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+            XCTFail("Cached readiness must not replace a fresh proof")
+        } catch {
+            XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify") == true)
+        }
+        XCTAssertGreaterThan(challengeCount, previousChallenges)
     }
 
     func testAutomaticParakeetProbeRecoversWithoutChangingProvider() {
@@ -1479,7 +1534,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "BugNarrator could not reach the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
+            "BugNarrator could not verify the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
         )
     }
 
@@ -1786,15 +1841,8 @@ final class SettingsStoreTests: XCTestCase {
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = "http://localhost:8422"
 
-        // The local provider presents the server's bearer token, never the
-        // saved OpenAI key (#1270).
-        let credential = store.aiProviderCredentialForUserInitiatedAccess()
-        XCTAssertNotEqual(credential, "sk-saved-openai-key")
-        XCTAssertEqual(
-            credential,
-            LocalServerTokenStore.storedToken(installDirectory: isolatedLocalServerInstallDirectory),
-            "Switching to a non-requiresAPIKey provider must not return the saved OpenAI key."
-        )
+        // Synchronous access must never expose a local bearer token.
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
 
         store.aiProvider = .localCompatible
         store.openAIBaseURL = "http://localhost:1234/v1"

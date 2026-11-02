@@ -123,9 +123,19 @@ final class PostTranscriptionPipelineController {
         statusPresenter.presentIssueExtractionProgress()
         recordingSessionController.swapActivity(reason: "Extracting review issues")
 
+        let extractionCredential: String
+        if settingsStore.aiProvider == .parakeetLocal {
+            guard let verifiedCredential = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
+                throw AppError.missingAPIKey
+            }
+            extractionCredential = verifiedCredential
+        } else {
+            extractionCredential = apiKey
+        }
+
         let extraction = try await issueExtractionController.extractIssues(
             for: session,
-            apiKey: apiKey,
+            apiKey: extractionCredential,
             model: settingsStore.issueExtractionModelValue,
             apiBaseURL: settingsStore.openAIBaseURLValue,
             includeScreenshots: settingsStore.uploadScreenshotsForExtraction,

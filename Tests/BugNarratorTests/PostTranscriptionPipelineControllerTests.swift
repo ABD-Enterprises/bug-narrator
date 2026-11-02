@@ -103,6 +103,24 @@ final class PostTranscriptionPipelineControllerTests: XCTestCase {
         XCTAssertFalse(harness.transcriptWindowSpy.didShow)
     }
 
+    func testAutomaticParakeetExtractionRechecksProofAfterTranscription() async throws {
+        let harness = try PostTranscriptionPipelineControllerHarness(autoExtractIssues: true, localProviderReachable: false)
+        defer { harness.cleanup() }
+        harness.settingsStore.aiProvider = .parakeetLocal
+        harness.settingsStore.autoExtractIssues = true
+
+        let result = await harness.controller.complete(
+            session: makeSampleTranscriptSession(index: 9),
+            apiKey: "credential-from-earlier-transcription",
+            mode: .finishedRecording
+        )
+
+        guard case .postTranscriptionFailure(let error) = result else {
+            return XCTFail("Automatic extraction must not reuse a credential without fresh proof")
+        }
+        XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify the local transcription server") == true)
+    }
+
     func testAutomaticIssueExtractionSuccessReturnsSessionWithExtractedIssues() async throws {
         let issueExtractionService = MockIssueExtractionService()
         let harness = try PostTranscriptionPipelineControllerHarness(
@@ -179,6 +197,7 @@ private final class PostTranscriptionPipelineControllerHarness {
 
     init(
         autoExtractIssues: Bool = false,
+        localProviderReachable: Bool = true,
         failSessionPersistence: Bool = false,
         issueExtractionService: (any IssueExtracting)? = nil
     ) throws {
@@ -191,7 +210,7 @@ private final class PostTranscriptionPipelineControllerHarness {
         defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
-        settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
+        settingsStore = Self.makeHermeticSettingsStore(defaults: defaults, localProviderReachable: localProviderReachable)
         settingsStore.apiKey = "api-key"
         settingsStore.autoCopyTranscript = true
         settingsStore.autoExtractIssues = autoExtractIssues
@@ -252,11 +271,12 @@ private final class PostTranscriptionPipelineControllerHarness {
         )
     }
 
-    private static func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
+    private static func makeHermeticSettingsStore(defaults: UserDefaults, localProviderReachable: Bool) -> SettingsStore {
         makeIsolatedSettingsStore(
             defaults: defaults,
             keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
+            launchAtLoginService: MockLaunchAtLoginService(),
+            localProviderReachabilityProbe: { _ in localProviderReachable }
         )
     }
 
