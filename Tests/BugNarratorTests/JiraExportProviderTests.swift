@@ -62,8 +62,33 @@ final class JiraExportProviderTests: XCTestCase {
     /// A redirect to a plaintext remote host is refused, and the reason is
     /// recorded so the error can say what would have happened.
     func testTheRefusalNamesTheReason() throws {
-        // The origin is checked first, so a plaintext host is only reached
-        // when the redirect stays on the origin it started at.
+        // An https answer that redirects to the same host over http is a
+        // plaintext redirect, not "another host".
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "http://jira.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            ),
+            .plaintextRemoteHost
+        )
+        // A plaintext redirect to a different remote host is still the
+        // plaintext reason.
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "http://other.example.com/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            ),
+            .plaintextRemoteHost
+        )
+        // A redirect to a local plaintext address from an https origin leaves
+        // the origin.
+        XCTAssertEqual(
+            JiraTransportRedirectPolicy.refusal(
+                for: URL(string: "http://localhost:8080/rest/api/3/issue"),
+                from: URL(string: "https://jira.example.com/rest/api/3/issue")
+            ),
+            .leavesTheOrigin
+        )
         XCTAssertEqual(
             JiraTransportRedirectPolicy.refusal(
                 for: URL(string: "http://jira.example.com/rest/api/3/issue"),

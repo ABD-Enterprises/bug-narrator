@@ -24,23 +24,29 @@ final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
 
     /// The reason a redirect to `url` may not be followed, or nil when it may.
     ///
-    /// A redirect that leaves the origin the request started at is refused:
-    /// the credentials belong to the site the user configured and to nowhere
-    /// else. A redirect that stays on the origin is fine, and so is one to a
-    /// local address over plaintext - but only when it stays on the origin
-    /// too, because the origin is what is checked first.
+    /// A redirect to a plaintext remote host is refused first, whatever the
+    /// origin it started at: that is the worse of the two cases, and checking
+    /// it first keeps it reachable (an `https` answer redirecting to the same
+    /// host over `http` is a plaintext redirect, not "another host"). A
+    /// redirect that then leaves the origin the request started at is refused
+    /// too: the credentials belong to the site the user configured and to
+    /// nowhere else. A redirect that stays on the origin is fine, and so is one
+    /// to a local address over plaintext - but only when it stays on the
+    /// origin too.
     static func refusal(for url: URL?, from original: URL? = nil) -> Refusal? {
         guard let url else { return nil }
+
+        if url.scheme?.lowercased() == "http" {
+            // A plaintext URL without a host is a host the app cannot check,
+            // so it is refused like any other one it cannot vouch for.
+            guard let host = url.host else { return .plaintextRemoteHost }
+            if !SettingsStore.isLocalEndpointHost(host) { return .plaintextRemoteHost }
+        }
 
         if let original, !sameOrigin(url, original) {
             return .leavesTheOrigin
         }
-
-        guard url.scheme?.lowercased() == "http" else { return nil }
-        // A plaintext URL without a host is a host the app cannot check, so it
-        // is refused like any other one it cannot vouch for.
-        guard let host = url.host else { return .plaintextRemoteHost }
-        return SettingsStore.isLocalEndpointHost(host) ? nil : .plaintextRemoteHost
+        return nil
     }
 
     /// Whether a redirect to `url` may be followed.
