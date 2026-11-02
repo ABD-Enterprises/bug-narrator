@@ -38,7 +38,7 @@ extension JiraExportProvider {
         configuration: JiraExportConfiguration
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/search/jql")
-        var request = authenticatedRequest(
+        var request = try authenticatedRequest(
             url: endpoint,
             httpMethod: "POST",
             email: configuration.email,
@@ -60,7 +60,7 @@ extension JiraExportProvider {
         configuration: JiraExportConfiguration
     ) throws -> URLRequest {
         let endpoint = configuration.baseURL.appending(path: "rest/api/3/search/jql")
-        var request = authenticatedRequest(
+        var request = try authenticatedRequest(
             url: endpoint,
             httpMethod: "POST",
             email: configuration.email,

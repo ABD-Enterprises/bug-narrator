@@ -241,6 +241,48 @@ final class IssueExportControllerTests: XCTestCase {
         XCTAssertNil(harness.controller.pendingExportReview)
     }
 
+    func testJiraExportIsRefusedForAPlaintextRemoteBaseURL() async throws {
+        let harness = try IssueExportControllerHarness()
+        defer { harness.cleanup() }
+
+        // A self-hosted Jira on plain HTTP is common, so the field accepts it.
+        // The export must still be refused: the account email, the API token and
+        // the issue content would cross the network in the clear.
+        harness.settingsStore.jiraBaseURL = "http://jira.example.com"
+        harness.settingsStore.jiraEmail = "jira-user@example.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        let issue = harness.makeIssue(
+            title: "App issue",
+            jiraExportTarget: JiraIssueExportTarget(
+                projectID: "10000",
+                projectKey: "APP",
+                issueTypeID: "10001",
+                issueTypeName: "Bug"
+            )
+        )
+        let session = harness.makeSession(issues: [issue])
+        try harness.transcriptStore.add(session)
+
+        switch harness.controller.preflightIssueExport(from: session, to: .jira, statusPhase: .idle) {
+        case .success:
+            XCTFail("expected the export to be refused for a plaintext remote Jira URL")
+        case .failure(let failure):
+            guard case .exportConfigurationIncompatible(let message) = failure.error else {
+                return XCTFail("expected an incompatible-configuration error, got \(failure.error)")
+            }
+            XCTAssertTrue(message.contains("jira.example.com"))
+            // The fix lives in Settings, so the failure has to open it.
+            XCTAssertTrue(failure.opensSettings)
+        }
+
+        // The same configuration is fine over HTTPS.
+        harness.settingsStore.jiraBaseURL = "https://jira.example.com"
+        let context = try harness.requireContext(
+            harness.controller.preflightIssueExport(from: session, to: .jira, statusPhase: .idle)
+        )
+        XCTAssertEqual(context.destination, .jira)
+    }
+
     func testPendingReviewMutationAndCancel() async throws {
         let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
