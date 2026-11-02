@@ -73,7 +73,7 @@ struct AISetupSectionsView: View {
                         .disabled(secureControlsDisabled || settingsStore.aiProvider == .parakeetLocal)
                         .accessibilityLabel("AI provider base URL")
                         .help(settingsStore.aiProvider == .parakeetLocal
-                            ? "Parakeet uses localhost:8422 automatically. Install and start the server using the controls below."
+                            ? "Parakeet uses 127.0.0.1:8422 automatically. Install and start the server using the controls below."
                             : "The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
                 }
 

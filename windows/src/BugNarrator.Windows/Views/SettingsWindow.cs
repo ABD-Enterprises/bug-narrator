@@ -794,7 +794,7 @@ public sealed class SettingsWindow : Window
 
         try
         {
-            // Effective URL so a blank Parakeet base URL checks localhost:8422 rather than api.openai.com.
+            // Effective URL so a blank Parakeet base URL checks 127.0.0.1:8422 rather than api.openai.com.
             await transcriptionClient.ValidateApiKeyAsync(
                 apiKey,
                 validationSettings.EffectiveAiProviderBaseUrl ?? aiProviderBaseUrlTextBox.Text);

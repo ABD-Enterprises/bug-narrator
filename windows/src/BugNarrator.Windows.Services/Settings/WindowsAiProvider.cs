@@ -25,7 +25,7 @@ public sealed record WindowsAiProviderProfile(
     /// Default base URL of the local Parakeet transcription server; mirrors
     /// AIProvider.baseURLPlaceholder for .parakeetLocal in the macOS app.
     /// </summary>
-    public const string ParakeetLocalBaseUrl = "http://localhost:8422";
+    public const string ParakeetLocalBaseUrl = "http://127.0.0.1:8422";
 
     /// <summary>
     /// Mirrors SettingsStore.parakeetTranscriptionModel in the macOS app.

@@ -32,6 +32,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
     private readonly Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription;
     private readonly SemaphoreSlim startOrRetryGate = new(1, 1);
 
+    private readonly string? localServerInstallDirectory;
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
 
@@ -50,8 +51,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         IIssueExtractionService issueExtractionService,
         WindowsDiagnostics diagnostics,
         ILocalServerHealthProbe? localServerHealthProbe = null,
-        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null)
+        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null,
+        string? localServerInstallDirectory = null)
     {
+        this.localServerInstallDirectory = localServerInstallDirectory;
         this.retryTranscription = retryTranscription;
         this.localServerHealthProbe = localServerHealthProbe ?? new LocalServerHealthProbe();
         this.audioRecorderService = audioRecorderService;
@@ -258,8 +261,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
 
         // Product-spec "fail before transcription": with Local (Parakeet) the server must answer
         // before any audio is captured, or the session could never be transcribed (#1180).
-        if (settings.UsesLocalTranscriptionServer
-            && !await localServerHealthProbe.IsReachableAsync(settings.EffectiveAiProviderBaseUrl!, cancellationToken))
+        if (!await LocalServerReadiness.IsReadyAsync(settings, localServerHealthProbe, cancellationToken))
         {
             diagnostics.Warning("recording", "local transcription server unreachable; recording refused");
             PublishState(new RecordingControlState(
@@ -617,26 +619,28 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         StateChanged?.Invoke(this, nextState);
     }
 
-    /// <summary>The settings and the credential the workflow may use with them — one resolution for transcription and extraction alike.</summary>
-    private async Task<(WindowsAppSettings Settings, string? Credential)> ResolveProviderAsync(CancellationToken cancellationToken)
-    {
-        var settings = await settingsStore.LoadAsync(cancellationToken);
-        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        return (settings, settings.AiProviderCredentialForWorkflow(apiKey));
-    }
-
     private async Task<CompletedSession> BuildCompletedSessionAsync(
         RecordingSessionDraft draft,
         CancellationToken cancellationToken)
     {
-        var provider = await ResolveProviderAsync(cancellationToken);
-        var settings = provider.Settings;
+        var settings = await settingsStore.LoadAsync(cancellationToken);
         var request = new OpenAiTranscriptionRequest(
             settings.EffectiveTranscriptionModel,
             settings.EffectiveLanguageHint,
             settings.EffectiveTranscriptionPrompt,
             settings.EffectiveAiProviderBaseUrl);
-        var providerCredential = provider.Credential;
+        if (!await LocalServerReadiness.IsReadyAsync(settings, localServerHealthProbe, cancellationToken))
+        {
+            return CreateCompletedSession(
+                draft,
+                request,
+                transcriptText: string.Empty,
+                transcriptionStatus: SessionTranscriptionStatus.Failed,
+                transcriptionFailureMessage: LocalServerHealthProbe.UnreachableMessage);
+        }
+
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey, localServerInstallDirectory);
 
         if (providerCredential is null)
         {
@@ -737,10 +741,15 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
             return completedSession;
         }
 
-        var provider = await ResolveProviderAsync(cancellationToken);
-        if (!provider.Settings.AutoExtractIssues
-            || !provider.Settings.SupportsIssueExtraction
-            || provider.Credential is null)
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        if (!settings.AutoExtractIssues || !settings.SupportsIssueExtraction)
+        {
+            return completedSession;
+        }
+
+        var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
+        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey, localServerInstallDirectory);
+        if (providerCredential is null)
         {
             return completedSession;
         }
@@ -757,9 +766,9 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
 
             var extraction = await issueExtractionService.ExtractAsync(
                 completedSession,
-                provider.Credential,
-                provider.Settings.EffectiveIssueExtractionModel,
-                provider.Settings.EffectiveAiProviderBaseUrl,
+                providerCredential,
+                settings.EffectiveIssueExtractionModel,
+                settings.EffectiveAiProviderBaseUrl,
                 cancellationToken);
             var extracted = completedSession with { IssueExtraction = extraction };
             await completedSessionStore.SaveAsync(extracted, cancellationToken);

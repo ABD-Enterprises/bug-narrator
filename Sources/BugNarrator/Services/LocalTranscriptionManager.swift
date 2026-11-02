@@ -53,8 +53,7 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     init(directory: URL? = nil, session: URLSession = .shared, dependencies: Dependencies = .live) {
-        self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("BugNarrator/LocalTranscription", isDirectory: true)
+        self.directory = directory ?? LocalServerPaths.defaultInstallDirectory
         self.session = session
         self.dependencies = dependencies
         installed = FileManager.default.fileExists(atPath: self.directory.appendingPathComponent("bugnarrator-transcription").path)
@@ -187,7 +186,16 @@ final class LocalTranscriptionManager: ObservableObject {
 
     private func launchVerifiedServer() {
         do {
-            let process = try dependencies.launch(executable, directory.appendingPathComponent("Models")) { [weak self] status, detail in
+            // The server refuses every request that does not carry the token,
+            // so it has to be handed the same token the app presents. It goes
+            // through the environment rather than the command line, where it
+            // would be visible in the process list.
+            let token = LocalServerTokenStore.token(installDirectory: directory)
+            let process = try dependencies.launch(
+                executable,
+                directory.appendingPathComponent("Models"),
+                token
+            ) { [weak self] status, detail in
                 guard let self else { return }
                 self.server = nil
                 self.running = false
@@ -331,12 +339,12 @@ final class LocalTranscriptionManager: ObservableObject {
     struct Dependencies: Sendable {
         var install: @Sendable (URL, Data, Int64, URL) async throws -> Void
         var verify: @Sendable (URL) async throws -> Void
-        var launch: @MainActor @Sendable (URL, URL, @escaping @MainActor @Sendable (Int32, String) -> Void) throws -> any LocalServerProcess
+        var launch: @MainActor @Sendable (URL, URL, String?, @escaping @MainActor @Sendable (Int32, String) -> Void) throws -> any LocalServerProcess
 
         static let isolated = Dependencies(
             install: { _, _, _, _ in throw Failure("Server installation is disabled in the isolated runtime.") },
             verify: { _ in throw Failure("Server launch is disabled in the isolated runtime.") },
-            launch: { _, _, _ in throw Failure("Server launch is disabled in the isolated runtime.") }
+            launch: { _, _, _, _ in throw Failure("Server launch is disabled in the isolated runtime.") }
         )
 
         static let live = Dependencies(
@@ -344,7 +352,9 @@ final class LocalTranscriptionManager: ObservableObject {
                 try await background { try installImage(image, checksum: checksum, expectedSize: size, directory: directory) }
             },
             verify: { binary in try await background { try verifyBinary(binary) } },
-            launch: { binary, models, onExit in try ManagedLocalServerProcess(binary: binary, models: models, onExit: onExit) }
+            launch: { binary, models, token, onExit in
+                try ManagedLocalServerProcess(binary: binary, models: models, token: token, onExit: onExit)
+            }
         )
     }
 
@@ -529,9 +539,12 @@ private final class ManagedLocalServerProcess: LocalServerProcess {
     static let terminationGrace: TimeInterval = 2
     private let lifecycle: LocalServerProcessLifecycle
     private var terminationTask: Task<Void, Never>?
-    init(binary: URL, models: URL, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
+    init(binary: URL, models: URL, token: String?, onExit: @escaping @MainActor @Sendable (Int32, String) -> Void) throws {
         var environment = ProcessInfo.processInfo.environment
         environment["HF_HOME"] = models.path
+        if let token {
+            environment[LocalServerTokenStore.environmentVariable] = token
+        }
         let lifecycle = LocalServerProcessLifecycle(
             executable: binary.path,
             arguments: ["--preload"],

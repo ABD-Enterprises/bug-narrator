@@ -14,6 +14,10 @@ enum LocalProviderReachability: Equatable {
     case unreachable
 }
 
+private struct UnownedSettingsStore: @unchecked Sendable {
+    weak var store: SettingsStore?
+}
+
 final class SettingsStore: ObservableObject {
     static let defaultLegacyDefaultsDomains = [
         "com.abdenterprises.sessionmic"
@@ -39,6 +43,13 @@ final class SettingsStore: ObservableObject {
 
     @Published private(set) var jiraEmailPersistenceState: APIKeyPersistenceState = .empty
     @Published private(set) var localProviderReachability: LocalProviderReachability = .unknown
+    /// Why the local server said it is not usable, when it said so. The server
+    /// stays up when it cannot load its model, so "unreachable" would be a lie.
+    @Published private(set) var localProviderModelError: String?
+    /// Why the app cannot present the local server its access token, when it
+    /// cannot. The server then refuses every request, so without this the
+    /// user is told the server could not be reached.
+    @Published private(set) var localProviderTokenProblem: LocalServerTokenStore.TokenUnavailable?
 
     @Published var openAIBaseURL: String = "" {
         didSet {
@@ -538,19 +549,43 @@ final class SettingsStore: ObservableObject {
         return components.url ?? fallback
     }
 
-    static func isHealthyLocalProvider(data: Data?, response: URLResponse?) -> Bool {
+    /// What the local server's health check said.
+    struct LocalProviderHealthReport: Equatable {
+        /// Whether the server is the Parakeet server and is ready to work.
+        let isHealthy: Bool
+        /// Why the server is not usable, when the server said so itself.
+        let modelError: String?
+    }
+
+    static func localProviderHealthReport(data: Data?, response: URLResponse?, expectedProof: String?) -> LocalProviderHealthReport {
         guard let response = response as? HTTPURLResponse,
               response.statusCode == 200,
+              let expectedProof,
               let data,
               let health = try? JSONDecoder().decode(LocalProviderHealth.self, from: data) else {
-            return false
+            return LocalProviderHealthReport(isHealthy: false, modelError: nil)
         }
-        return health.status == "ok"
+        // The peer has to prove that it knows the token. A listener that
+        // answers the health check with the right body is still not the
+        // server, and the app must not upload the user's audio to it.
+        guard response.value(forHTTPHeaderField: LocalServerTokenStore.proofHeader) == expectedProof else {
+            return LocalProviderHealthReport(isHealthy: false, modelError: nil)
+        }
+        // `model_loaded` has to be true as well: a stub that answers
+        // {"status":"ok"} is not a Parakeet server, and the health probe is
+        // what decides whether the app hands it the user's audio (#1270).
+        let isHealthy = health.status == "ok" && health.model_loaded
+        return LocalProviderHealthReport(isHealthy: isHealthy, modelError: health.model_error)
+    }
+
+    static func isHealthyLocalProvider(data: Data?, response: URLResponse?, expectedProof: String?) -> Bool {
+        localProviderHealthReport(data: data, response: response, expectedProof: expectedProof).isHealthy
     }
 
     private struct LocalProviderHealth: Decodable {
         let status: String
         let model_loaded: Bool
+        let model_error: String?
     }
 
     /// Whether `host` denotes a loopback / private / link-local endpoint.
@@ -1033,7 +1068,16 @@ final class SettingsStore: ObservableObject {
     }
 
     var localProviderUnreachableMessage: String {
-        "BugNarrator could not reach the local transcription server at \(openAIBaseURLValue.absoluteString). \(localProviderSetupDetail)"
+        if let tokenProblem = localProviderTokenProblem {
+            return "BugNarrator cannot use the local transcription server's token file. \(tokenProblem.explanation) The server may already be running; fix the token file, or choose another provider."
+        }
+        let reported: String
+        if let modelError = localProviderModelError, !modelError.isEmpty {
+            reported = " The server is running but could not load its model: \(modelError)."
+        } else {
+            reported = ""
+        }
+        return "BugNarrator could not verify the local transcription server at \(openAIBaseURLValue.absoluteString).\(reported) \(localProviderSetupDetail)"
     }
 
 
@@ -1063,8 +1107,22 @@ final class SettingsStore: ObservableObject {
 
             return openAIAPIKeyForUserInitiatedAccess() ?? ""
         case .parakeetLocal:
-            return ""
+            // Local credentials are available only through the fresh proof gate.
+            return nil
         }
+    }
+
+
+    @MainActor
+    func verifiedAIProviderCredentialForUserInitiatedAccess() async throws -> String? {
+        guard aiProvider == .parakeetLocal else {
+            return aiProviderCredentialForUserInitiatedAccess()
+        }
+        guard await verifyLocalProviderProof(),
+              let token = LocalServerTokenStore.token(installDirectory: localServerInstallDirectory) else {
+            throw AppError.transcriptionFailure(localProviderUnreachableMessage)
+        }
+        return token
     }
 
 
@@ -1159,39 +1217,78 @@ final class SettingsStore: ObservableObject {
         localProviderRequestID = requestID
         guard aiProvider == .parakeetLocal else {
             localProviderReachability = .unknown
+            localProviderModelError = nil
+            localProviderTokenProblem = nil
             lastLocalProviderReachabilityURL = nil
             return
         }
 
+        lastLocalProviderReachabilityURL = openAIBaseURLValue
+        // SettingsStore is only ever used from the main actor; the box carries
+        // the weak reference into the main-actor task.
+        let box = UnownedSettingsStore(store: self)
+        localProviderTask = Task { @MainActor in
+            guard let self = box.store, !Task.isCancelled, self.localProviderRequestID == requestID else { return }
+            _ = await self.verifyLocalProviderProof()
+            guard !Task.isCancelled, self.localProviderRequestID == requestID,
+                  self.aiProvider == .parakeetLocal else { return }
+            self.localProviderTask = nil
+            // Injected probes keep isolated tests network-free without polling.
+            guard self.localProviderReachabilityProbe == nil else { return }
+            let refresh = DispatchWorkItem { [weak self] in
+                self?.refreshLocalProviderReachabilityIfNeeded()
+            }
+            self.localProviderRefresh = refresh
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: refresh)
+        }
+    }
+
+    /// Always challenges the current endpoint; published readiness is not proof
+    /// that the listener receiving the next credential is still our server.
+    @MainActor
+    func verifyLocalProviderProof() async -> Bool {
+        guard !Task.isCancelled, aiProvider == .parakeetLocal else { return false }
         let url = openAIBaseURLValue
-        lastLocalProviderReachabilityURL = url
+        let requestID = localProviderRequestID
         if let localProviderReachabilityProbe {
-            // Injected probes keep isolated tests synchronous and network-free.
-            localProviderReachability = localProviderReachabilityProbe(url) ? .reachable : .unreachable
-            return
+            let reachable = localProviderReachabilityProbe(url)
+            localProviderReachability = reachable ? .reachable : .unreachable
+            return reachable
         }
 
         var request = URLRequest(url: url.appendingPathComponent("health"))
         request.timeoutInterval = 2
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        localProviderTask = localProviderSession.dataTaskPublisher(for: request)
-            .map { Self.isHealthyLocalProvider(data: $0.data, response: $0.response) }
-            .replaceError(with: false)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] reachable in
-                guard let self, self.localProviderRequestID == requestID,
-                      self.aiProvider == .parakeetLocal else { return }
-                self.localProviderTask = nil
-                let result: LocalProviderReachability = reachable ? .reachable : .unreachable
-                if self.localProviderReachability != result {
-                    self.localProviderReachability = result
-                }
-                let refresh = DispatchWorkItem { [weak self] in
-                    self?.refreshLocalProviderReachabilityIfNeeded()
-                }
-                self.localProviderRefresh = refresh
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: refresh)
+        // Read locally to verify the HMAC, but never send the token in the challenge.
+        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        request.setValue(nonce, forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
+        let tokenOutcome = LocalServerTokenStore.tokenOutcome(installDirectory: localServerInstallDirectory)
+        let expectedProof: String? = {
+            if case .ready(let token) = tokenOutcome {
+                return LocalServerTokenStore.proof(nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: url))
             }
+            return nil
+        }()
+        let report: LocalProviderHealthReport
+        do {
+            let (data, response) = try await localProviderSession.data(for: request)
+            report = Self.localProviderHealthReport(data: data, response: response, expectedProof: expectedProof)
+        } catch {
+            report = LocalProviderHealthReport(isHealthy: false, modelError: nil)
+        }
+        guard !Task.isCancelled, localProviderRequestID == requestID,
+              aiProvider == .parakeetLocal, openAIBaseURLValue == url else { return false }
+        localProviderModelError = report.modelError
+        if case .unavailable(let reason) = tokenOutcome {
+            localProviderTokenProblem = reason
+        } else {
+            localProviderTokenProblem = nil
+        }
+        let result: LocalProviderReachability = report.isHealthy ? .reachable : .unreachable
+        if localProviderReachability != result {
+            localProviderReachability = result
+        }
+        return report.isHealthy
     }
 
     func currentLocalProviderReachability() -> LocalProviderReachability {
@@ -1240,7 +1337,13 @@ final class SettingsStore: ObservableObject {
     private let launchAtLoginService: any LaunchAtLoginControlling
     private let legacyDefaultsDomains: [String]
     private let localProviderReachabilityProbe: ((URL) -> Bool)?
-    private var localProviderTask: AnyCancellable?
+
+    /// Where the local transcription server keeps the token that the app and
+    /// the server agree on. The isolated test runtime points this at its own
+    /// temporary directory, so the unit suite never reads or writes the
+    /// user's real token file.
+    private let localServerInstallDirectory: URL
+    private var localProviderTask: Task<Void, Never>?
     private let localProviderSession: URLSession
     private var localProviderRefresh: DispatchWorkItem?
     private var localProviderRequestID = UUID()
@@ -1255,7 +1358,8 @@ final class SettingsStore: ObservableObject {
         launchAtLoginService: any LaunchAtLoginControlling = SystemLaunchAtLoginService(),
         legacyDefaultsDomains: [String]? = nil,
         localProviderReachabilityProbe: ((URL) -> Bool)? = nil,
-        localProviderSession: URLSession = .shared
+        localProviderSession: URLSession = .shared,
+        localServerInstallDirectory: URL = LocalServerPaths.defaultInstallDirectory
     ) {
         self.defaults = defaults
         self.recordingPreferences = RecordingPreferencesStore(defaults: defaults)
@@ -1288,6 +1392,7 @@ final class SettingsStore: ObservableObject {
         )
         self.launchAtLoginService = launchAtLoginService
         self.localProviderReachabilityProbe = localProviderReachabilityProbe
+        self.localServerInstallDirectory = localServerInstallDirectory
         self.localProviderSession = localProviderSession
         self.legacyDefaultsDomains = resolvedLegacyDefaultsDomains
 

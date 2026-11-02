@@ -31,21 +31,21 @@ final class AIProviderSettingsController: ObservableObject {
             return
         }
 
-        guard let providerCredential = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
-            let provider = settingsStore.aiProvider
-            let message = provider.requiresAPIKey
-                ? AppError.missingAPIKey.userMessage(for: provider)
-                : "Choose a valid \(provider.displayName) base URL before validating the connection."
-            apiKeyValidationState = .failure(message)
-            showSettingsWindow?()
-            return
-        }
-
         isValidating = true
         apiKeyValidationState = .validating
         defer { isValidating = false }
 
         do {
+            guard let providerCredential = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
+                let provider = settingsStore.aiProvider
+                let message = provider.requiresAPIKey
+                    ? AppError.missingAPIKey.userMessage(for: provider)
+                    : "Choose a valid \(provider.displayName) base URL before validating the connection."
+                apiKeyValidationState = .failure(message)
+                showSettingsWindow?()
+                return
+            }
+
             try await transcriptionClient.validateAPIKey(
                 providerCredential,
                 apiBaseURL: settingsStore.openAIBaseURLValue

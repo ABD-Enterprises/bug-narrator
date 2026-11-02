@@ -470,7 +470,7 @@ final class AppState: ObservableObject {
                 return
             }
 
-            guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+            guard let apiKey = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
                 preserveRetryableSession(
                     from: recordingSession,
                     recordedAudio: recordedAudio,
@@ -652,7 +652,7 @@ final class AppState: ObservableObject {
                 throw AppError.transcriptionFailure("Finish the AI provider setup in Settings, then retry transcription from this session.")
             }
 
-            guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+            guard let apiKey = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
                 throw AppError.missingAPIKey
             }
 
@@ -693,7 +693,7 @@ final class AppState: ObservableObject {
             recordingSessionController.beginActivity(reason: "Extracting review issues")
 
             do {
-                guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+                guard let apiKey = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
                     throw AppError.missingAPIKey
                 }
 
