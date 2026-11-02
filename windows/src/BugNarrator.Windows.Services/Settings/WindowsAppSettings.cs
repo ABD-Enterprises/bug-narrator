@@ -229,7 +229,7 @@ public sealed record WindowsAppSettings(
         return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential) : null;
     }
 
-    public string? AiProviderCredentialForWorkflow(string? credential)
+    public string? AiProviderCredentialForWorkflow(string? credential, string? installDirectory = null)
     {
         if (AiProviderCompatibilityIssue is not null)
         {
@@ -248,7 +248,7 @@ public sealed record WindowsAppSettings(
             // bearer token, and the request builder already sends the
             // credential as one. An empty credential means no header at all,
             // which the server refuses — the safe direction to fail in.
-            return LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory) ?? string.Empty;
+            return LocalServerTokenStore.Token(installDirectory ?? LocalServerPaths.DefaultInstallDirectory) ?? string.Empty;
         }
 
         return trimmedCredential ?? string.Empty;

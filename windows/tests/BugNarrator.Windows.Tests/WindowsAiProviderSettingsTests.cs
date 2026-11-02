@@ -126,11 +126,20 @@ public sealed class WindowsAiProviderSettingsTests
         // The local server checks a bearer token on every route, so the
         // credential the app presents is that token rather than an empty
         // string (#1270).
-        var credential = settings.AiProviderCredentialForWorkflow(null);
-        Assert.False(string.IsNullOrWhiteSpace(credential));
-        Assert.Equal(
-            LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory),
-            credential);
+        var installDirectory = Path.Combine(Path.GetTempPath(), "bugnarrator-token-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var credential = settings.AiProviderCredentialForWorkflow(null, installDirectory);
+            Assert.False(string.IsNullOrWhiteSpace(credential));
+            Assert.Equal(LocalServerTokenStore.Token(installDirectory), credential);
+        }
+        finally
+        {
+            if (Directory.Exists(installDirectory))
+            {
+                Directory.Delete(installDirectory, recursive: true);
+            }
+        }
         Assert.Equal("parakeet-tdt-0.6b-v3", settings.EffectiveTranscriptionModel);
         Assert.Equal("http://127.0.0.1:8422", settings.EffectiveAiProviderBaseUrl);
         Assert.Equal(
