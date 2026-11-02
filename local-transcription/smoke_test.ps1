@@ -60,10 +60,22 @@ Log "fixture: $audioPath ($((Get-Item $audioPath).Length) bytes)"
 if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $smokeRoot "Models" }
 Log "model cache: $env:HF_HOME"
 
+# Every route of the packaged server requires the bearer token (#1270). The token
+# is handed over in the environment, the way the app hands it over, and it is
+# presented on every request below.
+$token = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
+$env:BUGNARRATOR_TRANSCRIPTION_TOKEN = $token
+$headers = @{ Authorization = "Bearer $token" }
+
+# The token file is the server's own, inside the scratch directory: the default
+# one belongs to the developer's own install, and the server would overwrite it
+# with the smoke token.
+$tokenPath = Join-Path $smokeRoot "token"
+
 # Started the way the app starts it: in its own (hidden) console, stderr to a file. A hidden
 # console — not CreateNoWindow — is what lets the graceful Ctrl+C reach the server later.
 $server = Start-Process -FilePath (Resolve-Path $ServerBinary).Path `
-    -ArgumentList "--host 127.0.0.1 --port $Port --preload" `
+    -ArgumentList "--host 127.0.0.1 --port $Port --preload --token-file $tokenPath" `
     -WindowStyle Hidden -RedirectStandardError $serverLog -PassThru
 Log "server pid $($server.Id) on port $Port"
 # PyInstaller onefile runs the real interpreter as a child of the bootloader; a stop must take
@@ -77,7 +89,7 @@ try {
     $deadline = (Get-Date).AddSeconds($PreloadTimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
         if ($server.HasExited) { throw "packaged transcription server exited before becoming healthy (code $($server.ExitCode))" }
-        try { $health = Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 2 } catch { $health = $null }
+        try { $health = Invoke-RestMethod "http://127.0.0.1:$Port/health" -Headers $headers -TimeoutSec 2 } catch { $health = $null }
         if ($health -and $health.status -eq "ok" -and $health.model_loaded) { break }
         Start-Sleep -Seconds 1
     }
@@ -86,11 +98,12 @@ try {
     }
     Log "health: $($health | ConvertTo-Json -Compress)"
 
-    $models = Invoke-RestMethod "http://127.0.0.1:$Port/v1/models" -TimeoutSec 5
+    $models = Invoke-RestMethod "http://127.0.0.1:$Port/v1/models" -Headers $headers -TimeoutSec 5
     if (-not ($models.data | Where-Object { $_.id -like "*parakeet*" })) { throw "/v1/models did not list the Parakeet model: $($models | ConvertTo-Json -Compress)" }
     Log "models: $($models | ConvertTo-Json -Compress)"
 
     $status = & curl.exe --silent --show-error --max-time 300 --output $responsePath --write-out "%{http_code}" `
+        --header "Authorization: Bearer $token" `
         --form "file=@$audioPath" --form "model=parakeet-tdt-0.6b-v3" --form "response_format=verbose_json" `
         "http://127.0.0.1:$Port/v1/audio/transcriptions"
     if ($status -ne "200") { throw "packaged transcription request returned HTTP ${status}: $(Get-Content $responsePath -Raw)" }

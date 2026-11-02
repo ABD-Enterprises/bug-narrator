@@ -235,6 +235,24 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
     }
 
     [Fact]
+    public async Task StopRecordingAsync_WhenParakeetLosesProofAfterStart_DoesNotUpload()
+    {
+        using var harness = new TestHarness();
+        harness.SettingsStore.Settings = WindowsAppSettings.Default with { AiProvider = "parakeetLocal" };
+        await harness.Service.StartRecordingAsync();
+        harness.LocalServerHealthProbe.Reachable = false;
+
+        await harness.Service.StopRecordingAsync();
+
+        var saved = Assert.Single(await harness.CompletedSessionStore.GetAllAsync());
+        Assert.Equal(SessionTranscriptionStatus.Failed, saved.TranscriptionStatus);
+        Assert.Equal(BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe.UnreachableMessage, saved.TranscriptionFailureMessage);
+        Assert.Equal(2, harness.LocalServerHealthProbe.Calls);
+        Assert.Equal(0, harness.TranscriptionClient.CallCount);
+        Assert.Null(harness.TranscriptionClient.LastApiKey);
+    }
+
+    [Fact]
     public async Task StartRecordingAsync_WithParakeetUnreachable_RefusesBeforeCapturingAudio()
     {
         using var harness = new TestHarness();
@@ -247,7 +265,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         Assert.Equal(RecordingWorkflowState.Failed, state.WorkflowState);
         Assert.Equal(BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe.UnreachableMessage, state.StatusMessage);
         Assert.Equal(RecoveryDestination.Settings, state.Blocker!.Destination);
-        Assert.Equal("http://localhost:8422", harness.LocalServerHealthProbe.LastBaseUrl);
+        Assert.Equal("http://127.0.0.1:8422", harness.LocalServerHealthProbe.LastBaseUrl);
         Assert.Null(harness.MicrophonePreflightService.LastDeviceNumber); // never got as far as the microphone
         Assert.Empty(await harness.CompletedSessionStore.GetAllAsync());
     }
@@ -486,7 +504,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                     };
                     await CompletedSessionStore.SaveAsync(updated, token);
                     return updated;
-                });
+                },
+                Path.Combine(rootDirectory, "LocalTranscription"));
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }
@@ -544,7 +563,7 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
         }
     }
 
-    private sealed class FakeLocalServerHealthProbe : BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe
+    internal sealed class FakeLocalServerHealthProbe : BugNarrator.Windows.Services.LocalTranscription.ILocalServerHealthProbe
     {
         public bool Reachable { get; set; } = true;
         public int Calls { get; private set; }

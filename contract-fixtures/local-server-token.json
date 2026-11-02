@@ -1,0 +1,21 @@
+{
+  "tokenFileName": "bugnarrator-transcription.token",
+  "environmentVariable": "BUGNARRATOR_TRANSCRIPTION_TOKEN",
+  "authorizationScheme": "Bearer",
+  "challengeHeader": "X-BugNarrator-Nonce",
+  "proofHeader": "X-BugNarrator-Proof",
+  "proofAlgorithm": "HMAC-SHA256",
+  "proofVector": {
+    "token": "s3cret-token-value",
+    "nonce": "the-nonce",
+    "proof": "f6ce50b97b51470ddd3f97bc27cb86247c36200d249195f07953b5cda8c605cd",
+    "authority": "127.0.0.1:8422"
+  },
+  "macos": {
+    "directoryRelativeToHome": "Library/Application Support/BugNarrator/LocalTranscription"
+  },
+  "windows": {
+    "directoryRelativeToLocalAppData": "BugNarrator/LocalTranscription"
+  },
+  "proofMessage": "UTF-8(nonce + \"\\n\" + authority); authority is lowercase host:port with an explicit port (80 for HTTP or 443 for HTTPS when omitted); IPv6 hosts use brackets. The server uses its configured bind host and port; clients use the URL host and port."
+}

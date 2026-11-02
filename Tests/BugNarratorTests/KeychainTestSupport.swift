@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 @testable import BugNarrator
 
 final class MockKeychainService: KeychainServicing {
@@ -63,20 +64,59 @@ final class MockLaunchAtLoginService: LaunchAtLoginControlling {
 
 
 /// Incidental settings tests must not inherit production health polling.
+/// Where the unit suite keeps the local transcription token.
+///
+/// The token file lives next to the managed server install, which is under
+/// the user's Application Support directory. The suite must not read or write
+/// that file: a test that depends on it depends on the machine, and a run
+/// would leave a token behind on the developer's disk.
+///
+/// The directory is one per run rather than one fixed path, so a token file
+/// left by an earlier run is never picked up by a later one.
+// nonisolated(unsafe) because the exit handler below reads it from a
+// nonisolated context, and the suite is not concurrent.
+private nonisolated(unsafe) var isolatedLocalServerInstallDirectoryToRemove: URL?
+
+let isolatedLocalServerInstallDirectory: URL = {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(
+            "BugNarratorTests-LocalServerInstall-\(UUID().uuidString)",
+            isDirectory: true
+        )
+    // The directory holds a token file, so it is removed when the suite's
+    // process exits: a run must not leave one behind on the machine.
+    isolatedLocalServerInstallDirectoryToRemove = directory
+    atexit {
+        if let directory = isolatedLocalServerInstallDirectoryToRemove {
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+    return directory
+}()
+
 func makeIsolatedSettingsStore(
     defaults: UserDefaults,
     keychainService: KeychainServicing = MockKeychainService(),
     launchAtLoginService: any LaunchAtLoginControlling = MockLaunchAtLoginService(),
     legacyDefaultsDomains: [String]? = nil,
     localProviderReachabilityProbe: ((URL) -> Bool)? = { _ in false },
-    localProviderSession: URLSession = .shared
+    localProviderSession: URLSession = .shared,
+    localServerInstallDirectory: URL = isolatedLocalServerInstallDirectory,
+    usesTheStoresOwnReachabilityProbe: Bool = false
 ) -> SettingsStore {
     SettingsStore(
         defaults: defaults,
         keychainService: keychainService,
         launchAtLoginService: launchAtLoginService,
         legacyDefaultsDomains: legacyDefaultsDomains,
-        localProviderReachabilityProbe: localProviderReachabilityProbe ?? { _ in false },
-        localProviderSession: localProviderSession
+        // The default refuses every host, so that an incidental test never
+        // polls for a server it is not about. A test that is about the probe
+        // itself asks for the store's own probe, which is the one that reads
+        // the health check over `localProviderSession`.
+        localProviderReachabilityProbe: usesTheStoresOwnReachabilityProbe
+            ? nil
+            : (localProviderReachabilityProbe ?? { _ in false }),
+        localProviderSession: localProviderSession,
+        localServerInstallDirectory: localServerInstallDirectory
     )
 }

@@ -2,6 +2,7 @@ using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Extraction;
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Windows.Services.Review;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
@@ -74,6 +75,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private readonly string rootDirectory;
     private readonly FakeIssueExportService issueExportService;
     private readonly FakeIssueExtractionService issueExtractionService;
+    private readonly RecordingLifecycleServiceMilestone5Tests.FakeLocalServerHealthProbe localServerHealthProbe = new();
     private readonly FakeSecretStore secretStore;
     private readonly FakeTranscriptionClient transcriptionClient;
     private readonly FakeWindowsAppSettingsStore settingsStore;
@@ -108,7 +110,9 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             new FakeSessionBundleExporter(),
             new FakeDebugBundleExporter(),
             transcriptionClient,
-            diagnostics);
+            diagnostics,
+            localServerHealthProbe,
+            Path.Combine(rootDirectory, "LocalTranscription"));
     }
 
     [Fact]
@@ -132,6 +136,7 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
 
         Assert.Equal(1, transcriptionClient.CallCount);
         Assert.Equal(preserved.AudioFilePath, transcriptionClient.LastAudioFilePath);
+        Assert.Equal(0, localServerHealthProbe.Calls);
         Assert.Equal(SessionTranscriptionStatus.Completed, updated.TranscriptionStatus);
         Assert.Equal("The checkout button is clipped.", updated.TranscriptText);
         Assert.False(updated.RequiresTranscriptionRetry);
@@ -139,6 +144,47 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         var saved = Assert.Single(await completedSessionStore.GetAllAsync());
         Assert.Equal(SessionTranscriptionStatus.Completed, saved.TranscriptionStatus);
         Assert.Equal("The checkout button is clipped.", saved.TranscriptText);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetryTranscriptionAsync_WithParakeet_RequiresProofBeforeSendingAudioOrCredential(bool reachable)
+    {
+        var preserved = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            TranscriptText = string.Empty,
+            TranscriptionStatus = SessionTranscriptionStatus.NotConfigured,
+        };
+        await File.WriteAllBytesAsync(preserved.AudioFilePath, [0x52, 0x49, 0x46, 0x46]);
+        await completedSessionStore.SaveAsync(preserved);
+        settingsStore.AiProvider = "parakeetLocal";
+        localServerHealthProbe.Reachable = reachable;
+        secretStore.Values[SecretKeys.OpenAiApiKey] = "fixture-provider-key";
+
+        if (reachable)
+        {
+            var updated = await service.RetryTranscriptionAsync(preserved);
+
+            Assert.Equal(SessionTranscriptionStatus.Completed, updated.TranscriptionStatus);
+            Assert.Equal(1, transcriptionClient.CallCount);
+            Assert.Equal(preserved.AudioFilePath, transcriptionClient.LastAudioFilePath);
+            Assert.Equal(WindowsAiProviderProfile.ParakeetLocalBaseUrl, transcriptionClient.LastRequest?.ProviderBaseUrl);
+        }
+        else
+        {
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetryTranscriptionAsync(preserved));
+
+            Assert.Equal(LocalServerHealthProbe.UnreachableMessage, failure.Message);
+            Assert.Equal(0, transcriptionClient.CallCount);
+            Assert.Null(transcriptionClient.LastApiKey);
+            Assert.Null(transcriptionClient.LastAudioFilePath);
+            Assert.Equal(0, secretStore.GetCallCount);
+            Assert.Equal(SessionTranscriptionStatus.NotConfigured, Assert.Single(await completedSessionStore.GetAllAsync()).TranscriptionStatus);
+        }
+
+        Assert.Equal(1, localServerHealthProbe.Calls);
+        Assert.Equal(WindowsAiProviderProfile.ParakeetLocalBaseUrl, localServerHealthProbe.LastBaseUrl);
     }
 
     [Fact]
@@ -352,6 +398,8 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
         public int CallCount { get; private set; }
         public Exception? ExceptionToThrow { get; set; }
         public string? LastAudioFilePath { get; private set; }
+        public string? LastApiKey { get; private set; }
+        public OpenAiTranscriptionRequest? LastRequest { get; private set; }
         public string TranscriptText { get; set; } = "Retried transcript.";
 
         public Task<string> TranscribeToTextAsync(
@@ -363,6 +411,8 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             CallCount++;
             Started.TrySetResult();
             LastAudioFilePath = audioFilePath;
+            LastApiKey = apiKey;
+            LastRequest = request;
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
@@ -380,9 +430,11 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
     private sealed class FakeSecretStore : ISecretStore
     {
         public Dictionary<string, string?> Values { get; } = new();
+        public int GetCallCount { get; private set; }
 
         public ValueTask<string?> GetAsync(string key, CancellationToken cancellationToken = default)
         {
+            GetCallCount++;
             Values.TryGetValue(key, out var value);
             return ValueTask.FromResult(value);
         }

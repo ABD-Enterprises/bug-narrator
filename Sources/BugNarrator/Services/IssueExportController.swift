@@ -173,16 +173,6 @@ final class IssueExportController: ObservableObject {
             ))
         }
 
-        // The export review sends the API key and the issue content to the AI
-        // provider endpoint, so a refused endpoint must not receive them. The
-        // extraction path has always checked this; the export path did not.
-        //
-        // It is the endpoint that is checked, not the whole provider
-        // configuration. An endpoint the app refuses is refused; a provider
-        // that is merely not ready - the local transcription server not
-        // running, say - is a different failure, and refusing the export for
-        // it would block a session whose issues were extracted with another
-        // provider.
         if let plaintextIssue = settingsStore.remotePlaintextEndpointIssue {
             return .failure(IssueExportPreflightFailure(
                 error: .exportFailure(plaintextIssue),
@@ -212,15 +202,14 @@ final class IssueExportController: ObservableObject {
             ))
         }
 
-        guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+        guard settingsStore.hasUsableAIProviderCredential else {
             return .failure(IssueExportPreflightFailure(error: .missingAPIKey, opensSettings: false))
         }
 
         return .success(IssueExportRequestContext(
             destination: destination,
             session: currentSession,
-            selectedIssues: selectedIssues,
-            apiKey: apiKey
+            selectedIssues: selectedIssues
         ))
     }
 
@@ -229,6 +218,12 @@ final class IssueExportController: ObservableObject {
         model: String,
         apiBaseURL: URL
     ) async throws -> IssueExportReview {
+        guard let apiKey = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
+            throw AppError.missingAPIKey
+        }
+
+        let reviewBaseURL = settingsStore.aiProvider == .parakeetLocal
+            ? settingsStore.openAIBaseURLValue : apiBaseURL
         exportDestinationInProgress = context.destination
         defer { exportDestinationInProgress = nil }
 
@@ -252,9 +247,9 @@ final class IssueExportController: ObservableObject {
                     issues: group.issues,
                     session: context.session,
                     configuration: group.configuration,
-                    apiKey: context.apiKey,
+                    apiKey: apiKey,
                     model: model,
-                    apiBaseURL: apiBaseURL
+                    apiBaseURL: reviewBaseURL
                 )
                 items.append(contentsOf: groupReview.items)
             }
@@ -267,9 +262,9 @@ final class IssueExportController: ObservableObject {
                     issues: group.issues,
                     session: context.session,
                     configuration: group.configuration,
-                    apiKey: context.apiKey,
+                    apiKey: apiKey,
                     model: model,
-                    apiBaseURL: apiBaseURL
+                    apiBaseURL: reviewBaseURL
                 )
                 items.append(contentsOf: groupReview.items)
             }

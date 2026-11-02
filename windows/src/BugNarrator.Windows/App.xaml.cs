@@ -72,6 +72,7 @@ public partial class App : Application
         var issueExportService = new IssueExportService(gitHubExportProvider, jiraExportProvider);
         var sessionBundleExporter = new FileSessionBundleExporter(storagePaths, diagnostics);
         var debugBundleExporter = new FileDebugBundleExporter(storagePaths, settingsStore, diagnostics);
+        var localServerHealthProbe = new BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe();
         var reviewSessionActionService = new ReviewSessionActionService(
             completedSessionStore,
             settingsStore,
@@ -81,8 +82,8 @@ public partial class App : Application
             sessionBundleExporter,
             debugBundleExporter,
             transcriptionClient,
-            diagnostics);
-        var localServerHealthProbe = new BugNarrator.Windows.Services.LocalTranscription.LocalServerHealthProbe();
+            diagnostics,
+            localServerHealthProbe);
         var localServerHttpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         var localServerManager = new BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager(
             BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerManager.DefaultInstallDirectory,

@@ -10,6 +10,37 @@ import XCTest
 @MainActor
 final class AppStateProviderValidationTests: XCTestCase {
 
+    func testParakeetModelValidationRefusesWhenFreshProofFails() async throws {
+        let name = "BugNarrator-ValidationProof-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        var checks = 0
+        let settings = makeIsolatedSettingsStore(
+            defaults: defaults,
+            localProviderReachabilityProbe: { _ in
+                checks += 1
+                // Cached/configuration readiness passes; credential-time proof fails.
+                return checks == 1
+            },
+            localServerInstallDirectory: directory
+        )
+        let client = MockTranscriptionClient()
+        let controller = AIProviderSettingsController(settingsStore: settings, transcriptionClient: client)
+        await controller.validateConnection()
+        guard case .failure(let message) = controller.apiKeyValidationState else {
+            return XCTFail("Model validation must refuse a failed fresh proof")
+        }
+        XCTAssertTrue(message.contains("could not verify the local transcription server"))
+        XCTAssertGreaterThanOrEqual(checks, 2)
+        let requests = await client.validationCallCount
+        XCTAssertEqual(requests, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: LocalServerTokenStore.tokenFileURL(installDirectory: directory).path))
+    }
+
     func testValidateAPIKeyUpdatesValidationStateOnSuccess() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
