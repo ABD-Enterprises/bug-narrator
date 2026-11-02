@@ -224,9 +224,9 @@ public sealed record WindowsAppSettings(
     /// Like <see cref="AiProviderCredentialForWorkflow"/> but also null for transcription-only
     /// providers, so extraction is refused before any request is built.
     /// </summary>
-    public string? AiProviderCredentialForIssueExtraction(string? credential)
+    public string? AiProviderCredentialForIssueExtraction(string? credential, string? installDirectory = null)
     {
-        return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential) : null;
+        return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential, installDirectory) : null;
     }
 
     public string? AiProviderCredentialForWorkflow(string? credential, string? installDirectory = null)

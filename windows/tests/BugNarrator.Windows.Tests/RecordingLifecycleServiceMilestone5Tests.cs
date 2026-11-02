@@ -504,7 +504,8 @@ public sealed class RecordingLifecycleServiceMilestone5Tests
                     };
                     await CompletedSessionStore.SaveAsync(updated, token);
                     return updated;
-                });
+                },
+                Path.Combine(rootDirectory, "LocalTranscription"));
         }
 
         public FakeAudioRecorderService AudioRecorderService { get; }

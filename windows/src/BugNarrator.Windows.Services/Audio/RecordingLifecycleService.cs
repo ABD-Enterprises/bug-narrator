@@ -32,6 +32,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
     private readonly Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription;
     private readonly SemaphoreSlim startOrRetryGate = new(1, 1);
 
+    private readonly string? localServerInstallDirectory;
     private RecordingSessionDraft? activeSession;
     private RecordingControlState currentState = RecordingControlState.Idle();
 
@@ -50,8 +51,10 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         IIssueExtractionService issueExtractionService,
         WindowsDiagnostics diagnostics,
         ILocalServerHealthProbe? localServerHealthProbe = null,
-        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null)
+        Func<CompletedSession, CancellationToken, Task<CompletedSession>>? retryTranscription = null,
+        string? localServerInstallDirectory = null)
     {
+        this.localServerInstallDirectory = localServerInstallDirectory;
         this.retryTranscription = retryTranscription;
         this.localServerHealthProbe = localServerHealthProbe ?? new LocalServerHealthProbe();
         this.audioRecorderService = audioRecorderService;
@@ -637,7 +640,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         }
 
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey, localServerInstallDirectory);
 
         if (providerCredential is null)
         {
@@ -745,7 +748,7 @@ public sealed class RecordingLifecycleService : IRecordingLifecycleService, IRec
         }
 
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey);
+        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey, localServerInstallDirectory);
         if (providerCredential is null)
         {
             return completedSession;

@@ -111,7 +111,8 @@ public sealed class ReviewSessionActionServiceTests : IDisposable
             new FakeDebugBundleExporter(),
             transcriptionClient,
             diagnostics,
-            localServerHealthProbe);
+            localServerHealthProbe,
+            Path.Combine(rootDirectory, "LocalTranscription"));
     }
 
     [Fact]

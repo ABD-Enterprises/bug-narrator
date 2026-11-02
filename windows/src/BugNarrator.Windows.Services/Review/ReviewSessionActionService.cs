@@ -22,6 +22,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
+    private readonly string? localServerInstallDirectory;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> activeSessionActions = new();
 
     public ReviewSessionActionService(
@@ -34,8 +35,10 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         IDebugBundleExporter debugBundleExporter,
         ITranscriptionClient transcriptionClient,
         WindowsDiagnostics diagnostics,
-        ILocalServerHealthProbe? localServerHealthProbe = null)
+        ILocalServerHealthProbe? localServerHealthProbe = null,
+        string? localServerInstallDirectory = null)
     {
+        this.localServerInstallDirectory = localServerInstallDirectory;
         this.completedSessionStore = completedSessionStore;
         this.transcriptionClient = transcriptionClient;
         this.settingsStore = settingsStore;
@@ -138,7 +141,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         }
 
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey, localServerInstallDirectory);
         if (providerCredential is null)
         {
             throw new InvalidOperationException(
@@ -204,7 +207,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
         // Transcription-only providers (Local Parakeet) are refused here, before any request is
         // built, with the same guidance the macOS app shows (#1168).
-        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey);
+        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey, localServerInstallDirectory);
         if (providerCredential is null)
         {
             throw new InvalidOperationException(
