@@ -10,7 +10,7 @@ import Foundation
 /// with the Basic-auth credentials attached. A redirect to another host
 /// would put the account email, the API token and the issue content in the
 /// hands of a host the user never named.
-final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate {
+final class JiraTransportRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     /// Why a redirect may not be followed.
     enum Refusal: Equatable {
         /// The redirect pointed at another origin: another host, another
