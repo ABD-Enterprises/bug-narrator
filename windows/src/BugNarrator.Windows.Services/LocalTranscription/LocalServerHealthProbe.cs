@@ -1,4 +1,6 @@
+using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
@@ -28,9 +30,16 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
 
     private readonly HttpClient httpClient;
 
-    public LocalServerHealthProbe(HttpClient? httpClient = null)
+    /// <summary>
+    /// Where the token file lives. The directory the app installs into, unless
+    /// a caller says otherwise.
+    /// </summary>
+    private readonly string installDirectory;
+
+    public LocalServerHealthProbe(HttpClient? httpClient = null, string? installDirectory = null)
     {
         this.httpClient = httpClient ?? new HttpClient { Timeout = Timeout };
+        this.installDirectory = installDirectory ?? LocalServerPaths.DefaultInstallDirectory;
     }
 
     public static bool IsHealthy(HttpStatusCode status, string? body)
@@ -46,7 +55,13 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("status", out var value)
                 && value.ValueKind == JsonValueKind.String
-                && value.GetString() == "ok";
+                && value.GetString() == "ok"
+                // `model_loaded` has to be true as well: a stub that answers
+                // {"status":"ok"} is not a Parakeet server, and the health probe
+                // is what decides whether the app hands it the user's audio
+                // (#1270).
+                && document.RootElement.TryGetProperty("model_loaded", out var loaded)
+                && loaded.ValueKind == JsonValueKind.True;
         }
         catch (JsonException)
         {
@@ -67,8 +82,38 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             timeout.CancelAfter(Timeout);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+            // The peer has to prove that it is the server before the app hands
+            // it anything. A listener that answers on the port is not the
+            // server, and the app must not learn its token from the first
+            // request it sends (#1270). So the challenge carries a fresh
+            // nonce and no token: the server answers with an HMAC of the
+            // nonce that only a peer that knows the token can produce, and the
+            // app sends the token on later requests only once that proof
+            // checks out.
+            var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            request.Headers.TryAddWithoutValidation(LocalServerTokenStore.ChallengeHeader, nonce);
+            var token = LocalServerTokenStore.Token(installDirectory);
+            var expectedProof = string.IsNullOrWhiteSpace(token)
+                ? null
+                : LocalServerTokenStore.Proof(nonce, token);
             using var response = await httpClient.SendAsync(request, timeout.Token);
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            if (expectedProof is null)
+            {
+                return false;
+            }
+
+            // The peer has to prove that it knows the token. A listener that
+            // answers the health check with the right body is still not the
+            // server, and the app must not upload the user's audio to it.
+            var proof = response.Headers.TryGetValues(LocalServerTokenStore.ProofHeader, out var values)
+                ? values.FirstOrDefault()
+                : null;
+            if (!string.Equals(proof, expectedProof, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             return IsHealthy(response.StatusCode, body);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -307,6 +307,7 @@
 		C94BCF47DC9E95A63364E063 /* MicrophonePermissionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FCEB9CBD524A3CA4F525A7D /* MicrophonePermissionServiceTests.swift */; };
 		CB86D0DD53DE4F044EC12470 /* ScreenshotCaptureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 998C4703160B45E816CF929F /* ScreenshotCaptureSupport.swift */; };
 		CB9E1F15D2FB0B7CF38DD5F6 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB303E43134D880AB6207D21 /* AppError.swift */; };
+		CBD952EF4D5C0652FF66ED78 /* LocalServerTokenStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1D43C6FBABF2C418CCD99E /* LocalServerTokenStoreTests.swift */; };
 		CBE08ABB1F52871FE33471BA /* ScreenshotPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57AE8EA0414CE7C5271CFD16 /* ScreenshotPreviewCache.swift */; };
 		CD22DEA9761A7BAD23814D52 /* SessionLibraryStatusPresenter+Attempt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313F4C6AD4D6A93E3995386E /* SessionLibraryStatusPresenter+Attempt.swift */; };
 		CE4D693465D160AD5AC4CF4C /* FirstRunFunnelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E56537BE26C86573F60174 /* FirstRunFunnelTests.swift */; };
@@ -361,6 +362,7 @@
 		EEFC9EAEC399AC7CA55A3128 /* AppSupportLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B609057DB2068E0F4FD292 /* AppSupportLocation.swift */; };
 		F0C234F3BD7753A09B98A332 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE629842187FE002FE2DE05D /* SessionRow.swift */; };
 		F1871DA7FB3E89FB5AE6C63F /* SessionArtifactsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4317A37DFABA4E92CBEA33 /* SessionArtifactsServiceTests.swift */; };
+		F3E8377010EA2659948E4537 /* LocalServerTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AFCDC9937E2C8F96515D3BD /* LocalServerTokenStore.swift */; };
 		F45F3D487D58DFAA0A586AD1 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331E206868D613B524051C60 /* OnboardingFlowTests.swift */; };
 		F4EA3CE8F9D57A67DDB2937D /* SettingsStore+DisplayMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5387A1EF0439835D2E0B2AAF /* SettingsStore+DisplayMask.swift */; };
 		F6A698B3E54CEF73047BC042 /* SessionMarkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0110337CFF56AF5224956A /* SessionMarkerTests.swift */; };
@@ -504,6 +506,7 @@
 		486CECB5D5265C1619CAB156 /* SettingsReadinessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsReadinessTests.swift; sourceTree = "<group>"; };
 		48DF28E6CC5FB74499C91B74 /* TransientToastController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientToastController.swift; sourceTree = "<group>"; };
 		4A9D6C752334532E660C00AF /* StorageRecoveryBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageRecoveryBanner.swift; sourceTree = "<group>"; };
+		4AFCDC9937E2C8F96515D3BD /* LocalServerTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalServerTokenStore.swift; sourceTree = "<group>"; };
 		4B0E47E6E5B3DD1BBA3AB1BA /* JiraExportProvider+IssueCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JiraExportProvider+IssueCreation.swift"; sourceTree = "<group>"; };
 		4B5B6268846602D2E2CC2102 /* GitHubExportProvider+WireTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubExportProvider+WireTypes.swift"; sourceTree = "<group>"; };
 		4C61E55C375715AA61C799A2 /* ElapsedTimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimeFormatter.swift; sourceTree = "<group>"; };
@@ -701,6 +704,7 @@
 		CC1605CDD1B7C6F848068F14 /* SessionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLibrary.swift; sourceTree = "<group>"; };
 		CCCB5C9DAEB3066CA8E30234 /* SingleInstanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleInstanceController.swift; sourceTree = "<group>"; };
 		CD7E24CD9C6DBE0BF94F5A53 /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvider.swift; sourceTree = "<group>"; };
+		CE1D43C6FBABF2C418CCD99E /* LocalServerTokenStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalServerTokenStoreTests.swift; sourceTree = "<group>"; };
 		D0FD7C5D1FD4184BCC0CC331 /* IssueExtractionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueExtractionController.swift; sourceTree = "<group>"; };
 		D2297A64FD7D8AD5B556637F /* SessionDataProtectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataProtectorTests.swift; sourceTree = "<group>"; };
 		D2370B53FBFD009E2E27655B /* SystemAudioTapSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTapSession.swift; sourceTree = "<group>"; };
@@ -843,6 +847,7 @@
 				C08F86DC1FE575150583FFC4 /* LaunchContinuityMonitorTests.swift */,
 				063E4212264C1B9FC3C61F2F /* LegacyIndexMigrationTests.swift */,
 				17E01384A3A5079D5BCBEF1B /* LocalDataDeletionControllerTests.swift */,
+				CE1D43C6FBABF2C418CCD99E /* LocalServerTokenStoreTests.swift */,
 				793E176AE9D548B28D857BEF /* LocalTranscriptionManagerTests.swift */,
 				EE21C0A922E1CA3CF2F1B714 /* MenuBarStatusPresentationTests.swift */,
 				5F444FA9FBF8F33C48106BB9 /* MicrophonePermissionResolverTests.swift */,
@@ -1092,6 +1097,7 @@
 				417CFE8D9349DE5596FD0017 /* LaunchAtLoginService.swift */,
 				F537B313D8FFBF8B7A5F75C0 /* LaunchContinuityMonitor.swift */,
 				38F534B2AFBEFF7F1351A4C9 /* LocalDataDeletionController.swift */,
+				4AFCDC9937E2C8F96515D3BD /* LocalServerTokenStore.swift */,
 				FCB5D60521B9B5249D5F75F2 /* LocalTranscriptionManager.swift */,
 				FFEDE046F0F85BBC5DD5D7D7 /* MicrophonePermissionService.swift */,
 				AAD13F66BE337808605304D9 /* MicrophonePermissionStatus.swift */,
@@ -1421,6 +1427,7 @@
 				5A0B0CC8B83B83D9C0180ECD /* LaunchContinuityMonitorTests.swift in Sources */,
 				472D11AB358B7A41B5F44FA1 /* LegacyIndexMigrationTests.swift in Sources */,
 				4F09098206B2332C4BE82DCC /* LocalDataDeletionControllerTests.swift in Sources */,
+				CBD952EF4D5C0652FF66ED78 /* LocalServerTokenStoreTests.swift in Sources */,
 				F988BF06EB89C39C8E2BA4A0 /* LocalTranscriptionManagerTests.swift in Sources */,
 				0952565F78B2C3C544A8B4FC /* MenuBarStatusPresentationTests.swift in Sources */,
 				14EB1BCFF0ADCB436C5A9451 /* MicrophonePermissionResolverTests.swift in Sources */,
@@ -1623,6 +1630,7 @@
 				099F3585D99B3E078A61EFE3 /* LaunchAtLoginService.swift in Sources */,
 				E4FADD1D63CEA498E41886BD /* LaunchContinuityMonitor.swift in Sources */,
 				525C328F410D5C0BAF88FE99 /* LocalDataDeletionController.swift in Sources */,
+				F3E8377010EA2659948E4537 /* LocalServerTokenStore.swift in Sources */,
 				F90E35BE86789559849ACAEC /* LocalTranscriptionManager.swift in Sources */,
 				E8037E3123427D9DE61D3BE7 /* MenuBarLabelView.swift in Sources */,
 				821321214EEE301B11A61654 /* MenuBarStatusPresentation.swift in Sources */,

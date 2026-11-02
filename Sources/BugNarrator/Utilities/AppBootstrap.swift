@@ -33,20 +33,27 @@ struct AppBootstrap {
                 status: runtimeEnvironment.testLaunchAtLoginStatus
             )
             self.storageMode = .isolatedForTests
+            // The local transcription token file lives next to the managed
+            // server install. Point it at the isolated storage root so the
+            // unit suite never reads or writes the user's real token file.
+            let isolatedInstallDirectory = storageRootURL
+                .appendingPathComponent("LocalTranscription", isDirectory: true)
             if let reachable = runtimeEnvironment.testLocalServerIsReachable {
                 self.settingsStore = SettingsStore(
                     defaults: defaults,
                     keychainService: InMemoryKeychainService(),
                     launchAtLoginService: launchAtLoginService,
                     legacyDefaultsDomains: [],
-                    localProviderReachabilityProbe: { _ in reachable }
+                    localProviderReachabilityProbe: { _ in reachable },
+                    localServerInstallDirectory: isolatedInstallDirectory
                 )
             } else {
                 self.settingsStore = SettingsStore(
                     defaults: defaults,
                     keychainService: InMemoryKeychainService(),
                     launchAtLoginService: launchAtLoginService,
-                    legacyDefaultsDomains: []
+                    legacyDefaultsDomains: [],
+                    localServerInstallDirectory: isolatedInstallDirectory
                 )
             }
             if let testProvider = runtimeEnvironment.testAIProvider {
@@ -57,7 +64,7 @@ struct AppBootstrap {
                 storageURL: storageRootURL.appendingPathComponent("sessions.json"),
                 artifactsRemover: Self.makeArtifactsRemover()
             )
-            self.localTranscriptionManager = .isolated(directory: storageRootURL.appendingPathComponent("LocalTranscription", isDirectory: true))
+            self.localTranscriptionManager = .isolated(directory: isolatedInstallDirectory)
             self.isolatedDefaultsSuiteName = defaultsSuiteName
             self.isolatedStorageRootURL = storageRootURL
             return

@@ -44,7 +44,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let process = FakeLocalServerProcess()
         var dependencies = LocalTranscriptionManager.Dependencies.live
         dependencies.verify = { _ in }
-        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        dependencies.launch = { _, _, _, onExit in process.onExit = onExit; return process }
         let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
         manager.start()
         await waitUntil { manager.running }
@@ -102,7 +102,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let process = FakeLocalServerProcess()
         var dependencies = LocalTranscriptionManager.Dependencies.live
         dependencies.verify = { _ in }
-        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        dependencies.launch = { _, _, _, onExit in process.onExit = onExit; return process }
         let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
         manager.start()
         await waitUntil { manager.running }
@@ -191,7 +191,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
             await gate.wait()
             try Task.checkCancellation()
         }
-        dependencies.launch = { _, _, _ in XCTFail("Canceled install must not launch"); return FakeLocalServerProcess() }
+        dependencies.launch = { _, _, _, _ in XCTFail("Canceled install must not launch"); return FakeLocalServerProcess() }
         let manager = LocalTranscriptionManager(directory: fixture.destination, session: makeMockURLSession(), dependencies: dependencies)
         try XCTSkipUnless(manager.supported, "Server packages require Apple Silicon")
         await manager.discover()
@@ -219,7 +219,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let entered = expectation(description: "Verification entered")
         var dependencies = LocalTranscriptionManager.Dependencies.live
         dependencies.verify = { _ in entered.fulfill(); await gate.wait() }
-        dependencies.launch = { _, _, _ in XCTFail("Canceled start must not launch"); return FakeLocalServerProcess() }
+        dependencies.launch = { _, _, _, _ in XCTFail("Canceled start must not launch"); return FakeLocalServerProcess() }
         let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
         manager.start()
         await fulfillment(of: [entered], timeout: 2)
@@ -243,7 +243,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let process = FakeLocalServerProcess()
         var dependencies = LocalTranscriptionManager.Dependencies.live
         dependencies.verify = { _ in }
-        dependencies.launch = { _, _, onExit in process.onExit = onExit; return process }
+        dependencies.launch = { _, _, _, onExit in process.onExit = onExit; return process }
         let manager = LocalTranscriptionManager(directory: fixture.destination, dependencies: dependencies)
         manager.start()
         for _ in 0..<100 where manager.busy { try await Task.sleep(for: .milliseconds(5)) }
@@ -347,7 +347,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let process = FakeLocalServerProcess()
         var dependencies = LocalTranscriptionManager.Dependencies.live
         dependencies.verify = { _ in }
-        dependencies.launch = { _, _, onExit in
+        dependencies.launch = { _, _, _, onExit in
             process.onExit = onExit
             return process
         }
@@ -371,7 +371,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
         try Data("unsigned".utf8).write(to: fixture.destination.appendingPathComponent("bugnarrator-transcription"))
         var dependencies = LocalTranscriptionManager.Dependencies.live
-        dependencies.launch = { _, _, _ in
+        dependencies.launch = { _, _, _, _ in
             XCTFail("Unverified binary must never launch")
             return FakeLocalServerProcess()
         }
@@ -425,7 +425,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let exited = expectation(description: "CLI process exits with diagnostics")
         // ls is a terminal-only fixture; --preload is deliberately invalid.
         let process = try LocalTranscriptionManager.Dependencies.live.launch(
-            URL(fileURLWithPath: "/bin/ls"), FileManager.default.temporaryDirectory
+            URL(fileURLWithPath: "/bin/ls"), FileManager.default.temporaryDirectory, nil
         ) { status, detail in
             XCTAssertNotEqual(status, 0)
             XCTAssertFalse(detail.isEmpty)
@@ -481,7 +481,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: binary.deletingLastPathComponent()) }
         let exited = expectation(description: "server exits")
         nonisolated(unsafe) var result: (Int32, String)?
-        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory) { status, detail in
+        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory, nil) { status, detail in
             result = (status, detail)
             exited.fulfill()
         }
@@ -503,7 +503,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: binary.deletingLastPathComponent()) }
         let exited = expectation(description: "server exits")
         nonisolated(unsafe) var result: (Int32, String)?
-        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory) { status, detail in
+        let process = try LocalTranscriptionManager.Dependencies.live.launch(binary, FileManager.default.temporaryDirectory, nil) { status, detail in
             result = (status, detail)
             exited.fulfill()
         }

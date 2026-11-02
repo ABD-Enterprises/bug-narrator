@@ -2,6 +2,7 @@ using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Http;
 using BugNarrator.Windows.Services.Hotkeys;
+using BugNarrator.Windows.Services.LocalTranscription;
 
 namespace BugNarrator.Windows.Services.Settings;
 
@@ -239,6 +240,15 @@ public sealed record WindowsAppSettings(
         if (EffectiveAiProviderProfile.RequiresCredential)
         {
             return string.IsNullOrWhiteSpace(trimmedCredential) ? null : trimmedCredential;
+        }
+
+        if (EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal)
+        {
+            // The local server refuses every request that does not carry its
+            // bearer token, and the request builder already sends the
+            // credential as one. An empty credential means no header at all,
+            // which the server refuses — the safe direction to fail in.
+            return LocalServerTokenStore.Token(LocalServerPaths.DefaultInstallDirectory) ?? string.Empty;
         }
 
         return trimmedCredential ?? string.Empty;

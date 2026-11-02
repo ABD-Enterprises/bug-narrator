@@ -169,7 +169,11 @@ public sealed class LocalServerProcessTests : IDisposable
     [Fact]
     public void ServerArguments_BindLoopbackOnTheFixedPortWithThePinnedModel()
     {
-        Assert.Equal("--host 127.0.0.1 --port 8422 --model parakeet-tdt-0.6b-v3", LocalServerProcess.ServerArguments);
+        // --preload is what macOS passes too: the health probe treats a server
+        // that has not loaded its model as not ready (#1270).
+        Assert.Equal(
+            "--host 127.0.0.1 --port 8422 --model parakeet-tdt-0.6b-v3 --preload",
+            LocalServerProcess.ServerArguments);
     }
 
     [Fact]
