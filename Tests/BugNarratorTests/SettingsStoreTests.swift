@@ -2090,13 +2090,13 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.gitHubConfigurationValidationIsReady)
         XCTAssertNotNil(store.githubExportConfiguration)
 
-        store.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net/"
+        store.jiraBaseURL = "https://example-site.atlassian.net/"
         store.jiraEmail = "alan.deffenderfer@gdit.com"
         store.jiraAPIToken = "fixture-jira-token"
 
         XCTAssertTrue(store.jiraProjectDiscoveryIsReady)
         XCTAssertEqual(store.jiraConnectionConfiguration?.baseURL.scheme, "https")
-        XCTAssertEqual(store.jiraConnectionConfiguration?.baseURL.host, "digitaltransformation-csra.atlassian.net")
+        XCTAssertEqual(store.jiraConnectionConfiguration?.baseURL.host, "example-site.atlassian.net")
         XCTAssertNil(store.jiraExportConfiguration)
     }
 

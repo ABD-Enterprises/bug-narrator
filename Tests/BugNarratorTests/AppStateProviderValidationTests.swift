@@ -166,7 +166,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net/"
+        harness.settingsStore.jiraBaseURL = "https://example-site.atlassian.net/"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         await harness.exportService.setJiraProjects(
@@ -198,7 +198,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         await harness.exportService.setJiraProjects(
@@ -236,7 +236,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraIssueType = "Task"
@@ -284,7 +284,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraProjectKey = "UCAP"
@@ -314,7 +314,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraProjectKey = "LEGACY"
@@ -339,7 +339,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraProjectKey = "OPS"
@@ -404,7 +404,7 @@ final class AppStateProviderValidationTests: XCTestCase {
         let harness = AppStateHarness()
         defer { harness.cleanup() }
 
-        harness.settingsStore.jiraBaseURL = "digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "alan.deffenderfer@gdit.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraProjectKey = "UCAP"
