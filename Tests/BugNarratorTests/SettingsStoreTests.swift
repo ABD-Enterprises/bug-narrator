@@ -452,7 +452,7 @@ final class SettingsStoreTests: XCTestCase {
                 from: "localhost:8422",
                 provider: .parakeetLocal
             ).absoluteString,
-            "http://localhost:8422"
+            "http://127.0.0.1:8422"
         )
     }
 
@@ -518,7 +518,7 @@ final class SettingsStoreTests: XCTestCase {
             "expected a parsed public address to be called remote, got: \(remote ?? "nil")"
         )
         XCTAssertTrue(
-            remote?.contains("email and API token would be sent unencrypted") ?? false,
+            remote?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(remote ?? "nil")"
         )
 
@@ -531,9 +531,105 @@ final class SettingsStoreTests: XCTestCase {
             "expected the refusal to say the host is not checkable, got: \(uncheckable ?? "nil")"
         )
         XCTAssertTrue(
-            uncheckable?.contains("email and API token would be sent unencrypted") ?? false,
+            uncheckable?.contains("email, API token and issue content would be sent unencrypted") ?? false,
             "expected the refusal to name the credentials at risk, got: \(uncheckable ?? "nil")"
         )
+    }
+
+    func testJiraBaseURLCompatibilityIssueBlocksOnlyPlaintextRemoteHost() {
+        let suiteName = "BugNarrator-JiraPlaintextCompatibilityTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for allowed in [
+            "https://acme.atlassian.net",   // remote HTTPS
+            "http://localhost:8080",         // loopback HTTP
+            "http://192.168.1.10",           // private network
+            "http://jira.localhost",         // loopback by name
+            "acme.atlassian.net",            // no scheme → defaults to https
+            ""
+        ] {
+            store.jiraBaseURL = allowed
+            XCTAssertNil(store.jiraBaseURLCompatibilityIssue, "expected no issue for \(allowed)")
+        }
+
+        store.jiraBaseURL = "http://jira.example.com"
+        let issue = store.jiraBaseURLCompatibilityIssue
+        XCTAssertNotNil(issue)
+        XCTAssertTrue(issue?.contains("jira.example.com") == true)
+        XCTAssertTrue(issue?.contains("https://") == true)
+    }
+
+    /// One host gets one answer. The refusal that blocks the export and the
+    /// warning shown next to the setting describe the same host, so they have
+    /// to be the same sentence: a user who reads one and acts on it must not
+    /// be told something different by the other.
+    func testTheExportRefusalAndTheSettingsWarningAreTheSameSentence() {
+        let suiteName = "BugNarrator-JiraPlaintextOneSentenceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+
+        for base in [
+            "http://jira.example.com",   // a name on the network
+            "http://8.8.8.8:8080",       // a parsed public address
+            "http://nas.local",          // a name the network answers over mDNS
+            "http://jira",               // a single-label name
+            "http://134744072",          // an address in another notation
+            "http://010.0.0.1"           // an address with a leading zero
+        ] {
+            store.jiraBaseURL = base
+            XCTAssertEqual(
+                store.jiraBaseURLCompatibilityIssue,
+                store.jiraBaseURLPlaintextWarning,
+                "expected one sentence for one host, got the refusal "
+                    + "\(store.jiraBaseURLCompatibilityIssue ?? "nil") and the warning "
+                    + "\(store.jiraBaseURLPlaintextWarning ?? "nil")"
+            )
+        }
+    }
+
+    /// One host gets one answer, on every surface that refuses it: the
+    /// warning next to the setting, the issue that blocks the export, and the
+    /// refusal the request builder raises.
+    func testEverySurfaceThatRefusesAHostSaysTheSameThing() async throws {
+        let suiteName = "BugNarrator-JiraPlaintextOneSurfaceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        let provider = JiraExportProvider()
+
+        for endpoint in [
+            "http://8.8.8.8:8080/jira",
+            "http://jira.example.com:8080/jira",
+            "http://nas.local:8080/jira",
+            "http://134744072:8080/jira"
+        ] {
+            store.jiraBaseURL = endpoint
+            let warning = store.jiraBaseURLPlaintextWarning
+            XCTAssertNotNil(warning, "expected a refusal for \(endpoint)")
+            XCTAssertEqual(store.jiraBaseURLCompatibilityIssue, warning)
+
+            do {
+                _ = try await provider.authenticatedRequest(
+                    url: URL(string: endpoint)!,
+                    httpMethod: "POST",
+                    email: "you@example.com",
+                    apiToken: "fixture-jira-token",
+                    includesJSONContentType: true
+                )
+                XCTFail("expected the request builder to refuse \(endpoint)")
+            } catch let error as AppError {
+                guard case .exportConfigurationIncompatible(let message) = error else {
+                    return XCTFail("expected an incompatible-configuration error, got \(error)")
+                }
+                XCTAssertEqual(message, warning)
+            }
+        }
     }
 
     func testIsLocalEndpointHostClassification() {
@@ -1088,8 +1184,20 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.preferredModel, "parakeet-tdt-0.6b-v3")
         XCTAssertEqual(store.transcriptionRequest.model, "parakeet-tdt-0.6b-v3")
-        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://localhost:8422")
+        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://127.0.0.1:8422")
         XCTAssertEqual(defaults.string(forKey: "settings.preferredModel"), "parakeet-tdt-0.6b-v3")
+    }
+
+    func testParakeetProviderUsesLiteralLoopbackForPersistedOldDefault() {
+        let suiteName = "BugNarrator-ParakeetOldDefault-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(AIProvider.parakeetLocal.rawValue, forKey: "settings.aiProvider")
+        defaults.set("http://localhost:8422", forKey: "settings.openAIBaseURL")
+
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService())
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://127.0.0.1:8422")
+        XCTAssertEqual(store.transcriptionRequest.apiBaseURL.absoluteString, "http://127.0.0.1:8422")
     }
 
     func testOpenAIProviderUsesCuratedTranscriptionModelChoices() {
@@ -1210,7 +1318,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
     }
 
-    func testParakeetProviderCanUseSafeDefaultBaseURLWithoutAPIKey() {
+    @MainActor
+    func testParakeetProviderCanUseSafeDefaultBaseURLWithoutAPIKey() async throws {
         let suiteName = "BugNarrator-SettingsParakeet-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -1227,8 +1336,70 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(store.aiProviderCompatibilityIssue)
         XCTAssertTrue(store.hasUsableAIProviderCredential)
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
-        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://localhost:8422")
-        XCTAssertEqual(store.aiProviderCredentialForUserInitiatedAccess(), "")
+        XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://127.0.0.1:8422")
+        // The local server checks a bearer token on every route, so the
+        // credential the app presents is that token rather than an empty
+        // string (#1270).
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+        let credential = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+        XCTAssertFalse(credential?.isEmpty ?? true)
+        XCTAssertEqual(
+            credential,
+            LocalServerTokenStore.storedToken(installDirectory: isolatedLocalServerInstallDirectory)
+        )
+    }
+
+    @MainActor
+    func testLocalCredentialAccessRequiresFreshHealthProof() async throws {
+        let name = "BugNarrator-CredentialProof-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        let session = makeMockURLSession()
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: directory)
+            session.invalidateAndCancel()
+            MockURLProtocol.requestHandler = nil
+        }
+        var suppliesProof = false
+        var challengeCount = 0
+        MockURLProtocol.requestHandler = { request in
+            challengeCount += 1
+            XCTAssertEqual(request.url?.path, "/health")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertNil(request.httpBody)
+            let nonce = try XCTUnwrap(request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader))
+            let token = try XCTUnwrap(LocalServerTokenStore.storedToken(installDirectory: directory))
+            let headers = suppliesProof ? [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(
+                nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: request.url!)
+            )] : [:]
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: headers)!,
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
+        }
+        let store = makeIsolatedSettingsStore(
+            defaults: defaults, localProviderSession: session,
+            localServerInstallDirectory: directory, usesTheStoresOwnReachabilityProbe: true
+        )
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
+        do {
+            _ = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+            XCTFail("A healthy listener without proof must not receive a credential")
+        } catch {
+            XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify") == true)
+        }
+        suppliesProof = true
+        let credential = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+        XCTAssertEqual(credential, LocalServerTokenStore.storedToken(installDirectory: directory))
+        XCTAssertFalse(credential?.isEmpty ?? true)
+        let previousChallenges = challengeCount
+        suppliesProof = false
+        do {
+            _ = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
+            XCTFail("Cached readiness must not replace a fresh proof")
+        } catch {
+            XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify") == true)
+        }
+        XCTAssertGreaterThan(challengeCount, previousChallenges)
     }
 
     func testAutomaticParakeetProbeRecoversWithoutChangingProvider() {
@@ -1243,11 +1414,20 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertEqual(request.url?.path, "/health")
             requests += 1
             let code = requests == 1 ? 503 : 200
-            return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!,
-                    Data(#"{"status":"ok","model_loaded":false}"#.utf8))
+            // The peer has to prove that it is the server: the app only
+            // trusts a health answer that carries the proof (#1270).
+            let nonce = request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader) ?? ""
+            let token = LocalServerTokenStore.token(installDirectory: isolatedLocalServerInstallDirectory) ?? ""
+            let headers = [LocalServerTokenStore.proofHeader: LocalServerTokenStore.proof(nonce: nonce, token: token, authority: LocalServerTokenStore.authority(for: request.url!))]
+            return (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: headers)!,
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
         }
-        let store = SettingsStore(defaults: defaults, keychainService: MockKeychainService(),
-                                  localProviderSession: makeMockURLSession())
+        // The isolated store keeps the probe the test is about: its own
+        // health check over the mock session. The default probe refuses every
+        // host, which would stop the recovery this test is watching for.
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  usesTheStoresOwnReachabilityProbe: true)
         XCTAssertEqual(store.localProviderReachability, .unknown)
         let unavailable = expectation(description: "Server initially unavailable")
         let recovered = expectation(description: "Server becomes ready without another user action")
@@ -1259,6 +1439,61 @@ final class SettingsStoreTests: XCTestCase {
         observation.cancel()
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
         store.aiProvider = .openAI
+    }
+
+    /// A token file that cannot be secured leaves the server running and
+    /// healthy while the app sends no token, so the message has to name that
+    /// cause rather than sending the user looking for a server that is there.
+    func testTheUnreachableMessageNamesATokenFileItCannotSecure() throws {
+        let suiteName = "BugNarrator-TokenProblem-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BugNarratorTests-TokenProblem-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let tokenURL = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        FileManager.default.createFile(
+            atPath: tokenURL.path,
+            contents: Data("an-old-token".utf8),
+            attributes: [.posixPermissions: NSNumber(value: 0o644)]
+        )
+        // A directory that cannot be written to is a file that cannot be
+        // replaced, so the repair fails.
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o500)],
+            ofItemAtPath: directory.path
+        )
+        addTeardownBlock {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o700)],
+                ofItemAtPath: directory.path
+            )
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        // The server is running and refuses the request, because the app
+        // sends no token.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+             Data())
+        }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  localServerInstallDirectory: directory,
+                                  usesTheStoresOwnReachabilityProbe: true)
+
+        let unreachable = expectation(description: "The server refuses the request without the token")
+        let observation = store.$localProviderReachability.dropFirst().sink { state in
+            if state == .unreachable { unreachable.fulfill() }
+        }
+        wait(for: [unreachable], timeout: 6)
+        observation.cancel()
+
+        XCTAssertEqual(
+            store.localProviderUnreachableMessage,
+            "BugNarrator cannot use the local transcription server's token file. The access token file could not be secured, so BugNarrator did not send it. The server may already be running; fix the token file, or choose another provider."
+        )
     }
 
     func testParakeetReadinessRecoversAtTheSameURL() {
@@ -1277,16 +1512,106 @@ final class SettingsStoreTests: XCTestCase {
 
     func testParakeetHealthRequiresSuccessfulStructuredResponse() {
         let url = URL(string: "http://localhost:8422/health")!
-        let healthy = Data(#"{"status":"ok","model_loaded":false}"#.utf8)
+        let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token", authority: LocalServerTokenStore.authority(for: url))
         for status in [404, 500] {
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
-            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: response, expectedProof: proof))
         }
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
-        XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response))
-        for body in ["OK", #"{"status":"ok"}"#, #"{"status":"error","model_loaded":true}"#] {
-            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response))
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: proof
+        ])
+        XCTAssertTrue(SettingsStore.isHealthyLocalProvider(data: healthy, response: response, expectedProof: proof))
+        // A listener that answers the health check with the right body is
+        // still not the server: it cannot produce the proof, so the app must
+        // not hand it the user's audio (#1270).
+        let impostor = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: impostor, expectedProof: proof))
+        let wrongProof = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: "not-the-proof"
+        ])
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: wrongProof, expectedProof: proof))
+        let relayedProof = LocalServerTokenStore.proof(
+            nonce: "the-nonce", token: "the-token", authority: "127.0.0.1:8422"
+        )
+        let relay = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: relayedProof
+        ])
+        XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: healthy, response: relay, expectedProof: proof))
+        // A server that has not loaded its model is not ready: the app must not
+        // hand the user's audio to it (#1270).
+        for body in [
+            "OK",
+            #"{"status":"ok"}"#,
+            #"{"status":"ok","model_loaded":false}"#,
+            #"{"status":"error","model_loaded":true}"#
+        ] {
+            XCTAssertFalse(SettingsStore.isHealthyLocalProvider(data: Data(body.utf8), response: response, expectedProof: proof))
         }
+    }
+
+    func testParakeetHealthReportsTheServersOwnReasonWhenItCannotLoadItsModel() {
+        let url = URL(string: "http://localhost:8422/health")!
+        let proof = LocalServerTokenStore.proof(nonce: "the-nonce", token: "the-token", authority: LocalServerTokenStore.authority(for: url))
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [
+            LocalServerTokenStore.proofHeader: proof
+        ])
+
+        // A server that is running but has no model says why, so the app can
+        // say something true instead of "could not reach the server".
+        let degraded = Data(#"{"status":"degraded","model_loaded":false,"model_error":"model file missing"}"#.utf8)
+        let report = SettingsStore.localProviderHealthReport(data: degraded, response: response, expectedProof: proof)
+        XCTAssertFalse(report.isHealthy)
+        XCTAssertEqual(report.modelError, "model file missing")
+
+        // A healthy server has no error to report.
+        let healthy = Data(#"{"status":"ok","model_loaded":true}"#.utf8)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: healthy, response: response, expectedProof: proof).modelError)
+
+        // A server that is still loading its model is not an error.
+        let loading = Data(#"{"status":"loading","model_loaded":false}"#.utf8)
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: loading, response: response, expectedProof: proof).modelError)
+
+        // A response that is not the server's health check says nothing.
+        XCTAssertNil(SettingsStore.localProviderHealthReport(data: nil, response: response, expectedProof: proof).modelError)
+    }
+
+    /// The health check must not hand the token to whatever answers on the
+    /// port, and the peer has to prove that it is the server before the app
+    /// uploads anything to it (#1270).
+    func testTheHealthCheckCarriesNoTokenAndThePeerHasToProveItself() {
+        let suiteName = "BugNarrator-Challenge-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            MockURLProtocol.requestHandler = nil
+        }
+
+        var presentedAuthorization: String?
+        var presentedNonce: String?
+        MockURLProtocol.requestHandler = { request in
+            presentedAuthorization = request.value(forHTTPHeaderField: "Authorization")
+            presentedNonce = request.value(forHTTPHeaderField: LocalServerTokenStore.challengeHeader)
+            // A listener that answers the health check with the right body is
+            // still not the server: it cannot produce the proof.
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(#"{"status":"ok","model_loaded":true}"#.utf8))
+        }
+        let store = makeIsolatedSettingsStore(defaults: defaults, keychainService: MockKeychainService(),
+                                  localProviderSession: makeMockURLSession(),
+                                  usesTheStoresOwnReachabilityProbe: true)
+
+        let unreachable = expectation(description: "The listener cannot prove that it is the server")
+        unreachable.assertForOverFulfill = false
+        let observation = store.$localProviderReachability.dropFirst().sink { state in
+            if state == .unreachable { unreachable.fulfill() }
+        }
+        wait(for: [unreachable], timeout: 6)
+        observation.cancel()
+
+        XCTAssertNil(presentedAuthorization, "the challenge must not carry the token")
+        XCTAssertNotNil(presentedNonce, "the challenge has to carry a nonce")
+        XCTAssertEqual(store.localProviderReachability, .unreachable)
     }
 
     func testParakeetProviderReportsUnreachableServerBeforeRecordingStarts() {
@@ -1305,7 +1630,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "BugNarrator could not reach the local transcription server at http://localhost:8422. Install and start the local server in AI Engines settings, or choose another provider."
+            "BugNarrator could not verify the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
         )
     }
 
@@ -1612,11 +1937,8 @@ final class SettingsStoreTests: XCTestCase {
         store.aiProvider = .parakeetLocal
         store.openAIBaseURL = "http://localhost:8422"
 
-        XCTAssertEqual(
-            store.aiProviderCredentialForUserInitiatedAccess(),
-            "",
-            "Switching to a non-requiresAPIKey provider must not return the saved OpenAI key."
-        )
+        // Synchronous access must never expose a local bearer token.
+        XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
 
         store.aiProvider = .localCompatible
         store.openAIBaseURL = "http://localhost:1234/v1"

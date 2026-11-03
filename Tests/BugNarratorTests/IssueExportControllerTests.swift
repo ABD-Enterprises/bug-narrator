@@ -198,6 +198,115 @@ final class IssueExportControllerTests: XCTestCase {
         )
     }
 
+    func testParakeetExportRefusesFailedProofWithoutReadingTokenOrSendingRequests() async throws {
+        var probeCalls = 0
+        let harness = try IssueExportControllerHarness(localProviderReachabilityProbe: { _ in
+            probeCalls += 1
+            return false
+        })
+        defer { harness.cleanup() }
+        harness.settingsStore.aiProvider = .parakeetLocal
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+        let issue = harness.makeIssue(title: "App issue")
+        let session = harness.makeSession(issues: [issue])
+        try harness.transcriptStore.add(session)
+        // A candidate is ready; bypassing the gate would invoke the review client.
+        await harness.exportService.setGitHubReview(harness.makeReview(for: issue, sessionID: session.id))
+        let context = try harness.requireContext(
+            harness.controller.preflightIssueExport(from: session, to: .github, statusPhase: .idle)
+        )
+        let callsBeforeExport = probeCalls
+        do {
+            _ = try await harness.controller.prepareIssueExportReview(
+                for: context, model: "local-model", apiBaseURL: harness.settingsStore.openAIBaseURLValue
+            )
+            XCTFail("Export must refuse a server without proof")
+        } catch {
+            let appError = try XCTUnwrap(error as? AppError)
+            XCTAssertTrue(appError.userMessage.contains("could not verify the local transcription server"))
+            let presenter = makeIssueExportPresentationController()
+            presenter.presenter.presentFailure(error)
+            XCTAssertEqual(presenter.presentationState.currentError, appError)
+        }
+        XCTAssertGreaterThan(probeCalls, callsBeforeExport)
+        let reviewCalls = await harness.exportService.gitHubReviewCallCount
+        let validationCalls = await harness.exportService.gitHubValidationCallCount
+        XCTAssertEqual(reviewCalls, 0)
+        XCTAssertEqual(validationCalls, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: harness.localTokenURL.path),
+                       "A failing injected probe must not even create/read the bearer credential")
+        XCTAssertNil(harness.controller.pendingExportReview)
+    }
+
+    func testParakeetExportSendsTokenAndIssueOnlyAfterFreshPassingProof() async throws {
+        var reachable = true
+        var probeCalls = 0
+        let mockSession = makeMockURLSession()
+        defer { mockSession.invalidateAndCancel(); MockURLProtocol.requestHandler = nil }
+        let service = ExportService(
+            gitHubProvider: GitHubExportProvider(session: mockSession),
+            similarIssueReviewService: SimilarIssueReviewService(session: mockSession)
+        )
+        let harness = try IssueExportControllerHarness(localProviderReachabilityProbe: { _ in
+            probeCalls += 1
+            return reachable
+        }, reviewExportService: service)
+        defer { harness.cleanup() }
+        harness.settingsStore.aiProvider = .parakeetLocal
+        harness.settingsStore.githubToken = "fixture-github-token"
+        harness.settingsStore.githubRepositoryOwner = "acme"
+        harness.settingsStore.githubRepositoryName = "bugnarrator"
+        let issue = harness.makeIssue(title: "App issue")
+        let session = harness.makeSession(issues: [issue])
+        try harness.transcriptStore.add(session)
+        var chatRequests = 0
+        var allRequests = 0
+        MockURLProtocol.requestHandler = { request in
+            allRequests += 1
+            let body: String
+            switch request.url!.path {
+            case "/search/issues":
+                body = #"{"items":[{"number":142,"title":"App issue","body":"Candidate","html_url":"https://github.com/acme/bugnarrator/issues/142"}]}"#
+            case "/v1/chat/completions":
+                chatRequests += 1
+                XCTAssertGreaterThan(probeCalls, 0)
+                XCTAssertTrue(reachable)
+                XCTAssertEqual(request.url?.host, "127.0.0.1")
+                let requestBody = try requestBodyData(from: request)
+                XCTAssertTrue(String(decoding: requestBody, as: UTF8.self).contains("App issue"))
+                let token = LocalServerTokenStore.storedToken(installDirectory: harness.localTokenURL.deletingLastPathComponent())
+                XCTAssertNotNil(token)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(token ?? "")")
+                body = #"{"choices":[{"message":{"content":"{\"matches\":[]}"}}]}"#
+            default:
+                body = #"{"has_issues":true}"#
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+        let context = try harness.requireContext(
+            harness.controller.preflightIssueExport(from: session, to: .github, statusPhase: .idle)
+        )
+        let callsBeforeExport = probeCalls
+        _ = try await harness.controller.prepareIssueExportReview(
+            for: context, model: "local-model", apiBaseURL: harness.settingsStore.openAIBaseURLValue
+        )
+        XCTAssertGreaterThan(probeCalls, callsBeforeExport)
+        XCTAssertEqual(chatRequests, 1)
+        let requestsBeforeFailure = allRequests
+        reachable = false
+        do {
+            _ = try await harness.controller.prepareIssueExportReview(
+                for: context, model: "local-model", apiBaseURL: harness.settingsStore.openAIBaseURLValue
+            )
+            XCTFail("A previous passing proof must not authorize another export")
+        } catch {
+            XCTAssertTrue((error as? AppError)?.userMessage.contains("could not verify") == true)
+        }
+        XCTAssertEqual(allRequests, requestsBeforeFailure)
+    }
+
     func testJiraGroupingUsesPerIssueTargets() async throws {
         let harness = try IssueExportControllerHarness()
         defer { harness.cleanup() }
@@ -239,6 +348,48 @@ final class IssueExportControllerTests: XCTestCase {
         XCTAssertEqual(reviewConfigurations.map(\.targetIdentity), ["10000::10001", "20000::20001"])
         XCTAssertNil(harness.controller.exportDestinationInProgress)
         XCTAssertNil(harness.controller.pendingExportReview)
+    }
+
+    func testJiraExportIsRefusedForAPlaintextRemoteBaseURL() async throws {
+        let harness = try IssueExportControllerHarness()
+        defer { harness.cleanup() }
+
+        // A self-hosted Jira on plain HTTP is common, so the field accepts it.
+        // The export must still be refused: the account email, the API token and
+        // the issue content would cross the network in the clear.
+        harness.settingsStore.jiraBaseURL = "http://jira.example.com"
+        harness.settingsStore.jiraEmail = "jira-user@example.com"
+        harness.settingsStore.jiraAPIToken = "fixture-jira-token"
+        let issue = harness.makeIssue(
+            title: "App issue",
+            jiraExportTarget: JiraIssueExportTarget(
+                projectID: "10000",
+                projectKey: "APP",
+                issueTypeID: "10001",
+                issueTypeName: "Bug"
+            )
+        )
+        let session = harness.makeSession(issues: [issue])
+        try harness.transcriptStore.add(session)
+
+        switch harness.controller.preflightIssueExport(from: session, to: .jira, statusPhase: .idle) {
+        case .success:
+            XCTFail("expected the export to be refused for a plaintext remote Jira URL")
+        case .failure(let failure):
+            guard case .exportConfigurationIncompatible(let message) = failure.error else {
+                return XCTFail("expected an incompatible-configuration error, got \(failure.error)")
+            }
+            XCTAssertTrue(message.contains("jira.example.com"))
+            // The fix lives in Settings, so the failure has to open it.
+            XCTAssertTrue(failure.opensSettings)
+        }
+
+        // The same configuration is fine over HTTPS.
+        harness.settingsStore.jiraBaseURL = "https://jira.example.com"
+        let context = try harness.requireContext(
+            harness.controller.preflightIssueExport(from: session, to: .jira, statusPhase: .idle)
+        )
+        XCTAssertEqual(context.destination, .jira)
     }
 
     func testPendingReviewMutationAndCancel() async throws {
@@ -384,7 +535,14 @@ private final class IssueExportControllerHarness {
     let sessionLibrary: SessionLibraryController
     let controller: IssueExportController
 
-    init() throws {
+    var localTokenURL: URL {
+        LocalServerTokenStore.tokenFileURL(installDirectory: rootDirectoryURL.appendingPathComponent("LocalServer"))
+    }
+
+    init(
+        localProviderReachabilityProbe: @escaping (URL) -> Bool = { _ in true },
+        reviewExportService: (any IssueExporting)? = nil
+    ) throws {
         let fileManager = FileManager.default
         rootDirectoryURL = fileManager.temporaryDirectory
             .appendingPathComponent("BugNarratorIssueExportControllerTests-\(UUID().uuidString)", isDirectory: true)
@@ -394,7 +552,11 @@ private final class IssueExportControllerHarness {
         defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
-        settingsStore = Self.makeHermeticSettingsStore(defaults: defaults)
+        settingsStore = makeIsolatedSettingsStore(
+            defaults: defaults,
+            localProviderReachabilityProbe: localProviderReachabilityProbe,
+            localServerInstallDirectory: rootDirectoryURL.appendingPathComponent("LocalServer")
+        )
         settingsStore.apiKey = "test-api-key"
 
         transcriptStore = TranscriptStore(
@@ -410,7 +572,7 @@ private final class IssueExportControllerHarness {
         controller = IssueExportController(
             settingsStore: settingsStore,
             sessionLibrary: sessionLibrary,
-            exportService: exportService
+            exportService: reviewExportService ?? exportService
         )
     }
 
@@ -478,14 +640,6 @@ private final class IssueExportControllerHarness {
             XCTFail("Expected export preflight success, got \(failure.error)", file: file, line: line)
             throw failure.error
         }
-    }
-
-    private static func makeHermeticSettingsStore(defaults: UserDefaults) -> SettingsStore {
-        makeIsolatedSettingsStore(
-            defaults: defaults,
-            keychainService: MockKeychainService(),
-            launchAtLoginService: MockLaunchAtLoginService()
-        )
     }
 
     func cleanup() {

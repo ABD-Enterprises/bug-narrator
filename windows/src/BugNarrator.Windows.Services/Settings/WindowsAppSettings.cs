@@ -2,6 +2,7 @@ using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Audio;
 using BugNarrator.Windows.Services.Http;
 using BugNarrator.Windows.Services.Hotkeys;
+using BugNarrator.Windows.Services.LocalTranscription;
 
 namespace BugNarrator.Windows.Services.Settings;
 
@@ -213,7 +214,7 @@ public sealed record WindowsAppSettings(
                 WindowsAiProvider.LocalCompatible when EffectiveIssueExtractionModel == Default.IssueExtractionModel =>
                     "Choose a local issue extraction model instead of gpt-4.1-mini for the Local-Compatible provider.",
                 // Parakeet ignores the typed base URL and model on macOS (SettingsStore+AIProviderReadiness);
-                // the base URL defaults to localhost:8422 and the model is pinned, so nothing to check here.
+                // the base URL defaults to 127.0.0.1:8422 and the model is pinned, so nothing to check here.
                 _ => null,
             };
         }
@@ -223,12 +224,12 @@ public sealed record WindowsAppSettings(
     /// Like <see cref="AiProviderCredentialForWorkflow"/> but also null for transcription-only
     /// providers, so extraction is refused before any request is built.
     /// </summary>
-    public string? AiProviderCredentialForIssueExtraction(string? credential)
+    public string? AiProviderCredentialForIssueExtraction(string? credential, string? installDirectory = null)
     {
-        return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential) : null;
+        return SupportsIssueExtraction ? AiProviderCredentialForWorkflow(credential, installDirectory) : null;
     }
 
-    public string? AiProviderCredentialForWorkflow(string? credential)
+    public string? AiProviderCredentialForWorkflow(string? credential, string? installDirectory = null)
     {
         if (AiProviderCompatibilityIssue is not null)
         {
@@ -239,6 +240,15 @@ public sealed record WindowsAppSettings(
         if (EffectiveAiProviderProfile.RequiresCredential)
         {
             return string.IsNullOrWhiteSpace(trimmedCredential) ? null : trimmedCredential;
+        }
+
+        if (EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal)
+        {
+            // The local server refuses every request that does not carry its
+            // bearer token, and the request builder already sends the
+            // credential as one. An empty credential means no header at all,
+            // which the server refuses — the safe direction to fail in.
+            return LocalServerTokenStore.Token(installDirectory ?? LocalServerPaths.DefaultInstallDirectory) ?? string.Empty;
         }
 
         return trimmedCredential ?? string.Empty;

@@ -173,16 +173,6 @@ final class IssueExportController: ObservableObject {
             ))
         }
 
-        // The export review sends the API key and the issue content to the AI
-        // provider endpoint, so a refused endpoint must not receive them. The
-        // extraction path has always checked this; the export path did not.
-        //
-        // It is the endpoint that is checked, not the whole provider
-        // configuration. An endpoint the app refuses is refused; a provider
-        // that is merely not ready - the local transcription server not
-        // running, say - is a different failure, and refusing the export for
-        // it would block a session whose issues were extracted with another
-        // provider.
         if let plaintextIssue = settingsStore.remotePlaintextEndpointIssue {
             return .failure(IssueExportPreflightFailure(
                 error: .exportFailure(plaintextIssue),
@@ -197,9 +187,12 @@ final class IssueExportController: ObservableObject {
         } catch {
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             let opensSettings: Bool
-            if case .exportConfigurationMissing = appError {
+            switch appError {
+            case .exportConfigurationMissing, .exportConfigurationIncompatible:
+                // Both are fixed in Settings: a missing field, or a base URL
+                // that would carry the credentials in the clear.
                 opensSettings = true
-            } else {
+            default:
                 opensSettings = false
             }
 
@@ -209,15 +202,14 @@ final class IssueExportController: ObservableObject {
             ))
         }
 
-        guard let apiKey = settingsStore.aiProviderCredentialForUserInitiatedAccess() else {
+        guard settingsStore.hasUsableAIProviderCredential else {
             return .failure(IssueExportPreflightFailure(error: .missingAPIKey, opensSettings: false))
         }
 
         return .success(IssueExportRequestContext(
             destination: destination,
             session: currentSession,
-            selectedIssues: selectedIssues,
-            apiKey: apiKey
+            selectedIssues: selectedIssues
         ))
     }
 
@@ -226,6 +218,12 @@ final class IssueExportController: ObservableObject {
         model: String,
         apiBaseURL: URL
     ) async throws -> IssueExportReview {
+        guard let apiKey = try await settingsStore.verifiedAIProviderCredentialForUserInitiatedAccess() else {
+            throw AppError.missingAPIKey
+        }
+
+        let reviewBaseURL = settingsStore.aiProvider == .parakeetLocal
+            ? settingsStore.openAIBaseURLValue : apiBaseURL
         exportDestinationInProgress = context.destination
         defer { exportDestinationInProgress = nil }
 
@@ -249,9 +247,9 @@ final class IssueExportController: ObservableObject {
                     issues: group.issues,
                     session: context.session,
                     configuration: group.configuration,
-                    apiKey: context.apiKey,
+                    apiKey: apiKey,
                     model: model,
-                    apiBaseURL: apiBaseURL
+                    apiBaseURL: reviewBaseURL
                 )
                 items.append(contentsOf: groupReview.items)
             }
@@ -264,9 +262,9 @@ final class IssueExportController: ObservableObject {
                     issues: group.issues,
                     session: context.session,
                     configuration: group.configuration,
-                    apiKey: context.apiKey,
+                    apiKey: apiKey,
                     model: model,
-                    apiBaseURL: apiBaseURL
+                    apiBaseURL: reviewBaseURL
                 )
                 items.append(contentsOf: groupReview.items)
             }
@@ -439,6 +437,12 @@ final class IssueExportController: ObservableObject {
                 throw AppError.exportConfigurationMissing(
                     "Jira export requires a base URL, email, and API token."
                 )
+            }
+            // A plaintext remote Jira URL would put the account email, the API
+            // token and the issue content on the wire in the clear. Refuse it
+            // here, before any request is made, and point the user at Settings.
+            if let compatibilityIssue = settingsStore.jiraBaseURLCompatibilityIssue {
+                throw AppError.exportConfigurationIncompatible(compatibilityIssue)
             }
         }
     }

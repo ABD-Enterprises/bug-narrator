@@ -29,7 +29,7 @@ struct MenuBarStatusPresentation: Equatable {
             return .systemAudio
         case .missingAPIKey, .invalidAPIKey, .revokedAPIKey:
             return .providerSettings
-        case .exportConfigurationMissing:
+        case .exportConfigurationMissing, .exportConfigurationIncompatible:
             return .exportConfiguration
         case .storageFailure:
             return .storage

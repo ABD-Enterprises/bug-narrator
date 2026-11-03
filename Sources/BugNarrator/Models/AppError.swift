@@ -23,6 +23,7 @@ enum AppError: LocalizedError, Equatable {
     case rateLimited(retryAfter: TimeInterval?)
     case providerQuotaExhausted
     case exportConfigurationMissing(String)
+    case exportConfigurationIncompatible(String)
     case exportFailure(String)
     case storageFailure(String)
     case diagnosticsFailure(String)
@@ -99,6 +100,8 @@ enum AppError: LocalizedError, Equatable {
             return "The \(providerName) server refused the request because its account has no credits left. Top it up, then retry."
         case .exportConfigurationMissing(let message):
             return "Export setup is incomplete: \(message)"
+        case .exportConfigurationIncompatible(let message):
+            return "Export setup is not safe to use: \(message)"
         case .exportFailure(let message):
             return "Export failed: \(message)"
         case .storageFailure(let message):
@@ -144,7 +147,7 @@ enum AppError: LocalizedError, Equatable {
             return "Network Issue"
         case .providerQuotaExhausted:
             return "Account Out of Credits"
-        case .exportConfigurationMissing:
+        case .exportConfigurationMissing, .exportConfigurationIncompatible:
             return "Export Setup Needed"
         case .exportFailure:
             return "Export Failed"
@@ -189,7 +192,7 @@ enum AppError: LocalizedError, Equatable {
             return "BugNarrator could not reach \(provider.displayName)."
         case .providerQuotaExhausted:
             return "Your \(provider.displayName) account has no credits left."
-        case .exportConfigurationMissing:
+        case .exportConfigurationMissing, .exportConfigurationIncompatible:
             return "Finish export setup before continuing."
         case .storageFailure:
             return "BugNarrator could not save the session. Copy your transcript before retrying."

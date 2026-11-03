@@ -2,6 +2,7 @@ using BugNarrator.Core.Models;
 using BugNarrator.Windows.Services.Diagnostics;
 using BugNarrator.Windows.Services.Export;
 using BugNarrator.Windows.Services.Extraction;
+using BugNarrator.Windows.Services.LocalTranscription;
 using BugNarrator.Windows.Services.Secrets;
 using BugNarrator.Windows.Services.Settings;
 using BugNarrator.Windows.Services.Storage;
@@ -16,10 +17,12 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
     private readonly WindowsDiagnostics diagnostics;
     private readonly IIssueExportService issueExportService;
     private readonly IIssueExtractionService issueExtractionService;
+    private readonly ILocalServerHealthProbe localServerHealthProbe;
     private readonly ISecretStore secretStore;
     private readonly ISessionBundleExporter sessionBundleExporter;
     private readonly IWindowsAppSettingsStore settingsStore;
     private readonly ITranscriptionClient transcriptionClient;
+    private readonly string? localServerInstallDirectory;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> activeSessionActions = new();
 
     public ReviewSessionActionService(
@@ -31,8 +34,11 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         ISessionBundleExporter sessionBundleExporter,
         IDebugBundleExporter debugBundleExporter,
         ITranscriptionClient transcriptionClient,
-        WindowsDiagnostics diagnostics)
+        WindowsDiagnostics diagnostics,
+        ILocalServerHealthProbe? localServerHealthProbe = null,
+        string? localServerInstallDirectory = null)
     {
+        this.localServerInstallDirectory = localServerInstallDirectory;
         this.completedSessionStore = completedSessionStore;
         this.transcriptionClient = transcriptionClient;
         this.settingsStore = settingsStore;
@@ -42,6 +48,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         this.sessionBundleExporter = sessionBundleExporter;
         this.debugBundleExporter = debugBundleExporter;
         this.diagnostics = diagnostics;
+        this.localServerHealthProbe = localServerHealthProbe ?? new LocalServerHealthProbe();
     }
 
     public async Task<CompletedSession> SaveSessionAsync(
@@ -128,8 +135,13 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         // .BuildCompletedSessionAsync); the difference is that a missing provider is an error here
         // rather than a NotConfigured save, because the user asked for a retry.
         var settings = await settingsStore.LoadAsync(cancellationToken);
+        if (!await LocalServerReadiness.IsReadyAsync(settings, localServerHealthProbe, cancellationToken))
+        {
+            throw new InvalidOperationException(LocalServerHealthProbe.UnreachableMessage);
+        }
+
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
-        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey);
+        var providerCredential = settings.AiProviderCredentialForWorkflow(apiKey, localServerInstallDirectory);
         if (providerCredential is null)
         {
             throw new InvalidOperationException(
@@ -195,7 +207,7 @@ public sealed class ReviewSessionActionService : IReviewSessionActionService
         var apiKey = await secretStore.GetAsync(SecretKeys.OpenAiApiKey, cancellationToken);
         // Transcription-only providers (Local Parakeet) are refused here, before any request is
         // built, with the same guidance the macOS app shows (#1168).
-        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey);
+        var providerCredential = settings.AiProviderCredentialForIssueExtraction(apiKey, localServerInstallDirectory);
         if (providerCredential is null)
         {
             throw new InvalidOperationException(
