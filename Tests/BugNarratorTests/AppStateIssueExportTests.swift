@@ -82,7 +82,7 @@ final class AppStateIssueExportTests: XCTestCase {
         XCTAssertNoThrow(try harness.transcriptStore.add(session))
         harness.appState.selectedTranscriptID = session.id
 
-        harness.settingsStore.jiraBaseURL = "https://digitaltransformation-csra.atlassian.net"
+        harness.settingsStore.jiraBaseURL = "https://example-site.atlassian.net"
         harness.settingsStore.jiraEmail = "jira-user@example.com"
         harness.settingsStore.jiraAPIToken = "fixture-jira-token"
         harness.settingsStore.jiraProjectKey = "UCAP"
