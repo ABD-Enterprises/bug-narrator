@@ -8,6 +8,7 @@
 
 - [SECURITY] Mac tracker and update links open only web addresses, refusing local files, application commands and addresses containing embedded credentials.
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
+- [SECURITY] Diagnostic filtering combines complete known-secret and pattern matches before replacement and covers the full Bearer credential alphabet, preventing exposed credential tails.
 - [SECURITY] Build checkouts discard their GitHub credentials before later steps run; validation prevents credential persistence from returning.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.
 

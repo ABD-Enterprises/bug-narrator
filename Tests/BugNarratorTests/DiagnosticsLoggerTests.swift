@@ -2,6 +2,44 @@ import XCTest
 @testable import BugNarrator
 
 final class DiagnosticsLoggerTests: XCTestCase {
+    func testKnownSecretsAreRemovedBeforePartialTokenPatterns() {
+        let fixture = "sk-fixture/PRIVATE_TAIL"
+        let sanitized = DiagnosticsRedactor.sanitizeFreeformText(
+            "Rejected \(fixture)", redactingExactValues: [fixture]
+        )
+        XCTAssertEqual(sanitized, "Rejected <redacted>")
+        XCTAssertFalse(sanitized.contains("PRIVATE_TAIL"))
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("long-secret-value short", redactingExactValues: ["long", "long-secret-value", "short"]),
+            "<redacted> <redacted>"
+        )
+    }
+
+    func testOverlappingPatternsAndKnownValuesCannotSplitAnotherCredential() {
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Bearer fixtureOtherToken", redactingExactValues: ["fixture"]),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Basic dXNlcjpwYXNz", redactingExactValues: ["dXNl"]),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Bearer sk-fixture/PRIVATE_TAIL=="),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("é 🎙 Bearer fixtureOtherToken", redactingExactValues: ["fixture"]),
+            "é 🎙 <redacted>"
+        )
+    }
+
+    func testBearerRedactionCoversTheFullCredentialAlphabet() {
+        let fixture = "abc-._~+/PRIVATE_TAIL=="
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText("Bearer \(fixture)"), "<redacted>")
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeMetadata(["detail": "Bearer \(fixture)"])["detail"], "<redacted>")
+    }
+
     func testDefaultDiagnosticsStoreUsesTemporaryPathDuringUnitTests() {
         let storageURL = DiagnosticsLogStore.defaultStorageURL(fileManager: .default)
 
