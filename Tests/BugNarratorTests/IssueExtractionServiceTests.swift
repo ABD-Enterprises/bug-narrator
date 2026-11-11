@@ -8,6 +8,35 @@ final class IssueExtractionServiceTests: XCTestCase {
         super.tearDown()
     }
 
+    func testPrivateTranscriptDoesNotFollowRealRedirectsWithDefaultOrInjectedSession() async throws {
+        for injectSession in [false, true] {
+            let target = try RedirectServer(location: "http://127.0.0.1/unused")
+            target.serve()
+            defer { target.stop() }
+            let source = try RedirectServer(location: "http://127.0.0.1:\(target.port)/capture")
+            source.serve()
+            defer { source.stop() }
+            let session = injectSession ? URLSession(configuration: .ephemeral) : nil
+            defer { session?.invalidateAndCancel() }
+            let service = IssueExtractionService(session: session)
+            let fixture = TranscriptSession(
+                createdAt: Date(), transcript: "Synthetic private transcript", duration: 1,
+                model: "fixture", languageHint: nil, prompt: nil
+            )
+            do {
+                _ = try await service.extractIssues(
+                    from: fixture, apiKey: "fixture-key", model: "fixture",
+                    apiBaseURL: URL(string: "http://127.0.0.1:\(source.port)")!
+                )
+                XCTFail("Expected the redirect to be refused")
+            } catch let error as AppError {
+                XCTAssertTrue(error.userMessage.contains("redirect"), error.userMessage)
+            }
+            XCTAssertEqual(source.requestCount, 1)
+            XCTAssertEqual(target.requestCount, 0, "Private transcript must never reach the redirect target")
+        }
+    }
+
     func testExtractIssuesReturnsStructuredDraftIssues() async throws {
         let session = makeReviewSession()
 
