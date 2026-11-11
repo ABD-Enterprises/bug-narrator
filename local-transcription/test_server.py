@@ -240,6 +240,73 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertNotIn("\n", str(caught.exception))
         self.assertNotIn("\x1b", str(caught.exception))
 
+    def test_hostile_wav_rate_cannot_expand_one_read_beyond_the_byte_budget(self):
+        import io
+
+        declared_size = 80 * 1024 * 1024
+        header = (
+            b"RIFF" + struct.pack("<I", declared_size + 36) + b"WAVEfmt "
+            + struct.pack("<IHHIIHH", 16, 1, 2, 1_000_000_000, 4_000_000_000, 4, 16)
+            + b"data" + struct.pack("<I", declared_size)
+        )
+
+        class VirtualWav(io.BytesIO):
+            def __init__(self):
+                super().__init__(header + bytes(4096))
+                self.requests = []
+
+            def seek(self, offset, whence=0):
+                if whence == os.SEEK_END:
+                    return super().seek(declared_size + 44 + offset)
+                return super().seek(offset, whence)
+
+            def read(self, count=-1):
+                self.requests.append(count)
+                return super().read(min(count, 4096))
+
+        handle = VirtualWav()
+        with patch.object(server, "open", return_value=handle, create=True):
+            windows = server._wav_windows("/synthetic.wav", 120)
+            _, rate, _ = next(windows)
+            windows.close()
+        self.assertEqual(rate, 1_000_000_000)
+        self.assertLessEqual(max(handle.requests), server._pcm_window_byte_limit)
+        self.assertEqual(max(handle.requests) % 4, 0)
+
+    def test_byte_limited_windows_preserve_samples_and_offsets(self):
+        import numpy as np
+
+        path = self._write_wav(8000, 5)
+        original = np.arange(40000, dtype="<i2")
+        with wave.open(path, "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(8000)
+            handle.writeframes(original.tobytes())
+        # An odd byte budget must round down to a complete PCM frame.
+        with patch.object(server, "_pcm_window_byte_limit", 32001):
+            windows = list(server._wav_windows(path, 120))
+        self.assertEqual([len(samples) for samples, _, _ in windows], [16000, 16000, 8000])
+        self.assertEqual([offset for _, _, offset in windows], [0, 2, 4])
+        self.assertTrue(all(rate == 8000 for _, rate, _ in windows))
+        np.testing.assert_array_equal(
+            np.concatenate([samples for samples, _, _ in windows]),
+            original.astype(np.float32) / 32768.0,
+        )
+
+    def test_invalid_wav_encoding_is_refused_before_reading_sample_data(self):
+        import io
+
+        header = (
+            b"RIFF" + struct.pack("<I", 40) + b"WAVEfmt "
+            + struct.pack("<IHHIIHH", 16, 1, 2, 48000, 192000, 4, 65535)
+            + b"data" + struct.pack("<I", 4) + bytes(4)
+        )
+        handle = io.BytesIO(header)
+        with self.assertRaises(server.UnsupportedAudioError):
+            server._parse_wav(handle)
+        self.assertLessEqual(handle.tell(), 44)
+
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
