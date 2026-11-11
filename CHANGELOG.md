@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [SECURITY] Windows support logs omit exception details and tracker error bodies that may echo private session text.
+
 - [SECURITY] Windows logs and support bundles remove complete Bearer credentials, including valid tilde characters and trailing punctuation.
 
 - [SECURITY] Mac AI and GitHub requests refuse automatic redirects, preventing credentials, transcripts and recordings from being forwarded to an address the user did not choose.

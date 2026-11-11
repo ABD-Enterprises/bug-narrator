@@ -35,7 +35,7 @@ public sealed class WindowsDiagnostics
     {
         var fullMessage = exception is null
             ? message
-            : $"{message}{Environment.NewLine}{exception}";
+            : $"{message} ({exception.GetType().Name}; see the in-app error for details)";
         Write("ERROR", category, fullMessage);
     }
 
