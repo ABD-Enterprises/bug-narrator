@@ -160,10 +160,30 @@ final class RedirectServer: @unchecked Sendable {
                     socklen_t(MemoryLayout<timeval>.size)
                 )
 
+                // Drain the complete fixture request before closing. Closing
+                // with an unread POST body can produce a TCP reset instead of
+                // a usable redirect response on hosted macOS runners.
                 var buffer = [UInt8](repeating: 0, count: 4096)
-                _ = buffer.withUnsafeMutableBytes { pointer in
-                    read(client, pointer.baseAddress, pointer.count)
+                var received = Data()
+                var expectedSize: Int?
+                while received.count < 1_048_576 {
+                    let count = buffer.withUnsafeMutableBytes { pointer in
+                        read(client, pointer.baseAddress, pointer.count)
+                    }
+                    if count <= 0 { break }
+                    received.append(contentsOf: buffer.prefix(count))
+                    if expectedSize == nil,
+                       let boundary = received.range(of: Data("\r\n\r\n".utf8)) {
+                        let headers = String(decoding: received[..<boundary.lowerBound], as: UTF8.self)
+                        let length = headers.components(separatedBy: "\r\n")
+                            .first { $0.lowercased().hasPrefix("content-length:") }
+                            .flatMap { Int($0.split(separator: ":", maxSplits: 1)[1].trimmingCharacters(in: .whitespaces)) } ?? 0
+                        guard length >= 0, length <= 1_000_000 else { break }
+                        expectedSize = boundary.upperBound + length
+                    }
+                    if let expectedSize, received.count >= expectedSize { break }
                 }
+                guard let expectedSize, received.count >= expectedSize else { continue }
 
                 state.record()
 
