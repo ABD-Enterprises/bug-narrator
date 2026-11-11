@@ -51,12 +51,56 @@ internal static class StoragePathGuards
 
     public static bool IsPathUnderRoot(string rootDirectory, string candidatePath)
     {
-        var normalizedRootDirectory = EnsureTrailingSeparator(Path.GetFullPath(rootDirectory));
-        var normalizedCandidatePath = EnsureTrailingSeparator(Path.GetFullPath(candidatePath));
+        try
+        {
+            var root = Path.GetFullPath(rootDirectory);
+            var candidate = Path.GetFullPath(candidatePath);
+            var rootPrefix = EnsureTrailingSeparator(root);
+            // The storage root is not one session or one artifact.
+            if (string.Equals(Path.TrimEndingDirectorySeparator(root), Path.TrimEndingDirectorySeparator(candidate), StringComparison.OrdinalIgnoreCase)
+                || !candidate.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
 
-        return normalizedCandidatePath.StartsWith(
-            normalizedRootDirectory,
-            StringComparison.OrdinalIgnoreCase);
+            // A textual child can still traverse a junction or symbolic link. Reject
+            // reparse points at the root and at every existing child component.
+            var current = root;
+            if (!IsOrdinaryPathComponent(current))
+            {
+                return false;
+            }
+            foreach (var component in candidate[rootPrefix.Length..].Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                current = Path.Combine(current, component);
+                if (!IsOrdinaryPathComponent(current))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsOrdinaryPathComponent(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
+        }
+        catch (FileNotFoundException)
+        {
+            // New session directories and files need not exist yet.
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
     }
 
     private static string EnsurePathUnderRoot(
