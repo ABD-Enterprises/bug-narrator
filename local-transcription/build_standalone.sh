@@ -101,6 +101,10 @@ PYINSTALLER_VERSION="$(
     "$BUILD_VENV_DIR/bin/python" -c \
         'from importlib.metadata import version; print(version("pyinstaller"))'
 )"
+PARAKEET_MLX_VERSION="$(
+    "$BUILD_VENV_DIR/bin/python" -c \
+        'from importlib.metadata import version; print(version("parakeet-mlx"))'
+)"
 PYINSTALLER_SIGNING_ARGS=()
 if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
     PYINSTALLER_SIGNING_ARGS=(
@@ -215,7 +219,7 @@ if [[ -f "$BINARY_PATH" ]]; then
         echo "tree_state: $RELEASE_TREE_STATE"
         echo "architecture: $ARCH"
         echo "python: $PYTHON_VERSION"
-        echo "parakeet_mlx: 0.5.1"
+        echo "parakeet_mlx: $PARAKEET_MLX_VERSION"
         echo "pyinstaller: $PYINSTALLER_VERSION"
         echo "dependency_lock_sha256: $(shasum -a 256 "$REQUIREMENTS_LOCK" | awk '{print $1}')"
         echo "signing_authority: $SIGNING_AUTHORITY"
