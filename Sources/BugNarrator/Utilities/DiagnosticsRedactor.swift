@@ -66,37 +66,49 @@ enum DiagnosticsRedactor {
     }
 
     static func sanitizeFreeformText(_ text: String, redactingExactValues exactValues: [String] = []) -> String {
-        var sanitized = text
-        // Remove complete known secrets before a pattern can replace only a prefix
-        // and leave the remainder no longer matching the original secret.
-        for exactValue in exactValues.filter({ !$0.isEmpty }).sorted(by: { $0.count > $1.count }) {
-            sanitized = sanitized.replacingOccurrences(of: exactValue, with: "<redacted>")
-        }
-        for pattern in tokenPatterns {
-            let range = NSRange(sanitized.startIndex..., in: sanitized)
-            sanitized = pattern.stringByReplacingMatches(
-                in: sanitized,
-                options: [],
-                range: range,
-                withTemplate: "<redacted>"
-            )
+        let source = text as NSString
+        let entireRange = NSRange(location: 0, length: source.length)
+        var ranges = tokenPatterns.flatMap { pattern in
+            pattern.matches(in: text, range: entireRange).map(\.range)
         }
 
-        // Decode Basic credentials so ordinary prose such as "Basic configuration"
-        // remains useful. Work backwards because replacements change string offsets.
-        if let basic = makeTokenPattern(#"\bBasic[ \t]+([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])"#, options: [.caseInsensitive]) {
-            for match in basic.matches(in: sanitized, range: NSRange(sanitized.startIndex..., in: sanitized)).reversed() {
-                guard let tokenRange = Range(match.range(at: 1), in: sanitized),
-                      let fullRange = Range(match.range, in: sanitized) else { continue }
-                var encoded = String(sanitized[tokenRange])
-                encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
-                guard let decoded = Data(base64Encoded: encoded),
-                      decoded.contains(0x3a) else { continue }
-                sanitized.replaceSubrange(fullRange, with: "<redacted>")
+        // Find every sensitive range before replacing anything. Replacing one
+        // prefix first can split another token and prevent its complete match.
+        for exactValue in exactValues where !exactValue.isEmpty {
+            var searchRange = entireRange
+            while searchRange.length > 0 {
+                let match = source.range(of: exactValue, range: searchRange)
+                guard match.location != NSNotFound else { break }
+                ranges.append(match)
+                let next = NSMaxRange(match)
+                searchRange = NSRange(location: next, length: source.length - next)
             }
         }
 
-        return sanitized
+        // Decode Basic credentials so ordinary "Basic configuration" prose stays.
+        if let basic = makeTokenPattern(#"\bBasic[ \t]+([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])"#, options: [.caseInsensitive]) {
+            for match in basic.matches(in: text, range: entireRange) {
+                var encoded = source.substring(with: match.range(at: 1))
+                encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+                if let decoded = Data(base64Encoded: encoded), decoded.contains(0x3a) {
+                    ranges.append(match.range)
+                }
+            }
+        }
+
+        var merged: [NSRange] = []
+        for range in ranges.sorted(by: { $0.location < $1.location }) {
+            if let last = merged.last, range.location <= NSMaxRange(last) {
+                merged[merged.count - 1] = NSUnionRange(last, range)
+            } else {
+                merged.append(range)
+            }
+        }
+        let sanitized = NSMutableString(string: text)
+        for range in merged.reversed() {
+            sanitized.replaceCharacters(in: range, with: "<redacted>")
+        }
+        return sanitized as String
     }
 
     private static func shouldRedactMetadataValue(for key: String, value: String) -> Bool {

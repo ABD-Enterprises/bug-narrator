@@ -15,6 +15,25 @@ final class DiagnosticsLoggerTests: XCTestCase {
         )
     }
 
+    func testOverlappingPatternsAndKnownValuesCannotSplitAnotherCredential() {
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Bearer fixtureOtherToken", redactingExactValues: ["fixture"]),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Basic dXNlcjpwYXNz", redactingExactValues: ["dXNl"]),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("Bearer sk-fixture/PRIVATE_TAIL=="),
+            "<redacted>"
+        )
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("é 🎙 Bearer fixtureOtherToken", redactingExactValues: ["fixture"]),
+            "é 🎙 <redacted>"
+        )
+    }
+
     func testBearerRedactionCoversTheFullCredentialAlphabet() {
         let fixture = "abc-._~+/PRIVATE_TAIL=="
         XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText("Bearer \(fixture)"), "<redacted>")
