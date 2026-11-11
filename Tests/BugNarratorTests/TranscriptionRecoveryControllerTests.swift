@@ -182,7 +182,7 @@ final class TranscriptionRecoveryControllerTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["context"], "retryable_session_persist_failed")
         XCTAssertEqual(telemetry.metadata["operation"], "session_library")
         XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
-        XCTAssertEqual(telemetry.metadata["underlying_error"], "Index path is a directory")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "<redacted>")
     }
 
     func testPreserveRetryableSessionCopiesAudioAndStoresPendingSession() throws {

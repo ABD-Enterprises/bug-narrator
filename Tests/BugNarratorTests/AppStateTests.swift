@@ -448,7 +448,7 @@ final class AppStateTests: XCTestCase {
         let event = try lastAppErrorTelemetry(in: harness)
         XCTAssertEqual(event.metadata["operation"], "privacy_export")
         XCTAssertEqual(event.metadata["error_type"], "export_failure")
-        XCTAssertEqual(event.metadata["underlying_error"], "temporary export directory is unavailable")
+        XCTAssertEqual(event.metadata["underlying_error"], "<redacted>")
     }
 
     func testSuccessfulSessionSavesCopiesAndDeletesTemporaryAudioFile() async throws {
@@ -531,7 +531,7 @@ final class AppStateTests: XCTestCase {
         let event = try lastAppErrorTelemetry(in: harness)
         XCTAssertEqual(event.metadata["operation"], "transcription")
         XCTAssertEqual(event.metadata["error_type"], "transcription_failure")
-        XCTAssertEqual(event.metadata["underlying_error"], "provider stream closed before returning text")
+        XCTAssertEqual(event.metadata["underlying_error"], "<redacted>")
     }
 
     func testSuccessfulTranscriptionWithStorageFailureKeepsTranscriptAvailableForManualSave() async throws {

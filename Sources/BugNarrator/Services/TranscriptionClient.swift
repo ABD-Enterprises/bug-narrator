@@ -288,7 +288,7 @@ actor TranscriptionClient: TranscriptionServing {
         } catch {
             logger.error(
                 "transcription_failed",
-                (error as? AppError)?.userMessage ?? error.localizedDescription
+                AppError.diagnosticMessage(for: error)
             )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.transcriptionFailure)
         }
@@ -344,7 +344,7 @@ actor TranscriptionClient: TranscriptionServing {
         } catch {
             logger.error(
                 "openai_key_validation_failed",
-                (error as? AppError)?.userMessage ?? error.localizedDescription
+                AppError.diagnosticMessage(for: error)
             )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.transcriptionFailure)
         }
@@ -407,7 +407,7 @@ actor TranscriptionClient: TranscriptionServing {
         } catch {
             logger.error(
                 "transcription_audio_invalid",
-                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                AppError.diagnosticMessage(for: error),
                 metadata: ["file_name": fileURL.lastPathComponent]
             )
             throw error
@@ -432,7 +432,7 @@ actor TranscriptionClient: TranscriptionServing {
         } catch {
             logger.error(
                 "transcription_audio_invalid",
-                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                AppError.diagnosticMessage(for: error),
                 metadata: ["file_name": fileURL.lastPathComponent]
             )
             throw error
