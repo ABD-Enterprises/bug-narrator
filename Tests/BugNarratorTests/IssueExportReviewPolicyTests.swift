@@ -16,12 +16,12 @@ final class IssueExportReviewPolicyTests: XCTestCase {
             "https://fixture-user:fixture-password@example.com/issue",
             "/relative/issue"
         ] {
-            XCTAssertNil(TrackerWebLinkPolicy.allowedURL(URL(string: text)), text)
+            XCTAssertNil(ExternalWebLinkPolicy.allowedURL(URL(string: text)), text)
         }
-        XCTAssertNil(TrackerWebLinkPolicy.allowedURL(nil))
+        XCTAssertNil(ExternalWebLinkPolicy.allowedURL(nil))
         for text in ["https://github.com/example/project/issues/1", "http://127.0.0.1:8080/browse/TEST-1"] {
             let url = URL(string: text)!
-            XCTAssertEqual(TrackerWebLinkPolicy.allowedURL(url), url)
+            XCTAssertEqual(ExternalWebLinkPolicy.allowedURL(url), url)
         }
     }
 
