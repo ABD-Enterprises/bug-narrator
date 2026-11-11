@@ -302,6 +302,30 @@ public sealed class BundleExporterTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("fixture~PRIVATE_TAIL==")]
+    [InlineData("fixture/PRIVATE_TAIL+")]
+    [InlineData("fixture._-~+/PRIVATE_TAIL==")]
+    public async Task FileDebugBundleExporter_RemovesCompleteBearerTokens(string token)
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        diagnostics.Error("provider", $"Provider rejected Bearer {token} after a request");
+
+        var log = await File.ReadAllTextAsync(diagnostics.LogFilePath);
+        Assert.Contains("Bearer [REDACTED] after a request", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("PRIVATE_TAIL", log, StringComparison.Ordinal);
+
+        var exporter = new FileDebugBundleExporter(storagePaths, new FakeWindowsAppSettingsStore(), diagnostics);
+        var bundlePath = await exporter.ExportAsync(session);
+        foreach (var file in Directory.GetFiles(bundlePath, "*", SearchOption.AllDirectories))
+        {
+            var content = await File.ReadAllTextAsync(file);
+            Assert.DoesNotContain("PRIVATE_TAIL", content, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>
     /// The bundle layout is a shared contract: contract-fixtures/session-bundle-layout.json is the
     /// same file Tests/BugNarratorTests/TranscriptExporterTests.swift reads on macOS. Reading it here
