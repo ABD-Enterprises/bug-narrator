@@ -26,6 +26,7 @@
 - [SECURITY] Structured server replies have streaming size limits on Mac and Windows, including successful and lengthless replies, so an endpoint cannot keep growing response buffers without a ceiling.
 - [SECURITY] Security scans use a reviewed local rules snapshot and a container locked by digest; host scans require the same scanner version.
 - [SECURITY] Transcription model identifiers reject control characters and excessive length before logging or loading.
+- [SECURITY] Mac local-server tokens are written inside private staging folders to prevent inherited sharing permissions from exposing secrets, and the app repairs shared tokens even when their ordinary mode is already owner-only.
 - [SECURITY] Local transcription logs omit uploaded filenames so client-controlled names cannot forge log lines or inject terminal commands.
 - [SECURITY] PCM decoding windows have an independent byte budget, and invalid WAV encodings are refused before sample allocation, so forged rate/channel headers cannot force whole-upload reads.
 - [SECURITY] Local audio decoding accepts self-contained media containers only, refusing playlists and indirect references to other local files or network resources.

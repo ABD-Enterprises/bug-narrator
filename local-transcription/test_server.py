@@ -1540,6 +1540,54 @@ class ServerTokenFileAndChildProcessTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     server.resolve_auth_token(token_file=token_file)
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS sharing-permission fixture")
+    def test_token_writer_removes_inherited_macos_sharing_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # Fixed native command, disposable fixture path, and no shell.
+            # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+            subprocess.run(
+                ["/bin/chmod", "+a", "everyone allow read,file_inherit,directory_inherit", directory],
+                check=True, capture_output=True,
+            )
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            server.write_token_file(token_file, "synthetic-token-fixture")
+            # Read-only native command inspecting this disposable fixture only.
+            # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+            listing = subprocess.run(
+                ["/bin/ls", "-le", str(token_file)], check=True, capture_output=True, text=True,
+            ).stdout
+            self.assertNotIn("everyone allow", listing)
+            self.assertEqual(token_file.read_text(), "synthetic-token-fixture")
+            self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
+
+    def test_macos_sharing_is_cleared_before_writing_and_child_gets_no_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+
+            def secure_empty(command, **kwargs):
+                self.assertEqual(command[:2], ["/bin/chmod", "-N"])
+                self.assertTrue(Path(command[2]).is_dir())
+                self.assertEqual(list(Path(command[2]).iterdir()), [])
+                self.assertNotIn(server.TOKEN_ENVIRONMENT_VARIABLE, kwargs["env"])
+                return None
+
+            with patch.object(server.sys, "platform", "darwin"), patch.dict(
+                os.environ, {server.TOKEN_ENVIRONMENT_VARIABLE: "synthetic-environment-token"}
+            ), patch.object(server.subprocess, "run", side_effect=secure_empty):
+                server.write_token_file(token_file, "synthetic-token-fixture")
+            self.assertEqual(token_file.read_text(), "synthetic-token-fixture")
+
+    def test_failed_macos_permission_cleanup_preserves_the_existing_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            token_file.write_text("synthetic-existing-token")
+            with patch.object(server.sys, "platform", "darwin"), patch.object(
+                server.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "chmod")
+            ), self.assertRaises(OSError):
+                server.write_token_file(token_file, "synthetic-new-token")
+            self.assertEqual(token_file.read_text(), "synthetic-existing-token")
+            self.assertEqual(list(Path(directory).iterdir()), [token_file])
+
     def test_the_authorization_scheme_is_case_insensitive(self):
         # RFC 7235: the scheme is case-insensitive, so `bearer` is as good as
         # `Bearer`. The token itself is compared as it was given.

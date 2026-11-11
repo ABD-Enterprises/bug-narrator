@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import XCTest
 @testable import BugNarrator
 
@@ -131,6 +132,51 @@ final class LocalServerTokenStoreTests: XCTestCase {
         try Data("  a-stored-token  ".utf8).write(to: url)
 
         XCTAssertEqual("a-stored-token", LocalServerTokenStore.storedToken(at: url))
+    }
+
+    func testStoredSharingPermissionsAreRepairedEvenWhenTheModeIs600() throws {
+        let directory = makeInstallDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        try Data("synthetic-fixture-token".utf8).write(to: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        try addSharingPermission(to: file, inherited: false)
+        XCTAssertTrue(hasSharingPermissions(file))
+
+        XCTAssertEqual(LocalServerTokenStore.tokenOutcome(installDirectory: directory), .ready("synthetic-fixture-token"))
+        XCTAssertFalse(hasSharingPermissions(file))
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "synthetic-fixture-token")
+    }
+
+    func testFreshTokensDoNotInheritFolderSharingPermissions() throws {
+        let directory = makeInstallDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try addSharingPermission(to: directory, inherited: true)
+
+        XCTAssertNotNil(LocalServerTokenStore.token(installDirectory: directory))
+        let file = LocalServerTokenStore.tokenFileURL(installDirectory: directory)
+        XCTAssertFalse(hasSharingPermissions(file))
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int, 0o600)
+    }
+
+    private func addSharingPermission(to url: URL, inherited: Bool) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        process.environment = [:]
+        let grant = inherited
+            ? "everyone allow read,list,search,readattr,readextattr,readsecurity,file_inherit,directory_inherit"
+            : "everyone allow read"
+        process.arguments = ["+a", grant, url.path]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+    }
+
+    private func hasSharingPermissions(_ url: URL) -> Bool {
+        guard let acl = acl_get_file(url.path, ACL_TYPE_EXTENDED) else { return errno != ENOENT }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        var entry: acl_entry_t?
+        return acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) != -1
     }
 
     func testAFreshTokenIsLongAndURLSafe() {

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import CryptoKit
 import Security
 
@@ -137,7 +138,19 @@ enum LocalServerTokenStore {
               let permissions = attributes[.posixPermissions] as? NSNumber else {
             return false
         }
-        return permissions.int16Value == 0o600
+        guard permissions.int16Value == 0o600 else { return false }
+        guard let acl = acl_get_file(url.path, ACL_TYPE_EXTENDED) else { return errno == ENOENT }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        var entry: acl_entry_t?
+        return acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1
+    }
+
+    private static func removeSharingPermissions(at url: URL) throws {
+        guard let acl = acl_init(0) else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        guard acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 
     /// The stored token, without creating one.
@@ -163,36 +176,24 @@ enum LocalServerTokenStore {
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            // The temporary file is created owner-only and empty, and the
-            // token is written into it afterwards: `createFile` applies the
-            // mode after it has written, so the token would otherwise sit in
-            // a file anyone else could read.
-            let temporary = url.deletingLastPathComponent()
-                .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
-            guard manager.createFile(
-                atPath: temporary.path,
-                contents: nil,
-                attributes: [.posixPermissions: NSNumber(value: 0o600)]
-            ) else {
+            // Secure an empty staging directory before creating the token file.
+            // Clearing an ACL on an already-created file cannot revoke a handle
+            // another reader acquired while the inherited ACL still allowed it.
+            let staging = url.deletingLastPathComponent()
+                .appendingPathComponent(".token-\(UUID().uuidString)", isDirectory: true)
+            try manager.createDirectory(at: staging, withIntermediateDirectories: false,
+                                        attributes: [.posixPermissions: NSNumber(value: 0o700)])
+            defer { try? manager.removeItem(at: staging) }
+            try removeSharingPermissions(at: staging)
+            let temporary = staging.appendingPathComponent("token")
+            guard manager.createFile(atPath: temporary.path, contents: nil,
+                                     attributes: [.posixPermissions: NSNumber(value: 0o600)]) else {
                 return false
             }
-            do {
-                try Data(token.utf8).write(to: temporary)
-                // The file is replaced in one step, so a reader never sees a
-                // missing or an empty token file. The new file's metadata is
-                // the one that is kept: a token file that was already there
-                // with wider permissions would otherwise stay readable by
-                // everyone else.
-                _ = try manager.replaceItemAt(
-                    url,
-                    withItemAt: temporary,
-                    options: [.usingNewMetadataOnly]
-                )
-            } catch {
-                try? manager.removeItem(at: temporary)
-                return false
-            }
-            return true
+            try removeSharingPermissions(at: temporary)
+            try Data(token.utf8).write(to: temporary)
+            _ = try manager.replaceItemAt(url, withItemAt: temporary, options: [.usingNewMetadataOnly])
+            return isReadableOnlyByItsOwner(url)
         } catch {
             return false
         }
