@@ -24,6 +24,10 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 python3 "$ROOT/scripts/sync_product_spec_contract.py" --check
+python3 "$ROOT/scripts/check_security_scanner.py"
+SEMGREP_IMAGE="$(python3 -c 'import json; print(json.load(open("security/semgrep/lock.json"))["image"])')"
+SEMGREP_VERSION="$(python3 -c 'import json; print(json.load(open("security/semgrep/lock.json"))["version"])')"
+export SEMGREP_ENABLE_VERSION_CHECK=0
 python3 "$ROOT/scripts/check_checkout_credentials.py"
 
 BASE_REF="${AI_VALIDATOR_BASE_REF:-${1:-}}"
@@ -62,7 +66,7 @@ should_skip_semgrep_target() {
   local target="$1"
 
   case "$target" in
-    tools/validators/*)
+    tools/validators/*|security/semgrep/*)
       return 0
       ;;
   esac
@@ -135,8 +139,23 @@ run_semgrep_docker() {
     return 2
   fi
 
-  if docker run --rm -v "${ROOT}":/src -w /src -e SEMGREP_APP_TOKEN \
-    semgrep/semgrep semgrep scan --config=auto --error "$@" \
+  # Some Docker hosts cannot see this checkout path. Probe the mounted
+  # snapshot before treating a missing container path as a scanner failure.
+  local probe_status
+  if docker run --rm -v "${ROOT}":/src -w /src --entrypoint /bin/sh \
+    "$SEMGREP_IMAGE" -c 'test -f /src/security/semgrep/rules.yaml || exit 86' \
+    >"$SEMGREP_OUTPUT_FILE" 2>&1; then
+    :
+  else
+    probe_status=$?
+    if [[ "$probe_status" == 86 ]]; then
+      return 2
+    fi
+    return 1
+  fi
+
+  if docker run --rm -v "${ROOT}":/src -w /src -e SEMGREP_APP_TOKEN -e SEMGREP_ENABLE_VERSION_CHECK=0 \
+    "$SEMGREP_IMAGE" semgrep scan --config=security/semgrep/rules.yaml --metrics=off --disable-version-check --error "$@" \
     >"$SEMGREP_OUTPUT_FILE" 2>&1; then
     return 0
   fi
@@ -153,7 +172,11 @@ run_semgrep_local() {
     return 2
   fi
 
-  if semgrep scan --config=auto --error "$@" >"$SEMGREP_OUTPUT_FILE" 2>&1; then
+  if [[ "$(semgrep --version 2>/dev/null)" != "$SEMGREP_VERSION" ]]; then
+    printf 'FAIL: local semgrep must be version %s\n' "$SEMGREP_VERSION" >"$SEMGREP_OUTPUT_FILE"
+    return 1
+  fi
+  if semgrep scan --config=security/semgrep/rules.yaml --metrics=off --disable-version-check --error "$@" >"$SEMGREP_OUTPUT_FILE" 2>&1; then
     return 0
   fi
   return 1
@@ -198,7 +221,8 @@ else
           *)
             printf 'NOT RUN: docker semgrep could not see repo path %s, and no local semgrep on PATH is available\n' "$ROOT" \
               >"$SEMGREP_STATUS_FILE"
-            semgrep_outcome="skipped"
+            cat "$SEMGREP_STATUS_FILE" >&2
+            exit 1
             ;;
         esac
       else
@@ -223,7 +247,8 @@ else
           ;;
         *)
           printf 'NOT RUN: neither docker nor a local semgrep on PATH is available\n' >"$SEMGREP_STATUS_FILE"
-          semgrep_outcome="skipped"
+          cat "$SEMGREP_STATUS_FILE" >&2
+          exit 1
           ;;
       esac
       ;;
