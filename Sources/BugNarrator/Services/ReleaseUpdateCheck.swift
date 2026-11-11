@@ -72,9 +72,9 @@ enum ReleaseUpdateOutcome: Equatable {
         case .upToDate:
             return nil
         case .updateAvailable(_, _, let releaseURL):
-            return releaseURL
+            return ExternalWebLinkPolicy.allowedURL(releaseURL) ?? ExternalWebLinkPolicy.allowedURL(fallback)
         case .undetermined:
-            return fallback
+            return ExternalWebLinkPolicy.allowedURL(fallback)
         }
     }
 
@@ -132,7 +132,7 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
         }
 
         let payload = try JSONDecoder().decode(GitHubReleasePayload.self, from: data)
-        guard let releaseURL = URL(string: payload.htmlURL) else {
+        guard let releaseURL = ExternalWebLinkPolicy.allowedURL(URL(string: payload.htmlURL)) else {
             throw AppError.networkFailure.asUpdateCheckFailure("the releases feed returned an unusable link")
         }
 

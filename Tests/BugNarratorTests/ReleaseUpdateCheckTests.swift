@@ -29,6 +29,16 @@ final class ReleaseUpdateCheckTests: XCTestCase {
 
     // MARK: - Version ordering
 
+    func testUntrustedReleaseLinkCannotLaunchAnApplication() {
+        for text in ["file:///tmp/fixture.command", "custom-app://run", "https://user:password@example.com/release"] {
+            let outcome = ReleaseUpdateOutcome.updateAvailable(
+                latest: "2.0", current: "1.0", releaseURL: URL(string: text)!
+            )
+            XCTAssertEqual(outcome.urlToOpen(fallback: BugNarratorLinks.releases), BugNarratorLinks.releases)
+            XCTAssertNil(outcome.urlToOpen(fallback: URL(string: "file:///tmp/fixture")!))
+        }
+    }
+
     func testVersionOrderingHandlesTagPrefixAndUnevenComponentCounts() {
         XCTAssertLessThan(ReleaseVersion("1.0.41")!, ReleaseVersion("v1.0.42")!)
         XCTAssertLessThan(ReleaseVersion("1.0.9")!, ReleaseVersion("1.0.10")!, "String comparison would get this backwards.")
