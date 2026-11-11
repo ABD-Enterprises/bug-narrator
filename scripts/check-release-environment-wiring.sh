@@ -232,8 +232,18 @@ parse_jobs() {
             if (step_publish && publish_step == 0) { publishes = 1; publish_step = step }
             step_continue = ""; step_conditional = 0; step_gate = 0; step_publish = 0; step_envs = ""; step_uses = ""
         }
-        /^jobs:[ \t]*$/ { injobs = 1; next }
-        !injobs && /^permissions:[ \t]*$/ { workflow_perms = 1; next }
+        function permission_writes(value) {
+            value = normalize_value(value)
+            gsub(/["'"'"']/, "", value)
+            return value == "write-all" || value ~ /(^|[{,])[ \t]*contents:[ \t]*write[ \t]*([},]|$)/
+        }
+        /^jobs:[ \t]*$/ { workflow_perms = 0; injobs = 1; next }
+        !injobs && /^permissions:/ {
+            value = $0; sub(/^permissions:[ \t]*/, "", value)
+            workflow_perms = (normalize_value(value) == "")
+            workflow_write = permission_writes(value)
+            next
+        }
         workflow_perms && /^  contents:[ \t]*write[ \t]*$/ { workflow_write = 1; next }
         workflow_perms && /^[^ \t]/ { workflow_perms = 0 }
         injobs && /^[^ \t]/ { close_step(); flush(); injobs = 0; next }
@@ -266,7 +276,11 @@ parse_jobs() {
 
             # The permissions of the job. A job that does not declare any
             # inherits the workflow default.
-            if ($0 ~ /^    permissions:[ \t]*$/) { job_has_perms = 1 }
+            if ($0 ~ /^    permissions:/) {
+                job_has_perms = 1
+                value = $0; sub(/^    permissions:[ \t]*/, "", value)
+                job_write = permission_writes(value)
+            }
             if ($0 ~ /^      contents:[ \t]*write[ \t]*$/) { job_write = 1 }
 
             # A job-level environment: key sits at the job level indentation.
@@ -894,6 +908,34 @@ if (check_tree "$workspace") >/dev/null 2>&1; then
     fail 'the wiring check accepted a publishing job that runs a repository script'
 fi
 restore_workflow ".github/workflows/windows-tester-release.yml"
+
+# Permission spelling must not hide a job that can publish. These fixtures
+# inspect the same parser used by check_tree; no workflow is executed.
+for permission in 'write-all' '{ contents: write }' '{"contents": "write"}'; do
+    for level in workflow job; do
+        fixture="$workspace/permissions-fixture.yml"
+        {
+            if [[ "$level" == workflow ]]; then
+                printf 'permissions: %s\n' "$permission"
+            fi
+            printf 'jobs:\n  fixture:\n'
+            if [[ "$level" == job ]]; then
+                printf '    permissions: %s\n' "$permission"
+            fi
+            printf '    steps:\n      - run: echo fixture\n'
+        } >"$fixture"
+        if ! parse_jobs "$fixture" | awk -F '|' '$1 == "fixture" && $3 == 1 { found = 1 } END { exit !found }'; then
+            fail "the wiring check missed $level permissions: $permission"
+        fi
+    done
+done
+# Explicit job permissions replace the workflow default, even an empty map.
+for permission in '{}' 'read-all' '{ contents: read }'; do
+    printf 'permissions: write-all\njobs:\n  fixture:\n    permissions: %s\n    steps:\n      - run: echo fixture\n' "$permission" >"$fixture"
+    if ! parse_jobs "$fixture" | awk -F '|' '$1 == "fixture" && $3 == 0 { found = 1 } END { exit !found }'; then
+        fail "the wiring check inherited write access through job permissions: $permission"
+    fi
+done
 
 # The object form of the environment key is valid, so it has to be accepted.
 mutate_workflow "$workspace/.github/workflows/windows-tester-release.yml" environment-object-form

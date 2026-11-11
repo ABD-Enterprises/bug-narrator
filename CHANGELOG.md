@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [SECURITY] Release safety checks recognize inline permission maps and write-all permissions, including explicit job overrides.
+
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.
 
