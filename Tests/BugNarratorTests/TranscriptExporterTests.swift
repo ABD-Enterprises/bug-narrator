@@ -34,7 +34,11 @@ final class TranscriptExporterTests: XCTestCase {
     }
 
     private func assertNoSharingPermissions(_ url: URL) throws {
-        let acl = try XCTUnwrap(acl_get_file(url.path, ACL_TYPE_EXTENDED))
+        guard let acl = acl_get_file(url.path, ACL_TYPE_EXTENDED) else {
+            XCTAssertEqual(errno, ENOENT)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+            return
+        }
         defer { acl_free(UnsafeMutableRawPointer(acl)) }
         var entry: acl_entry_t?
         XCTAssertEqual(acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry), -1)
