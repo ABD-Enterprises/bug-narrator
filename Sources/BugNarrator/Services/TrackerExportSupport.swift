@@ -10,6 +10,7 @@ struct TrackerIssueCandidate: Equatable {
 /// Helpers shared by the tracker export providers (Jira, GitHub) whose
 /// implementations are byte-identical apart from the provider's display name.
 enum TrackerExportSupport {
+    static let maximumAutomaticRetryDelaySeconds = 60
     /// Reserved words that act as operators/keywords in GitHub issue search and
     /// in Jira's JQL. The term tokenizer already strips all non-alphanumeric
     /// characters (so quotes, colons, and slashes can never reach the query),
@@ -85,7 +86,7 @@ enum TrackerExportSupport {
     /// that just failed).
     static func retryDelay(attempt: Int, retryAfterSeconds: Int?, base: Duration) -> Duration {
         if let retryAfterSeconds, retryAfterSeconds > 0 {
-            return .seconds(retryAfterSeconds)
+            return .seconds(min(retryAfterSeconds, maximumAutomaticRetryDelaySeconds))
         }
         let multiplier = 1 << max(0, attempt - 1)
         return base * multiplier
@@ -170,7 +171,10 @@ extension TrackerExportSupport {
                     throw partialExportError(createError, providerName: context.displayName, successfulCount: successfulCount)
                 }
 
-                if attempt < retryConfiguration.maxAttempts {
+                // Long server waits require a later manual retry. Never retry
+                // earlier than requested or pass an untrusted extreme to sleep.
+                if attempt < retryConfiguration.maxAttempts,
+                   (retryAfterSeconds ?? 0) <= maximumAutomaticRetryDelaySeconds {
                     let delay = retryDelay(
                         attempt: attempt,
                         retryAfterSeconds: retryAfterSeconds,
