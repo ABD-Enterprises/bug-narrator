@@ -12,7 +12,7 @@ def problems(text):
     for job in workflow.get("jobs", {}).values():
         for step in job.get("steps", []):
             if str(step.get("uses", "")).lower().startswith("actions/checkout@"):
-                if step.get("with", {}).get("persist-credentials") is not False:
+                if str((step.get("with") or {}).get("persist-credentials")).lower() != "false":
                     errors.append("checkout must explicitly set persist-credentials: false")
             if re.search(r"\bgit\s+push\b", str(step.get("run", ""))):
                 errors.append("workflow must not push using checkout credentials")
