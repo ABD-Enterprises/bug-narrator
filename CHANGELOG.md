@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [SECURITY] Windows session storage refuses linked paths and whole-library deletion, and saved metadata cannot redirect one session to another session’s folder.
+
 - [SECURITY] Windows support logs omit exception details and tracker error bodies that may echo private session text.
 
 - [SECURITY] Windows logs and support bundles remove complete Bearer credentials, including valid tilde characters and trailing punctuation.

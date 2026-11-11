@@ -40,7 +40,9 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
             cancellationToken.ThrowIfCancellationRequested();
 
             var metadataPath = Path.Combine(sessionDirectory, "session.json");
-            if (!File.Exists(metadataPath))
+            if (!StoragePathGuards.IsPathUnderRoot(sessionsDirectory, sessionDirectory)
+                || !StoragePathGuards.IsPathUnderRoot(sessionDirectory, metadataPath)
+                || !File.Exists(metadataPath))
             {
                 continue;
             }
@@ -64,7 +66,9 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
                 var session = JsonSerializer.Deserialize<CompletedSession>(json, JsonOptions);
                 if (session is not null)
                 {
-                    sessions.Add(SessionArtifactPathPolicy.NormalizeCompletedSession(session, sessionsDirectory));
+                    // A saved absolute path is data, not authority over another session.
+                    sessions.Add(SessionArtifactPathPolicy.NormalizeCompletedSession(
+                        session with { SessionDirectory = sessionDirectory }, sessionsDirectory));
                 }
             }
             catch (OperationCanceledException)
@@ -174,20 +178,7 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
 
     private void EnsurePathIsUnderSessionsRoot(string sessionDirectory)
     {
-        var normalizedRoot = EnsureTrailingSeparator(Path.GetFullPath(sessionsDirectory));
-        var normalizedSessionDirectory = EnsureTrailingSeparator(Path.GetFullPath(sessionDirectory));
-
-        if (!normalizedSessionDirectory.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Refusing to delete session content outside the BugNarrator Sessions directory: {sessionDirectory}");
-        }
-    }
-
-    private static string EnsureTrailingSeparator(string path)
-    {
-        return path.EndsWith(Path.DirectorySeparatorChar)
-            ? path
-            : $"{path}{Path.DirectorySeparatorChar}";
+        _ = StoragePathGuards.EnsureDirectoryPathUnderRoot(
+            sessionsDirectory, sessionDirectory, "session deletion directory");
     }
 }

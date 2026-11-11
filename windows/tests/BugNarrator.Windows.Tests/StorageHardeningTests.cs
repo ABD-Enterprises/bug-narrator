@@ -117,6 +117,91 @@ public sealed class StorageHardeningTests : IDisposable
         Assert.Equal(session.Title, match.Title);
     }
 
+    [Fact]
+    public async Task CompletedSessionDeletion_RefusesTheEntireStorageRoot()
+    {
+        var sentinel = Path.Combine(storagePaths.SessionsDirectory, "keep.txt");
+        await File.WriteAllTextAsync(sentinel, "synthetic session sentinel");
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            SessionDirectory = storagePaths.SessionsDirectory,
+        };
+        var store = new FileCompletedSessionStore(storagePaths);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.DeleteAsync(session));
+        Assert.True(File.Exists(sentinel));
+    }
+
+    [Fact]
+    public async Task CompletedSessionLoad_BindsPathsToTheDirectoryActuallyRead()
+    {
+        var actualDirectory = Path.Combine(storagePaths.SessionsDirectory, "actual-session");
+        var otherDirectory = Path.Combine(storagePaths.SessionsDirectory, "other-session");
+        Directory.CreateDirectory(actualDirectory);
+        Directory.CreateDirectory(otherDirectory);
+        var sentinel = Path.Combine(otherDirectory, "keep.txt");
+        await File.WriteAllTextAsync(sentinel, "synthetic other session");
+        var forged = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with
+        {
+            SessionDirectory = otherDirectory,
+            MetadataFilePath = Path.Combine(otherDirectory, "session.json"),
+        };
+        await File.WriteAllTextAsync(Path.Combine(actualDirectory, "session.json"), JsonSerializer.Serialize(forged));
+        var store = new FileCompletedSessionStore(storagePaths);
+
+        var loaded = Assert.Single(await store.GetAllAsync());
+        Assert.Equal(actualDirectory, loaded.SessionDirectory);
+        Assert.Equal(Path.Combine(actualDirectory, "session.json"), loaded.MetadataFilePath);
+        await store.DeleteAsync(loaded);
+        Assert.True(File.Exists(sentinel));
+    }
+
+    [Fact]
+    public async Task SessionBundleExport_ExcludesLinkedScreenshotFilesAndDirectories()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        Directory.CreateDirectory(session.SessionDirectory);
+        var externalDirectory = Path.Combine(rootDirectory, "external-fixture");
+        Directory.CreateDirectory(externalDirectory);
+        var externalFile = Path.Combine(externalDirectory, "private.txt");
+        await File.WriteAllTextAsync(externalFile, "PRIVATE_FILE_CANARY");
+        var directoryLink = Path.Combine(session.SessionDirectory, "linked");
+        var fileLink = Path.Combine(session.SessionDirectory, "linked.txt");
+        Directory.CreateSymbolicLink(directoryLink, externalDirectory);
+        File.CreateSymbolicLink(fileLink, externalFile);
+        session = session with
+        {
+            Screenshots = new[] { "linked/private.txt", "linked.txt" }.Select(relative =>
+                new ScreenshotArtifact(Guid.NewGuid(), relative, Path.Combine(session.SessionDirectory, relative),
+                    DateTimeOffset.UtcNow, 1, 1, 1, "synthetic linked file")).ToArray(),
+        };
+        var exporter = new BugNarrator.Windows.Services.Export.FileSessionBundleExporter(
+            storagePaths, new WindowsDiagnostics(storagePaths));
+
+        var bundle = await exporter.ExportAsync(session);
+        Assert.Empty(Directory.GetFiles(Path.Combine(bundle, "screenshots")));
+        Assert.Equal("PRIVATE_FILE_CANARY", await File.ReadAllTextAsync(externalFile));
+    }
+
+    [Fact]
+    public async Task CompletedSessionStore_RefusesLinkedSessionDirectories()
+    {
+        var outside = Path.Combine(rootDirectory, "outside-session");
+        Directory.CreateDirectory(outside);
+        var link = Path.Combine(storagePaths.SessionsDirectory, "linked-session");
+        Directory.CreateSymbolicLink(link, outside);
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory) with { SessionDirectory = link };
+        await File.WriteAllTextAsync(Path.Combine(outside, "session.json"), JsonSerializer.Serialize(session));
+        var sentinel = Path.Combine(outside, "keep.txt");
+        await File.WriteAllTextAsync(sentinel, "synthetic external data");
+        var store = new FileCompletedSessionStore(storagePaths);
+
+        Assert.Empty(await store.GetAllAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(session));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.DeleteAsync(session));
+        Assert.True(File.Exists(sentinel));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(rootDirectory))
