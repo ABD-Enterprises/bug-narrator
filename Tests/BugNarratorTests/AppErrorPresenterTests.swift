@@ -8,7 +8,7 @@ final class AppErrorPresenterTests: XCTestCase {
         let marker = "SYNTHETIC_PRIVATE_TRANSCRIPT_731"
         let error = AppError.openAIRequestRejected(marker)
         _ = harness.presenter.presentError(error, operation: .issueExtraction)
-        XCTAssertTrue(harness.presentationState.status.detail.contains(marker))
+        XCTAssertTrue(harness.presentationState.status.detail?.contains(marker) == true)
         let telemetry = try harness.lastAppErrorTelemetry()
         XCTAssertFalse(telemetry.metadata.values.joined().contains(marker))
         XCTAssertFalse(error.diagnosticMessage().contains(marker))
@@ -19,7 +19,7 @@ final class AppErrorPresenterTests: XCTestCase {
         let marker = "SYNTHETIC_PRIVATE_TRANSCRIPT_731"
         let raw = NSError(domain: "SyntheticProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: marker])
         _ = harness.presenter.presentError(raw, operation: .issueExtraction, fallback: AppError.issueExtractionFailure)
-        XCTAssertTrue(harness.presentationState.status.detail.contains(marker))
+        XCTAssertTrue(harness.presentationState.status.detail?.contains(marker) == true)
         let metadata = try harness.lastAppErrorTelemetry().metadata
         XCTAssertEqual(metadata["underlying_error"], "<redacted>")
         XCTAssertFalse(metadata.values.joined().contains(marker))

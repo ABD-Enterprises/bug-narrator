@@ -2,6 +2,25 @@ import XCTest
 @testable import BugNarrator
 
 final class DebugSessionContextProviderTests: XCTestCase {
+    func testDebugMetadataDoesNotExportRawStatusOrProviderErrorText() throws {
+        let marker = "SYNTHETIC_PRIVATE_TRANSCRIPT_731"
+        let contexts: [(RecordingSessionDraft?, TranscriptSession?)] = [
+            (nil, nil),
+            (nil, makeSampleTranscriptSession(index: 1)),
+            (RecordingSessionDraft(sessionID: UUID(), artifactsDirectoryURL: FileManager.default.temporaryDirectory), nil)
+        ]
+        for (recording, transcript) in contexts {
+            for error in [nil, AppError.openAIRequestRejected(marker)] {
+                let metadata = DebugSessionMetadata.make(
+                    currentTranscript: transcript, displayedTranscript: nil,
+                    activeRecordingSession: recording, status: .error(marker), currentError: error
+                )
+                let encoded = try JSONEncoder().encode(metadata)
+                XCTAssertFalse(String(decoding: encoded, as: UTF8.self).contains(marker))
+            }
+        }
+    }
+
     func testCurrentSessionIDPrefersActiveRecordingSession() {
         let activeSession = RecordingSessionDraft(
             sessionID: UUID(),
@@ -57,7 +76,7 @@ final class DebugSessionContextProviderTests: XCTestCase {
 
         XCTAssertEqual(metadata.source, .transcript)
         XCTAssertEqual(metadata.sessionID, displayedTranscript.id)
-        XCTAssertEqual(metadata.statusDetail, "Support export failed.")
+        XCTAssertEqual(metadata.statusDetail, AppError.missingAPIKey.diagnosticMessage())
         XCTAssertEqual(metadata.errorMessage, AppError.missingAPIKey.userMessage)
         XCTAssertEqual(metadata.transcriptCharacterCount, displayedTranscript.transcript.count)
     }
@@ -78,7 +97,7 @@ final class DebugSessionContextProviderTests: XCTestCase {
 
         XCTAssertEqual(metadata.source, .activeRecording)
         XCTAssertEqual(metadata.sessionID, activeSession.sessionID)
-        XCTAssertEqual(metadata.statusDetail, "Recording in progress.")
+        XCTAssertEqual(metadata.statusDetail, "Recording")
         XCTAssertNil(metadata.errorMessage)
         XCTAssertNil(metadata.transcriptCharacterCount)
     }

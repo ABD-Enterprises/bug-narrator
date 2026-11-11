@@ -61,7 +61,7 @@ final class AIProviderSettingsController: ObservableObject {
             apiKeyValidationState = .failure(appError.userMessage(for: settingsStore.aiProvider))
             logger.warning(
                 .validateAIProviderFailed,
-                appError.userMessage(for: settingsStore.aiProvider),
+                appError.diagnosticMessage(for: settingsStore.aiProvider),
                 metadata: ["provider": settingsStore.aiProvider.rawValue]
             )
         }
