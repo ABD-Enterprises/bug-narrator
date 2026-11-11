@@ -112,6 +112,7 @@ public sealed class FileCompletedSessionStore : ICompletedSessionStore
         var draftPath = Path.Combine(normalizedSession.SessionDirectory, "session-draft.json");
         if (File.Exists(draftPath))
         {
+            _ = StoragePathGuards.EnsureFilePathUnderRoot(normalizedSession.SessionDirectory, draftPath, "saved recording draft");
             if (new FileInfo(draftPath).Length > MaxStoredMetadataBytes)
             {
                 throw new InvalidDataException("The saved recording draft is too large to protect.");

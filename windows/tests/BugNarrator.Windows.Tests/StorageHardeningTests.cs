@@ -202,6 +202,21 @@ public sealed class StorageHardeningTests : IDisposable
         Assert.True(File.Exists(sentinel));
     }
 
+    [Fact]
+    public async Task CompletedSessionLoad_RefusesALinkedDefaultAudioFile()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(rootDirectory);
+        var outside = Path.Combine(rootDirectory, "private-audio-fixture.wav");
+        await File.WriteAllTextAsync(outside, "PRIVATE_AUDIO_CANARY");
+        File.Delete(session.AudioFilePath);
+        File.CreateSymbolicLink(session.AudioFilePath, outside);
+        await File.WriteAllTextAsync(session.MetadataFilePath, JsonSerializer.Serialize(session));
+        var store = new FileCompletedSessionStore(storagePaths);
+
+        Assert.Empty(await store.GetAllAsync());
+        Assert.Equal("PRIVATE_AUDIO_CANARY", await File.ReadAllTextAsync(outside));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(rootDirectory))
