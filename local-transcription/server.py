@@ -891,6 +891,12 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
         str(start),
         "-t",
         str(_chunk_duration_seconds),
+        # Uploaded media is a self-contained recording, not instructions to
+        # fetch a playlist, concatenate files, or read another local file.
+        "-protocol_whitelist",
+        "file",
+        "-format_whitelist",
+        "mov,mp3,wav,matroska,webm,ogg,flac,aac,aiff,caf,mpeg,mpegts",
         "-i",
         audio_path,
         "-f",

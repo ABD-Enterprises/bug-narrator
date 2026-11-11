@@ -206,6 +206,30 @@ class ServerModelConfigurationTests(unittest.TestCase):
         with wave.open(tail, "rb") as handle:
             self.assertAlmostEqual(handle.getnframes() / handle.getframerate(), 5, places=1)
 
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
+    def test_decoder_rejects_playlists_that_reference_other_local_audio(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sibling = root / "private.mp3"
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=1", "-y", str(sibling)],
+                check=True, capture_output=True,
+            )
+            uploads = root / "uploads"
+            uploads.mkdir()
+            playlist = uploads / "upload.m3u8"
+            playlist.write_text(
+                "#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\n"
+                + sibling.as_uri() + "\n#EXT-X-ENDLIST\n"
+            )
+            with self.assertRaises(RuntimeError):
+                server._decode_audio_window(str(playlist), 0)
+            # The same decoder still accepts the self-contained audio upload.
+            decoded = server._decode_audio_window(str(sibling), 0)
+            self.addCleanup(server._unlink_quietly, decoded)
+            self.assertIsNotNone(decoded)
+
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
