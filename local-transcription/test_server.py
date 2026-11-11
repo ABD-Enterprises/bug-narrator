@@ -1568,7 +1568,7 @@ class ServerTokenFileAndChildProcessTests(unittest.TestCase):
                 self.assertEqual(command[:2], ["/bin/chmod", "-N"])
                 self.assertEqual(Path(command[2]).read_bytes(), b"")
                 self.assertNotIn(server.TOKEN_ENVIRONMENT_VARIABLE, kwargs["env"])
-                return subprocess.CompletedProcess(command, 0)
+                return None
 
             with patch.object(server.sys, "platform", "darwin"), patch.dict(
                 os.environ, {server.TOKEN_ENVIRONMENT_VARIABLE: "synthetic-environment-token"}
