@@ -148,6 +148,11 @@ final class RedirectServer: @unchecked Sendable {
                     continue
                 }
                 defer { close(client) }
+                // Darwin inherits the listener's nonblocking flag. Reads must
+                // wait for request bytes rather than treating EAGAIN as EOF.
+                let clientFlags = fcntl(client, F_GETFL, 0)
+                guard clientFlags >= 0,
+                      fcntl(client, F_SETFL, clientFlags & ~O_NONBLOCK) == 0 else { continue }
 
                 // A client that sends nothing must not hold the server: the
                 // read is given a moment and the connection is dropped after.
@@ -299,4 +304,45 @@ func makeMockURLSession() -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]
     return URLSession(configuration: configuration)
+}
+
+final class RedirectServerTests: XCTestCase {
+    func testRequestBytesMayArriveAfterTheConnectionIsAccepted() throws {
+        let server = try RedirectServer(location: "http://127.0.0.1/fixture")
+        server.serve()
+        defer { server.stop() }
+        let client = socket(AF_INET, SOCK_STREAM, 0)
+        XCTAssertGreaterThanOrEqual(client, 0)
+        guard client >= 0 else { return }
+        defer { close(client) }
+        var noPipe: Int32 = 1
+        setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &noPipe, socklen_t(MemoryLayout<Int32>.size))
+        var timeout = timeval(tv_sec: 2, tv_usec: 0)
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = server.port.bigEndian
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let connected = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(client, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        XCTAssertEqual(connected, 0)
+        Thread.sleep(forTimeInterval: 0.1)
+        let request = "GET /fixture HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        let sent = request.withCString { send(client, $0, strlen($0), 0) }
+        XCTAssertEqual(sent, request.utf8.count)
+        var buffer = [UInt8](repeating: 0, count: 512)
+        var response = Data()
+        while response.count < 4096 {
+            let count = read(client, &buffer, buffer.count)
+            if count <= 0 { break }
+            response.append(contentsOf: buffer.prefix(count))
+            if response.range(of: Data("\r\n\r\n".utf8)) != nil { break }
+        }
+        XCTAssertTrue(String(decoding: response, as: UTF8.self).contains("HTTP/1.1 307"))
+        XCTAssertEqual(server.requestCount, 1)
+    }
 }
