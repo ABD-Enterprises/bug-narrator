@@ -26,7 +26,7 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
         HttpClient? httpClient = null)
     {
         this.diagnostics = diagnostics;
-        this.httpClient = httpClient ?? new HttpClient
+        this.httpClient = httpClient ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = TimeSpan.FromMinutes(3),
         };
