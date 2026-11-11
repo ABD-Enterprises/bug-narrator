@@ -170,6 +170,18 @@ def write_token_file(path: Path, token: str) -> None:
     )
     try:
         os.chmod(temporary, 0o600)
+        if sys.platform == "darwin":
+            # macOS sharing ACLs can grant read access despite mode 0600.
+            # Clear them before the empty temporary file receives the token.
+            try:
+                # Fixed system executable and separate argv; no shell or token argument.
+                # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+                subprocess.run(
+                    ["/bin/chmod", "-N", temporary], check=True,
+                    capture_output=True, env=_child_environment(),
+                )
+            except subprocess.CalledProcessError as error:
+                raise OSError("Could not secure the server token file") from error
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             handle.write(token)

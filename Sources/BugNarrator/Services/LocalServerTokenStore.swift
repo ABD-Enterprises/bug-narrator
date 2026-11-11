@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import CryptoKit
 import Security
 
@@ -137,7 +138,19 @@ enum LocalServerTokenStore {
               let permissions = attributes[.posixPermissions] as? NSNumber else {
             return false
         }
-        return permissions.int16Value == 0o600
+        guard permissions.int16Value == 0o600 else { return false }
+        guard let acl = acl_get_file(url.path, ACL_TYPE_EXTENDED) else { return errno == ENOENT }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        var entry: acl_entry_t?
+        return acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1
+    }
+
+    private static func removeSharingPermissions(at url: URL) throws {
+        guard let acl = acl_init(0) else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        guard acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 
     /// The stored token, without creating one.
@@ -177,6 +190,9 @@ enum LocalServerTokenStore {
                 return false
             }
             do {
+                // Mode 0600 does not remove inherited macOS sharing ACLs.
+                // Clear them while the temporary file is still empty.
+                try removeSharingPermissions(at: temporary)
                 try Data(token.utf8).write(to: temporary)
                 // The file is replaced in one step, so a reader never sees a
                 // missing or an empty token file. The new file's metadata is
@@ -192,7 +208,7 @@ enum LocalServerTokenStore {
                 try? manager.removeItem(at: temporary)
                 return false
             }
-            return true
+            return isReadableOnlyByItsOwner(url)
         } catch {
             return false
         }
