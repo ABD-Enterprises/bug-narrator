@@ -273,6 +273,27 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertLessEqual(max(handle.requests), server._pcm_window_byte_limit)
         self.assertEqual(max(handle.requests) % 4, 0)
 
+    def test_byte_limited_windows_preserve_samples_and_offsets(self):
+        import numpy as np
+
+        path = self._write_wav(8000, 5)
+        original = np.arange(40000, dtype="<i2")
+        with wave.open(path, "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(8000)
+            handle.writeframes(original.tobytes())
+        # An odd byte budget must round down to a complete PCM frame.
+        with patch.object(server, "_pcm_window_byte_limit", 32001):
+            windows = list(server._wav_windows(path, 120))
+        self.assertEqual([len(samples) for samples, _, _ in windows], [16000, 16000, 8000])
+        self.assertEqual([offset for _, _, offset in windows], [0, 2, 4])
+        self.assertTrue(all(rate == 8000 for _, rate, _ in windows))
+        np.testing.assert_array_equal(
+            np.concatenate([samples for samples, _, _ in windows]),
+            original.astype(np.float32) / 32768.0,
+        )
+
     def test_invalid_wav_encoding_is_refused_before_reading_sample_data(self):
         import io
 
