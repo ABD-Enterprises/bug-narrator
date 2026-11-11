@@ -3,34 +3,28 @@
 import re
 from pathlib import Path
 
+import yaml
+
 
 def problems(text):
-    lines = text.splitlines()
+    workflow = yaml.safe_load(text) or {}
     errors = []
-    for i, line in enumerate(lines):
-        if line.lstrip().startswith("#"):
-            continue
-        if re.search(r"\bgit\s+push\b", line):
-            errors.append("workflow must not push using checkout credentials")
-        if re.search(r"uses:\s*actions/checkout@", line):
-            indent = len(line) - len(line.lstrip())
-            block = []
-            for following in lines[i + 1:]:
-                if following.strip() and len(following) - len(following.lstrip()) < indent:
-                    break
-                block.append(following)
-            expected = " " * (indent + 2) + "persist-credentials: false"
-            if " " * indent + "with:" not in block or expected not in block:
-                errors.append("checkout must explicitly set persist-credentials: false")
+    for job in workflow.get("jobs", {}).values():
+        for step in job.get("steps", []):
+            if str(step.get("uses", "")).lower().startswith("actions/checkout@"):
+                if step.get("with", {}).get("persist-credentials") is not False:
+                    errors.append("checkout must explicitly set persist-credentials: false")
+            if re.search(r"\bgit\s+push\b", str(step.get("run", ""))):
+                errors.append("workflow must not push using checkout credentials")
     return errors
 
 
 def main():
-    good = "  uses: actions/checkout@fixture\n  with:\n    persist-credentials: false\n"
+    good = "jobs:\n  test:\n    steps:\n      - uses: 'actions/checkout@fixture'\n        with:\n          persist-credentials: false # deliberate\n"
     assert not problems(good)
     assert problems(good.replace("false", "true"))
-    assert problems(good.replace("    persist-credentials: false\n", ""))
-    assert problems("  uses: actions/checkout@fixture\n- name: Other\n  with:\n    persist-credentials: false")
+    assert problems(good.replace("          persist-credentials: false # deliberate\n", ""))
+    assert problems("jobs: {test: {steps: [{uses: actions/checkout@fixture}]}}")
     failures = []
     for path in sorted(Path(".github/workflows").glob("*")):
         if path.suffix in {".yml", ".yaml"}:
