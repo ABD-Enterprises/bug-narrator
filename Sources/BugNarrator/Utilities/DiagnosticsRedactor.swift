@@ -23,6 +23,7 @@ enum DiagnosticsRedactor {
         makeTokenPattern(#"sk-[A-Za-z0-9_-]+"#),
         makeTokenPattern(#"github_pat_[A-Za-z0-9_]+"#),
         makeTokenPattern(#"gh[pousr]_[A-Za-z0-9]+"#, options: [.caseInsensitive]),
+        makeTokenPattern(#"ATATT3xFfGF0[A-Za-z0-9_\-=]+"#),
         makeTokenPattern(#"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
     ].compactMap { $0 }
 
@@ -74,6 +75,20 @@ enum DiagnosticsRedactor {
                 range: range,
                 withTemplate: "<redacted>"
             )
+        }
+
+        // Decode Basic credentials so ordinary prose such as "Basic configuration"
+        // remains useful. Work backwards because replacements change string offsets.
+        if let basic = makeTokenPattern(#"\bBasic[ \t]+([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])"#, options: [.caseInsensitive]) {
+            for match in basic.matches(in: sanitized, range: NSRange(sanitized.startIndex..., in: sanitized)).reversed() {
+                guard let tokenRange = Range(match.range(at: 1), in: sanitized),
+                      let fullRange = Range(match.range, in: sanitized) else { continue }
+                var encoded = String(sanitized[tokenRange])
+                encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+                guard let decoded = Data(base64Encoded: encoded),
+                      decoded.contains(0x3a) else { continue }
+                sanitized.replaceSubrange(fullRange, with: "<redacted>")
+            }
         }
 
         for exactValue in exactValues where !exactValue.isEmpty {
