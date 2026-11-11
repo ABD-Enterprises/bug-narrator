@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -91,14 +92,14 @@ public sealed class LocalServerPackageCatalog
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"{ReleasesEndpoint}?per_page={PageSize}&page={page}");
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
                 request.Headers.UserAgent.ParseAdd("BugNarrator");
-                using var response = await httpClient.SendAsync(request, cancellationToken);
+                using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new LocalServerFailure("The download server returned an unsuccessful response");
                 }
 
-                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                var releases = await JsonSerializer.DeserializeAsync<List<LocalServerRelease>>(stream, cancellationToken: cancellationToken)
+                var body = await ResponseBodyReader.ReadAsync(response, cancellationToken);
+                var releases = JsonSerializer.Deserialize<List<LocalServerRelease>>(body)
                     ?? [];
                 if (SelectPackage(releases) is { } found)
                 {
