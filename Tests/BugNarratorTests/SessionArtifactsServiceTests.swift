@@ -22,6 +22,41 @@ final class SessionArtifactsServiceTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: externalDirectoryURL.path))
     }
 
+    func testRemovalRefusesAnOutsideDirectoryReachedThroughAnIntermediateLink() throws {
+        let manager = FileManager.default
+        let base = makeTempDirectory()
+        defer { try? manager.removeItem(at: base) }
+        let root = base.appendingPathComponent("SessionAssets")
+        let outside = base.appendingPathComponent("outside")
+        let victim = outside.appendingPathComponent("synthetic-session")
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        try manager.createDirectory(at: victim, withIntermediateDirectories: true)
+        let sentinel = victim.appendingPathComponent("keep.txt")
+        try Data("synthetic private fixture".utf8).write(to: sentinel)
+        try manager.createSymbolicLink(at: root.appendingPathComponent("alias"), withDestinationURL: outside)
+        let service = SessionArtifactsService(rootDirectoryURL: root)
+
+        XCTAssertEqual(service.removeArtifactsDirectory(at: root.appendingPathComponent("alias/synthetic-session")),
+                       .rejectedUnmanagedDirectory)
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("synthetic private fixture".utf8))
+    }
+
+    func testRemovalRefusesALinkBackToTheStorageRoot() throws {
+        let manager = FileManager.default
+        let base = makeTempDirectory()
+        defer { try? manager.removeItem(at: base) }
+        let root = base.appendingPathComponent("SessionAssets")
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        let sentinel = root.appendingPathComponent("keep.txt")
+        try Data("synthetic root fixture".utf8).write(to: sentinel)
+        try manager.createSymbolicLink(at: root.appendingPathComponent("root-alias"), withDestinationURL: root)
+        let service = SessionArtifactsService(rootDirectoryURL: root)
+
+        XCTAssertEqual(service.removeArtifactsDirectory(at: root.appendingPathComponent("root-alias")),
+                       .rejectedUnmanagedDirectory)
+        XCTAssertTrue(manager.fileExists(atPath: sentinel.path))
+    }
+
     func testPreserveRecordedAudioCopiesIntoDirectoryAndLeavesSource() throws {
         let rootDirectoryURL = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
