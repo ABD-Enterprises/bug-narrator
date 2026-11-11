@@ -12,9 +12,16 @@ public static class ResponseBodyReader
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
-        return response.IsSuccessStatusCode
-            ? await response.Content.ReadAsStringAsync(timeout.Token)
-            : await ReadBoundedAsync(response.Content, timeout.Token);
+        try
+        {
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadAsStringAsync(timeout.Token)
+                : await ReadBoundedAsync(response.Content, timeout.Token);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("The server response timed out. Check the connection and try again.", exception);
+        }
     }
 
     public static async Task<string> ReadBoundedAsync(HttpContent content, CancellationToken cancellationToken = default)

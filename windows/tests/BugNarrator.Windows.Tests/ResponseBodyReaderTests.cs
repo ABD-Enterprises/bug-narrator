@@ -43,6 +43,40 @@ public sealed class ResponseBodyReaderTests
     }
 
     [Fact]
+    public async Task InternalTimeoutIsReportedAsFailureInsteadOfUserCancellation()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StreamContent(new StalledStream(simulateTimeout: true)),
+        };
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => ResponseBodyReader.ReadAsync(response));
+        Assert.Contains("timed out", failure.Message);
+    }
+
+    [Fact]
+    public async Task CancellationWhileReadingRemainsUserCancellation()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StreamContent(new StalledStream(simulateTimeout: false)),
+        };
+        using var cancellation = new CancellationTokenSource();
+        var reading = ResponseBodyReader.ReadAsync(response, cancellation.Token);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
+    }
+
+    private sealed class StalledStream(bool simulateTimeout) : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (simulateTimeout) throw new OperationCanceledException();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+    }
+
+    [Fact]
     public void ErrorMessageCannotCreateLogLinesOrGrowWithoutLimit()
     {
         var input = "fixture\r\nforged\u001b[2J\u2028\u202e" + new string('x', 9000);
