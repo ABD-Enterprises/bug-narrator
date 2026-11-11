@@ -1,4 +1,5 @@
 import Foundation
+import XCTest
 #if canImport(Darwin)
 import Darwin
 #endif
