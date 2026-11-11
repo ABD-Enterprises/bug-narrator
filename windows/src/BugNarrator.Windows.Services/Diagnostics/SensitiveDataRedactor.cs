@@ -9,7 +9,7 @@ internal static partial class SensitiveDataRedactor
     [GeneratedRegex(@"(?im)(authorization\s*:\s*)([^\r\n]+)")]
     private static partial Regex AuthorizationHeaderRegex();
 
-    [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._\-+/=]+\b")]
+    [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+=*")]
     private static partial Regex BearerTokenRegex();
 
     [GeneratedRegex(@"(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}\b")]
