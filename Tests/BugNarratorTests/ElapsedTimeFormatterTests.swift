@@ -15,6 +15,14 @@ final class ElapsedTimeFormatterTests: XCTestCase {
         XCTAssertEqual(ElapsedTimeFormatter.string(from: 7_325), "2:02:05")
     }
 
+    func testUnrepresentableDurationsCannotTrapIntegerConversion() {
+        for value in [Double.nan, .infinity, -.infinity, 1e308, -1e308, Double(Int.max)] {
+            XCTAssertEqual(ElapsedTimeFormatter.string(from: value), "00:00")
+        }
+        XCTAssertEqual(ElapsedTimeFormatter.string(from: 1e15), "277777777777:46:40")
+        XCTAssertFalse(ElapsedTimeFormatter.string(from: Double(Int.max).nextDown).isEmpty)
+    }
+
     func testNegativeDurationsClampToZero() {
         XCTAssertEqual(ElapsedTimeFormatter.string(from: -12), "00:00")
     }

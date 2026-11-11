@@ -158,6 +158,13 @@ final class IssueExtractionResponseParserNonFiniteTests: XCTestCase {
         XCTAssertEqual(try parse(issue: #"{\#(base),"timestamp":"01:05"}"#).timestamp, 65)
     }
 
+    func testFiniteButHugeServerTimestampCanBeRenderedSafely() throws {
+        let issue = try parse(issue: #"{\#(base),"timestamp":"1e306:00","reproductionSteps":[{"instruction":"Open","timestamp":"1e306:00"}]}"#)
+        XCTAssertNotNil(issue.timestamp)
+        XCTAssertEqual(issue.timestampLabel, "00:00")
+        XCTAssertEqual(issue.reproductionSteps.first?.timestampLabel, "00:00")
+    }
+
     func testNonFiniteStepTimestampFallsBack() throws {
         let issue = try parse(issue: #"{\#(base),"timestamp":"00:10","reproductionSteps":[{"instruction":"Open","timestamp":"nan:00"}]}"#)
         XCTAssertEqual(issue.reproductionSteps.first?.timestamp, 10, "falls back to the issue timestamp")
