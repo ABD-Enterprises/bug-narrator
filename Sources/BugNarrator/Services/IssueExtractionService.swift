@@ -5,9 +5,14 @@ actor IssueExtractionService: IssueExtracting {
 
     private let session: URLSession
     private let injectedTimeoutDuration: Duration?
-    private let logger = DiagnosticsLogger(category: .transcription)
+    private let logger: DiagnosticsLogger
 
-    init(session: URLSession? = nil, timeoutDuration: Duration? = nil) {
+    init(
+        session: URLSession? = nil,
+        timeoutDuration: Duration? = nil,
+        logger: DiagnosticsLogger = DiagnosticsLogger(category: .transcription)
+    ) {
+        self.logger = logger
         if let session {
             self.session = session
         } else {

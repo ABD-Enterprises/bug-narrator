@@ -8,6 +8,40 @@ final class IssueExtractionServiceTests: XCTestCase {
         super.tearDown()
     }
 
+    func testEchoedProviderTranscriptIsShownToUserButNotStoredInDiagnostics() async throws {
+        let marker = "SYNTHETIC_PRIVATE_TRANSCRIPT_731"
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DiagnosticsLogStore(storageURL: storage)
+        let logger = DiagnosticsLogger(category: .transcription, store: store)
+        let service = IssueExtractionService(session: makeMockURLSession(), logger: logger)
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertTrue(String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains(marker) == true)
+            return (
+                HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!,
+                try JSONSerialization.data(withJSONObject: ["error": ["message": marker]])
+            )
+        }
+        let fixture = TranscriptSession(
+            createdAt: Date(), transcript: marker, duration: 1, model: "fixture",
+            languageHint: nil, prompt: nil
+        )
+        do {
+            _ = try await service.extractIssues(from: fixture, apiKey: "fixture-key", model: "fixture")
+            XCTFail("Expected a provider failure")
+        } catch let error as AppError {
+            XCTAssertTrue(error.userMessage.contains(marker))
+        }
+        var entries: [DiagnosticsLogEntry] = []
+        for _ in 0..<50 {
+            entries = await store.recentEntries()
+            if entries.contains(where: { $0.event == "issue_extraction_request_failed" }) { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(entries.contains(where: { $0.event == "issue_extraction_request_failed" }))
+        XCTAssertFalse(entries.map { $0.formattedLine() }.joined().contains(marker))
+        await store.clear()
+    }
+
     func testPrivateTranscriptDoesNotFollowRealRedirectsWithDefaultOrInjectedSession() async throws {
         for injectSession in [false, true] {
             let target = try RedirectServer(location: "http://127.0.0.1/unused")
