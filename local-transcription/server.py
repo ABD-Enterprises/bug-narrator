@@ -165,10 +165,26 @@ def write_token_file(path: Path, token: str) -> None:
     it inherits from the directory it is created in.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
-    )
+    staging = None
+    descriptor = -1
+    temporary = None
     try:
+        if sys.platform == "darwin":
+            # Secure an empty directory before any token file exists. Removing
+            # a file ACL cannot revoke a handle opened before the ACL was cleared.
+            staging = tempfile.mkdtemp(dir=path.parent, prefix=f".{path.name}.")
+            try:
+                # Fixed system executable and separate argv; no shell or token argument.
+                # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+                subprocess.run(
+                    ["/bin/chmod", "-N", staging], check=True,
+                    capture_output=True, env=_child_environment(),
+                )
+            except subprocess.CalledProcessError as error:
+                raise OSError("Could not secure the server token directory") from error
+        descriptor, temporary = tempfile.mkstemp(
+            dir=staging or path.parent, prefix=f".{path.name}.", suffix=".tmp"
+        )
         os.chmod(temporary, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
@@ -177,8 +193,12 @@ def write_token_file(path: Path, token: str) -> None:
     finally:
         if descriptor >= 0:
             os.close(descriptor)
-        with contextlib.suppress(OSError):
-            os.unlink(temporary)
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+        if staging is not None:
+            with contextlib.suppress(OSError):
+                os.rmdir(staging)
 
 
 def resolve_auth_token(
