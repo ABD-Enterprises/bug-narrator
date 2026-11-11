@@ -13,6 +13,18 @@ namespace BugNarrator.Windows.Tests;
 /// </summary>
 public sealed class ReleaseUpdateCheckerTests
 {
+    [Fact]
+    public async Task ReleaseFeed_RefusesAnOversizedReplyBeforeEagerBuffering()
+    {
+        using var content = new PrefetchDetectingContent();
+        content.Headers.ContentLength = BugNarrator.Windows.Services.Http.ResponseBodyReader.SuccessBodyByteLimit + 1;
+        using var client = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = content }));
+        var checker = new ReleaseUpdateChecker(new GitHubLatestReleaseFeed(client, Architecture.X64));
+        var outcome = await checker.CheckAsync("1.1.0");
+        Assert.Equal(ReleaseUpdateOutcomeKind.Undetermined, outcome.Kind);
+        Assert.Equal(0, content.SerializationCalls);
+    }
+
     private const string Fallback = BugNarratorLinks.Releases;
 
     [Theory]
