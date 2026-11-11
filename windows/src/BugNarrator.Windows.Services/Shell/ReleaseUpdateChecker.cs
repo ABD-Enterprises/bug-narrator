@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Http;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -192,14 +193,14 @@ public sealed class GitHubLatestReleaseFeed : ILatestReleaseFeed
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{Endpoint}?per_page={PageSize}&page={page}");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             request.Headers.UserAgent.ParseAdd("BugNarrator");
-            using var response = await httpClient.SendAsync(request, search.Token);
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, search.Token);
             if (!response.IsSuccessStatusCode)
             {
                 throw new ReleaseFeedException($"the releases feed answered {(int)response.StatusCode}");
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(search.Token);
-            var releases = await JsonSerializer.DeserializeAsync<List<GitHubReleasePayload?>>(stream, cancellationToken: search.Token)
+            var body = await ResponseBodyReader.ReadAsync(response, search.Token);
+            var releases = JsonSerializer.Deserialize<List<GitHubReleasePayload?>>(body)
                 ?? throw new ReleaseFeedException("the releases feed returned an unusable release list");
             foreach (var release in releases)
             {

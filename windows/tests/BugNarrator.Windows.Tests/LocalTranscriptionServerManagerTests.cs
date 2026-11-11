@@ -37,6 +37,17 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
     // ---- catalog ----
 
     [Fact]
+    public async Task PackageCatalog_RefusesAnOversizedReplyBeforeEagerBuffering()
+    {
+        using var content = new PrefetchDetectingContent();
+        content.Headers.ContentLength = BugNarrator.Windows.Services.Http.ResponseBodyReader.SuccessBodyByteLimit + 1;
+        using var client = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = content }));
+        var result = await new LocalServerPackageCatalog(client).DiscoverAsync();
+        Assert.Null(result.Package);
+        Assert.Equal(0, content.SerializationCalls);
+    }
+
+    [Fact]
     public void SelectPackage_SkipsDraftsPrereleasesAndReleasesMissingEitherAsset()
     {
         var good = Release(draft: false, prerelease: false, ImageAsset(1000), ChecksumAsset(70));
