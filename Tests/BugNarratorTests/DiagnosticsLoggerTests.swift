@@ -23,6 +23,17 @@ final class DiagnosticsLoggerTests: XCTestCase {
         XCTAssertFalse(sanitized.contains("Bearer test.token-123"))
     }
 
+    func testBasicAndAtlassianCredentialsAreRedactedWithoutLosingProse() {
+        let credential = Data("fixture-user:fixture-secret".utf8).base64EncodedString()
+        for scheme in ["Basic", "basic", "BASIC"] {
+            XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText("Header: \(scheme) \(credential)"), "Header: <redacted>")
+        }
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText("Basic configuration failed"), "Basic configuration failed")
+        let token = "ATATT3xFfGF0fixture_token-123456789="
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText(token), "<redacted>")
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeMetadata(["detail": "Basic \(credential)"])["detail"], "<redacted>")
+    }
+
     func testLoggerRedactsCredentialsFromMetadataAndMessage() async {
         BugNarratorDiagnostics.setDebugModeEnabled(true)
         let storageURL = FileManager.default.temporaryDirectory
