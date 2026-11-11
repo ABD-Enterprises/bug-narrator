@@ -14,6 +14,11 @@ public static class OpenAiCompatibleEndpoint
             throw new ArgumentException("Endpoint path is required.", nameof(relativePath));
         }
 
+        if (PlaintextRemoteWarning(configuredBaseUrl) is { } refusal)
+        {
+            throw new InvalidOperationException(refusal);
+        }
+
         var baseUri = NormalizeBaseUri(configuredBaseUrl);
         return new Uri(baseUri, relativePath.TrimStart('/'));
     }

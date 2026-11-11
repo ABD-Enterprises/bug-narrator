@@ -199,6 +199,12 @@ public sealed record WindowsAppSettings(
     {
         get
         {
+            if (EffectiveAiProviderProfile.Provider != WindowsAiProvider.ParakeetLocal
+                && AiProviderBaseUrlSecurityWarning is { } transportIssue)
+            {
+                return transportIssue;
+            }
+
             var profile = EffectiveAiProviderProfile;
             var hasBaseUrl = !string.IsNullOrWhiteSpace(AiProviderBaseUrl);
 
