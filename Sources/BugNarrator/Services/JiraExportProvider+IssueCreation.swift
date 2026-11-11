@@ -152,7 +152,7 @@ extension JiraExportProvider {
         configuration: JiraExportConfiguration
     ) async -> ExportCreateOutcome {
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: redirectPolicy)
             guard let httpResponse = response as? HTTPURLResponse else {
                 return .permanent(.exportFailure("Jira returned an invalid response."))
             }

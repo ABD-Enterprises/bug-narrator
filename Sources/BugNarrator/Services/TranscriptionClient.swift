@@ -246,7 +246,7 @@ actor TranscriptionClient: TranscriptionServing {
         }
 
         do {
-            let (data, response) = try await session.data(for: urlRequest, delegate: SensitiveRequestRedirectPolicy.shared)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: urlRequest, using: session, delegate: SensitiveRequestRedirectPolicy.shared)
             let httpResponse = response as? HTTPURLResponse
 
             guard let httpResponse else {
@@ -321,7 +321,7 @@ actor TranscriptionClient: TranscriptionServing {
         logger.info("openai_key_validation_requested", "Validating the provider connection.")
 
         do {
-            let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: SensitiveRequestRedirectPolicy.shared)
             let httpResponse = response as? HTTPURLResponse
 
             guard let httpResponse else {

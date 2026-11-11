@@ -124,7 +124,7 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
         var request = URLRequest(url: endpoint)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw AppError.networkFailure

@@ -63,7 +63,7 @@ extension JiraExportProvider {
 
         while true {
             let request = try makeProjectSearchRequest(configuration: configuration, startAt: startAt)
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: redirectPolicy)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AppError.exportFailure("Jira returned an invalid response.")
@@ -220,7 +220,7 @@ extension JiraExportProvider {
             projectKey: projectKey,
             projectID: projectID
         )
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: redirectPolicy)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.exportFailure("Jira returned an invalid response.")
@@ -257,7 +257,7 @@ extension JiraExportProvider {
             projectKey: projectKey,
             issueTypeID: issueTypeID
         )
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: redirectPolicy)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.exportFailure("Jira returned an invalid response.")
