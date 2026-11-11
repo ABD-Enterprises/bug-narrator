@@ -22,8 +22,8 @@ targets:
         PRODUCT_NAME: BugNarrator
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        CURRENT_PROJECT_VERSION: 47
-        MARKETING_VERSION: 1.1.0
+        CURRENT_PROJECT_VERSION: 48
+        MARKETING_VERSION: 1.1.1
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Resources/BugNarrator.entitlements
         ENABLE_HARDENED_RUNTIME: YES
