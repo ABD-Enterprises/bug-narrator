@@ -630,10 +630,16 @@ def _resolve_model_id(model: Optional[str]) -> str:
     Map model names from BugNarrator's settings to parakeet-mlx model IDs.
     Passes through any value that already looks like a HuggingFace model ID.
     """
-    if model is None or not model.strip():
+    if model is None:
         return _default_model_name
-
+    if len(model) > 4096 or model and not model.isprintable():
+        raise HTTPException(
+            status_code=400,
+            detail="Model identifiers must be printable text no longer than 4096 characters",
+        )
     value = model.strip()
+    if not value:
+        return _default_model_name
     if value in _model_aliases:
         return _default_model_name
 
