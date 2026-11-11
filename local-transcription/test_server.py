@@ -476,10 +476,12 @@ server._serve("127.0.0.1", {port})
             def recognize(self, *args, **kwargs):
                 raise AssertionError("inference must not run on undecodable audio")
 
-        upload = UploadFile(io.BytesIO(b"\x00\x00\x00\x18ftypM4A "), filename="clip.m4a")
-        with patch.object(server, "get_model", return_value=NeverCalled()):
+        upload = UploadFile(io.BytesIO(b"\x00\x00\x00\x18ftypM4A "), filename="fixture\nFORGED\x1b[2J.m4a")
+        with self.assertLogs(server.logger, level="INFO") as captured, patch.object(server, "get_model", return_value=NeverCalled()):
             response = asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
 
+        self.assertNotIn("FORGED", "\n".join(captured.output))
+        self.assertNotIn("\x1b", "\n".join(captured.output))
         body = json.loads(response.body)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(body["error"]["type"], "invalid_request_error")

@@ -561,7 +561,7 @@ async def transcribe(
         model_id = _resolve_model_id(model)
 
         logger.info(
-            f"Transcribing {file.filename} ({file_size_mb:.1f} MB) "
+            f"Transcribing uploaded audio ({file_size_mb:.1f} MB) "
             f"with model {model_id} in {_chunk_duration_seconds}s chunks"
         )
         start = time.time()
