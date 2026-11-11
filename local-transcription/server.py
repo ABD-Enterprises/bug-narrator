@@ -678,6 +678,7 @@ _unsupported_audio_message = (
 _WAVE_FORMAT_PCM = 1
 _WAVE_FORMAT_IEEE_FLOAT = 3
 _WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+_pcm_window_byte_limit = 64 * 1024 * 1024
 
 
 def _parse_wav(handle):
@@ -727,6 +728,14 @@ def _parse_wav(handle):
     if fmt is None or data_offset is None:
         raise UnsupportedAudioError("missing fmt or data chunk")
 
+    tag, channels, rate, bits = fmt
+    if channels < 1 or rate < 1:
+        raise UnsupportedAudioError("invalid WAV header")
+    if not (
+        tag == _WAVE_FORMAT_PCM and bits in (8, 16, 24, 32)
+        or tag == _WAVE_FORMAT_IEEE_FLOAT and bits in (32, 64)
+    ):
+        raise UnsupportedAudioError(f"unsupported WAV format tag {tag} with {bits} bits per sample")
     return (*fmt, data_offset, data_size)
 
 
@@ -782,7 +791,12 @@ def _wav_windows(audio_path: str, window_seconds: int):
         if channels < 1 or rate < 1:
             raise UnsupportedAudioError("invalid WAV header")
         block_align = max(1, channels * bits // 8)
-        window_bytes = window_seconds * rate * block_align
+        if block_align > _pcm_window_byte_limit or window_seconds <= 0:
+            raise UnsupportedAudioError("WAV frame exceeds the decoding budget")
+        # Duration and channel counts are untrusted file metadata. A duration
+        # bound alone does not bound allocation when a header claims a huge rate.
+        byte_budget = (_pcm_window_byte_limit // block_align) * block_align
+        window_bytes = min(window_seconds * rate * block_align, byte_budget)
         position = 0
         while position < data_size:
             length = min(window_bytes, data_size - position)
