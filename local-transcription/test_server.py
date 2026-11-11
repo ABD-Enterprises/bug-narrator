@@ -230,6 +230,16 @@ class ServerModelConfigurationTests(unittest.TestCase):
             self.addCleanup(server._unlink_quietly, decoded)
             self.assertIsNotNone(decoded)
 
+    def test_decoder_error_does_not_inject_log_control_text(self):
+        failure = subprocess.CalledProcessError(
+            1, "ffmpeg", stderr=b"invalid media\nFORGED\x1b[2J"
+        )
+        with patch.object(server.subprocess, "run", side_effect=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                server._decode_audio_window("/tmp/synthetic.audio", 0)
+        self.assertNotIn("\n", str(caught.exception))
+        self.assertNotIn("\x1b", str(caught.exception))
+
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
@@ -527,9 +537,10 @@ server._serve("127.0.0.1", {port})
 
         def fake_run_inference(_model_id, path):
             seen["bytes"] = Path(path).read_bytes()
+            seen["path"] = path
             return server._Transcription("ok", [])
 
-        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a")
+        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a\nFORGED\x1b[2J")
         original_read = upload.read
         read_sizes = []
 
@@ -546,6 +557,8 @@ server._serve("127.0.0.1", {port})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(seen.get("bytes"), payload)
+        self.assertEqual(Path(seen["path"]).suffix, ".audio")
+        self.assertNotIn("FORGED", seen["path"])
         # Every read is a bounded piece; the whole upload is never read at once (#1229).
         self.assertTrue(read_sizes)
         self.assertEqual(max(read_sizes), server._upload_piece_bytes)
