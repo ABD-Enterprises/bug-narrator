@@ -13,7 +13,8 @@ func settingsLabeledField<Content: View>(
 ) -> some View {
     HStack(alignment: .top) {
         Text(title)
-            .frame(width: 170, alignment: .leading)
+            .frame(width: 140, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         content()
     }
 }
