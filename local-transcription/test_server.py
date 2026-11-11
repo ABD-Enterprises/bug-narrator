@@ -630,7 +630,7 @@ server._serve("127.0.0.1", {port})
         return path
 
     def test_model_identifiers_reject_log_control_text_and_excessive_length(self):
-        for value in ["repo/model\nFORGED", "repo/model\x1b[2J", "repo/\u202emodel", "x" * 4097]:
+        for value in ["repo/model\nFORGED", "repo/model\n", "\n", "repo/model\x1b[2J", "repo/\u202emodel", "x" * 4097, " " * 4097]:
             with self.subTest(value=value[:20]):
                 with self.assertRaises(server.HTTPException) as caught:
                     server._resolve_model_id(value)
@@ -639,17 +639,50 @@ server._serve("127.0.0.1", {port})
         self.assertEqual(server._resolve_model_id("owner/model"), "owner/model")
         self.assertEqual(server._resolve_model_id("/synthetic/model directory"), "/synthetic/model directory")
 
-    def test_invalid_request_model_never_reaches_logs_or_inference(self):
-        import io
-        from fastapi import UploadFile
+    def test_invalid_multipart_model_never_reaches_logs_or_inference(self):
+        async def request(value):
+            body = (
+                "--fixture-boundary\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n"
+                + value + "\r\n--fixture-boundary\r\n"
+                + "Content-Disposition: form-data; name=\"file\"; filename=\"fixture.wav\"\r\n"
+                + "Content-Type: audio/wav\r\n\r\nsynthetic\r\n--fixture-boundary--\r\n"
+            ).encode()
+            scope = {
+                "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+                "method": "POST", "scheme": "http", "path": "/v1/audio/transcriptions",
+                "raw_path": b"/v1/audio/transcriptions", "query_string": b"",
+                "server": ("127.0.0.1", 8422), "client": ("127.0.0.1", 12345),
+                "headers": [
+                    (b"host", b"127.0.0.1:8422"),
+                    (b"authorization", b"Bearer fixture-token"),
+                    (b"content-type", b"multipart/form-data; boundary=fixture-boundary"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+            sent = False
+            messages = []
 
-        upload = UploadFile(io.BytesIO(b"synthetic"), filename="fixture.wav")
-        with patch.object(server.logger, "info") as info, patch.object(server, "_run_inference") as inference:
-            with self.assertRaises(server.HTTPException) as caught:
-                asyncio.run(server.transcribe(file=upload, model="repo/model\nFORGED"))
-        self.assertEqual(caught.exception.status_code, 400)
-        info.assert_not_called()
-        inference.assert_not_called()
+            async def receive():
+                nonlocal sent
+                if sent:
+                    return {"type": "http.disconnect"}
+                sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            async def send(message):
+                messages.append(message)
+
+            await server.app(scope, receive, send)
+            return messages
+
+        for value in ["repo/model\nFORGED", "repo/model\n", "\n", " " * 4097]:
+            with self.subTest(value=value[:20]), patch.object(server, "_auth_token", "fixture-token"):
+                with patch.object(server.logger, "info") as info, patch.object(server, "_run_inference") as inference:
+                    messages = asyncio.run(request(value))
+                status = next(message["status"] for message in messages if message["type"] == "http.response.start")
+                self.assertEqual(status, 400)
+                info.assert_not_called()
+                inference.assert_not_called()
 
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
