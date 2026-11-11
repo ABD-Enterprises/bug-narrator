@@ -12,7 +12,7 @@ internal static class RemoteServiceRequestGuard
     {
         try
         {
-            return await httpClient.SendAsync(request, cancellationToken);
+            return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
