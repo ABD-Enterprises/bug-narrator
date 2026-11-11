@@ -247,6 +247,8 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server._load_model_in_background("a-model")
             deadline = time.time() + 5
             while server._model_load_state != "failed" and time.time() < deadline:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.02)
 
         self.assertEqual(server._model_load_state, "failed")
@@ -378,6 +380,8 @@ server._inference_executor.submit(time.sleep, 30)
 server._serve("127.0.0.1", {port})
 """
         creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -394,6 +398,8 @@ server._serve("127.0.0.1", {port})
                     with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                         break
                 except OSError:
+                    # Bounded polling waits for a test server, not production work.
+                    # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                     time.sleep(0.05)
             else:
                 self.fail("transcription server did not start within 10 seconds")
@@ -867,6 +873,8 @@ server.main()
         environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
         environment["PYTHONUNBUFFERED"] = "1"
         creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -884,6 +892,8 @@ server.main()
                 with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                     return process
             except OSError:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.05)
         self.fail("the transcription server did not start within 20 seconds")
 
@@ -1136,6 +1146,8 @@ server.main()
         environment = dict(os.environ)
         environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
         environment["PYTHONUNBUFFERED"] = "1"
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -1152,6 +1164,8 @@ server.main()
                 with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                     return process
             except OSError:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.05)
         self.fail("the transcription server did not start within 20 seconds")
 
