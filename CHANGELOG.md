@@ -3,6 +3,7 @@
 ## Unreleased
 
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
+- [SECURITY] Build checkouts discard their GitHub credentials before later steps run; validation prevents credential persistence from returning.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.
 
 - [INTERNAL] GitHub's automatic CodeQL setup (default setup) no longer scans Swift. Its Swift job ran on a hosted macOS runner and failed twice (2026-11-09 and 2026-11-10 UTC, after about 70 to 85 minutes each, "hosted runner lost communication"), which left a failed `Analyze (swift)` check on `main`; it now scans actions, C#, JavaScript/TypeScript and Python. **Swift has no CodeQL scan at the moment:** `.github/workflows/codeql.yml`, which analyzes Swift monthly and on demand, has shown as `disabled_manually` since 2026-11-09 02:22 UTC (it coincides with a default-setup run that session; the cause is not established). Restoring Swift coverage needs an owner choice: run `codeql.yml` again in place of default setup, or put `swift` back into the default setup's languages (`gh api -X PATCH repos/ABD-Enterprises/bug-narrator/code-scanning/default-setup -f state=configured -f runner_type=standard -f query_suite=default` plus a `-F 'languages[]=...'` flag for each of actions, csharp, javascript-typescript, python and swift).

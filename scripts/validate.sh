@@ -24,6 +24,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 python3 "$ROOT/scripts/sync_product_spec_contract.py" --check
+python3 "$ROOT/scripts/check_checkout_credentials.py"
 
 BASE_REF="${AI_VALIDATOR_BASE_REF:-${1:-}}"
 if [[ -z "$BASE_REF" && -n "${GITHUB_BASE_REF:-}" ]]; then
