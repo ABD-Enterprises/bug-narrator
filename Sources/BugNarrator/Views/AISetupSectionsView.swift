@@ -6,6 +6,8 @@ struct AISetupSectionsView: View {
     let secureControlsDisabled: Bool
 
     @State private var revealCredential = false
+    @State private var showsProviderComparison = false
+    @State private var showsInstallationDetails = false
     @ObservedObject var localServer: LocalTranscriptionManager
 
     var body: some View {
@@ -21,7 +23,8 @@ struct AISetupSectionsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .accessibilityLabel("AI provider")
+                    .labelsHidden()
+                    .accessibilityIdentifier("AI provider")
                     .help("OpenAI uses cloud transcription. Local (Parakeet) transcribes on this Mac with no API key or upload required.")
                 }
 
@@ -29,17 +32,10 @@ struct AISetupSectionsView: View {
 
                 if settingsStore.aiProvider.credentialFieldTitle.isEmpty {
                     labeledField(title: "Credential") {
-                        HStack {
-                            Text("No API key required")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if settingsStore.aiProvider == .parakeetLocal {
-                                Text("Transcription runs entirely on this Mac.")
-                                    .font(.footnote)
-                                    .foregroundStyle(.green)
-                            }
-                        }
-                        .accessibilityLabel("No AI provider credential required")
+                        Text("No API key required")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityLabel("No AI provider credential required")
                     }
                 } else {
                     labeledField(title: settingsStore.aiProvider.credentialFieldTitle) {
@@ -67,14 +63,19 @@ struct AISetupSectionsView: View {
                     costEstimate
                 }
 
-                labeledField(title: "API Base URL") {
-                    TextField(settingsStore.aiProvider.baseURLPlaceholder, text: $settingsStore.openAIBaseURL)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(secureControlsDisabled || settingsStore.aiProvider == .parakeetLocal)
-                        .accessibilityLabel("AI provider base URL")
-                        .help(settingsStore.aiProvider == .parakeetLocal
-                            ? "Parakeet uses 127.0.0.1:8422 automatically. Install and start the server using the controls below."
-                            : "The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
+                if settingsStore.aiProvider == .parakeetLocal {
+                    labeledField(title: "Local server address") {
+                        Text(settingsStore.openAIBaseURLValue.absoluteString)
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    labeledField(title: "API Base URL") {
+                        TextField(settingsStore.aiProvider.baseURLPlaceholder, text: $settingsStore.openAIBaseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(secureControlsDisabled)
+                            .accessibilityLabel("AI provider base URL")
+                            .help("The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
+                    }
                 }
 
                 Text(settingsStore.aiProvider.baseURLHint)
@@ -99,9 +100,11 @@ struct AISetupSectionsView: View {
                 }
 
                 HStack(spacing: 12) {
-                    Text(settingsStore.maskedSelectedAIProviderCredential)
-                        .font(.subheadline.monospaced())
-                        .foregroundStyle(settingsStore.hasSelectedAIProviderCredential ? .primary : .secondary)
+                    if settingsStore.aiProvider != .parakeetLocal {
+                        Text(settingsStore.maskedSelectedAIProviderCredential)
+                            .font(.subheadline.monospaced())
+                            .foregroundStyle(settingsStore.hasSelectedAIProviderCredential ? .primary : .secondary)
+                    }
 
                     Spacer()
 
@@ -127,10 +130,12 @@ struct AISetupSectionsView: View {
                         ? "Checks that the local Parakeet transcription server is running and reachable."
                         : "Validates the credential and base URL against the selected provider.")
 
-                    Button("Remove Key", role: .destructive) {
-                        appState.removeAPIKey()
+                    if settingsStore.aiProvider != .parakeetLocal {
+                        Button("Remove Key", role: .destructive) {
+                            appState.removeAPIKey()
+                        }
+                        .disabled(secureControlsDisabled || !settingsStore.hasSelectedAIProviderCredential)
                     }
-                    .disabled(secureControlsDisabled || !settingsStore.hasSelectedAIProviderCredential)
                 }
 
                 if let message = appState.apiKeyValidationState.message {
@@ -150,22 +155,25 @@ struct AISetupSectionsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(settingsStore.selectedAIProviderCredentialStorageDescription)
-                    .font(.footnote)
-                    .foregroundStyle(
-                        settingsStore.selectedAIProviderCredentialPersistenceState == .sessionOnly ||
-                        settingsStore.selectedAIProviderCredentialPersistenceState == .keychainLocked ||
-                        settingsStore.selectedAIProviderCredentialPersistenceState == .pendingSave
-                            ? .orange
-                            : .secondary
-                    )
+                if settingsStore.aiProvider != .parakeetLocal {
+                    Text(settingsStore.selectedAIProviderCredentialStorageDescription)
+                        .font(.footnote)
+                        .foregroundStyle(
+                            settingsStore.selectedAIProviderCredentialPersistenceState == .sessionOnly ||
+                            settingsStore.selectedAIProviderCredentialPersistenceState == .keychainLocked ||
+                            settingsStore.selectedAIProviderCredentialPersistenceState == .pendingSave
+                                ? .orange
+                                : .secondary
+                        )
 
-                Text("BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    Text("BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityIdentifier("AI Provider Setup section")
+        .disabled(secureControlsDisabled)
 
         GroupBox("Transcription Defaults") {
             VStack(alignment: .leading, spacing: 12) {
@@ -181,33 +189,40 @@ struct AISetupSectionsView: View {
                     )
                 }
 
-                labeledField(title: "Language Hint") {
-                    TextField("For English narration, keep en", text: $settingsStore.languageHint)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Transcription language hint")
-                        .help("Helps the model recognize the correct language. Use 'en' for English. Clear for auto-detection.")
+                if settingsStore.aiProvider == .parakeetLocal {
+                    Text("The local server does not use language hints or transcription prompts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    labeledField(title: "Language Hint") {
+                        TextField("For English narration, keep en", text: $settingsStore.languageHint)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel("Transcription language hint")
+                            .help("Helps the model recognize the correct language. Use 'en' for English. Clear for auto-detection.")
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Prompt")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        TextEditor(text: $settingsStore.transcriptionPrompt)
+                            .font(.body)
+                            .frame(height: 110)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(.quaternary, lineWidth: 1)
+                            )
+                            .accessibilityLabel("Transcription prompt")
+                    }
+
+                    Text("Fresh installs default the language hint to en to reduce wrong-language transcript hallucinations. Clear it only when recording non-English narration.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Prompt")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    TextEditor(text: $settingsStore.transcriptionPrompt)
-                        .font(.body)
-                        .frame(height: 110)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(.quaternary, lineWidth: 1)
-                        )
-                        .accessibilityLabel("Transcription prompt")
-                }
-
-                Text("Fresh installs default the language hint to en to reduce wrong-language transcript hallucinations. Clear it only when recording non-English narration.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
         .accessibilityIdentifier("Transcription Defaults section")
+        .disabled(secureControlsDisabled)
 
         GroupBox("Issue Extraction") {
             VStack(alignment: .leading, spacing: 12) {
@@ -231,6 +246,7 @@ struct AISetupSectionsView: View {
                 }
 
                 Toggle("Run issue extraction automatically after transcription", isOn: autoExtractIssuesBinding)
+                    .disabled(!settingsStore.supportsIssueExtraction || secureControlsDisabled)
 
                 Text(issueExtractionHelpText)
                     .font(.footnote)
@@ -238,43 +254,53 @@ struct AISetupSectionsView: View {
             }
         }
         .accessibilityIdentifier("Issue Extraction section")
+        .disabled(secureControlsDisabled)
     }
 
-    @ViewBuilder
     private var providerComparison: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            comparisonRow(label: "API key", openAI: "Required", parakeet: "Not needed")
-            comparisonRow(label: "Cost", openAI: "~$0.04 / 5-min session", parakeet: "Free")
-            comparisonRow(label: "Privacy", openAI: "Audio sent to OpenAI", parakeet: "Stays on device")
-            comparisonRow(label: "Network", openAI: "Required", parakeet: "Offline after setup")
-        }
-        .font(.footnote)
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Provider comparison. OpenAI requires an API key and network and sends audio to OpenAI. Local Parakeet is free, offline, and keeps audio on device.")
-    }
-
-    private func comparisonRow(label: String, openAI: String, parakeet: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
-            Text(openAI)
-                .fontWeight(settingsStore.aiProvider == .openAI ? .semibold : .regular)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(parakeet)
-                .fontWeight(settingsStore.aiProvider == .parakeetLocal ? .semibold : .regular)
-                .foregroundStyle(settingsStore.aiProvider == .parakeetLocal ? .green : .primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 6) {
+            Button(showsProviderComparison ? "Hide provider comparison" : "Compare OpenAI and Local (Parakeet)") {
+                showsProviderComparison.toggle()
+            }
+            .buttonStyle(.borderless)
+            if showsProviderComparison {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                    GridRow {
+                        Text("Provider")
+                        Text("OpenAI").fontWeight(.semibold)
+                        Text("Local (Parakeet)").fontWeight(.semibold)
+                    }
+                    GridRow {
+                        Text("API key")
+                        Text("Required")
+                        Text("Not needed")
+                    }
+                    GridRow {
+                        Text("Processing")
+                        Text("Audio sent to OpenAI")
+                        Text("On this Mac")
+                    }
+                    GridRow {
+                        Text("Issue extraction")
+                        Text("Supported")
+                        Text("Not supported")
+                    }
+                    GridRow {
+                        Text("Network")
+                        Text("Required")
+                        Text("Offline after setup")
+                    }
+                }
+                .font(.footnote)
+                .padding(.top, 6)
+            }
         }
     }
 
     @ViewBuilder
     private var costEstimate: some View {
         if settingsStore.aiProvider == .openAI {
-            Text("Typical cost: about $0.04 for a 5-minute session (Whisper transcription), plus issue-extraction tokens. Switch to Local (Parakeet) for free, offline transcription.")
+            Text("OpenAI charges your account for transcription and issue extraction. Costs depend on the models and usage.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -382,7 +408,7 @@ struct AISetupSectionsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Picker(accessibilityLabel, selection: selection) {
                     ForEach(choices) { choice in
-                        Text("\(choice.title) (\(choice.id))")
+                        Text(choice.title)
                             .tag(choice.id)
                     }
                 }
@@ -395,6 +421,7 @@ struct AISetupSectionsView: View {
                     Text("\(selectedChoice.id) - \(selectedChoice.detail)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -402,17 +429,13 @@ struct AISetupSectionsView: View {
 
     @ViewBuilder
     private func labeledField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .frame(width: 170, alignment: .leading)
-            content()
-        }
+        settingsLabeledField(title: title, content: content)
     }
 
     private var localServerControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             if localServer.supported {
-                Text("Local server download: \(localServer.downloadSize). Model weights download on first start and require additional disk space.")
+                Text("Local server download: \(localServer.downloadSize). Setup needs an internet connection; model weights download on first start and require additional disk space.")
                     .font(.footnote)
                     .fixedSize(horizontal: false, vertical: true)
                 if localServer.installed {
@@ -426,7 +449,11 @@ struct AISetupSectionsView: View {
                     }
                 } else {
                     Button("Download the local transcription server") { localServer.installAndStart() }
-                        .disabled(localServer.busy || localServer.package == nil)
+                        .disabled(localServer.busy || localServer.package == nil || appState.localServerControlsDisabled)
+                    if localServer.package == nil && localServer.busy {
+                        ProgressView("Checking for a server download…")
+                            .controlSize(.small)
+                    }
                     if localServer.package == nil {
                         Button("Check server download") { Task { await localServer.discover() } }
                             .disabled(localServer.busy || appState.localServerControlsDisabled)
@@ -437,9 +464,16 @@ struct AISetupSectionsView: View {
                     Button("Cancel installation") { appState.stopLocalServer(localServer) }
                         .disabled(appState.localServerControlsDisabled)
                 }
-                Text("Install location: \(localServer.directory.path)")
-                    .font(.caption)
-                    .textSelection(.enabled)
+                Button(showsInstallationDetails ? "Hide installation details" : "Show installation details") {
+                    showsInstallationDetails.toggle()
+                }
+                .buttonStyle(.borderless)
+                if showsInstallationDetails {
+                    Text("Install location: \(localServer.directory.path)")
+                        .font(.caption)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !localServer.message.isEmpty {
                     Text(localServer.message).font(.footnote).fixedSize(horizontal: false, vertical: true)
                 }
@@ -448,6 +482,7 @@ struct AISetupSectionsView: View {
                     .font(.footnote)
             }
             Button("Use OpenAI instead") { settingsStore.aiProvider = .openAI }
+                .disabled(secureControlsDisabled)
         }
         .task {
             await localServer.discover()
