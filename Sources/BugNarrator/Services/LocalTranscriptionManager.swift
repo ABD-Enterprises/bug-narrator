@@ -111,7 +111,9 @@ final class LocalTranscriptionManager: ObservableObject {
             }
             message = "Server release search reached its limit. Check the project releases or choose OpenAI."
 
-        } catch { message = "Could not check server releases: \(error.localizedDescription). Try again." }
+        } catch {
+            message = "Could not check server downloads. Check your internet connection and try again."
+        }
     }
 
     func installAndStart() {

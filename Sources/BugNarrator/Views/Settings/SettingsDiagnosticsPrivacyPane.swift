@@ -104,9 +104,12 @@ struct SettingsDiagnosticsPrivacyPane: View {
                     Divider()
 
                     Toggle("Send screenshots to the AI provider", isOn: $settingsStore.uploadScreenshotsForExtraction)
+                        .disabled(!settingsStore.supportsIssueExtraction || secureControlsDisabled)
                         .help("Off by default. When on, issue extraction uploads up to four screenshots with the transcript so the model can see what you described.")
 
-                    Text("Issue extraction always sends the transcript and screenshot filenames. Turning this on additionally uploads the screenshot images themselves to \(settingsStore.aiProvider.displayName). Leave it off to keep the images on this Mac.")
+                    Text(settingsStore.supportsIssueExtraction
+                        ? "Issue extraction sends the transcript and screenshot filenames. Turning this on additionally uploads screenshot images to \(settingsStore.aiProvider.displayName). Leave it off to keep the images on this Mac."
+                        : "Local (Parakeet) transcribes audio on this Mac and does not run issue extraction or upload screenshots. Choose a chat-capable provider to use this option.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
