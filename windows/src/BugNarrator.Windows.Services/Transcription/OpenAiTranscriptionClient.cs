@@ -11,7 +11,7 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
 
     public OpenAiTranscriptionClient(HttpClient? httpClient = null)
     {
-        this.httpClient = httpClient ?? new HttpClient
+        this.httpClient = httpClient ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = TimeSpan.FromMinutes(5),
         };
