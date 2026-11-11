@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [SECURITY] Windows support logs omit exception details and tracker error bodies that may echo private session text.
+
 - [SECURITY] Mac AI and GitHub requests refuse automatic redirects, preventing credentials, transcripts and recordings from being forwarded to an address the user did not choose.
 
 - [SECURITY] Release safety checks recognize inline permission maps and write-all permissions, including explicit job overrides.

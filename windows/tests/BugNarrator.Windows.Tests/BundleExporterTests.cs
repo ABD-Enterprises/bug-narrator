@@ -282,6 +282,26 @@ public sealed class BundleExporterTests : IDisposable
         Assert.Contains("jira api token [REDACTED] rejected", recentLog, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task FileDebugBundleExporter_OmitsPrivateExceptionDetails()
+    {
+        const string privateText = "PRIVATE_TRANSCRIPT_CANARY";
+        var failure = new InvalidOperationException(privateText, new Exception(privateText));
+        diagnostics.Error("provider", "Provider request failed", failure);
+        Assert.Contains(privateText, failure.Message, StringComparison.Ordinal);
+        var log = await File.ReadAllTextAsync(diagnostics.LogFilePath);
+        Assert.Contains("Provider request failed", log, StringComparison.Ordinal);
+        Assert.Contains("InvalidOperationException", log, StringComparison.Ordinal);
+        Assert.DoesNotContain(privateText, log, StringComparison.Ordinal);
+
+        var exporter = new FileDebugBundleExporter(storagePaths, new FakeWindowsAppSettingsStore(), diagnostics);
+        var bundlePath = await exporter.ExportAsync(null);
+        foreach (var file in Directory.GetFiles(bundlePath, "*", SearchOption.AllDirectories))
+        {
+            Assert.DoesNotContain(privateText, await File.ReadAllTextAsync(file), StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>
     /// The bundle layout is a shared contract: contract-fixtures/session-bundle-layout.json is the
     /// same file Tests/BugNarratorTests/TranscriptExporterTests.swift reads on macOS. Reading it here

@@ -570,6 +570,43 @@ public sealed class IssueExportProviderTests : IDisposable
         Assert.Contains("Issue type is invalid", exception.Message);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExportFailure_KeepsProviderDetailsOutOfLogs(bool jira)
+    {
+        const string privateText = "PRIVATE_ISSUE_CANARY";
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory, issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        using var client = new HttpClient(new TestHttpMessageHandler((request, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new { message = privateText, errorMessages = new[] { privateText } }),
+                    Encoding.UTF8, "application/json"),
+            })));
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            if (jira)
+            {
+                await new JiraExportProvider(diagnostics, client).ExportAsync(
+                    session.IssueExtraction!.Issues, session,
+                    new JiraExportConfiguration(new Uri("https://tracker.example.test/"), "fixture@example.test", "fixture", "BN", "Task"));
+            }
+            else
+            {
+                await new GitHubExportProvider(diagnostics, client).ExportAsync(
+                    session.IssueExtraction!.Issues, session,
+                    new GitHubExportConfiguration("fixture", "fixture", "fixture", []));
+            }
+        });
+        Assert.Contains(privateText, failure.Message, StringComparison.Ordinal);
+        diagnostics.Error("export", "Export failed", failure);
+        var log = await File.ReadAllTextAsync(diagnostics.LogFilePath);
+        Assert.Contains("HTTP 400", log, StringComparison.Ordinal);
+        Assert.DoesNotContain(privateText, log, StringComparison.Ordinal);
+    }
+
     private static byte[] TinyPngBytes() => Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
 

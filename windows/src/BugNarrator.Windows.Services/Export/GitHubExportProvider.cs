@@ -69,7 +69,7 @@ public sealed class GitHubExportProvider
                     responseBody,
                     configuration,
                     results.Count));
-                diagnostics.Warning("export", message);
+                diagnostics.Warning("export", $"GitHub export failed with HTTP {(int)response.StatusCode}");
                 throw new InvalidOperationException(message);
             }
 
