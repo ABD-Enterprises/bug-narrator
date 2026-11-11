@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class TranscriptExporterTests: XCTestCase {
+    func testBundlePermissionsArePrivateDuringAndAfterWriting() throws {
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? manager.removeItem(at: root) }
+        let bundle = try AtomicBundleDirectoryWriter().writeBundle(in: root, suggestedName: "fixture") { staging in
+            XCTAssertEqual(try manager.attributesOfItem(atPath: staging.path)[.posixPermissions] as? Int, 0o700)
+            let nested = staging.appendingPathComponent("screenshots")
+            try manager.createDirectory(at: nested, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o755])
+            let file = nested.appendingPathComponent("fixture.txt")
+            try Data("synthetic fixture".utf8).write(to: file)
+            try manager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: file.path)
+        }
+        for name in ["", "screenshots"] {
+            XCTAssertEqual(try manager.attributesOfItem(atPath: bundle.appendingPathComponent(name).path)[.posixPermissions] as? Int, 0o700)
+        }
+        XCTAssertEqual(try manager.attributesOfItem(atPath: bundle.appendingPathComponent("screenshots/fixture.txt").path)[.posixPermissions] as? Int, 0o600)
+    }
+
     private struct SessionBundleLayoutContract: Decodable {
         let always: [String]
         let whenIssueExtractionHasRun: [String]
