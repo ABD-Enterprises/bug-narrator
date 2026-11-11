@@ -92,13 +92,13 @@ public sealed class OpenAiIssueExtractionService : IIssueExtractionService
             request,
             "AI provider issue extraction",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ResponseBodyReader.ReadAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             diagnostics.Warning(
                 "issue-extraction",
                 $"issue extraction request failed with HTTP {(int)response.StatusCode}");
-            throw new InvalidOperationException(BuildFailureMessage(response.StatusCode, responseBody));
+            throw new InvalidOperationException(ResponseBodyReader.SanitizeMessage(BuildFailureMessage(response.StatusCode, responseBody)));
         }
 
         var content = ExtractMessageContent(responseBody);

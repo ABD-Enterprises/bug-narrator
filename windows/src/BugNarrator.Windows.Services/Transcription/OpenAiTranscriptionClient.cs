@@ -145,10 +145,10 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             message,
             "AI provider transcription",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ResponseBodyReader.ReadAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(BuildFailureMessage(response.StatusCode, responseBody));
+            throw new InvalidOperationException(ResponseBodyReader.SanitizeMessage(BuildFailureMessage(response.StatusCode, responseBody)));
         }
 
         using var document = JsonDocument.Parse(responseBody);
@@ -184,10 +184,10 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
             message,
             "AI provider validation",
             cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseBody = await ResponseBodyReader.ReadAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(BuildFailureMessage(response.StatusCode, responseBody));
+            throw new InvalidOperationException(ResponseBodyReader.SanitizeMessage(BuildFailureMessage(response.StatusCode, responseBody)));
         }
     }
 
