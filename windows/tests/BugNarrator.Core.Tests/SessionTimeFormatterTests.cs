@@ -21,4 +21,19 @@ public sealed class SessionTimeFormatterTests
     {
         Assert.Equal(SessionTimeFormatter.FormatDuration(TimeSpan.FromSeconds(65)), SessionTimeFormatter.FormatElapsedSeconds(65));
     }
+    [Theory]
+    [InlineData(1e308)]
+    [InlineData(-1e308)]
+    [InlineData(9223372036854775808d)]
+    public void FormatElapsedSeconds_RejectsNumbersOutsideTheIntegerRange(double seconds)
+    {
+        Assert.Equal("00:00", SessionTimeFormatter.FormatElapsedSeconds(seconds));
+    }
+
+    [Fact]
+    public void FormatElapsedSeconds_HandlesFiniteValuesLargerThanTimeSpan()
+    {
+        Assert.Equal("277777777777:46:40", SessionTimeFormatter.FormatElapsedSeconds(1e15));
+        Assert.NotEmpty(SessionTimeFormatter.FormatElapsedSeconds(Math.BitDecrement((double)long.MaxValue)));
+    }
 }
