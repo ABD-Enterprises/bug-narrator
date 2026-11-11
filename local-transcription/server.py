@@ -537,8 +537,8 @@ async def transcribe(
     Returns verbose_json format with segments containing start, end, text,
     and no_speech_prob fields that BugNarrator expects.
     """
-    suffix = Path(file.filename).suffix if file.filename else ".m4a"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    # File names are client-controlled; only media bytes influence decoding.
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".audio")
     try:
         # Stream the upload to disk in bounded pieces: a long recording must not be
         # held in memory as one buffer (#1229).
@@ -597,8 +597,6 @@ async def transcribe(
                     "duration": segments[-1]["end"] if segments else 0.0,
                 }
             )
-        elif response_format == "json":
-            return JSONResponse(content={"text": full_text})
         else:
             return JSONResponse(content={"text": full_text})
 
@@ -879,8 +877,8 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
     the end. ffmpeg seeks to `start` and reads at most _chunk_duration_seconds, so only one
     window's audio exists in memory at a time instead of the whole file (#1229)."""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    destination = tmp.name
     tmp.close()
+    destination = tmp.name
     command = [
         "ffmpeg",
         "-nostdin",
@@ -891,6 +889,12 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
         str(start),
         "-t",
         str(_chunk_duration_seconds),
+        # Uploaded media is a self-contained recording, not instructions to
+        # fetch a playlist, concatenate files, or read another local file.
+        "-protocol_whitelist",
+        "file",
+        "-format_whitelist",
+        "mov,mp3,wav,matroska,webm,ogg,flac,aac,aiff,caf,mpeg,mpegts",
         "-i",
         audio_path,
         "-f",
@@ -905,6 +909,8 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
         destination,
     ]
     try:
+        # Fixed executable and separate argv values; no shell interprets uploaded data.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         subprocess.run(command, check=True, capture_output=True, env=_child_environment())
         if _wav_data_size(destination) == 0:
             # Seek past the end decodes to nothing (ffmpeg exits 0 with an empty file):
@@ -914,8 +920,9 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
         return destination
     except subprocess.CalledProcessError as error:
         _unlink_quietly(destination)
-        detail = (error.stderr or b"").decode(errors="replace").strip()
-        raise RuntimeError(f"ffmpeg could not decode {audio_path}: {detail[-500:]}") from error
+        detail = (error.stderr or b"").decode(errors="replace")
+        detail = "".join(character if character.isprintable() else " " for character in detail)
+        raise RuntimeError(f"ffmpeg could not decode {audio_path}: {detail[-500:].strip()}") from error
     except BaseException:
         _unlink_quietly(destination)
         raise
