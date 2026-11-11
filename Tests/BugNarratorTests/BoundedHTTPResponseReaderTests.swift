@@ -58,6 +58,7 @@ final class BoundedHTTPResponseReaderTests: XCTestCase {
     func testRedirectRefusalStillRunsWithTheStreamingReader() async throws {
         let target = try RedirectServer(location: "http://127.0.0.1:1/unused")
         defer { target.stop() }
+        target.serve()
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
         let (_, response) = try await BoundedHTTPResponseReader.data(
