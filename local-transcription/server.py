@@ -634,6 +634,11 @@ def _resolve_model_id(model: Optional[str]) -> str:
         return _default_model_name
 
     value = model.strip()
+    if len(value) > 4096 or not value.isprintable():
+        raise HTTPException(
+            status_code=400,
+            detail="Model identifiers must be printable text no longer than 4096 characters",
+        )
     if value in _model_aliases:
         return _default_model_name
 

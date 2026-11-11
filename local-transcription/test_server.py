@@ -629,6 +629,28 @@ server._serve("127.0.0.1", {port})
                 handle.writeframes(bytes([128] * frames))
         return path
 
+    def test_model_identifiers_reject_log_control_text_and_excessive_length(self):
+        for value in ["repo/model\nFORGED", "repo/model\x1b[2J", "repo/\u202emodel", "x" * 4097]:
+            with self.subTest(value=value[:20]):
+                with self.assertRaises(server.HTTPException) as caught:
+                    server._resolve_model_id(value)
+                self.assertEqual(caught.exception.status_code, 400)
+                self.assertNotIn(value, caught.exception.detail)
+        self.assertEqual(server._resolve_model_id("owner/model"), "owner/model")
+        self.assertEqual(server._resolve_model_id("/synthetic/model directory"), "/synthetic/model directory")
+
+    def test_invalid_request_model_never_reaches_logs_or_inference(self):
+        import io
+        from fastapi import UploadFile
+
+        upload = UploadFile(io.BytesIO(b"synthetic"), filename="fixture.wav")
+        with patch.object(server.logger, "info") as info, patch.object(server, "_run_inference") as inference:
+            with self.assertRaises(server.HTTPException) as caught:
+                asyncio.run(server.transcribe(file=upload, model="repo/model\nFORGED"))
+        self.assertEqual(caught.exception.status_code, 400)
+        info.assert_not_called()
+        inference.assert_not_called()
+
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
             Path(__file__).with_name("requirements.txt").read_text().splitlines()
