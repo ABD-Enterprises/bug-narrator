@@ -15,7 +15,7 @@ final class IssueExtractionServiceTests: XCTestCase {
         let logger = DiagnosticsLogger(category: .transcription, store: store)
         let service = IssueExtractionService(session: makeMockURLSession(), logger: logger)
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains(marker) == true)
+            XCTAssertTrue(String(data: try requestBodyData(from: request), encoding: .utf8)?.contains(marker) == true)
             return (
                 HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!,
                 try JSONSerialization.data(withJSONObject: ["error": ["message": marker]])
