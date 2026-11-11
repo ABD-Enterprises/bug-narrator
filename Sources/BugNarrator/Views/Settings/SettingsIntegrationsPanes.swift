@@ -80,18 +80,21 @@ struct SettingsGitHubExportPane: View {
                 settingsLabeledField(title: "Repository Owner") {
                     TextField("for example acme", text: $settingsStore.githubRepositoryOwner)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(secureControlsDisabled)
                         .accessibilityLabel("GitHub repository owner")
                 }
 
                 settingsLabeledField(title: "Repository Name") {
                     TextField("for example bugnarrator", text: $settingsStore.githubRepositoryName)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(secureControlsDisabled)
                         .accessibilityLabel("GitHub repository name")
                 }
 
                 settingsLabeledField(title: "Default Labels") {
                     TextField("Comma-separated labels", text: $settingsStore.githubDefaultLabels)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(secureControlsDisabled)
                         .accessibilityLabel("GitHub default labels")
                 }
 
@@ -220,6 +223,7 @@ struct SettingsJiraExportPane: View {
                 settingsLabeledField(title: "Jira Cloud URL") {
                     TextField("your-domain.atlassian.net", text: $settingsStore.jiraBaseURL)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(secureControlsDisabled)
                         .accessibilityLabel("Jira Cloud URL")
                 }
 
@@ -234,6 +238,7 @@ struct SettingsJiraExportPane: View {
                 settingsLabeledField(title: "Email") {
                     TextField("you@example.com", text: $settingsStore.jiraEmail)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(secureControlsDisabled)
                         .accessibilityLabel("Jira email")
                 }
 

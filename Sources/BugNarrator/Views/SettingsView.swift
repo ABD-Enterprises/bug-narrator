@@ -47,55 +47,59 @@ struct SettingsView: View {
         case aiEngines = "AI Engines"
         case audio = "Audio"
         case integrations = "Integrations"
-        case diagnostics = "Diagnostics & Privacy"
+        case diagnostics = "Privacy"
 
         var id: String { rawValue }
         var title: String { rawValue }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("BugNarrator Settings")
-                    .font(.title2.weight(.semibold))
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("BugNarrator Settings")
+                        .font(.title2.weight(.semibold))
+                        .accessibilityIdentifier("settings.heading")
 
-                Text("Set up your AI provider, review workflow defaults, export destinations, and local diagnostics in one place.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+                    Text("Set up your AI provider, review workflow defaults, export destinations, and local diagnostics in one place.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            statusSummary
+                statusSummary
 
-            Picker("Settings section", selection: $selectedSection) {
-                ForEach(SettingsSection.allCases) { section in
-                    Text(section.title).tag(section)
+                Picker("Settings section", selection: $selectedSection) {
+                    ForEach(SettingsSection.allCases) { section in
+                        Text(section.title).tag(section)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityIdentifier("settings.tabs")
+                .accessibilityLabel("Settings section")
+
+                switch selectedSection {
+                case .general:
+                    generalTab
+                case .aiEngines:
+                    aiEnginesTab
+                case .audio:
+                    audioTab
+                case .integrations:
+                    integrationsTab
+                case .diagnostics:
+                    diagnosticsTab
+                }
+
+                if secureControlsDisabled {
+                    Text("Credential changes are disabled while recording, transcription, extraction, or export is in progress.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityIdentifier("settings.tabs")
-            .accessibilityLabel("Settings section")
-
-            switch selectedSection {
-            case .general:
-                generalTab
-            case .aiEngines:
-                aiEnginesTab
-            case .audio:
-                audioTab
-            case .integrations:
-                integrationsTab
-            case .diagnostics:
-                diagnosticsTab
-            }
-
-            if secureControlsDisabled {
-                Text("Credential changes are disabled while recording, transcription, extraction, or export is in progress.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(20)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
-        .padding(24)
         .frame(minWidth: 660, minHeight: 580)
         .onAppear {
             guard !hasAppliedInitialSection else {
@@ -146,7 +150,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
 
                         Text("Use the download controls below to install, start, or remove the local server.")
-                            .font(.footnote.monospaced())
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     } else {
@@ -215,14 +219,16 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func settingsTabScroll<Content: View>(
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                content()
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    content()
+                }
+                .frame(width: max(0, geometry.size.width - 24), alignment: .leading)
+                .padding(12)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         // Preserve the identifier the UI-test scroll helpers look for; only the
         // selected tab's scroll view is in the tree at a time.
@@ -234,37 +240,34 @@ struct SettingsView: View {
             Text("Setup Status")
                 .font(.headline)
 
-            let configured = setupConfiguredCount
-            let total = setupTotalCount
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(configured) of \(total) configured")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                ProgressView(value: Double(configured), total: Double(total))
-                    .accessibilityLabel("Setup progress: \(configured) of \(total) configured")
-            }
-
-            VStack(spacing: 8) {
+            HStack {
                 settingsStatusRow(
                     title: settingsStore.aiProvider.statusTitle,
-                    detail: "Transcription and issue extraction",
+                    detail: settingsStore.supportsIssueExtraction
+                        ? "Transcription and issue extraction"
+                        : "Transcription only; issue extraction needs a chat provider",
                     status: openAIReadiness,
                     accessibilityLabel: "AI provider status: \(openAIReadiness.title)"
                 )
+                Button("Configure") {
+                    selectedSection = .aiEngines
+                }
+                .accessibilityLabel("Configure AI provider")
+            }
 
-                settingsStatusRow(
-                    title: "GitHub Export",
-                    detail: "Issues destination",
-                    status: gitHubReadiness,
-                    accessibilityLabel: "GitHub export status: \(gitHubReadiness.title)"
-                )
+            Text("Optional exports — configure only the destinations you use.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-                settingsStatusRow(
-                    title: "Jira Export",
-                    detail: "Cloud project destination",
-                    status: jiraReadiness,
-                    accessibilityLabel: "Jira export status: \(jiraReadiness.title)"
-                )
+            HStack {
+                Button("GitHub Export: \(gitHubReadiness.title)") {
+                    selectedSection = .integrations
+                }
+                .accessibilityLabel("GitHub export status: \(gitHubReadiness.title)")
+                Button("Jira Export: \(jiraReadiness.title)") {
+                    selectedSection = .integrations
+                }
+                .accessibilityLabel("Jira export status: \(jiraReadiness.title)")
             }
         }
         .padding(14)
@@ -276,17 +279,9 @@ struct SettingsView: View {
     }
 
     private var secureControlsDisabled: Bool {
-        appState.status.phase == .recording || appState.status.phase == .transcribing
-    }
-
-    private var setupTotalCount: Int { 3 }
-
-    private var setupConfiguredCount: Int {
-        var count = 0
-        if openAIReadiness == .ready { count += 1 }
-        if gitHubReadiness == .ready { count += 1 }
-        if jiraReadiness == .ready { count += 1 }
-        return count
+        appState.localServerControlsDisabled ||
+            appState.issueExtractionController.issueExtractionSessionID != nil ||
+            appState.exportDestinationInProgress != nil
     }
 
     private var openAIReadiness: SettingsReadinessStatus {

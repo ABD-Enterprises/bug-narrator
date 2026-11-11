@@ -36,6 +36,44 @@ final class BugNarratorSettingsUITests: XCTestCase {
     }
 
     @MainActor
+    func testSetupTabsFitWindowAndShowProviderSpecificPrivacy() throws {
+        let app = launchSettingsApp(scope: "settings-layout-review")
+        defer { app.terminate() }
+        let window = app.windows["BugNarrator Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        waitForSettingsLayout()
+
+        for title in ["General", "AI Engines", "Audio", "Integrations", "Privacy"] {
+            selectSettingsTab(title, in: app)
+            let heading = window.staticTexts["settings.heading"]
+            XCTAssertTrue(heading.exists)
+            XCTAssertGreaterThanOrEqual(heading.frame.minX, window.frame.minX)
+            XCTAssertLessThanOrEqual(heading.frame.maxX, window.frame.maxX)
+            let tabs = window.descendants(matching: .any)["settings.tabs"].firstMatch
+            XCTAssertTrue(tabs.exists)
+            XCTAssertGreaterThanOrEqual(tabs.frame.minX, window.frame.minX)
+            XCTAssertLessThanOrEqual(tabs.frame.maxX, window.frame.maxX)
+            if title == "AI Engines" {
+                let comparison = window.buttons["Compare OpenAI and Local (Parakeet)"]
+                XCTAssertTrue(waitForSettingsElement(comparison, in: window))
+                comparison.click()
+                XCTAssertTrue(window.staticTexts["Not supported"].waitForExistence(timeout: 5))
+                XCTAssertGreaterThanOrEqual(tabs.frame.minX, window.frame.minX)
+                XCTAssertLessThanOrEqual(tabs.frame.maxX, window.frame.maxX)
+            }
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = "Settings - \(title)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+
+        let uploadToggle = window.checkBoxes["Send screenshots to the AI provider"]
+        XCTAssertTrue(waitForSettingsElement(uploadToggle, in: window))
+        XCTAssertFalse(uploadToggle.isEnabled)
+        XCTAssertTrue(window.staticTexts.matching(NSPredicate(format: "value == %@", "Local (Parakeet) transcribes audio on this Mac and does not run issue extraction or upload screenshots. Choose a chat-capable provider to use this option.")).firstMatch.exists)
+    }
+
+    @MainActor
     func testSavedOpenAIKeyKeepsSettingsCredentialActionsEnabled() throws {
         let app = launchSettingsApp(scope: "saved-openai-key-actions", seedCredentials: true, aiProvider: "openAI")
         defer { app.terminate() }
@@ -85,7 +123,11 @@ final class BugNarratorSettingsUITests: XCTestCase {
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(app.staticTexts["No AI provider credential required"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["No key required"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Remove Key"].exists)
+        let extractionToggle = settingsWindow.checkBoxes["Run issue extraction automatically after transcription"]
+        XCTAssertTrue(extractionToggle.waitForExistence(timeout: 5))
+        XCTAssertFalse(extractionToggle.isEnabled)
+        XCTAssertTrue(app.staticTexts["Optional exports — configure only the destinations you use."].exists)
         XCTAssertTrue(app.buttons["Check Server"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Download the local transcription server"].waitForExistence(timeout: 5))
         XCTAssertTrue(
@@ -664,7 +706,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
     /// accessibility tree — call this before accessing any field in a section. The
     /// segmented `Picker` exposes each section as a `radioButton` labeled with the
     /// section title (e.g. "General", "AI Engines", "Audio", "Integrations",
-    /// "Diagnostics & Privacy").
+    /// "Privacy").
     @MainActor
     private func selectSettingsTab(_ section: String, in app: XCUIApplication) {
         // Bring the settings window forward — while the test runner is key, the

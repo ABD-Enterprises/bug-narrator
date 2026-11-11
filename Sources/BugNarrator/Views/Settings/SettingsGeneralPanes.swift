@@ -90,6 +90,7 @@ struct SettingsGlobalHotkeysPane: View {
             Text(action.title)
                 .font(.subheadline.weight(.medium))
             HotkeyRecorderView(actionTitle: action.title, shortcut: shortcut)
+                .disabled(secureControlsDisabled)
 
             if !shortcut.wrappedValue.isEnabled,
                let suggestion = settingsStore.suggestedShortcutIfAvailable(for: action) {
