@@ -1,5 +1,21 @@
 import Foundation
 
+/// Requests carrying credentials or private content must not follow redirects.
+/// A task delegate also protects sessions injected by callers.
+final class SensitiveRequestRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    static let shared = SensitiveRequestRedirectPolicy()
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 enum OpenAIEndpointBuilder {
     static func endpoint(for path: String, baseURL: URL) -> URL {
         var pathComponents = path.split(separator: "/").map(String.init)
@@ -22,6 +38,9 @@ enum OpenAIErrorMapper {
         fallback: (String) -> AppError,
         responseHeaders: [AnyHashable: Any]? = nil
     ) -> AppError {
+        if (300...399).contains(statusCode) {
+            return fallback("The server redirected the request. Update the provider address in Settings; redirects are not followed to protect credentials and private content.")
+        }
         let payload = decodeAPIErrorPayload(from: data)
         let message = payload?.message ?? HTTPURLResponse.localizedString(forStatusCode: statusCode)
         let normalizedMessage = message.lowercased()

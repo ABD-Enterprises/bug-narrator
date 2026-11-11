@@ -12,7 +12,7 @@ extension GitHubExportProvider {
         }
 
         let request = try makeSearchRequest(issue: issue, configuration: configuration)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.exportFailure("GitHub returned an invalid response.")
@@ -130,7 +130,7 @@ extension GitHubExportProvider {
             fingerprint: fingerprint,
             configuration: configuration
         )
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.exportFailure("GitHub returned an invalid response.")
