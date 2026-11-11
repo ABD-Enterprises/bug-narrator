@@ -73,7 +73,8 @@ internal static class SessionArtifactPathPolicy
             }
         }
 
-        return Path.Combine(sessionDirectory, defaultFileName);
+        return StoragePathGuards.EnsureFilePathUnderRoot(
+            sessionDirectory, Path.Combine(sessionDirectory, defaultFileName), "default session artifact");
     }
 
     private static string NormalizeRelativePath(string relativePath)
