@@ -60,15 +60,15 @@ public sealed class JiraExportProvider
                 request,
                 "Jira",
                 cancellationToken);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseBody = await ResponseBodyReader.ReadAsync(response, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                var message = BuildFailureMessage(
+                var message = ResponseBodyReader.SanitizeMessage(BuildFailureMessage(
                     response.StatusCode,
                     responseBody,
                     configuration,
-                    results.Count);
+                    results.Count));
                 diagnostics.Warning("export", message);
                 throw new InvalidOperationException(message);
             }

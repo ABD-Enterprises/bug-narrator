@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [SECURITY] Windows bounds failed server replies and health responses, and limits error messages while removing log-control characters.
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.
 

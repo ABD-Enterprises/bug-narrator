@@ -1,4 +1,5 @@
 using System.Linq;
+using BugNarrator.Windows.Services.Http;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -96,8 +97,8 @@ public sealed class LocalServerHealthProbe : ILocalServerHealthProbe
             var expectedProof = string.IsNullOrWhiteSpace(token)
                 ? null
                 : LocalServerTokenStore.Proof(nonce, token, LocalServerTokenStore.Authority(url));
-            using var response = await httpClient.SendAsync(request, timeout.Token);
-            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            var body = await ResponseBodyReader.ReadBoundedAsync(response.Content, timeout.Token);
             if (expectedProof is null)
             {
                 return false;
