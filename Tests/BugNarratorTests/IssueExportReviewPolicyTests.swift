@@ -6,6 +6,25 @@ final class IssueExportReviewPolicyTests: XCTestCase {
 
     // MARK: - preparedIssues
 
+    func testTrackerLinksCannotLaunchApplicationsOrOpenLocalFiles() {
+        for text in [
+            "file:///tmp/synthetic-fixture.command",
+            "javascript:alert(1)",
+            "data:text/html,synthetic",
+            "x-apple.systempreferences:synthetic",
+            "custom-app://perform-action",
+            "https://fixture-user:fixture-password@example.com/issue",
+            "/relative/issue"
+        ] {
+            XCTAssertNil(ExternalWebLinkPolicy.allowedURL(URL(string: text)), text)
+        }
+        XCTAssertNil(ExternalWebLinkPolicy.allowedURL(nil))
+        for text in ["https://github.com/example/project/issues/1", "http://127.0.0.1:8080/browse/TEST-1"] {
+            let url = URL(string: text)!
+            XCTAssertEqual(ExternalWebLinkPolicy.allowedURL(url), url)
+        }
+    }
+
     func testExportNewPassesTheIssueThroughUnchanged() throws {
         let issue = makeIssue("Crash on launch")
         let review = makeReview(items: [IssueExportReviewItem(issue: issue, matches: [])])
