@@ -99,7 +99,7 @@ struct ExportHistorySummaryView: View {
 
                     Spacer(minLength: 0)
 
-                    if let remoteURL = receipt.remoteURL {
+                    if let remoteURL = TrackerWebLinkPolicy.allowedURL(receipt.remoteURL) {
                         Link("Open", destination: remoteURL)
                             .font(.caption.weight(.semibold))
                     }

@@ -4,6 +4,7 @@
 
 - [SECURITY] Release safety checks recognize inline permission maps and write-all permissions, including explicit job overrides.
 
+- [SECURITY] Mac tracker links open only web addresses, refusing local files, application commands and addresses containing embedded credentials.
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
 - [SECURITY] Build checkouts discard their GitHub credentials before later steps run; validation prevents credential persistence from returning.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.

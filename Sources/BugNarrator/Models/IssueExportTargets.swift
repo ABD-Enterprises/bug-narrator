@@ -122,3 +122,16 @@ struct ExportResult: Identifiable, Equatable {
     }
 }
 
+
+
+/// Tracker-supplied links are web data, never commands for another application.
+enum TrackerWebLinkPolicy {
+    static func allowedURL(_ url: URL?) -> URL? {
+        guard let url,
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = url.host, !host.isEmpty,
+              url.user == nil, url.password == nil else { return nil }
+        return url
+    }
+}

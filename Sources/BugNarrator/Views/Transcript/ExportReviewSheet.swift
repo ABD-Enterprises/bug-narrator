@@ -142,7 +142,7 @@ extension TranscriptView {
                         .multilineTextAlignment(.leading)
                 }
 
-                if let remoteURL = match.remoteURL {
+                if let remoteURL = TrackerWebLinkPolicy.allowedURL(match.remoteURL) {
                     Link("Open Tracker Issue", destination: remoteURL)
                         .font(.caption.weight(.semibold))
                 }
