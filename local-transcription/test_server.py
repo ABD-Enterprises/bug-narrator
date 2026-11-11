@@ -1566,7 +1566,8 @@ class ServerTokenFileAndChildProcessTests(unittest.TestCase):
 
             def secure_empty(command, **kwargs):
                 self.assertEqual(command[:2], ["/bin/chmod", "-N"])
-                self.assertEqual(Path(command[2]).read_bytes(), b"")
+                self.assertTrue(Path(command[2]).is_dir())
+                self.assertEqual(list(Path(command[2]).iterdir()), [])
                 self.assertNotIn(server.TOKEN_ENVIRONMENT_VARIABLE, kwargs["env"])
                 return None
 

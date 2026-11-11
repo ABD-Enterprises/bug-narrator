@@ -176,38 +176,23 @@ enum LocalServerTokenStore {
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            // The temporary file is created owner-only and empty, and the
-            // token is written into it afterwards: `createFile` applies the
-            // mode after it has written, so the token would otherwise sit in
-            // a file anyone else could read.
-            let temporary = url.deletingLastPathComponent()
-                .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
-            guard manager.createFile(
-                atPath: temporary.path,
-                contents: nil,
-                attributes: [.posixPermissions: NSNumber(value: 0o600)]
-            ) else {
+            // Secure an empty staging directory before creating the token file.
+            // Clearing an ACL on an already-created file cannot revoke a handle
+            // another reader acquired while the inherited ACL still allowed it.
+            let staging = url.deletingLastPathComponent()
+                .appendingPathComponent(".token-\(UUID().uuidString)", isDirectory: true)
+            try manager.createDirectory(at: staging, withIntermediateDirectories: false,
+                                        attributes: [.posixPermissions: NSNumber(value: 0o700)])
+            defer { try? manager.removeItem(at: staging) }
+            try removeSharingPermissions(at: staging)
+            let temporary = staging.appendingPathComponent("token")
+            guard manager.createFile(atPath: temporary.path, contents: nil,
+                                     attributes: [.posixPermissions: NSNumber(value: 0o600)]) else {
                 return false
             }
-            do {
-                // Mode 0600 does not remove inherited macOS sharing ACLs.
-                // Clear them while the temporary file is still empty.
-                try removeSharingPermissions(at: temporary)
-                try Data(token.utf8).write(to: temporary)
-                // The file is replaced in one step, so a reader never sees a
-                // missing or an empty token file. The new file's metadata is
-                // the one that is kept: a token file that was already there
-                // with wider permissions would otherwise stay readable by
-                // everyone else.
-                _ = try manager.replaceItemAt(
-                    url,
-                    withItemAt: temporary,
-                    options: [.usingNewMetadataOnly]
-                )
-            } catch {
-                try? manager.removeItem(at: temporary)
-                return false
-            }
+            try removeSharingPermissions(at: temporary)
+            try Data(token.utf8).write(to: temporary)
+            _ = try manager.replaceItemAt(url, withItemAt: temporary, options: [.usingNewMetadataOnly])
             return isReadableOnlyByItsOwner(url)
         } catch {
             return false
