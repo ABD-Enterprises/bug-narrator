@@ -936,6 +936,36 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(receipt?.remoteIdentifier, "#91")
     }
 
+    func testExtremeServerRetryDelayStopsAfterReconciliationAndKeepsThePendingReceipt() async throws {
+        let issue = makeRetryFixtureIssue()
+        let session = makeRetryFixtureSession(issue: issue)
+        let configuration = makeRetryFixtureConfiguration()
+        let receipts = StubExportReceiptStore()
+        let provider = GitHubExportProvider(session: makeMockURLSession(), receiptStore: receipts)
+        var postCount = 0
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                postCount += 1
+                return (HTTPURLResponse(url: request.url!, statusCode: 429, httpVersion: nil,
+                    headerFields: ["Retry-After": String(Int.max)])!, Data(#"{"message":"rate limited"}"#.utf8))
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: nil)!, Data(#"{"items":[]}"#.utf8))
+        }
+        do {
+            _ = try await provider.export(issues: [issue], session: session, configuration: configuration)
+            XCTFail("A long wait must be surfaced for a later manual retry")
+        } catch let error as AppError {
+            XCTAssertTrue(error.userMessage.contains(String(Int.max)))
+        }
+        XCTAssertEqual(postCount, 1)
+        let fingerprint = TrackerExportFingerprint.make(destination: .github,
+            targetIdentity: configuration.targetIdentity, sessionID: session.id, issueID: issue.id)
+        let receipt = try await receipts.receipt(for: fingerprint)
+        XCTAssertEqual(receipt?.state, .pending)
+        XCTAssertEqual(TrackerExportSupport.retryDelay(attempt: 1, retryAfterSeconds: Int.max, base: .zero), .seconds(60))
+    }
+
     func testRetryDelayHonorsRetryAfterAndOtherwiseBacksOffExponentially() {
         // An explicit Retry-After wins over the configured backoff.
         XCTAssertEqual(

@@ -17,6 +17,7 @@
 - [SECURITY] Mac diagnostic logs redact Basic authentication credentials and Atlassian API tokens, while preserving ordinary prose about basic configuration.
 - [SECURITY] Diagnostic filtering combines complete known-secret and pattern matches before replacement and covers the full Bearer credential alphabet, preventing exposed credential tails.
 - [SECURITY] Build checkouts discard their GitHub credentials before later steps run; validation prevents credential persistence from returning.
+- [SECURITY] Timeline labels safely handle enormous finite timestamps on Mac and Windows; extreme tracker retry delays stop for a later manual retry instead of overflowing sleep conversions.
 - [SECURITY] Mac provider failures use generic diagnostic summaries rather than server-supplied private details; malformed retry headers cannot crash error presentation.
 - [SECURITY] Windows blocks remote unencrypted AI endpoints before sending credentials, audio or transcripts. Default AI clients refuse redirects.
 
