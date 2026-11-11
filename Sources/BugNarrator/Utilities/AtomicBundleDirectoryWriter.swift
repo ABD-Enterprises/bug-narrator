@@ -43,7 +43,7 @@ struct AtomicBundleDirectoryWriter {
         guard let emptyACL = acl_init(0) else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }
-        defer { acl_free(emptyACL) }
+        defer { acl_free(UnsafeMutableRawPointer(emptyACL)) }
         guard acl_set_file(url.path, ACL_TYPE_EXTENDED, emptyACL) == 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }

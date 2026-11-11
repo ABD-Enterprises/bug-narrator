@@ -35,9 +35,9 @@ final class TranscriptExporterTests: XCTestCase {
 
     private func assertNoSharingPermissions(_ url: URL) throws {
         let acl = try XCTUnwrap(acl_get_file(url.path, ACL_TYPE_EXTENDED))
-        defer { acl_free(acl) }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
         var entry: acl_entry_t?
-        XCTAssertEqual(acl_get_entry(acl, ACL_FIRST_ENTRY, &entry), 0)
+        XCTAssertEqual(acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry), -1)
     }
 
     private struct SessionBundleLayoutContract: Decodable {
