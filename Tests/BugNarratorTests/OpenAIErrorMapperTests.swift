@@ -2,6 +2,15 @@ import XCTest
 @testable import BugNarrator
 
 final class OpenAIErrorMapperTests: XCTestCase {
+    func testRetryHeaderCannotIntroduceNonFiniteOrUnrepresentableNumbers() {
+        for value in ["NaN", "nan", "inf", "-inf", "1e999", "1e308", "9223372036854775808"] {
+            XCTAssertNil(OpenAIErrorMapper.parseRetryAfter(from: ["Retry-After": value]), value)
+        }
+        for value in [Double.infinity, -.infinity, .nan, Double.greatestFiniteMagnitude] {
+            XCTAssertFalse(AppError.rateLimited(retryAfter: value).userMessage.contains("seconds"))
+        }
+    }
+
     func testEndpointBuilderDoesNotDuplicateVersionPath() {
         let endpoint = OpenAIEndpointBuilder.endpoint(
             for: "v1/audio/transcriptions",

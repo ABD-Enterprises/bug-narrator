@@ -111,7 +111,7 @@ final class TrackerIntegrationController: ObservableObject {
 
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             gitHubValidationState = .failure(appError.userMessage)
-            exportLogger.warning(.validateGitHubConfigurationFailed, appError.userMessage)
+            exportLogger.warning(.validateGitHubConfigurationFailed, appError.diagnosticMessage())
         }
     }
 
@@ -171,7 +171,7 @@ final class TrackerIntegrationController: ObservableObject {
 
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             gitHubValidationState = .failure(appError.userMessage)
-            exportLogger.warning("load_github_repositories_failed", appError.userMessage)
+            exportLogger.warning("load_github_repositories_failed", appError.diagnosticMessage())
         }
     }
 

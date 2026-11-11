@@ -150,7 +150,7 @@ extension TrackerExportSupport {
             case .transient(let createError, let retryAfterSeconds):
                 logger.error(
                     context.failedLogEvent,
-                    createError.userMessage,
+                    createError.diagnosticMessage(),
                     metadata: [
                         "source_issue_id": issueID.uuidString,
                         "attempt": "\(attempt)",
@@ -164,7 +164,7 @@ extension TrackerExportSupport {
                 } catch {
                     logger.warning(
                         context.reconciliationFailedLogEvent,
-                        (error as? AppError)?.userMessage ?? error.localizedDescription,
+                        AppError.diagnosticMessage(for: error),
                         metadata: ["source_issue_id": issueID.uuidString]
                     )
                     throw partialExportError(createError, providerName: context.displayName, successfulCount: successfulCount)
@@ -186,7 +186,7 @@ extension TrackerExportSupport {
             case .permanent(let error):
                 logger.error(
                     context.failedLogEvent,
-                    error.userMessage,
+                    error.diagnosticMessage(),
                     metadata: ["source_issue_id": issueID.uuidString, "transient": "false"]
                 )
                 if let reconciled = try? await reconcile() {

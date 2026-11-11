@@ -108,7 +108,7 @@ final class AppErrorPresenter {
     func logAppError(_ normalizedError: AppErrorNormalization, context: String) {
         let error = normalizedError.appError
         let metadata = appErrorMetadata(for: normalizedError, context: context)
-        let message = error.userMessage(for: provider())
+        let message = error.diagnosticMessage(for: provider())
 
         telemetryRecorder.record(.appError, metadata: metadata)
 
@@ -150,8 +150,8 @@ final class AppErrorPresenter {
             "error_type": telemetryErrorType(for: normalizedError.appError)
         ]
 
-        if let underlyingErrorDescription = normalizedError.underlyingErrorDescription {
-            metadata["underlying_error"] = underlyingErrorDescription
+        if normalizedError.underlyingErrorDescription != nil {
+            metadata["underlying_error"] = "<redacted>"
         }
 
         return metadata

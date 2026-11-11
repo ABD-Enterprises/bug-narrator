@@ -86,7 +86,7 @@ enum AppError: LocalizedError, Equatable {
             }
             return "BugNarrator could not reach \(providerName). Check the connection and try again."
         case .rateLimited(let retryAfter):
-            if let retryAfter {
+            if let retryAfter, retryAfter.isFinite, retryAfter >= 0, retryAfter < Double(Int.max) {
                 return "\(providerName) rate limit reached. Try again in \(Int(retryAfter)) seconds."
             }
             return "\(providerName) rate limit reached. Wait a moment and try again."
@@ -247,5 +247,33 @@ enum AppError: LocalizedError, Equatable {
         default:
             return false
         }
+    }
+}
+
+
+extension AppError {
+    /// Associated error details can come from a remote server and may echo
+    /// private request content. They belong in the app, never diagnostic exports.
+    func diagnosticMessage(for provider: AIProvider = .openAI) -> String {
+        switch self {
+        case .microphoneUnavailable: return "The microphone is unavailable."
+        case .systemAudioUnavailable: return "System audio is unavailable."
+        case .noActiveSession: return "No active session."
+        case .recordingFailure: return "Recording failed; see the in-app error for details."
+        case .transcriptionFailure: return "Transcription failed; see the in-app error for details."
+        case .openAIRequestRejected: return "The provider rejected the request; see the in-app error for details."
+        case .screenshotCaptureFailure: return "Screenshot capture failed; see the in-app error for details."
+        case .issueExtractionFailure: return "Issue extraction failed; see the in-app error for details."
+        case .exportConfigurationMissing: return "Export configuration is incomplete."
+        case .exportConfigurationIncompatible: return "Export configuration is incompatible."
+        case .exportFailure: return "Export failed; see the in-app error for details."
+        case .storageFailure: return "Local storage failed; see the in-app error for details."
+        case .diagnosticsFailure: return "Diagnostics failed; see the in-app error for details."
+        default: return userMessage(for: provider)
+        }
+    }
+
+    static func diagnosticMessage(for error: Error) -> String {
+        (error as? AppError)?.diagnosticMessage() ?? "The operation failed; see the in-app error for details."
     }
 }
