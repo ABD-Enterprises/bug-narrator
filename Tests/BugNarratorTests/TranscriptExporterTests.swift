@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 @testable import BugNarrator
 
 @MainActor
@@ -7,7 +8,15 @@ final class TranscriptExporterTests: XCTestCase {
         let manager = FileManager.default
         let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? manager.removeItem(at: root) }
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        let sharing = Process()
+        sharing.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        sharing.arguments = ["+a", "everyone allow read,list,search,readattr,readextattr,readsecurity,file_inherit,directory_inherit", root.path]
+        try sharing.run()
+        sharing.waitUntilExit()
+        XCTAssertEqual(sharing.terminationStatus, 0)
         let bundle = try AtomicBundleDirectoryWriter().writeBundle(in: root, suggestedName: "fixture") { staging in
+            try assertNoSharingPermissions(staging)
             XCTAssertEqual(try manager.attributesOfItem(atPath: staging.path)[.posixPermissions] as? Int, 0o700)
             let nested = staging.appendingPathComponent("screenshots")
             try manager.createDirectory(at: nested, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o755])
@@ -15,10 +24,20 @@ final class TranscriptExporterTests: XCTestCase {
             try Data("synthetic fixture".utf8).write(to: file)
             try manager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: file.path)
         }
+        for name in ["", "screenshots", "screenshots/fixture.txt"] {
+            try assertNoSharingPermissions(bundle.appendingPathComponent(name))
+        }
         for name in ["", "screenshots"] {
             XCTAssertEqual(try manager.attributesOfItem(atPath: bundle.appendingPathComponent(name).path)[.posixPermissions] as? Int, 0o700)
         }
         XCTAssertEqual(try manager.attributesOfItem(atPath: bundle.appendingPathComponent("screenshots/fixture.txt").path)[.posixPermissions] as? Int, 0o600)
+    }
+
+    private func assertNoSharingPermissions(_ url: URL) throws {
+        let acl = try XCTUnwrap(acl_get_file(url.path, ACL_TYPE_EXTENDED))
+        defer { acl_free(acl) }
+        var entry: acl_entry_t?
+        XCTAssertEqual(acl_get_entry(acl, ACL_FIRST_ENTRY, &entry), 0)
     }
 
     private struct SessionBundleLayoutContract: Decodable {
