@@ -206,6 +206,40 @@ class ServerModelConfigurationTests(unittest.TestCase):
         with wave.open(tail, "rb") as handle:
             self.assertAlmostEqual(handle.getnframes() / handle.getframerate(), 5, places=1)
 
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
+    def test_decoder_rejects_playlists_that_reference_other_local_audio(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sibling = root / "private.mp3"
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=1", "-y", str(sibling)],
+                check=True, capture_output=True,
+            )
+            uploads = root / "uploads"
+            uploads.mkdir()
+            playlist = uploads / "upload.m3u8"
+            playlist.write_text(
+                "#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\n"
+                + sibling.as_uri() + "\n#EXT-X-ENDLIST\n"
+            )
+            with self.assertRaises(RuntimeError):
+                server._decode_audio_window(str(playlist), 0)
+            # The same decoder still accepts the self-contained audio upload.
+            decoded = server._decode_audio_window(str(sibling), 0)
+            self.addCleanup(server._unlink_quietly, decoded)
+            self.assertIsNotNone(decoded)
+
+    def test_decoder_error_does_not_inject_log_control_text(self):
+        failure = subprocess.CalledProcessError(
+            1, "ffmpeg", stderr=b"invalid media\nFORGED\x1b[2J"
+        )
+        with patch.object(server.subprocess, "run", side_effect=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                server._decode_audio_window("/tmp/synthetic.audio", 0)
+        self.assertNotIn("\n", str(caught.exception))
+        self.assertNotIn("\x1b", str(caught.exception))
+
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
@@ -223,6 +257,8 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server._load_model_in_background("a-model")
             deadline = time.time() + 5
             while server._model_load_state != "failed" and time.time() < deadline:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.02)
 
         self.assertEqual(server._model_load_state, "failed")
@@ -354,6 +390,8 @@ server._inference_executor.submit(time.sleep, 30)
 server._serve("127.0.0.1", {port})
 """
         creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -370,6 +408,8 @@ server._serve("127.0.0.1", {port})
                     with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                         break
                 except OSError:
+                    # Bounded polling waits for a test server, not production work.
+                    # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                     time.sleep(0.05)
             else:
                 self.fail("transcription server did not start within 10 seconds")
@@ -497,9 +537,10 @@ server._serve("127.0.0.1", {port})
 
         def fake_run_inference(_model_id, path):
             seen["bytes"] = Path(path).read_bytes()
+            seen["path"] = path
             return server._Transcription("ok", [])
 
-        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a")
+        upload = UploadFile(io.BytesIO(payload), filename="clip.m4a\nFORGED\x1b[2J")
         original_read = upload.read
         read_sizes = []
 
@@ -516,6 +557,8 @@ server._serve("127.0.0.1", {port})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(seen.get("bytes"), payload)
+        self.assertEqual(Path(seen["path"]).suffix, ".audio")
+        self.assertNotIn("FORGED", seen["path"])
         # Every read is a bounded piece; the whole upload is never read at once (#1229).
         self.assertTrue(read_sizes)
         self.assertEqual(max(read_sizes), server._upload_piece_bytes)
@@ -843,6 +886,8 @@ server.main()
         environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
         environment["PYTHONUNBUFFERED"] = "1"
         creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -860,6 +905,8 @@ server.main()
                 with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                     return process
             except OSError:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.05)
         self.fail("the transcription server did not start within 20 seconds")
 
@@ -1112,6 +1159,8 @@ server.main()
         environment = dict(os.environ)
         environment[server.TOKEN_ENVIRONMENT_VARIABLE] = token
         environment["PYTHONUNBUFFERED"] = "1"
+        # Fixed test interpreter and fixture script; no user input or shell.
+        # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         process = subprocess.Popen(
             [sys.executable, "-c", script],
             cwd=Path(__file__).parent,
@@ -1128,6 +1177,8 @@ server.main()
                 with socket.create_connection(("127.0.0.1", port), timeout=0.1):
                     return process
             except OSError:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
                 time.sleep(0.05)
         self.fail("the transcription server did not start within 20 seconds")
 
