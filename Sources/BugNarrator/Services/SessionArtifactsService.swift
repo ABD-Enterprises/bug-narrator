@@ -130,6 +130,10 @@ struct SessionArtifactsService: SessionArtifactsManaging {
 
     private func isManagedArtifactsDirectory(_ directoryURL: URL) -> Bool {
         guard directoryURL.isFileURL else { return false }
+        let lexicalDirectory = directoryURL.standardizedFileURL
+        let lexicalRoot = rootDirectoryURL.standardizedFileURL
+        guard lexicalDirectory != lexicalRoot,
+              lexicalDirectory.path.hasPrefix(lexicalRoot.path + "/") else { return false }
         // Stored paths are data. A lexical child can pass through a folder
         // link into unrelated files, so check its actual destination too.
         let standardizedDirectoryURL = directoryURL.standardizedFileURL.resolvingSymlinksInPath()

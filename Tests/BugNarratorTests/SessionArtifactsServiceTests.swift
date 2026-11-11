@@ -57,6 +57,22 @@ final class SessionArtifactsServiceTests: XCTestCase {
         XCTAssertTrue(manager.fileExists(atPath: sentinel.path))
     }
 
+    func testRemovalStillRefusesAnOutsideLinkPointingIntoManagedStorage() throws {
+        let manager = FileManager.default
+        let base = makeTempDirectory()
+        defer { try? manager.removeItem(at: base) }
+        let root = base.appendingPathComponent("SessionAssets")
+        let managed = root.appendingPathComponent("session")
+        try manager.createDirectory(at: managed, withIntermediateDirectories: true)
+        let outsideLink = base.appendingPathComponent("outside-alias")
+        try manager.createSymbolicLink(at: outsideLink, withDestinationURL: managed)
+        let service = SessionArtifactsService(rootDirectoryURL: root)
+
+        XCTAssertEqual(service.removeArtifactsDirectory(at: outsideLink), .rejectedUnmanagedDirectory)
+        XCTAssertTrue(manager.fileExists(atPath: outsideLink.path))
+        XCTAssertTrue(manager.fileExists(atPath: managed.path))
+    }
+
     func testPreserveRecordedAudioCopiesIntoDirectoryAndLeavesSource() throws {
         let rootDirectoryURL = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectoryURL) }
