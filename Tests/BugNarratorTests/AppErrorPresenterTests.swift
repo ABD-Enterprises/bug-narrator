@@ -3,6 +3,17 @@ import XCTest
 
 @MainActor
 final class AppErrorPresenterTests: XCTestCase {
+    func testProviderFailureDetailsStayInTheAppAndOutOfTelemetry() throws {
+        let harness = AppErrorPresenterHarness()
+        let marker = "SYNTHETIC_PRIVATE_TRANSCRIPT_731"
+        let error = AppError.openAIRequestRejected(marker)
+        _ = harness.presenter.presentError(error, operation: .issueExtraction)
+        XCTAssertTrue(harness.presentationState.status.detail.contains(marker))
+        let telemetry = try harness.lastAppErrorTelemetry()
+        XCTAssertFalse(telemetry.metadata.values.joined().contains(marker))
+        XCTAssertFalse(error.diagnosticMessage().contains(marker))
+    }
+
     func testSetStatusUpdatesPresentationState() {
         let harness = AppErrorPresenterHarness()
 
@@ -35,7 +46,7 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["context"], "present_error")
         XCTAssertEqual(telemetry.metadata["operation"], "session_library")
         XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
-        XCTAssertEqual(telemetry.metadata["underlying_error"], "Disk is full")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "<redacted>")
     }
 
     func testPresentErrorPassesThroughAppErrorAndRecommendsSettingsWhenNeeded() throws {
@@ -94,7 +105,7 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["context"], "present_post_transcription_error")
         XCTAssertEqual(telemetry.metadata["operation"], "post_transcription")
         XCTAssertEqual(telemetry.metadata["error_type"], "issue_extraction_failure")
-        XCTAssertEqual(telemetry.metadata["underlying_error"], "Issue extraction service unavailable")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "<redacted>")
     }
 
     func testPostTranscriptionFailurePresenterOpensSettingsForCredentialFailure() throws {
@@ -176,7 +187,7 @@ final class AppErrorPresenterTests: XCTestCase {
         XCTAssertEqual(telemetry.metadata["context"], "transcript_persist_failed")
         XCTAssertEqual(telemetry.metadata["operation"], "session_library")
         XCTAssertEqual(telemetry.metadata["error_type"], "storage_failure")
-        XCTAssertEqual(telemetry.metadata["underlying_error"], "Disk locked")
+        XCTAssertEqual(telemetry.metadata["underlying_error"], "<redacted>")
     }
 }
 

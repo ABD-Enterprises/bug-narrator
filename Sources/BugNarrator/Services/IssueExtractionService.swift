@@ -83,7 +83,7 @@ actor IssueExtractionService: IssueExtracting {
         } catch {
             logger.error(
                 "issue_extraction_request_failed",
-                (error as? AppError)?.userMessage ?? error.localizedDescription,
+                AppError.diagnosticMessage(for: error),
                 metadata: ["session_id": reviewSession.id.uuidString]
             )
             throw OpenAIErrorMapper.mapTransportError(error, fallback: AppError.issueExtractionFailure)

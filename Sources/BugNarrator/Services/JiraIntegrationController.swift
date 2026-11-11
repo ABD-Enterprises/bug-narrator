@@ -175,7 +175,7 @@ final class JiraIntegrationController: ObservableObject {
             issueTypeMetadataIsStale = !issueTypes.isEmpty
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             validationState = .failure(appError.userMessage)
-            exportLogger.warning(.validateJiraConfigurationFailed, appError.userMessage)
+            exportLogger.warning(.validateJiraConfigurationFailed, appError.diagnosticMessage())
         }
     }
 
@@ -272,7 +272,7 @@ final class JiraIntegrationController: ObservableObject {
 
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             validationState = .failure(appError.userMessage)
-            exportLogger.warning("load_jira_issue_types_failed", appError.userMessage)
+            exportLogger.warning("load_jira_issue_types_failed", appError.diagnosticMessage())
         }
     }
 
@@ -322,7 +322,7 @@ final class JiraIntegrationController: ObservableObject {
             let appError = (error as? AppError) ?? .exportFailure(error.localizedDescription)
             issueTypeMetadataIsStale = !issueTypes.isEmpty && issueTypesProjectKey == project.key
             validationState = .failure(appError.userMessage)
-            exportLogger.warning("load_jira_issue_types_failed", appError.userMessage)
+            exportLogger.warning("load_jira_issue_types_failed", appError.diagnosticMessage())
         }
     }
 

@@ -87,11 +87,13 @@ enum OpenAIErrorMapper {
         let trimmed = retryValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let seconds = TimeInterval(trimmed) {
+            guard seconds.isFinite, seconds < Double(Int.max) else { return nil }
             return max(seconds, 1)
         }
 
         if let date = httpDateFormatter.date(from: trimmed) {
             let interval = date.timeIntervalSince(now)
+            guard interval.isFinite, interval < Double(Int.max) else { return nil }
             return max(interval, 1)
         }
 
