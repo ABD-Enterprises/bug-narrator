@@ -1271,7 +1271,7 @@ final class SettingsStore: ObservableObject {
         }()
         let report: LocalProviderHealthReport
         do {
-            let (data, response) = try await localProviderSession.data(for: request)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: localProviderSession, delegate: SensitiveRequestRedirectPolicy.shared, maximumBytes: 64 * 1_024)
             report = Self.localProviderHealthReport(data: data, response: response, expectedProof: expectedProof)
         } catch {
             report = LocalProviderHealthReport(isHealthy: false, modelError: nil)

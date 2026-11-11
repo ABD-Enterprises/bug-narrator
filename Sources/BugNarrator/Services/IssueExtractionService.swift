@@ -120,7 +120,7 @@ actor IssueExtractionService: IssueExtracting {
         using session: URLSession,
         reviewSession: TranscriptSession
     ) async throws -> IssueExtractionResult {
-        let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
+        let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: SensitiveRequestRedirectPolicy.shared)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.issueExtractionFailure("The server response was invalid.")
         }

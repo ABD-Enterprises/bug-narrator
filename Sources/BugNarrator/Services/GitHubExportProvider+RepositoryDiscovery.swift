@@ -13,7 +13,7 @@ extension GitHubExportProvider {
 
         while true {
             let request = try makeRepositoryListRequest(token: token, page: page)
-            let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
+            let (data, response) = try await BoundedHTTPResponseReader.data(for: request, using: session, delegate: SensitiveRequestRedirectPolicy.shared)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AppError.exportFailure("GitHub returned an invalid response.")

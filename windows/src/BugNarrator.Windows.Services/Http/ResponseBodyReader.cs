@@ -5,6 +5,7 @@ namespace BugNarrator.Windows.Services.Http;
 
 public static class ResponseBodyReader
 {
+    public const int SuccessBodyByteLimit = 16 * 1024 * 1024;
     public const int ErrorBodyByteLimit = 64 * 1024;
     public const int MessageCharacterLimit = 2048;
 
@@ -15,13 +16,41 @@ public static class ResponseBodyReader
         try
         {
             return response.IsSuccessStatusCode
-                ? await response.Content.ReadAsStringAsync(timeout.Token)
+                ? await ReadSuccessfulBodyAsync(response.Content, timeout.Token)
                 : await ReadBoundedAsync(response.Content, timeout.Token);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new InvalidOperationException("The server response timed out. Check the connection and try again.", exception);
         }
+    }
+
+    private static async Task<string> ReadSuccessfulBodyAsync(HttpContent content, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (content.Headers.ContentLength is long declared && declared > SuccessBodyByteLimit)
+        {
+            throw new InvalidOperationException("The server reply exceeded BugNarrator's size limit.");
+        }
+        using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var payload = new MemoryStream();
+        var buffer = new byte[8192];
+        while (true)
+        {
+            // Read one byte beyond the ceiling at most, never a whole oversized body.
+            var requested = (int)Math.Min(buffer.Length, SuccessBodyByteLimit - payload.Length + 1);
+            var count = await stream.ReadAsync(buffer.AsMemory(0, requested), cancellationToken);
+            if (count == 0) break;
+            if (payload.Length + count > SuccessBodyByteLimit)
+            {
+                throw new InvalidOperationException("The server reply exceeded BugNarrator's size limit.");
+            }
+            payload.Write(buffer, 0, count);
+        }
+        // Preserve HttpContent's declared charset and BOM handling after bounding bytes.
+        using var bounded = new ByteArrayContent(payload.ToArray());
+        bounded.Headers.ContentType = content.Headers.ContentType;
+        return await bounded.ReadAsStringAsync(cancellationToken);
     }
 
     public static async Task<string> ReadBoundedAsync(HttpContent content, CancellationToken cancellationToken = default)
