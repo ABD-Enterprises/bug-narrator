@@ -96,7 +96,7 @@ final class LocalTranscriptionManager: ObservableObject {
             for page in 1...20 {
                 try Task.checkCancellation()
                 let url = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases?per_page=30&page=\(page)")!
-                let (data, response) = try await session.data(from: url)
+                let (data, response) = try await BoundedHTTPResponseReader.data(from: url, using: session)
                 try Self.requireSuccess(response)
                 let releases = try JSONDecoder().decode([Release].self, from: data)
                 if let found = Self.selectPackage(from: releases) {
@@ -126,7 +126,7 @@ final class LocalTranscriptionManager: ObservableObject {
                 let delegate = LocalServerDownloadProgress { [weak self] fraction in
                     Task { @MainActor in self?.progress = fraction }
                 }
-                let (checksum, checksumResponse) = try await self.session.data(from: package.checksum.browser_download_url)
+                let (checksum, checksumResponse) = try await BoundedHTTPResponseReader.data(from: package.checksum.browser_download_url, using: self.session, maximumBytes: 4_096)
                 try Self.requireSuccess(checksumResponse)
                 guard checksum.count < 4096 else { throw Failure("Invalid checksum manifest") }
                 let (temporary, response) = try await self.session.download(from: package.image.browser_download_url, delegate: delegate)

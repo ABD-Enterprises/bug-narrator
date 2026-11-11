@@ -26,6 +26,62 @@ public sealed class ResponseBodyReaderTests
     }
 
     [Fact]
+    public async Task SuccessfulLengthlessResponseStopsAtTheStreamingCeiling()
+    {
+        var stream = new RepeatingStream();
+        using var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(stream) };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ResponseBodyReader.ReadAsync(response));
+        Assert.Equal(ResponseBodyReader.SuccessBodyByteLimit + 1, stream.BytesRead);
+    }
+
+    [Fact]
+    public async Task SuccessfulDeclaredOversizeIsRefusedBeforeReading()
+    {
+        var stream = new RepeatingStream();
+        using var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(stream) };
+        response.Content.Headers.ContentLength = ResponseBodyReader.SuccessBodyByteLimit + 1;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ResponseBodyReader.ReadAsync(response));
+        Assert.Equal(0, stream.BytesRead);
+    }
+
+    [Fact]
+    public async Task SuccessfulResponsePreservesTheDeclaredCharset()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("synthetic é fixture", Encoding.Unicode),
+        };
+        Assert.Equal("synthetic é fixture", await ResponseBodyReader.ReadAsync(response));
+    }
+
+    private sealed class RepeatingStream : Stream
+    {
+        public int BytesRead { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => BytesRead; set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            Array.Fill(buffer, (byte)'x', offset, count);
+            BytesRead += count;
+            return count;
+        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            buffer.Span.Fill((byte)'x');
+            BytesRead += buffer.Length;
+            return ValueTask.FromResult(buffer.Length);
+        }
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Fact]
     public async Task HealthResponseUsesTheSameBoundEvenOnSuccess()
     {
         using var content = new StringContent(new string('a', ResponseBodyReader.ErrorBodyByteLimit + 10));
