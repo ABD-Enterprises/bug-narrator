@@ -2,6 +2,25 @@ import XCTest
 @testable import BugNarrator
 
 final class DiagnosticsLoggerTests: XCTestCase {
+    func testKnownSecretsAreRemovedBeforePartialTokenPatterns() {
+        let fixture = "sk-fixture/PRIVATE_TAIL"
+        let sanitized = DiagnosticsRedactor.sanitizeFreeformText(
+            "Rejected \(fixture)", redactingExactValues: [fixture]
+        )
+        XCTAssertEqual(sanitized, "Rejected <redacted>")
+        XCTAssertFalse(sanitized.contains("PRIVATE_TAIL"))
+        XCTAssertEqual(
+            DiagnosticsRedactor.sanitizeFreeformText("long-secret-value short", redactingExactValues: ["long", "long-secret-value", "short"]),
+            "<redacted> <redacted>"
+        )
+    }
+
+    func testBearerRedactionCoversTheFullCredentialAlphabet() {
+        let fixture = "abc-._~+/PRIVATE_TAIL=="
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeFreeformText("Bearer \(fixture)"), "<redacted>")
+        XCTAssertEqual(DiagnosticsRedactor.sanitizeMetadata(["detail": "Bearer \(fixture)"])["detail"], "<redacted>")
+    }
+
     func testDefaultDiagnosticsStoreUsesTemporaryPathDuringUnitTests() {
         let storageURL = DiagnosticsLogStore.defaultStorageURL(fileManager: .default)
 

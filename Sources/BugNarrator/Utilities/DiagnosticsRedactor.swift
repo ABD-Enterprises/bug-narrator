@@ -24,7 +24,7 @@ enum DiagnosticsRedactor {
         makeTokenPattern(#"github_pat_[A-Za-z0-9_]+"#),
         makeTokenPattern(#"gh[pousr]_[A-Za-z0-9]+"#, options: [.caseInsensitive]),
         makeTokenPattern(#"ATATT3xFfGF0[A-Za-z0-9_\-=]+"#),
-        makeTokenPattern(#"Bearer\s+[A-Za-z0-9._\-]+"#, options: [.caseInsensitive])
+        makeTokenPattern(#"Bearer\s+[A-Za-z0-9._~+/\-]+=*"#, options: [.caseInsensitive])
     ].compactMap { $0 }
 
     static func sensitiveValues(in metadata: [String: String]) -> [String] {
@@ -67,6 +67,11 @@ enum DiagnosticsRedactor {
 
     static func sanitizeFreeformText(_ text: String, redactingExactValues exactValues: [String] = []) -> String {
         var sanitized = text
+        // Remove complete known secrets before a pattern can replace only a prefix
+        // and leave the remainder no longer matching the original secret.
+        for exactValue in exactValues.filter({ !$0.isEmpty }).sorted(by: { $0.count > $1.count }) {
+            sanitized = sanitized.replacingOccurrences(of: exactValue, with: "<redacted>")
+        }
         for pattern in tokenPatterns {
             let range = NSRange(sanitized.startIndex..., in: sanitized)
             sanitized = pattern.stringByReplacingMatches(
@@ -89,10 +94,6 @@ enum DiagnosticsRedactor {
                       decoded.contains(0x3a) else { continue }
                 sanitized.replaceSubrange(fullRange, with: "<redacted>")
             }
-        }
-
-        for exactValue in exactValues where !exactValue.isEmpty {
-            sanitized = sanitized.replacingOccurrences(of: exactValue, with: "<redacted>")
         }
 
         return sanitized
