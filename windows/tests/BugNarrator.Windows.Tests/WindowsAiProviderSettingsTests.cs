@@ -7,6 +7,23 @@ namespace BugNarrator.Windows.Tests;
 
 public sealed class WindowsAiProviderSettingsTests
 {
+    [Theory]
+    [InlineData("http://example.com/v1")]
+    [InlineData("http://provider.local/v1")]
+    [InlineData("http://127.1/v1")]
+    public void RemotePlaintextProviderIsBlocked(string endpoint)
+    {
+        var settings = WindowsAppSettings.Default with
+        {
+            AiProvider = "openAICompatible",
+            AiProviderBaseUrl = endpoint,
+        };
+        Assert.NotNull(settings.AiProviderCompatibilityIssue);
+        Assert.Null(settings.AiProviderCredentialForWorkflow("fixture-key"));
+        Assert.Throws<InvalidOperationException>(() =>
+            BugNarrator.Windows.Services.Http.OpenAiCompatibleEndpoint.Build(endpoint, "models"));
+    }
+
     [Fact]
     public void DefaultSettings_UseOpenAiProvider()
     {
