@@ -149,7 +149,7 @@ extension GitHubExportProvider {
         configuration: GitHubExportConfiguration
     ) async -> ExportCreateOutcome {
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
             guard let httpResponse = response as? HTTPURLResponse else {
                 return .permanent(.exportFailure("GitHub returned an invalid response."))
             }

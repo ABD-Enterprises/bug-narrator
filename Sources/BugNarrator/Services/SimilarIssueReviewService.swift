@@ -62,7 +62,7 @@ actor SimilarIssueReviewService {
             apiKey: apiKey,
             model: model
         )
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SensitiveRequestRedirectPolicy.shared)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError.exportFailure("The similar issue review returned an invalid response.")
