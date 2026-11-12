@@ -72,11 +72,11 @@ report_hit() {
 }
 
 # The tracked documentation is the published surface: root notes, docs/, the
-# docs site mirrors and the repository's own templates. Every markdown file
+# docs site mirrors and the repository's own templates. Every markdown and JSON file
 # the repository tracks is scanned, so the identifiers cannot return in a file
 # this check does not know about.
 DOC_FILES=""
-if ! DOC_FILES="$(git ls-files -- '*.md')"; then
+if ! DOC_FILES="$(git ls-files -- '*.md' '*.json')"; then
   printf 'FAIL: could not list the tracked documentation\n' >&2
   exit 1
 fi
