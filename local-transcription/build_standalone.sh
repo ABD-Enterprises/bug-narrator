@@ -21,7 +21,16 @@ CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 PUBLIC_RELEASE="${PUBLIC_RELEASE:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-***REMOVED***}"
+# The notary profile name is the canonical default in scripts/build_dmg.sh.
+# Read it from there rather than holding a second copy of it here: a copy
+# could go stale when the owner rotates the profile, and the two scripts
+# would then notarize under different profiles (#1275).
+DEFAULT_NOTARY_PROFILE="$(sed -n 's/^DEFAULT_NOTARY_PROFILE="\(.*\)"$/\1/p' "$ROOT_DIR/scripts/build_dmg.sh" | head -1)"
+if [[ -z "$DEFAULT_NOTARY_PROFILE" ]]; then
+    echo "error: could not read DEFAULT_NOTARY_PROFILE from $ROOT_DIR/scripts/build_dmg.sh" >&2
+    exit 1
+fi
+NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
 VERSION="$(tr -d '[:space:]' <"$ROOT_DIR/VERSION")"
 ARCH="$(uname -m)"
 RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
