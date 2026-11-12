@@ -315,8 +315,11 @@ if ! "$ROOT/scripts/check-doc-identifiers.sh" >"$DOC_IDENTIFIERS_OUTPUT_FILE" 2>
   cat "$DOC_IDENTIFIERS_OUTPUT_FILE" >&2
   exit 1
 fi
+# Echoed, not only written to the status file: CI neither prints nor uploads
+# .validation-artifacts, so a check that only writes a status file leaves no
+# trace in the log (#1012).
 printf 'PASS: published documentation carries no owner notarization identifiers\n' \
-  >"$DOC_IDENTIFIERS_STATUS_FILE"
+  | tee "$DOC_IDENTIFIERS_STATUS_FILE"
 
 if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   if ! "$ROOT/scripts/check-agent-rules-sync.sh"; then
