@@ -25,7 +25,7 @@
       },
       {
         "index": 2,
-        "text": "A positive trust statement replaces it, naming Developer ID + notarization and Team ID ***REMOVED***.",
+        "text": "A positive trust statement replaces it, naming Developer ID + notarization and the Team ID.",
         "backed": false,
         "satisfied": null,
         "evidence": null,
@@ -58,7 +58,7 @@
     "depends_on": [],
     "done_when": [
       "The Control-click/Gatekeeper-bypass step is removed from README.md install instructions and surrounding steps are renumbered.",
-      "A positive trust statement replaces it, naming Developer ID + notarization and Team ID ***REMOVED***.",
+      "A positive trust statement replaces it, naming Developer ID + notarization and the Team ID.",
       "No other tracked doc instructs a Gatekeeper bypass (grep for 'Control-click' and 'Gatekeeper').",
       "No source files are modified - docs-only change."
     ],
