@@ -13,6 +13,7 @@
 #   swift-parse-status.txt  PASS / NOT RUN from swift-parse-check.sh
 #   shell-lint-status.txt   PASS / NOT RUN from the shell script lint (see below)
 #   python-lint-status.txt  PASS / NOT RUN from ruff over scripts/*.py and local-transcription/*.py
+#   doc-identifiers-status.txt  PASS from the owner-identifier documentation audit
 
 set -euo pipefail
 
@@ -46,6 +47,8 @@ LOCAL_TRANSCRIPTION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/local-transcription-
 EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
 REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
+DOC_IDENTIFIERS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/doc-identifiers-status.txt"
+DOC_IDENTIFIERS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/doc-identifiers-output.txt"
 SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
 RUFF_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/python-lint-status.txt"
 REPO_DOCS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-output.txt"
@@ -59,6 +62,8 @@ rm -f \
   "$EFFORT_LEAK_OUTPUT_FILE" \
   "$REPO_DOCS_STATUS_FILE" \
   "$REPO_DOCS_OUTPUT_FILE" \
+  "$DOC_IDENTIFIERS_STATUS_FILE" \
+  "$DOC_IDENTIFIERS_OUTPUT_FILE" \
   "$SHELLCHECK_STATUS_FILE" \
   "$RUFF_STATUS_FILE"
 
@@ -296,6 +301,25 @@ if [[ -x "$ROOT/scripts/repo-docs-audit.sh" ]]; then
     exit 1
   fi
 fi
+
+# The published documentation must not carry the owner's notarization
+# identifiers: this repository is public, and a team ID, a keychain profile
+# name, a password-manager item name and an Apple ID together point at exactly
+# which credentials to go after (#1275). The check derives the values from
+# scripts/build_dmg.sh, so it never holds a copy of them itself.
+if [[ ! -x "$ROOT/scripts/check-doc-identifiers.sh" ]]; then
+  printf 'FAIL: scripts/check-doc-identifiers.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-doc-identifiers.sh" >"$DOC_IDENTIFIERS_OUTPUT_FILE" 2>&1; then
+  cat "$DOC_IDENTIFIERS_OUTPUT_FILE" >&2
+  exit 1
+fi
+# Echoed, not only written to the status file: CI neither prints nor uploads
+# .validation-artifacts, so a check that only writes a status file leaves no
+# trace in the log (#1012).
+printf 'PASS: published documentation carries no owner notarization identifiers\n' \
+  | tee "$DOC_IDENTIFIERS_STATUS_FILE"
 
 if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   if ! "$ROOT/scripts/check-agent-rules-sync.sh"; then
