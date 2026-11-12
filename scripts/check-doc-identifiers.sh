@@ -141,6 +141,12 @@ fi
 # scripts/build_dmg.sh at run time. A value that was published and then
 # rotated out of the canonical script is not among them, so this check finds
 # the current identity, not every identity that was ever published.
+#
+# The match is case-insensitive. The Apple ID is a mailbox, and a mailbox is
+# reachable at any case, so a differently-cased spelling of it is the same
+# account and a case-sensitive check would wave it through. The team ID and
+# the profile name are case-insensitive for the same reason: a copy of the
+# value that has been retyped in a different case is still the value.
 scan_for_literal() {
   local file="$1"
   local needle="$2"
@@ -152,11 +158,11 @@ scan_for_literal() {
   while IFS= read -r line_number; do
     [[ -n "$line_number" ]] || continue
     report_hit "$file" "$line_number" "$description"
-  done < <(grep -nIF -- "$needle" "$file" 2>/dev/null | cut -d: -f1 || true)
+  done < <(grep -niIF -- "$needle" "$file" 2>/dev/null | cut -d: -f1 || true)
 
   # A binary file that matches has no useful line number, but it is still a
   # published copy and must not be reported as clean.
-  if grep -qlF -- "$needle" "$file" 2>/dev/null && ! grep -qIF -- "$needle" "$file" 2>/dev/null; then
+  if grep -qilF -- "$needle" "$file" 2>/dev/null && ! grep -qiIF -- "$needle" "$file" 2>/dev/null; then
     report_hit "$file" "" "$description"
   fi
 }
@@ -173,8 +179,10 @@ is_placeholder() {
   value="${value%\'}"
   value="${value#\'}"
 
-  # Angle-bracket placeholders (<team id>) and the YOUR… convention.
-  if [[ "$value" == *'<'* || "$value" == *'>'* || "$value" == YOUR* ]]; then
+  # Angle-bracket placeholders (<team id>) and the YOUR… convention, matched
+  # case-insensitively so that `your-team-id` is read as the placeholder it is.
+  local lowered="${value,,}"
+  if [[ "$lowered" == *'<'* || "$lowered" == *'>'* || "$lowered" == your* ]]; then
     return 0
   fi
 
