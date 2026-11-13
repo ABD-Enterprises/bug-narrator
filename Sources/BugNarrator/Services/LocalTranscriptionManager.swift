@@ -51,6 +51,7 @@ final class LocalTranscriptionManager: ObservableObject {
         let draft: Bool
         let prerelease: Bool
         let assets: [Asset]
+        var tag_name: String? = nil
     }
     struct Package: Equatable, Sendable {
         let image: Asset
@@ -104,6 +105,14 @@ final class LocalTranscriptionManager: ObservableObject {
 
     static func selectPackage(from releases: [Release]) -> Package? {
         for release in releases where !release.draft && !release.prerelease {
+            // v1.1.1 is the first published authenticated-proof server. Never
+            // mark an older signed package as upgraded merely because it installs.
+            guard let tag = release.tag_name, tag.hasPrefix("v") else { continue }
+            let parts = tag.dropFirst().split(separator: ".", omittingEmptySubsequences: false)
+            let version = parts.compactMap { Int($0) }
+            guard parts.count == 3, version.count == 3, version.allSatisfy({ $0 >= 0 }),
+                  version[0] > 1 || (version[0] == 1 && version[1] > 1) ||
+                    (version[0] == 1 && version[1] == 1 && version[2] >= 1) else { continue }
             if let image = release.assets.first(where: { $0.name == assetName }),
                let checksum = release.assets.first(where: { $0.name == assetName + ".sha256" }),
                image.size > 0, image.size < 1_000_000_000,
@@ -150,7 +159,7 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func installAndStart() {
-        guard let package, supported, !busy, !installed, !shuttingDown else { return }
+        guard let package, supported, !busy, server == nil, !shuttingDown else { return }
         busy = true
         progress = 0
         message = "Downloading the local server…"
@@ -181,7 +190,22 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func start() {
-        guard installed, server == nil, startOperation == nil, !shuttingDown else { return }
+        guard installed, server == nil, startOperation == nil, provisioningTask == nil, !shuttingDown else { return }
+        if Self.requiresUpgrade(directory) {
+            message = "Updating the local server for this app. Models and recordings will be kept."
+            provisioningTask = Task { [weak self] in
+                guard let self else { return }
+                defer { self.provisioningTask = nil }
+                while self.busy, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                guard !Task.isCancelled, !self.shuttingDown else { return }
+                await self.discover()
+                guard !Task.isCancelled, !self.shuttingDown else { return }
+                self.installAndStart()
+            }
+            return
+        }
         busy = true
         let binary = executable
         startOperation = Task {
@@ -298,7 +322,7 @@ final class LocalTranscriptionManager: ObservableObject {
         try command("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement + " and identifier \"bugnarrator-transcription\"", binary.path])
     }
 
-    nonisolated static func installImage(_ image: URL, checksum: Data, expectedSize: Int64, directory: URL, command: Command = run) throws {
+    nonisolated static func installImage(_ image: URL, checksum: Data, expectedSize: Int64, directory: URL, command: Command = run, retire: @Sendable (URL) throws -> Void = { try retireVerifiedProcesses($0) }) throws {
         try Task.checkCancellation()
         try verifyChecksum(file: image, manifest: checksum, expectedSize: expectedSize)
         try command("/usr/bin/codesign", ["--verify", "--strict", "-R", publisherRequirement, image.path])
@@ -331,7 +355,11 @@ final class LocalTranscriptionManager: ObservableObject {
         try command("/usr/bin/hdiutil", ["detach", mount.path])
         detached = true
         try Task.checkCancellation()
-        try files.moveItem(at: staging, to: directory.appendingPathComponent("bugnarrator-transcription"))
+        let target = directory.appendingPathComponent("bugnarrator-transcription")
+        try retire(target)
+        try Task.checkCancellation()
+        guard Darwin.rename(staging.path, target.path) == 0 else { throw Failure("Could not replace the local server. Try updating again.") }
+        try Data("1\n".utf8).write(to: directory.appendingPathComponent(protocolReceipt), options: .atomic)
     }
 
     typealias Command = @Sendable (String, [String]) throws -> Void

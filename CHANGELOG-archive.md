@@ -1,5 +1,13 @@
 # Changelog Archive
 
+## 1.1.2 - 2026-11-12
+
+- [FIX] Upgrade older managed local transcription helpers before starting them, safely stop verified leftover helper processes, and preserve downloaded models and authentication during replacement. Add regression coverage for a legacy helper still running and refusal to stop unverified processes.
+
+- [SECURITY] Stop publishing the owner's notarization identifiers: the Apple ID, development team ID, notary keychain profile name and password-manager item name are out of the published documentation, and a new audit wired into `./scripts/validate.sh` keeps them out of every tracked file (#1275)
+
+- [SECURITY] The signing and notarization settings no longer live in this public repository at all: `scripts/build_dmg.sh` and `local-transcription/build_standalone.sh` read them from the machine-local signing settings (the environment overrides the file), the app pins its server publisher from the team the build injects into the bundle, the release build refuses an artifact whose bundle carries no publisher team, and the documentation audit no longer needs to know the values to keep them out: it scans every tracked file for the exact values when this machine holds them, and every published file - the tracked markdown, plus everything under .github, docs and site - for the shape of an e-mail address everywhere else, and for a literal value after a credential flag (#1275)
+
 ## 1.1.1 - 2026-11-11
 
 - [FIX] Settings separates optional exports from recording setup, shows provider-specific capabilities and privacy controls, and reduces crowded field layouts and irrelevant local-provider actions.

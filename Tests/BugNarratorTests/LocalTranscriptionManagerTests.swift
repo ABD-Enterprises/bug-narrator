@@ -5,6 +5,51 @@ import XCTest
 @testable import BugNarrator
 
 final class LocalTranscriptionManagerTests: XCTestCase {
+    func testUpgradeRetiresOldManagedHelperAndPreservesModelsAndToken() throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        let files = FileManager.default
+        try files.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        let binary = fixture.destination.appendingPathComponent("bugnarrator-transcription")
+        try files.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        let models = fixture.destination.appendingPathComponent("Models")
+        try files.createDirectory(at: models, withIntermediateDirectories: true)
+        let sentinel = models.appendingPathComponent("fixture-model")
+        try Data("model fixture".utf8).write(to: sentinel)
+        let token = fixture.destination.appendingPathComponent(LocalServerTokenStore.tokenFileName)
+        try Data("fixture-token".utf8).write(to: token)
+        let old = Process()
+        old.executableURL = binary
+        old.arguments = ["60"]
+        try old.run()
+        defer { if old.isRunning { old.terminate(); old.waitUntilExit() } }
+        XCTAssertTrue(LocalTranscriptionManager.requiresUpgrade(fixture.destination))
+        try fixture.install { path in
+            try LocalTranscriptionManager.retireVerifiedProcesses(path, authenticate: { $0 == old.processIdentifier })
+        }
+        old.waitUntilExit()
+        XCTAssertFalse(old.isRunning)
+        XCTAssertEqual(try String(contentsOf: binary, encoding: .utf8), "verified server")
+        XCTAssertEqual(try String(contentsOf: sentinel, encoding: .utf8), "model fixture")
+        XCTAssertEqual(try String(contentsOf: token, encoding: .utf8), "fixture-token")
+        XCTAssertEqual(try String(contentsOf: fixture.destination.appendingPathComponent(LocalTranscriptionManager.protocolReceipt), encoding: .utf8), "1\n")
+    }
+
+    func testUpgradeDoesNotStopAnUnverifiedProcessAtManagedPath() throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        let binary = fixture.destination.appendingPathComponent("bugnarrator-transcription")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        let other = Process()
+        other.executableURL = binary
+        other.arguments = ["60"]
+        try other.run()
+        defer { other.terminate(); other.waitUntilExit() }
+        try LocalTranscriptionManager.retireVerifiedProcesses(binary, authenticate: { _ in false })
+        XCTAssertTrue(other.isRunning)
+    }
+
     @MainActor
     func testPendingQuitBlocksActualRecordingStartAndReleasesOnRejection() async {
         let harness = AppStateHarness()
@@ -175,7 +220,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
             if request.url!.path.contains("releases/download") {
                 data = request.url!.path.hasSuffix("checksum") ? manifest : Data("image".utf8)
             } else {
-                data = try JSONSerialization.data(withJSONObject: [["draft": false, "prerelease": false, "assets": [
+                data = try JSONSerialization.data(withJSONObject: [["tag_name": "v1.1.1", "draft": false, "prerelease": false, "assets": [
                     ["name": assetName, "size": 5, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/image"],
                     ["name": assetName + ".sha256", "size": 64, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/checksum"]
                 ]]])
@@ -268,13 +313,14 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         let checksum = LocalTranscriptionManager.Asset(name: LocalTranscriptionManager.assetName + ".sha256", size: 100,
             browser_download_url: URL(string: "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/server.dmg.sha256")!)
         let releases = [
-            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: []),
-            LocalTranscriptionManager.Release(draft: true, prerelease: false, assets: [image, checksum]),
-            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [image]),
-            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [image, checksum])
+            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [], tag_name: "v1.1.1"),
+            LocalTranscriptionManager.Release(draft: true, prerelease: false, assets: [image, checksum], tag_name: "v1.1.1"),
+            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [image], tag_name: "v1.1.1"),
+            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [image, checksum], tag_name: "v1.1.0"),
+            LocalTranscriptionManager.Release(draft: false, prerelease: false, assets: [image, checksum], tag_name: "v1.1.1")
         ]
         XCTAssertEqual(LocalTranscriptionManager.selectPackage(from: releases)?.image, image)
-        XCTAssertNil(LocalTranscriptionManager.selectPackage(from: Array(releases.prefix(3))))
+        XCTAssertNil(LocalTranscriptionManager.selectPackage(from: Array(releases.prefix(4))))
     }
 
     @MainActor
@@ -323,8 +369,8 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         MockURLProtocol.requestHandler = { @Sendable request in
             let page = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!.first { $0.name == "page" }!.value!
             let releases: [[String: Any]] = page == "1"
-                ? Array(repeating: ["draft": false, "prerelease": false, "assets": []], count: 30)
-                : [["draft": false, "prerelease": false, "assets": [
+                ? Array(repeating: ["tag_name": "v1.1.1", "draft": false, "prerelease": false, "assets": []], count: 30)
+                : [["tag_name": "v1.1.1", "draft": false, "prerelease": false, "assets": [
                     ["name": image, "size": 100, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/server/a"],
                     ["name": image + ".sha256", "size": 64, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/server/b"]
                 ]]]
@@ -602,8 +648,8 @@ private final class InstallerFixture: @unchecked Sendable {
         manifest = Data(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined().utf8)
     }
     func remove() { try? FileManager.default.removeItem(at: root) }
-    func install() throws {
-        try LocalTranscriptionManager.installImage(image, checksum: manifest, expectedSize: 5, directory: destination) { command, args in
+    func install(retire: @escaping @Sendable (URL) throws -> Void = { try LocalTranscriptionManager.retireVerifiedProcesses($0) }) throws {
+        try LocalTranscriptionManager.installImage(image, checksum: manifest, expectedSize: 5, directory: destination, command: { command, args in
             if command == "/usr/bin/hdiutil", args.first == "attach" {
                 let mount = URL(fileURLWithPath: args[4])
                 try Data("verified server".utf8).write(to: mount.appendingPathComponent("bugnarrator-transcription"))
@@ -617,7 +663,7 @@ private final class InstallerFixture: @unchecked Sendable {
                     throw LocalTranscriptionManager.Failure("Test installer was not resumed")
                 }
             }
-        }
+        }, retire: retire)
     }
 }
 

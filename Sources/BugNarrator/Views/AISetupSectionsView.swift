@@ -440,7 +440,7 @@ struct AISetupSectionsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if localServer.installed {
                     HStack {
-                        Button(localServer.running ? "Stop local server" : "Start local server") {
+                        Button(localServer.running ? "Stop local server" : (LocalTranscriptionManager.requiresUpgrade(localServer.directory) ? "Update local server" : "Start local server")) {
                             if localServer.running { appState.stopLocalServer(localServer) } else { localServer.start() }
                         }
                         .disabled(localServer.busy || appState.localServerControlsDisabled)
