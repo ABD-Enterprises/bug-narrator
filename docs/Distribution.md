@@ -146,9 +146,9 @@ with `#` are ignored, a value may be quoted or not, and a value is taken
 literally — nothing in it is expanded:
 
 ```bash
-BUGNARRATOR_DEVELOPMENT_TEAM="YOURTEAMID"
-BUGNARRATOR_NOTARY_PROFILE="notary-profile-name"
-BUGNARRATOR_NOTARY_APPLE_ID="you@example.com"
+BUGNARRATOR_DEVELOPMENT_TEAM="<your-team-id>"
+BUGNARRATOR_NOTARY_PROFILE="<notary-profile-name>"
+BUGNARRATOR_NOTARY_APPLE_ID="<notary-apple-id>"
 ```
 
 `export NAME="value"` and `NAME = "value"` are accepted as well. The

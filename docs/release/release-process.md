@@ -61,7 +61,8 @@ The build is not tied to this machine beyond credentials. Another Mac needs:
 - the signing settings file — by default `~/.config/bug-narrator/signing.env`,
   or whatever `BUGNARRATOR_SIGNING_ENV` names — holding one `NAME="value"` per
   line for `BUGNARRATOR_DEVELOPMENT_TEAM`, `BUGNARRATOR_NOTARY_PROFILE` and
-  `BUGNARRATOR_NOTARY_APPLE_ID`
+  `BUGNARRATOR_NOTARY_APPLE_ID` (an unquoted value, an `export ` prefix and
+  spaces around the `=` are accepted too)
 - the `Developer ID Application` certificate + private key for the team
   named in the machine-local signing settings, imported into the login keychain
 - a `notarytool` keychain profile named as in the machine-local signing settings

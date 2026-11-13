@@ -30,7 +30,8 @@
 #
 # The check fails closed on the things it can decide alone: if the tracked
 # files cannot be listed, it reports the failure rather than reporting a
-# clean scan it did not perform.
+# clean scan it did not perform, and a settings file it cannot read is an
+# error rather than an absent configuration.
 
 set -euo pipefail
 
@@ -96,6 +97,22 @@ while IFS= read -r value; do
   add_needle "$value" "notarization Apple ID"
 done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_NOTARY_APPLE_ID)
 
+# The build scripts also honour the older variable names, so a value supplied
+# through one of those is signed and injected like any other. It has to be
+# scanned like any other too.
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(printenv DEVELOPMENT_TEAM 2>/dev/null || true)
+
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(printenv EXPECTED_SIGNING_TEAM 2>/dev/null || true)
+
+while IFS= read -r value; do
+  add_needle "$value" "notary keychain profile name"
+  add_needle "Apple Notarytool - ${value}" "password-manager item name"
+done < <(printenv NOTARY_PROFILE 2>/dev/null || true)
+
 # Reports every line of the tracked tree that carries a literal identifier.
 #
 # The match is case-insensitive. The Apple ID is a mailbox, and a mailbox is
@@ -138,6 +155,14 @@ if [[ "${#NEEDLES[@]}" -gt 0 ]]; then
   for index in "${!NEEDLES[@]}"; do
     scan_tree_for_literal "${NEEDLES[$index]}" "${DESCRIPTIONS[$index]}"
   done
+elif [[ -f "$BUGNARRATOR_SIGNING_ENV" ]]; then
+  # The file is there but nothing could be read out of it. That is a
+  # misconfigured file, not an absent one, and it must not be reported as a
+  # clean scan that was never performed: a typo in a key name would
+  # otherwise switch the exact tier off without a word.
+  printf 'FAIL: %s exists, but none of BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID could be read from it.\n' "$BUGNARRATOR_SIGNING_ENV" >&2
+  printf 'hint: the file holds one NAME="value" per line, for example BUGNARRATOR_DEVELOPMENT_TEAM="...".\n' >&2
+  exit 1
 else
   printf 'note: no machine-local signing settings found (%s); the exact scan is skipped on this machine\n' "$BUGNARRATOR_SIGNING_ENV"
 fi
@@ -146,21 +171,32 @@ fi
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 
-# Every tracked markdown file. The published surface is wider than docs/:
-# SECURITY.md, CONTRIBUTING.md, QUICKSTART.md, the Windows readme and the
-# issue templates are published too, and the original leak was an Apple ID
-# in a published document. Scoping the scan to a curated list would let any
-# file outside that list carry the identifier while CI stayed green, so the
-# scan covers every tracked markdown file instead.
+# The published surface: every tracked markdown file, plus everything under
+# .github, docs and site whatever its format.
 #
-# Non-markdown files are deliberately out of scope for this shape check: a
-# binary or a data file can contain a sequence that looks like an address
-# without carrying one (an asset named icon_16x16@2x.png, for instance).
+# The published surface is wider than docs/: SECURITY.md, CONTRIBUTING.md,
+# QUICKSTART.md, the Windows readme, the issue templates and the workflow
+# files are published too, and the original leak was an Apple ID in a
+# published document. Scoping the scan to a curated list would let any file
+# outside that list carry the identifier while CI stayed green.
+#
+# The wider tree is out of scope for this shape check, and the reason is
+# concrete: a tracked test fixture carries a genuine corporate e-mail
+# address, and the asset catalogs and data files carry byte sequences that
+# read like an address without being one. Both would have to be published
+# here to be allow-listed, so the shape check stays on the surface a reader
+# actually sees. Tier 1 covers the whole tree on the machine that holds the
+# settings.
 PUBLISHED_DOCS=()
 while IFS= read -r file; do
   [[ -n "$file" ]] || continue
   PUBLISHED_DOCS+=("$file")
-done < <(git ls-files -- '*.md')
+done < <(
+  {
+    git ls-files -- '*.md'
+    git ls-files -- .github docs site
+  } | sort -u
+)
 
 if [[ "${#PUBLISHED_DOCS[@]}" -eq 0 ]]; then
   printf 'FAIL: no published documentation was found to scan\n' >&2
@@ -250,7 +286,10 @@ flag_values() {
   done < <(grep -nIF -- "$flag" "$file" 2>/dev/null || true)
 }
 
-for file in "${TRACKED_FILES[@]}"; do
+# The tracked file list is a newline-separated string, so it is read line by
+# line. Iterating it as an array would expand the whole listing into one
+# word and the rule below would never run.
+while IFS= read -r file; do
   [[ -n "$file" ]] || continue
   [[ -f "$file" ]] || continue
   case "$file" in
@@ -275,7 +314,7 @@ for file in "${TRACKED_FILES[@]}"; do
       fi
     done < <(flag_values "$file" "$assignment")
   done
-done
+done <<<"$TRACKED_FILES"
 
 if [[ "$FAILURES" -ne 0 ]]; then
   printf '\nDocumentation identifier audit failed.\n' >&2
