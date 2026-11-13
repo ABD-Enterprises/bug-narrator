@@ -21,13 +21,15 @@ CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 PUBLIC_RELEASE="${PUBLIC_RELEASE:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
-# The notary profile name is the canonical default in scripts/build_dmg.sh.
-# Read it from there rather than holding a second copy of it here: a copy
-# could go stale when the owner rotates the profile, and the two scripts
-# would then notarize under different profiles (#1275).
-DEFAULT_NOTARY_PROFILE="$(sed -n 's/^DEFAULT_NOTARY_PROFILE="\(.*\)"$/\1/p' "$ROOT_DIR/scripts/build_dmg.sh" | head -1)"
+# The notary profile name is the owner's, and this repository is public, so
+# it is not held here. Read it from the machine-local signing settings, the
+# same source scripts/build_dmg.sh reads, so the two scripts cannot drift into
+# notarizing under different profiles (#1275).
+# shellcheck source=scripts/signing-settings.sh
+. "$ROOT_DIR/scripts/signing-settings.sh"
+DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
 if [[ -z "$DEFAULT_NOTARY_PROFILE" ]]; then
-    echo "error: could not read DEFAULT_NOTARY_PROFILE from $ROOT_DIR/scripts/build_dmg.sh" >&2
+    echo "error: no notary profile found; set BUGNARRATOR_NOTARY_PROFILE in the environment or in $BUGNARRATOR_SIGNING_ENV" >&2
     exit 1
 fi
 NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"

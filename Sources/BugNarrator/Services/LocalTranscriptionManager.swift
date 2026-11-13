@@ -7,7 +7,31 @@ import Foundation
 @MainActor
 final class LocalTranscriptionManager: ObservableObject {
     static let assetName = "bugnarrator-transcription-macos-arm64.dmg"
-    nonisolated static let publisherRequirement = "=anchor apple generic and certificate leaf[subject.OU] = \"2R4WAH4R53\""
+    /// The team the app itself is signed with, injected into the bundle by
+    /// the build from the owner's machine-local signing settings. The team is
+    /// not written into this repository: it is public in every released
+    /// artifact's signature, but it must not be published here.
+    nonisolated static let publisherTeam: String? = {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "BugNarratorPublisherTeam") as? String else {
+            return nil
+        }
+        let team = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // An unset build setting leaves the unexpanded placeholder behind.
+        guard !team.isEmpty, !team.hasPrefix("$(") else { return nil }
+        return team
+    }()
+
+    /// The requirement the downloaded transcription server must satisfy.
+    ///
+    /// Pinned to the team the app is signed with when the bundle carries it.
+    /// An unsigned local build carries no team, and then the requirement is
+    /// the Apple anchor alone: the pinned checksum manifest remains the
+    /// integrity gate, and the publisher pin is only as strong as the build.
+    nonisolated static var publisherRequirement: String {
+        let anchor = "=anchor apple generic"
+        guard let team = publisherTeam else { return anchor }
+        return anchor + " and certificate leaf[subject.OU] = \"\(team)\""
+    }
 
     struct Asset: Decodable, Equatable, Sendable {
         let name: String

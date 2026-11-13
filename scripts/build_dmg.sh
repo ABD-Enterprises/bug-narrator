@@ -12,9 +12,18 @@ HOST_ARCH="$(uname -m)"
 MACOS_DESTINATION="${MACOS_DESTINATION:-platform=macOS,arch=$HOST_ARCH}"
 CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_STYLE="${CODE_SIGN_STYLE:-Automatic}"
-DEFAULT_DEVELOPMENT_TEAM="2R4WAH4R53"
-DEFAULT_NOTARY_PROFILE="BugNarratorNotary"
-CANONICAL_NOTARY_APPLE_ID="abdeffenderfer@icloud.com"
+# The signing and notarization settings are the owner's Apple account, team and
+# keychain profile. This repository is public, so no value of theirs lives in
+# it: the canonical copy is the machine-local file named by
+# BUGNARRATOR_SIGNING_ENV (default ~/.config/bug-narrator/signing.env), which
+# is untracked and outside the tree, and the environment overrides it. Read
+# them from there; nothing below holds a value, so nothing below can publish
+# one.
+# shellcheck source=scripts/signing-settings.sh
+. "$ROOT_DIR/scripts/signing-settings.sh"
+DEFAULT_DEVELOPMENT_TEAM="$(bugnarrator_signing_setting BUGNARRATOR_DEVELOPMENT_TEAM)"
+DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
+CANONICAL_NOTARY_APPLE_ID="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_APPLE_ID)"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
 # The Team ID a Developer ID-signed build MUST carry. Defaults to the canonical
 # BugNarrator team; override only to intentionally sign under a different team.
@@ -62,6 +71,15 @@ if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
 
     if [[ "$CODE_SIGNING_ALLOWED" != "YES" ]]; then
         echo "error: PUBLIC_RELEASE=YES requires CODE_SIGNING_ALLOWED=YES. The default is NO, which produced unsigned artifacts indistinguishable from signed ones downstream." >&2
+        exit 1
+    fi
+
+    # The signing settings live outside this repository, so a release build on
+    # a machine that does not have them cannot be signed at all. Say that
+    # plainly instead of producing an unsigned artifact.
+    if [[ -z "$DEFAULT_DEVELOPMENT_TEAM" || -z "$DEFAULT_NOTARY_PROFILE" || -z "$CANONICAL_NOTARY_APPLE_ID" ]]; then
+        echo "error: PUBLIC_RELEASE=YES needs the signing settings, and none were found." >&2
+        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
         exit 1
     fi
 
@@ -172,7 +190,7 @@ verify_notarization_access() {
             echo "error: Apple Developer Program agreements must be accepted before BugNarrator can be notarized for distribution." >&2
         fi
 
-        echo "hint: canonical BugNarrator notarization uses Apple ID $CANONICAL_NOTARY_APPLE_ID on team $DEFAULT_DEVELOPMENT_TEAM through keychain profile $DEFAULT_NOTARY_PROFILE." >&2
+        echo "hint: canonical BugNarrator notarization is configured through BUGNARRATOR_NOTARY_APPLE_ID, BUGNARRATOR_DEVELOPMENT_TEAM and BUGNARRATOR_NOTARY_PROFILE (environment, or $BUGNARRATOR_SIGNING_ENV)." >&2
         echo "hint: resolve the Apple notarization account problem first, or rerun with NOTARIZE=NO for a non-distributable signed-only internal build." >&2
         exit 1
     fi
@@ -355,6 +373,10 @@ fi
 if [[ -n "$DEVELOPMENT_TEAM" ]]; then
     xcodebuild_args+=(
         DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
+        # The app pins the publisher of the transcription server it downloads.
+        # The team goes into the bundle from here, so it never has to be
+        # written into this repository.
+        BUGNARRATOR_PUBLISHER_TEAM="$DEVELOPMENT_TEAM"
     )
 fi
 
