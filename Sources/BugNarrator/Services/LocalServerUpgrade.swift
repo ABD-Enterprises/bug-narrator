@@ -45,7 +45,7 @@ extension LocalTranscriptionManager {
             while matches(pid), Date() < deadline {
                 Thread.sleep(forTimeInterval: 0.05)
             }
-            if matches(pid) { throw Failure("The previous local server is still stopping. Try updating again.") }
+            if matches(pid) { throw Failure("The previous local server did not stop. Open Activity Monitor, find bugnarrator-transcription, stop it (Force Quit if needed), then retry Update local server in Settings.") }
         }
     }
 
