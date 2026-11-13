@@ -305,8 +305,10 @@ fi
 # The published documentation must not carry the owner's notarization
 # identifiers: this repository is public, and a team ID, a keychain profile
 # name, a password-manager item name and an Apple ID together point at exactly
-# which credentials to go after (#1275). The check derives the values from
-# scripts/build_dmg.sh, so it never holds a copy of them itself.
+# which credentials to go after (#1275). The check reads the values from the
+# machine-local signing settings, and this repository holds no copy of them, so
+# it falls back to a shape check on the published surface when this machine
+# has no settings.
 if [[ ! -x "$ROOT/scripts/check-doc-identifiers.sh" ]]; then
   printf 'FAIL: scripts/check-doc-identifiers.sh is missing or not executable\n' >&2
   exit 1

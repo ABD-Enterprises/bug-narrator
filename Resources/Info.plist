@@ -32,5 +32,11 @@
 	<string>BugNarrator records microphone audio so you can narrate software testing sessions while working in other apps.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>BugNarrator can record system audio only when you choose a system audio mode for a session.</string>
+	<!-- The Developer ID team the app is signed with, injected by the build
+	     from the owner's machine-local signing settings. The app uses it to
+	     pin the publisher of the transcription server it downloads, so the
+	     team never has to be written into this repository. -->
+	<key>BugNarratorPublisherTeam</key>
+	<string>$(BUGNARRATOR_PUBLISHER_TEAM)</string>
 </dict>
 </plist>

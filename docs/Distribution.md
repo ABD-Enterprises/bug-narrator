@@ -133,13 +133,32 @@ For broad public distribution outside your own Mac, you should use `Developer ID
 
 ### Developer ID And Notarization
 
-BugNarrator's canonical notarization identity lives in `scripts/build_dmg.sh` as the script's defaults. This document does not repeat it: the repository is public, and a team ID, a keychain profile name and a password-manager item name together point at exactly which credentials to go after. Read the live values from the script instead of copying them into a doc, an issue or a pull request.
+BugNarrator's canonical notarization identity is the owner's, and this repository is public, so no value of it lives here: a team ID, a keychain profile name and a password-manager item name together point at exactly which credentials to go after. The values live in the machine-local signing settings — the file named by `BUGNARRATOR_SIGNING_ENV` (default `~/.config/bug-narrator/signing.env`), or the environment — and the build reads them from there. Read them from there instead of copying them into a doc, an issue or a pull request.
 
-The three values the script holds are:
+The three settings are:
 
-- the development team ID (`DEFAULT_DEVELOPMENT_TEAM`)
-- the notary keychain profile name (`DEFAULT_NOTARY_PROFILE`)
-- the notarization Apple ID (`CANONICAL_NOTARY_APPLE_ID`)
+- the development team ID (`BUGNARRATOR_DEVELOPMENT_TEAM`)
+- the notary keychain profile name (`BUGNARRATOR_NOTARY_PROFILE`)
+- the notarization Apple ID (`BUGNARRATOR_NOTARY_APPLE_ID`)
+
+The settings file holds one setting per line. Blank lines and lines starting
+with `#` are ignored, a value may be quoted or not, and a value is taken
+literally — nothing in it is expanded:
+
+```bash
+BUGNARRATOR_DEVELOPMENT_TEAM="<your-team-id>"
+BUGNARRATOR_NOTARY_PROFILE="<notary-profile-name>"
+BUGNARRATOR_NOTARY_APPLE_ID="<notary-apple-id>"
+```
+
+`export NAME="value"` and `NAME = "value"` are accepted as well. The
+environment overrides the file, so a one-off build can supply a value without
+editing the file.
+
+The Apple ID is a presence check only. The build never passes it to
+`notarytool` — the keychain profile holds the credential — but it is required,
+so a release cannot be produced on a machine whose notary account was never
+configured.
 
 Do not store the app-specific password in the repo. Keep it only in:
 
@@ -148,7 +167,7 @@ Do not store the app-specific password in the repo. Keep it only in:
 
 If the password is rotated, update both of those locations before the next release.
 
-First, store a notarization credential profile in your keychain, substituting the values from `scripts/build_dmg.sh`:
+First, store a notarization credential profile in your keychain, substituting the values from your signing settings:
 
 ```bash
 xcrun notarytool store-credentials <notary-profile-name> \

@@ -21,16 +21,21 @@ CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 PUBLIC_RELEASE="${PUBLIC_RELEASE:-NO}"
 NOTARIZE="${NOTARIZE:-NO}"
-# The notary profile name is the canonical default in scripts/build_dmg.sh.
-# Read it from there rather than holding a second copy of it here: a copy
-# could go stale when the owner rotates the profile, and the two scripts
-# would then notarize under different profiles (#1275).
-DEFAULT_NOTARY_PROFILE="$(sed -n 's/^DEFAULT_NOTARY_PROFILE="\(.*\)"$/\1/p' "$ROOT_DIR/scripts/build_dmg.sh" | head -1)"
-if [[ -z "$DEFAULT_NOTARY_PROFILE" ]]; then
-    echo "error: could not read DEFAULT_NOTARY_PROFILE from $ROOT_DIR/scripts/build_dmg.sh" >&2
-    exit 1
-fi
+# The notary profile name is the owner's, and this repository is public, so
+# it is not held here. Read it from the machine-local signing settings, the
+# same source scripts/build_dmg.sh reads, so the two scripts cannot drift into
+# notarizing under different profiles (#1275).
+#
+# A plain local build needs none of these, so a missing setting is not an
+# error here: only notarization actually needs the profile, and that branch
+# says so plainly below.
+# shellcheck source=scripts/signing-settings.sh
+. "$ROOT_DIR/scripts/signing-settings.sh"
+DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
 NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
+# The team that publishes this server is also the team the app pins, so a
+# server signed by anyone else would be refused by the app that ships it.
+PUBLISHER_TEAM="$(bugnarrator_signing_setting BUGNARRATOR_DEVELOPMENT_TEAM)"
 VERSION="$(tr -d '[:space:]' <"$ROOT_DIR/VERSION")"
 ARCH="$(uname -m)"
 RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -68,11 +73,25 @@ if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
         echo "error: PUBLIC_RELEASE=YES cannot skip the packaged transcription smoke test." >&2
         exit 1
     fi
+    # The publisher team and the notary profile live outside this repository,
+    # so a release built without them cannot be signed by the team the app
+    # pins, and cannot be notarized at all. Say that plainly instead of
+    # producing a server the app would refuse.
+    if [[ -z "$PUBLISHER_TEAM" || -z "$NOTARY_PROFILE" ]]; then
+        echo "error: PUBLIC_RELEASE=YES needs the signing settings, and none were found." >&2
+        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
+        exit 1
+    fi
 fi
 
 if [[ "$NOTARIZE" == "YES" ]]; then
     if [[ "$CODE_SIGNING_ALLOWED" != "YES" || -z "$CODE_SIGN_IDENTITY" ]]; then
         echo "error: notarization requires a signed standalone binary." >&2
+        exit 1
+    fi
+    if [[ -z "$NOTARY_PROFILE" ]]; then
+        echo "error: notarization requires a notary profile, and none was found." >&2
+        echo "hint: set BUGNARRATOR_NOTARY_PROFILE in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
         exit 1
     fi
     echo "Checking Apple notarization access..."
@@ -164,6 +183,15 @@ if [[ -f "$BINARY_PATH" ]]; then
         codesign --verify --strict --verbose=2 "$BINARY_PATH"
         CODESIGN_DETAILS="$(codesign -dv --verbose=2 "$BINARY_PATH" 2>&1)"
         SIGNING_AUTHORITY="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^Authority=/ && !found {print $2; found=1}')"
+        SIGNING_TEAM="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^TeamIdentifier=/ {print $2; exit}')"
+
+        # The app pins the publisher of this server, so a server signed under
+        # another team would be refused by the app that downloads it. Check
+        # that here rather than at the user's install.
+        if [[ "$PUBLIC_RELEASE" == "YES" && -n "$PUBLISHER_TEAM" && "$SIGNING_TEAM" != "$PUBLISHER_TEAM" ]]; then
+            echo "error: the standalone server is signed by team '$SIGNING_TEAM', but the app pins the publisher team '$PUBLISHER_TEAM'." >&2
+            exit 1
+        fi
     else
         SIGNING_AUTHORITY="<unsigned>"
     fi

@@ -12,9 +12,18 @@ HOST_ARCH="$(uname -m)"
 MACOS_DESTINATION="${MACOS_DESTINATION:-platform=macOS,arch=$HOST_ARCH}"
 CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
 CODE_SIGN_STYLE="${CODE_SIGN_STYLE:-Automatic}"
-DEFAULT_DEVELOPMENT_TEAM="***REMOVED***"
-DEFAULT_NOTARY_PROFILE="***REMOVED***"
-CANONICAL_NOTARY_APPLE_ID="***REMOVED***"
+# The signing and notarization settings are the owner's Apple account, team and
+# keychain profile. This repository is public, so no value of theirs lives in
+# it: the canonical copy is the machine-local file named by
+# BUGNARRATOR_SIGNING_ENV (default ~/.config/bug-narrator/signing.env), which
+# is untracked and outside the tree, and the environment overrides it. Read
+# them from there; nothing below holds a value, so nothing below can publish
+# one.
+# shellcheck source=scripts/signing-settings.sh
+. "$ROOT_DIR/scripts/signing-settings.sh"
+DEFAULT_DEVELOPMENT_TEAM="$(bugnarrator_signing_setting BUGNARRATOR_DEVELOPMENT_TEAM)"
+DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
+CANONICAL_NOTARY_APPLE_ID="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_APPLE_ID)"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-$DEFAULT_DEVELOPMENT_TEAM}"
 # The Team ID a Developer ID-signed build MUST carry. Defaults to the canonical
 # BugNarrator team; override only to intentionally sign under a different team.
@@ -62,6 +71,15 @@ if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
 
     if [[ "$CODE_SIGNING_ALLOWED" != "YES" ]]; then
         echo "error: PUBLIC_RELEASE=YES requires CODE_SIGNING_ALLOWED=YES. The default is NO, which produced unsigned artifacts indistinguishable from signed ones downstream." >&2
+        exit 1
+    fi
+
+    # The signing settings live outside this repository, so a release build on
+    # a machine that does not have them cannot be signed at all. Say that
+    # plainly instead of producing an unsigned artifact.
+    if [[ -z "$DEFAULT_DEVELOPMENT_TEAM" || -z "$DEFAULT_NOTARY_PROFILE" || -z "$CANONICAL_NOTARY_APPLE_ID" ]]; then
+        echo "error: PUBLIC_RELEASE=YES needs the signing settings, and none were found." >&2
+        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV (one NAME=\"value\" per line; an unquoted value, an export prefix and spaces around the = are accepted too)." >&2
         exit 1
     fi
 
@@ -172,7 +190,7 @@ verify_notarization_access() {
             echo "error: Apple Developer Program agreements must be accepted before BugNarrator can be notarized for distribution." >&2
         fi
 
-        echo "hint: canonical BugNarrator notarization uses Apple ID $CANONICAL_NOTARY_APPLE_ID on team $DEFAULT_DEVELOPMENT_TEAM through keychain profile $DEFAULT_NOTARY_PROFILE." >&2
+        echo "hint: canonical BugNarrator notarization is configured through BUGNARRATOR_NOTARY_APPLE_ID, BUGNARRATOR_DEVELOPMENT_TEAM and BUGNARRATOR_NOTARY_PROFILE (environment, or $BUGNARRATOR_SIGNING_ENV)." >&2
         echo "hint: resolve the Apple notarization account problem first, or rerun with NOTARIZE=NO for a non-distributable signed-only internal build." >&2
         exit 1
     fi
@@ -358,6 +376,17 @@ if [[ -n "$DEVELOPMENT_TEAM" ]]; then
     )
 fi
 
+# The app pins the publisher of the transcription server it downloads. That
+# publisher is always the canonical team, whoever signs the app, so the team
+# that goes into the bundle is the canonical one and not an overridden
+# DEVELOPMENT_TEAM. The team goes into the bundle from here, so it never has
+# to be written into this repository.
+if [[ -n "$DEFAULT_DEVELOPMENT_TEAM" ]]; then
+    xcodebuild_args+=(
+        BUGNARRATOR_PUBLISHER_TEAM="$DEFAULT_DEVELOPMENT_TEAM"
+    )
+fi
+
 if [[ -n "$CODE_SIGN_IDENTITY" && "$MANUAL_DISTRIBUTION_SIGNING" != "YES" ]]; then
     xcodebuild_args+=(
         CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY"
@@ -445,6 +474,32 @@ if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
 fi
 
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
+
+# The app pins the publisher of the transcription server it downloads, and
+# that pin travels in the bundle: the build injects the team into
+# Resources/Info.plist. A release whose publisher team never reached the
+# plist would ship an app that accepts a server signed by any Apple
+# developer, and nothing downstream would notice, so the release path
+# checks the bundle instead of trusting the build setting.
+PUBLISHER_TEAM_IN_BUNDLE=""
+if [[ -f "$INFO_PLIST" ]]; then
+    PUBLISHER_TEAM_IN_BUNDLE="$(plutil -extract BugNarratorPublisherTeam raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+fi
+# The Info.plist source holds a build-setting placeholder. When the build
+# setting never reached the build, the placeholder is still there, unexpanded,
+# so the bundle is checked for a value that is not a placeholder.
+unexpanded_prefix='$'
+if [[ -z "$PUBLISHER_TEAM_IN_BUNDLE" || "$PUBLISHER_TEAM_IN_BUNDLE" == "$unexpanded_prefix"* ]]; then
+    if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
+        echo "error: the built app carries no publisher team, so it cannot pin the publisher of the transcription server it downloads." >&2
+        echo "hint: check that the signing settings are readable and that BUGNARRATOR_PUBLISHER_TEAM reaches the build." >&2
+        exit 1
+    fi
+    echo "warning: the built app carries no publisher team, so it cannot pin the publisher of the transcription server it downloads. Only a public release build needs this." >&2
+elif [[ "$PUBLIC_RELEASE" == "YES" && "$PUBLISHER_TEAM_IN_BUNDLE" != "$DEFAULT_DEVELOPMENT_TEAM" ]]; then
+    echo "error: the built app pins publisher team '$PUBLISHER_TEAM_IN_BUNDLE', but the canonical publisher team is '$DEFAULT_DEVELOPMENT_TEAM'." >&2
+    exit 1
+fi
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
 APP_ICON_ICNS_PATH="$APP_PATH/Contents/Resources/AppIcon.icns"
