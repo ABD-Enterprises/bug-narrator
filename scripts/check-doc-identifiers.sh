@@ -245,6 +245,11 @@ is_placeholder() {
   value="${value%\'}"
   value="${value#\'}"
 
+  # An explicitly empty value carries nothing to publish.
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+
   # Angle-bracket placeholders (<team id>) and the YOUR… convention, matched
   # case-insensitively so that `your-team-id` is read as the placeholder it is.
   local lowered="${value,,}"
@@ -316,7 +321,8 @@ while IFS= read -r file; do
     done < <(flag_values "$file" "$flag")
   done
 
-  for assignment in "DEVELOPMENT_TEAM=" "NOTARY_PROFILE="; do
+  # The YAML form of the same setting is as copy-pasteable as the shell one.
+  for assignment in "DEVELOPMENT_TEAM=" "DEVELOPMENT_TEAM:" "NOTARY_PROFILE=" "NOTARY_PROFILE:"; do
     while IFS=$'\t' read -r lineno value; do
       [[ -n "$value" ]] || continue
       if ! is_placeholder "$value"; then

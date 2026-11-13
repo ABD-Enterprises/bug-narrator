@@ -73,6 +73,15 @@ if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
         echo "error: PUBLIC_RELEASE=YES cannot skip the packaged transcription smoke test." >&2
         exit 1
     fi
+    # The publisher team and the notary profile live outside this repository,
+    # so a release built without them cannot be signed by the team the app
+    # pins, and cannot be notarized at all. Say that plainly instead of
+    # producing a server the app would refuse.
+    if [[ -z "$PUBLISHER_TEAM" || -z "$NOTARY_PROFILE" ]]; then
+        echo "error: PUBLIC_RELEASE=YES needs the signing settings, and none were found." >&2
+        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
+        exit 1
+    fi
 fi
 
 if [[ "$NOTARIZE" == "YES" ]]; then
