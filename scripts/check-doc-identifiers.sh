@@ -236,6 +236,9 @@ done
 is_placeholder() {
   local value="$1"
 
+  # A flag written as FLAG=value carries its value after the "=".
+  value="${value#=}"
+
   # Strip surrounding quotes so a quoted expansion is recognised.
   value="${value%\"}"
   value="${value#\"}"
@@ -282,20 +285,27 @@ flag_values() {
     fi
 
     [[ -n "$value" ]] || continue
+
+    # A flag written as FLAG=value carries its value after the "=".
+    value="${value#=}"
+
+    # The next option on the line is not this flag's value.
+    if [[ "$value" == -* ]]; then
+      continue
+    fi
+
     printf '%s\t%s\n' "$lineno" "$value"
   done < <(grep -nIF -- "$flag" "$file" 2>/dev/null || true)
 }
 
-# The tracked file list is a newline-separated string, so it is read line by
-# line. Iterating it as an array would expand the whole listing into one
-# word and the rule below would never run.
+# The published surface, the same one tier 2 scans: a command a reader can
+# copy out of a workflow file or a doc is as copyable as one in a markdown
+# page. The list is read line by line, because it is a newline-separated
+# string and iterating it as an array would expand the whole listing into
+# one word.
 while IFS= read -r file; do
   [[ -n "$file" ]] || continue
   [[ -f "$file" ]] || continue
-  case "$file" in
-    *.md) ;;
-    *) continue ;;
-  esac
 
   for flag in "--apple-id" "--team-id" "store-credentials"; do
     while IFS=$'\t' read -r lineno value; do
@@ -314,7 +324,7 @@ while IFS= read -r file; do
       fi
     done < <(flag_values "$file" "$assignment")
   done
-done <<<"$TRACKED_FILES"
+done <<<"$(printf '%s\n' "${PUBLISHED_DOCS[@]}")"
 
 if [[ "$FAILURES" -ne 0 ]]; then
   printf '\nDocumentation identifier audit failed.\n' >&2

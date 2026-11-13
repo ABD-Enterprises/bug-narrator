@@ -33,6 +33,9 @@ NOTARIZE="${NOTARIZE:-NO}"
 . "$ROOT_DIR/scripts/signing-settings.sh"
 DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
 NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
+# The team that publishes this server is also the team the app pins, so a
+# server signed by anyone else would be refused by the app that ships it.
+PUBLISHER_TEAM="$(bugnarrator_signing_setting BUGNARRATOR_DEVELOPMENT_TEAM)"
 VERSION="$(tr -d '[:space:]' <"$ROOT_DIR/VERSION")"
 ARCH="$(uname -m)"
 RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -171,6 +174,15 @@ if [[ -f "$BINARY_PATH" ]]; then
         codesign --verify --strict --verbose=2 "$BINARY_PATH"
         CODESIGN_DETAILS="$(codesign -dv --verbose=2 "$BINARY_PATH" 2>&1)"
         SIGNING_AUTHORITY="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^Authority=/ && !found {print $2; found=1}')"
+        SIGNING_TEAM="$(printf '%s\n' "$CODESIGN_DETAILS" | awk -F= '/^TeamIdentifier=/ {print $2; exit}')"
+
+        # The app pins the publisher of this server, so a server signed under
+        # another team would be refused by the app that downloads it. Check
+        # that here rather than at the user's install.
+        if [[ "$PUBLIC_RELEASE" == "YES" && -n "$PUBLISHER_TEAM" && "$SIGNING_TEAM" != "$PUBLISHER_TEAM" ]]; then
+            echo "error: the standalone server is signed by team '$SIGNING_TEAM', but the app pins the publisher team '$PUBLISHER_TEAM'." >&2
+            exit 1
+        fi
     else
         SIGNING_AUTHORITY="<unsigned>"
     fi

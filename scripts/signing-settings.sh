@@ -64,13 +64,20 @@ bugnarrator_signing_file_value() {
 
       if (key != name) next
 
+      # A quoted value ends at its closing quote, so a comment after it is
+      # not part of the value and the quotes are not either. An unquoted
+      # value ends at a comment.
       quote = sprintf("%c", 39)
-      if (value ~ /^".*"$/) {
-        value = substr(value, 2, length(value) - 2)
-      } else if (value ~ ("^" quote ".*" quote "$")) {
-        value = substr(value, 2, length(value) - 2)
+      first = substr(value, 1, 1)
+      if (first == "\"" || first == quote) {
+        rest = substr(value, 2)
+        end = index(rest, first)
+        if (end > 0) {
+          value = substr(rest, 1, end - 1)
+        } else {
+          value = rest
+        }
       } else {
-        # An unquoted value may be followed by a comment.
         hash = index(value, " #")
         if (hash > 0) value = substr(value, 1, hash - 1)
         gsub(/[[:space:]]+$/, "", value)
