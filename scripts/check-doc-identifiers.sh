@@ -10,9 +10,12 @@
 # tiers instead.
 #
 # Tier 1 - exact. When the machine-local values are available, every tracked
-# text file is scanned for them, whatever shape they take. This is the tier
+# file is scanned for them, whatever shape they take. This is the tier
 # that catches a value copied into any tracked file, and it covers the whole
-# tree: every file in this public repository is world-readable.
+# tree: every file in this public repository is world-readable. Both the
+# environment value and the file value are scanned, because the environment
+# overrides the file at build time while the file's own value is still a
+# value that must not be published.
 #
 # Tier 2 - shape. Always, including on CI where the machine-local values do
 # not exist: the published documentation may not carry an e-mail address at
@@ -65,56 +68,76 @@ fi
 
 # ── Tier 1: the exact values, when this machine holds them ──────────────────
 
-TEAM_ID="$(bugnarrator_signing_setting BUGNARRATOR_DEVELOPMENT_TEAM)"
-NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
-APPLE_ID="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_APPLE_ID)"
+# Every value to look for, with what to call it when it is found.
+NEEDLES=()
+DESCRIPTIONS=()
 
-# The password-manager item name is built from the profile name, so the
-# profile value covers it.
-PASSWORD_MANAGER_ITEM=""
-if [[ -n "$NOTARY_PROFILE" ]]; then
-  PASSWORD_MANAGER_ITEM="Apple Notarytool - ${NOTARY_PROFILE}"
-fi
+add_needle() {
+  local needle="$1"
+  local description="$2"
+  [[ -n "$needle" ]] || return 0
+  NEEDLES+=("$needle")
+  DESCRIPTIONS+=("$description")
+  return 0
+}
 
-# Reports every line of a file that carries a literal identifier.
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_DEVELOPMENT_TEAM)
+
+while IFS= read -r value; do
+  add_needle "$value" "notary keychain profile name"
+  # The password-manager item name is built from the profile name, so the
+  # profile value covers it.
+  add_needle "Apple Notarytool - ${value}" "password-manager item name"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_NOTARY_PROFILE)
+
+while IFS= read -r value; do
+  add_needle "$value" "notarization Apple ID"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_NOTARY_APPLE_ID)
+
+# Reports every line of the tracked tree that carries a literal identifier.
 #
 # The match is case-insensitive. The Apple ID is a mailbox, and a mailbox is
 # reachable at any case, so a differently-cased spelling of it is the same
 # account and a case-sensitive check would wave it through. The team ID and
 # the profile name are case-insensitive for the same reason: a copy of the
 # value that has been retyped in a different case is still the value.
-scan_for_literal() {
-  local file="$1"
-  local needle="$2"
-  local description="$3"
+#
+# The scan is one git grep over the tracked tree rather than a grep per file
+# per value: this check runs on every push, and the per-file form took about
+# a minute on this tree.
+scan_tree_for_literal() {
+  local needle="$1"
+  local description="$2"
 
-  [[ -n "$needle" ]] || return 0
+  local output
+  output="$(git grep -n -i -F -e "$needle" 2>/dev/null || true)"
 
-  local line_number
-  while IFS= read -r line_number; do
-    [[ -n "$line_number" ]] || continue
-    report_hit "$file" "$line_number" "$description"
-  done < <(grep -niIF -- "$needle" "$file" 2>/dev/null | cut -d: -f1 || true)
-
-  # A binary file that matches has no useful line number, but it is still a
-  # published copy and must not be reported as clean.
-  if grep -qilF -- "$needle" "$file" 2>/dev/null && ! grep -qiIF -- "$needle" "$file" 2>/dev/null; then
-    report_hit "$file" "" "$description"
-  fi
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    case "$line" in
+      "Binary file "*)
+        # A binary file that matches has no useful line number, but it is
+        # still a published copy and must not be reported as clean.
+        local binary_path="${line#Binary file }"
+        report_hit "${binary_path% matches}" "" "$description"
+        ;;
+      *)
+        report_hit "${line%%:*}" "$(printf '%s' "$line" | cut -d: -f2)" "$description"
+        ;;
+    esac
+  done <<<"$output"
 }
 
 TIER1_RAN=0
-if [[ -n "$TEAM_ID" || -n "$NOTARY_PROFILE" || -n "$APPLE_ID" ]]; then
+if [[ "${#NEEDLES[@]}" -gt 0 ]]; then
   TIER1_RAN=1
   printf 'scanning the whole tracked tree for the owner identifiers on this machine\n'
-  while IFS= read -r file; do
-    [[ -n "$file" ]] || continue
-    [[ -f "$file" ]] || continue
-    scan_for_literal "$file" "$TEAM_ID" "development team ID"
-    scan_for_literal "$file" "$NOTARY_PROFILE" "notary keychain profile name"
-    scan_for_literal "$file" "$PASSWORD_MANAGER_ITEM" "password-manager item name"
-    scan_for_literal "$file" "$APPLE_ID" "notarization Apple ID"
-  done <<<"$TRACKED_FILES"
+  for index in "${!NEEDLES[@]}"; do
+    scan_tree_for_literal "${NEEDLES[$index]}" "${DESCRIPTIONS[$index]}"
+  done
 else
   printf 'note: no machine-local signing settings found (%s); the exact scan is skipped on this machine\n' "$BUGNARRATOR_SIGNING_ENV"
 fi
@@ -123,18 +146,21 @@ fi
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 
-# The documentation a reader sees. The docs site mirrors these files, so a
-# leak here is a leak on the published site too.
+# Every tracked markdown file. The published surface is wider than docs/:
+# SECURITY.md, CONTRIBUTING.md, QUICKSTART.md, the Windows readme and the
+# issue templates are published too, and the original leak was an Apple ID
+# in a published document. Scoping the scan to a curated list would let any
+# file outside that list carry the identifier while CI stayed green, so the
+# scan covers every tracked markdown file instead.
+#
+# Non-markdown files are deliberately out of scope for this shape check: a
+# binary or a data file can contain a sequence that looks like an address
+# without carrying one (an asset named icon_16x16@2x.png, for instance).
 PUBLISHED_DOCS=()
 while IFS= read -r file; do
   [[ -n "$file" ]] || continue
   PUBLISHED_DOCS+=("$file")
-done < <(
-  for f in README.md CHANGELOG.md CHANGELOG-archive.md; do
-    [[ -f "$f" ]] && printf '%s\n' "$f"
-  done
-  git ls-files -- 'docs/*.md' 'docs/**/*.md' 'site/*.md' 'site/**/*.md'
-)
+done < <(git ls-files -- '*.md')
 
 if [[ "${#PUBLISHED_DOCS[@]}" -eq 0 ]]; then
   printf 'FAIL: no published documentation was found to scan\n' >&2
@@ -224,7 +250,7 @@ flag_values() {
   done < <(grep -nIF -- "$flag" "$file" 2>/dev/null || true)
 }
 
-while IFS= read -r file; do
+for file in "${TRACKED_FILES[@]}"; do
   [[ -n "$file" ]] || continue
   [[ -f "$file" ]] || continue
   case "$file" in
@@ -249,7 +275,7 @@ while IFS= read -r file; do
       fi
     done < <(flag_values "$file" "$assignment")
   done
-done <<<"$TRACKED_FILES"
+done
 
 if [[ "$FAILURES" -ne 0 ]]; then
   printf '\nDocumentation identifier audit failed.\n' >&2

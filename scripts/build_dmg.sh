@@ -79,7 +79,7 @@ if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
     # plainly instead of producing an unsigned artifact.
     if [[ -z "$DEFAULT_DEVELOPMENT_TEAM" || -z "$DEFAULT_NOTARY_PROFILE" || -z "$CANONICAL_NOTARY_APPLE_ID" ]]; then
         echo "error: PUBLIC_RELEASE=YES needs the signing settings, and none were found." >&2
-        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
+        echo "hint: set BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID in the environment, or in $BUGNARRATOR_SIGNING_ENV (one NAME=\"value\" per line)." >&2
         exit 1
     fi
 
@@ -467,6 +467,33 @@ if [[ "$CODE_SIGNING_ALLOWED" == "YES" ]]; then
 fi
 
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
+
+# The app pins the publisher of the transcription server it downloads, and
+# that pin travels in the bundle: the build injects the team into
+# Resources/Info.plist. A release whose publisher team never reached the
+# plist would ship an app that accepts a server signed by any Apple
+# developer, and nothing downstream would notice, so the release path
+# checks the bundle instead of trusting the build setting.
+PUBLISHER_TEAM_IN_BUNDLE="$(/usr/libexec/PlistBuddy -c 'Print :BugNarratorPublisherTeam' "$INFO_PLIST" 2>/dev/null || true)"
+# The Info.plist source holds a build-setting placeholder. When the build
+# setting never reached the build, the placeholder is still there, unexpanded,
+# so the bundle is checked for a value that is not a placeholder.
+unexpanded_prefix='$'
+if [[ "$PUBLIC_RELEASE" == "YES" ]]; then
+    if [[ -z "$PUBLISHER_TEAM_IN_BUNDLE" || "$PUBLISHER_TEAM_IN_BUNDLE" == "$unexpanded_prefix"* ]]; then
+        echo "error: the built app carries no publisher team, so it cannot pin the publisher of the transcription server it downloads." >&2
+        echo "hint: check that BUGNARRATOR_PUBLISHER_TEAM reaches the build and that Resources/Info.plist is the Info.plist this build uses." >&2
+        exit 1
+    fi
+    if [[ "$PUBLISHER_TEAM_IN_BUNDLE" != "$EXPECTED_SIGNING_TEAM" ]]; then
+        echo "error: the built app carries publisher team '$PUBLISHER_TEAM_IN_BUNDLE', but the approved canonical team is '$EXPECTED_SIGNING_TEAM'." >&2
+        exit 1
+    fi
+else
+    if [[ -z "$PUBLISHER_TEAM_IN_BUNDLE" || "$PUBLISHER_TEAM_IN_BUNDLE" == "$unexpanded_prefix"* ]]; then
+        echo "warning: the built app carries no publisher team, so it cannot pin the publisher of the transcription server it downloads. Only a signed release build needs this." >&2
+    fi
+fi
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
 APP_ICON_ICNS_PATH="$APP_PATH/Contents/Resources/AppIcon.icns"

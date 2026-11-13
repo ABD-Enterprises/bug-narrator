@@ -24,9 +24,13 @@ final class LocalTranscriptionManager: ObservableObject {
     /// The requirement the downloaded transcription server must satisfy.
     ///
     /// Pinned to the team the app is signed with when the bundle carries it.
-    /// An unsigned local build carries no team, and then the requirement is
-    /// the Apple anchor alone: the pinned checksum manifest remains the
-    /// integrity gate, and the publisher pin is only as strong as the build.
+    /// The checksum manifest that accompanies the download is published with
+    /// the same release, so it does not stand on its own: the publisher pin
+    /// is what tells the owner's server apart from one signed by a different
+    /// Apple developer. An unsigned local build of the app carries no team,
+    /// so the requirement there is the Apple anchor alone and the pin is only
+    /// as strong as that build. The release build asserts that the team
+    /// reached the bundle, so a published artifact always carries it.
     nonisolated static var publisherRequirement: String {
         let anchor = "=anchor apple generic"
         guard let team = publisherTeam else { return anchor }

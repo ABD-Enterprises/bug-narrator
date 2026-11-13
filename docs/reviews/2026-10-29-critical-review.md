@@ -493,7 +493,7 @@ It ships with regression tests in `windows/tests/BugNarrator.Windows.Tests/Issue
 
 **Fix:** replace lines 138-145 with placeholders (`<notary Apple ID>`, `<team ID>`, …) and point at `scripts/build_dmg.sh`, which already holds the real defaults. Then rewrite history or accept the address is already public — worth deciding explicitly.
 
-**Follow-up (2026-11-12):** the first half shipped — the documentation now carries placeholders (#1275). The second half was decided by the owner: the settings moved out of this repository altogether, into the machine-local signing settings the build reads, so no value of them is in the tree at all; and the history that carried them is being rewritten. The placeholders below therefore point at the signing settings, not at `scripts/build_dmg.sh`.
+**Follow-up (2026-11-12):** the first half shipped — the documentation now carries placeholders (#1275). The second half was decided by the owner: the settings moved out of this repository altogether, into the machine-local signing settings the build reads, so no value of them is in the tree at all; and the history that carried them is rewritten in a separate follow-up under #1275, so the values leave the repository's history as well. The placeholders below therefore point at the signing settings, not at `scripts/build_dmg.sh`.
 
 ---
 

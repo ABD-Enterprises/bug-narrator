@@ -141,6 +141,25 @@ The three settings are:
 - the notary keychain profile name (`BUGNARRATOR_NOTARY_PROFILE`)
 - the notarization Apple ID (`BUGNARRATOR_NOTARY_APPLE_ID`)
 
+The settings file holds one setting per line. Blank lines and lines starting
+with `#` are ignored, a value may be quoted or not, and a value is taken
+literally — nothing in it is expanded:
+
+```bash
+BUGNARRATOR_DEVELOPMENT_TEAM="YOURTEAMID"
+BUGNARRATOR_NOTARY_PROFILE="notary-profile-name"
+BUGNARRATOR_NOTARY_APPLE_ID="you@example.com"
+```
+
+`export NAME="value"` and `NAME = "value"` are accepted as well. The
+environment overrides the file, so a one-off build can supply a value without
+editing the file.
+
+The Apple ID is a presence check only. The build never passes it to
+`notarytool` — the keychain profile holds the credential — but it is required,
+so a release cannot be produced on a machine whose notary account was never
+configured.
+
 Do not store the app-specific password in the repo. Keep it only in:
 
 - the password manager, in the item that holds the notarization credential

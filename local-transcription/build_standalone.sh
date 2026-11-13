@@ -25,13 +25,13 @@ NOTARIZE="${NOTARIZE:-NO}"
 # it is not held here. Read it from the machine-local signing settings, the
 # same source scripts/build_dmg.sh reads, so the two scripts cannot drift into
 # notarizing under different profiles (#1275).
+#
+# A plain local build needs none of these, so a missing setting is not an
+# error here: only notarization actually needs the profile, and that branch
+# says so plainly below.
 # shellcheck source=scripts/signing-settings.sh
 . "$ROOT_DIR/scripts/signing-settings.sh"
 DEFAULT_NOTARY_PROFILE="$(bugnarrator_signing_setting BUGNARRATOR_NOTARY_PROFILE)"
-if [[ -z "$DEFAULT_NOTARY_PROFILE" ]]; then
-    echo "error: no notary profile found; set BUGNARRATOR_NOTARY_PROFILE in the environment or in $BUGNARRATOR_SIGNING_ENV" >&2
-    exit 1
-fi
 NOTARY_PROFILE="${NOTARY_PROFILE:-$DEFAULT_NOTARY_PROFILE}"
 VERSION="$(tr -d '[:space:]' <"$ROOT_DIR/VERSION")"
 ARCH="$(uname -m)"
@@ -75,6 +75,11 @@ fi
 if [[ "$NOTARIZE" == "YES" ]]; then
     if [[ "$CODE_SIGNING_ALLOWED" != "YES" || -z "$CODE_SIGN_IDENTITY" ]]; then
         echo "error: notarization requires a signed standalone binary." >&2
+        exit 1
+    fi
+    if [[ -z "$NOTARY_PROFILE" ]]; then
+        echo "error: notarization requires a notary profile, and none was found." >&2
+        echo "hint: set BUGNARRATOR_NOTARY_PROFILE in the environment, or in $BUGNARRATOR_SIGNING_ENV." >&2
         exit 1
     fi
     echo "Checking Apple notarization access..."
