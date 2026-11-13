@@ -40,6 +40,65 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: fixture.destination.appendingPathComponent(LocalTranscriptionManager.protocolReceipt), encoding: .utf8), "1\n")
     }
 
+    func testUpgradeThatCannotRetireHelperPreservesInstallationAndExplainsRecovery() throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        let files = FileManager.default
+        try files.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        let binary = fixture.destination.appendingPathComponent("bugnarrator-transcription")
+        try files.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        try signExecutableFixture(binary)
+        let originalBinary = try Data(contentsOf: binary)
+        let models = fixture.destination.appendingPathComponent("Models")
+        try files.createDirectory(at: models, withIntermediateDirectories: true)
+        let model = models.appendingPathComponent("fixture-model")
+        try Data("model fixture".utf8).write(to: model)
+        let token = fixture.destination.appendingPathComponent(LocalServerTokenStore.tokenFileName)
+        try Data("fixture-token".utf8).write(to: token)
+        let receipt = fixture.destination.appendingPathComponent(LocalTranscriptionManager.protocolReceipt)
+        try Data("0\n".utf8).write(to: receipt)
+
+        // Ignored signals survive exec, so the native managed-path fixture
+        // stays alive through SIGTERM without relying on Python startup.
+        let old = Process()
+        old.executableURL = URL(fileURLWithPath: "/bin/sh")
+        old.arguments = ["-c", "trap '' TERM; exec \"$1\" 60", "fixture", binary.path]
+        try old.run()
+        defer {
+            if old.isRunning { _ = kill(old.processIdentifier, SIGKILL) }
+            old.waitUntilExit()
+        }
+        let expectedPath = binary.resolvingSymlinksInPath().standardizedFileURL.path
+        func fixtureIsReady() -> Bool {
+            var path = [CChar](repeating: 0, count: 4096)
+            guard proc_pidpath(old.processIdentifier, &path, UInt32(path.count)) > 0 else { return false }
+            let reported = String(decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            return URL(fileURLWithPath: reported).resolvingSymlinksInPath().standardizedFileURL.path == expectedPath
+        }
+        let deadline = Date().addingTimeInterval(5)
+        while !fixtureIsReady(), old.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        XCTAssertTrue(fixtureIsReady(), "The shell must exec the native helper before retirement")
+        guard fixtureIsReady() else { return }
+        let oldPID = old.processIdentifier
+        XCTAssertThrowsError(try fixture.install { path in
+            try LocalTranscriptionManager.retireVerifiedProcesses(path, authenticate: { $0 == oldPID })
+        }) { error in
+            let message = error.localizedDescription
+            XCTAssertTrue(message.contains("Activity Monitor"))
+            XCTAssertTrue(message.contains("bugnarrator-transcription"))
+            XCTAssertTrue(message.contains("Force Quit"))
+            XCTAssertTrue(message.contains("retry Update local server in Settings"))
+        }
+        XCTAssertTrue(old.isRunning, "Automatic retirement must not escalate to SIGKILL")
+        XCTAssertEqual(try Data(contentsOf: binary), originalBinary)
+        XCTAssertEqual(try String(contentsOf: model, encoding: .utf8), "model fixture")
+        XCTAssertEqual(try String(contentsOf: token, encoding: .utf8), "fixture-token")
+        XCTAssertEqual(try String(contentsOf: receipt, encoding: .utf8), "0\n")
+        XCTAssertFalse(try files.contentsOfDirectory(atPath: fixture.destination.path).contains { $0.hasPrefix(".install-") })
+    }
+
     func testUpgradeDoesNotStopAnUnverifiedProcessAtManagedPath() throws {
         let fixture = try InstallerFixture()
         defer { fixture.remove() }
