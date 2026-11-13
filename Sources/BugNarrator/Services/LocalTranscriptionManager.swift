@@ -7,7 +7,40 @@ import Foundation
 @MainActor
 final class LocalTranscriptionManager: ObservableObject {
     static let assetName = "bugnarrator-transcription-macos-arm64.dmg"
-    nonisolated static let publisherRequirement = "=anchor apple generic and certificate leaf[subject.OU] = \"***REMOVED***\""
+    /// The team the app itself is signed with, injected into the bundle by
+    /// the build from the owner's machine-local signing settings. The team is
+    /// not written into this repository: it is public in every released
+    /// artifact's signature, but it must not be published here.
+    nonisolated static let publisherTeam: String? = {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "BugNarratorPublisherTeam") as? String else {
+            return nil
+        }
+        let team = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // An unset build setting leaves the unexpanded placeholder behind.
+        guard !team.isEmpty, !team.hasPrefix("$(") else { return nil }
+        return team
+    }()
+
+    /// The requirement the downloaded transcription server must satisfy.
+    ///
+    /// Pinned to the team that publishes the transcription server, which the
+    /// build injects into this bundle. The checksum manifest that accompanies
+    /// the download is published with the same release, so it does not stand
+    /// on its own: the publisher pin is what tells the owner's server apart
+    /// from one signed by a different Apple developer.
+    ///
+    /// A build that is not made by scripts/build_dmg.sh carries no team: the
+    /// value lives only in the owner's machine-local signing settings, which
+    /// this repository does not hold. Such a build - a plain Xcode build, or a
+    /// self-build from this public repository - pins nothing, and the
+    /// requirement there is the Apple anchor alone. The release build asserts
+    /// that the team reached the bundle, so a published artifact always
+    /// carries the pin.
+    nonisolated static var publisherRequirement: String {
+        let anchor = "=anchor apple generic"
+        guard let team = publisherTeam else { return anchor }
+        return anchor + " and certificate leaf[subject.OU] = \"\(team)\""
+    }
 
     struct Asset: Decodable, Equatable, Sendable {
         let name: String

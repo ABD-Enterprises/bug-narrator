@@ -2,110 +2,44 @@
 # Refuse to let the owner's notarization identifiers back into the published
 # surface of this public repository.
 #
-# The Apple ID, the development team ID, the notary keychain profile name and
-# the password-manager item name together tell an attacker exactly which
-# credentials to go after. None of them needs to be public (AGENTS.md, "Safety:
-# releases and signing").
+# The signing and notarization settings do not live in this repository at all.
+# The canonical copy is the machine-local file named by BUGNARRATOR_SIGNING_ENV
+# (default ~/.config/bug-narrator/signing.env): it is untracked, it lives
+# outside the tree, and no value of it is written into any file here. So this
+# check cannot read the identifiers out of the repository, and runs in two
+# tiers instead.
 #
-# `scripts/build_dmg.sh` holds them as the canonical source of truth. This
-# check derives the values from there at run time instead of repeating them:
-# the identifiers are never written into this script, into any other script,
-# or into any file an agent might copy from one.
+# Tier 1 - exact. When the machine-local values are available, every tracked
+# file is scanned for them, whatever shape they take. This is the tier
+# that catches a value copied into any tracked file, and it covers the whole
+# tree: every file in this public repository is world-readable. Both the
+# environment value and the file value are scanned, because the environment
+# overrides the file at build time while the file's own value is still a
+# value that must not be published.
 #
-# The check scans every tracked text file, not just the documentation, because
-# the identifiers were published in a doc once and can be published in any
-# tracked file the next time. A short allowlist names the few places that
-# legitimately hold a value, each with the reason it holds it.
+# Tier 2 - shape. Always, including on CI where the machine-local values do
+# not exist: the published documentation may not carry an e-mail address at
+# all. The notarization Apple ID is an e-mail address, and the original leak
+# was an Apple ID in a doc, so this tier catches the same class of leak
+# without needing to know the value. Reserved example domains are exempt.
 #
-# The check fails closed. If the canonical values cannot be read, or the
-# tracked files cannot be listed, it reports the failure rather than
-# reporting a clean scan it did not perform.
+# Tier 2 is a backstop, not a replacement. It cannot see the team ID or the
+# keychain profile name: neither has a shape that can be told apart from
+# ordinary text, so only tier 1 can catch those, and only on the machine that
+# holds the settings. Keep both.
+#
+# The check fails closed on the things it can decide alone: if the tracked
+# files cannot be listed, it reports the failure rather than reporting a
+# clean scan it did not perform, and a settings file it cannot read is an
+# error rather than an absent configuration.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-CANONICAL="$ROOT/scripts/build_dmg.sh"
-
-if [[ ! -f "$CANONICAL" ]]; then
-  printf 'FAIL: %s is missing; cannot read the canonical notarization identity\n' "$CANONICAL" >&2
-  exit 1
-fi
-
-# Reads `NAME="value"` out of the canonical script.
-read_default() {
-  local name="$1"
-  local value
-  value="$(sed -n "s/^${name}=\"\(.*\)\"\$/\1/p" "$CANONICAL" | head -1)"
-  printf '%s' "$value"
-}
-
-TEAM_ID="$(read_default DEFAULT_DEVELOPMENT_TEAM)"
-NOTARY_PROFILE="$(read_default DEFAULT_NOTARY_PROFILE)"
-APPLE_ID="$(read_default CANONICAL_NOTARY_APPLE_ID)"
-
-MISSING=0
-if [[ -z "$TEAM_ID" ]]; then
-  printf 'FAIL: could not read DEFAULT_DEVELOPMENT_TEAM from %s\n' "$CANONICAL" >&2
-  MISSING=1
-fi
-if [[ -z "$NOTARY_PROFILE" ]]; then
-  printf 'FAIL: could not read DEFAULT_NOTARY_PROFILE from %s\n' "$CANONICAL" >&2
-  MISSING=1
-fi
-if [[ -z "$APPLE_ID" ]]; then
-  printf 'FAIL: could not read CANONICAL_NOTARY_APPLE_ID from %s\n' "$CANONICAL" >&2
-  MISSING=1
-fi
-if [[ "$MISSING" -ne 0 ]]; then
-  exit 1
-fi
-
-# The password-manager item name is built from the profile name, so the
-# profile value covers it.
-PASSWORD_MANAGER_ITEM="Apple Notarytool - ${NOTARY_PROFILE}"
-
-# The places that legitimately hold an identifier, and why. Everything else
-# tracked in the repository must be free of them.
-#
-# The team ID is disclosed by the published artifact itself — `spctl -a -vv`
-# prints it for any signed release — so it is not a secret in itself. It is
-# still kept out of the published documentation, where it would narrow an
-# attacker on the Apple ID, the notary profile and the password-manager item
-# that sit next to it.
-#
-#   scripts/build_dmg.sh                          the canonical defaults
-#   Sources/.../LocalTranscriptionManager.swift  the publisher requirement the
-#                                                app verifies the downloaded
-#                                                server against
-#
-# The recorded clauses of closed tickets are not on the list: an archived
-# done_when clause that names the team is a published copy of it, and it is
-# scrubbed like any other.
-ALLOWED_TEAM_ID=(
-  "scripts/build_dmg.sh"
-  "Sources/BugNarrator/Services/LocalTranscriptionManager.swift"
-)
-
-# The Apple ID, the notary profile name and the password-manager item name
-# name the credentials themselves, so only the canonical script may hold them.
-ALLOWED_CREDENTIAL=(
-  "scripts/build_dmg.sh"
-)
-
-# A path is allowed for an identifier when it is that identifier's file, or
-# inside one of its directories.
-path_allowed_for() {
-  local file="$1"
-  shift
-  local allowed
-  for allowed in "$@"; do
-    [[ "$file" == "$allowed" ]] && return 0
-    [[ "$file" == "$allowed"/* ]] && return 0
-  done
-  return 1
-}
+# shellcheck source=scripts/signing-settings.sh
+. "$ROOT/scripts/signing-settings.sh"
 
 FAILURES=0
 
@@ -121,9 +55,8 @@ report_hit() {
   FAILURES=1
 }
 
-# The tracked files are the published surface: every file in this public
-# repository is world-readable, so the identifiers must stay out of all of
-# them, not only out of the documentation.
+# ── The tracked files are the published surface ──────────────────────────────
+
 TRACKED_FILES=""
 if ! TRACKED_FILES="$(git ls-files)"; then
   printf 'FAIL: could not list the tracked files\n' >&2
@@ -134,50 +67,188 @@ if [[ -z "$TRACKED_FILES" ]]; then
   exit 1
 fi
 
-# Reports every line of a file that carries a literal identifier. A file is
-# skipped for an identifier only when it is on that identifier's allowlist.
-#
-# The values compared here are the canonical ones read from
-# scripts/build_dmg.sh at run time. A value that was published and then
-# rotated out of the canonical script is not among them, so this check finds
-# the current identity, not every identity that was ever published.
+# ── Tier 1: the exact values, when this machine holds them ──────────────────
+
+# Every value to look for, with what to call it when it is found.
+NEEDLES=()
+DESCRIPTIONS=()
+
+add_needle() {
+  local needle="$1"
+  local description="$2"
+  [[ -n "$needle" ]] || return 0
+  NEEDLES+=("$needle")
+  DESCRIPTIONS+=("$description")
+  return 0
+}
+
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_DEVELOPMENT_TEAM)
+
+while IFS= read -r value; do
+  add_needle "$value" "notary keychain profile name"
+  # The password-manager item name is built from the profile name, so the
+  # profile value covers it.
+  add_needle "Apple Notarytool - ${value}" "password-manager item name"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_NOTARY_PROFILE)
+
+while IFS= read -r value; do
+  add_needle "$value" "notarization Apple ID"
+done < <(bugnarrator_signing_setting_candidates BUGNARRATOR_NOTARY_APPLE_ID)
+
+# The build scripts also honour the older variable names, so a value supplied
+# through one of those is signed and injected like any other. It has to be
+# scanned like any other too.
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(printenv DEVELOPMENT_TEAM 2>/dev/null || true)
+
+while IFS= read -r value; do
+  add_needle "$value" "development team ID"
+done < <(printenv EXPECTED_SIGNING_TEAM 2>/dev/null || true)
+
+while IFS= read -r value; do
+  add_needle "$value" "notary keychain profile name"
+  add_needle "Apple Notarytool - ${value}" "password-manager item name"
+done < <(printenv NOTARY_PROFILE 2>/dev/null || true)
+
+# Reports every line of the tracked tree that carries a literal identifier.
 #
 # The match is case-insensitive. The Apple ID is a mailbox, and a mailbox is
 # reachable at any case, so a differently-cased spelling of it is the same
 # account and a case-sensitive check would wave it through. The team ID and
 # the profile name are case-insensitive for the same reason: a copy of the
 # value that has been retyped in a different case is still the value.
-scan_for_literal() {
-  local file="$1"
-  local needle="$2"
-  local description="$3"
+#
+# The scan is one git grep over the tracked tree rather than a grep per file
+# per value: this check runs on every push, and the per-file form took about
+# a minute on this tree.
+scan_tree_for_literal() {
+  local needle="$1"
+  local description="$2"
 
-  [[ -n "$needle" ]] || return 0
+  local output
+  output="$(git grep -n -i -F -e "$needle" 2>/dev/null || true)"
 
-  local line_number
-  while IFS= read -r line_number; do
-    [[ -n "$line_number" ]] || continue
-    report_hit "$file" "$line_number" "$description"
-  done < <(grep -niIF -- "$needle" "$file" 2>/dev/null | cut -d: -f1 || true)
-
-  # A binary file that matches has no useful line number, but it is still a
-  # published copy and must not be reported as clean.
-  if grep -qilF -- "$needle" "$file" 2>/dev/null && ! grep -qiIF -- "$needle" "$file" 2>/dev/null; then
-    report_hit "$file" "" "$description"
-  fi
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    case "$line" in
+      "Binary file "*)
+        # A binary file that matches has no useful line number, but it is
+        # still a published copy and must not be reported as clean.
+        local binary_path="${line#Binary file }"
+        report_hit "${binary_path% matches}" "" "$description"
+        ;;
+      *)
+        report_hit "${line%%:*}" "$(printf '%s' "$line" | cut -d: -f2)" "$description"
+        ;;
+    esac
+  done <<<"$output"
 }
 
-# A published command must carry a placeholder, never a live identifier. The
-# canonical identifiers are already checked above; this catches the case
-# where a different value is written into a tracked file.
+TIER1_RAN=0
+if [[ "${#NEEDLES[@]}" -gt 0 ]]; then
+  TIER1_RAN=1
+  printf 'scanning the whole tracked tree for the owner identifiers on this machine\n'
+  for index in "${!NEEDLES[@]}"; do
+    scan_tree_for_literal "${NEEDLES[$index]}" "${DESCRIPTIONS[$index]}"
+  done
+elif [[ -f "$BUGNARRATOR_SIGNING_ENV" ]]; then
+  # The file is there but nothing could be read out of it. That is a
+  # misconfigured file, not an absent one, and it must not be reported as a
+  # clean scan that was never performed: a typo in a key name would
+  # otherwise switch the exact tier off without a word.
+  printf 'FAIL: %s exists, but none of BUGNARRATOR_DEVELOPMENT_TEAM, BUGNARRATOR_NOTARY_PROFILE and BUGNARRATOR_NOTARY_APPLE_ID could be read from it.\n' "$BUGNARRATOR_SIGNING_ENV" >&2
+  printf 'hint: the file holds one NAME="value" per line, for example BUGNARRATOR_DEVELOPMENT_TEAM="...".\n' >&2
+  exit 1
+else
+  printf 'note: no machine-local signing settings found (%s); the exact scan is skipped on this machine\n' "$BUGNARRATOR_SIGNING_ENV"
+fi
+
+# ── Tier 2: the published documentation may not carry an e-mail address ─────
+
+EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+
+# The published surface: every tracked markdown file, plus everything under
+# .github, docs and site whatever its format.
+#
+# The published surface is wider than docs/: SECURITY.md, CONTRIBUTING.md,
+# QUICKSTART.md, the Windows readme, the issue templates and the workflow
+# files are published too, and the original leak was an Apple ID in a
+# published document. Scoping the scan to a curated list would let any file
+# outside that list carry the identifier while CI stayed green.
+#
+# The wider tree is out of scope for this shape check, and the reason is
+# concrete: a tracked test fixture carries a genuine corporate e-mail
+# address, and the asset catalogs and data files carry byte sequences that
+# read like an address without being one. Both would have to be published
+# here to be allow-listed, so the shape check stays on the surface a reader
+# actually sees. Tier 1 covers the whole tree on the machine that holds the
+# settings.
+PUBLISHED_DOCS=()
+while IFS= read -r file; do
+  [[ -n "$file" ]] || continue
+  PUBLISHED_DOCS+=("$file")
+done < <(
+  {
+    git ls-files -- '*.md'
+    git ls-files -- .github docs site
+  } | sort -u
+)
+
+if [[ "${#PUBLISHED_DOCS[@]}" -eq 0 ]]; then
+  printf 'FAIL: no published documentation was found to scan\n' >&2
+  exit 1
+fi
+
+# Reserved example domains carry no identity: they are the RFC 2606 and
+# RFC 6762 names, plus the addresses GitHub issues for commits.
+email_is_reserved() {
+  local domain="$1"
+  domain="${domain,,}"
+  case "$domain" in
+    example.com|example.org|example.net|example.edu) return 0 ;;
+    *.example.com|*.example.org|*.example.net|*.example.edu) return 0 ;;
+    localhost|*.localhost|*.local|*.invalid|*.test) return 0 ;;
+    *.noreply.github.com) return 0 ;;
+  esac
+  return 1
+}
+
+for file in "${PUBLISHED_DOCS[@]}"; do
+  [[ -f "$file" ]] || continue
+  while IFS= read -r hit; do
+    [[ -n "$hit" ]] || continue
+    hit_line="${hit%%:*}"
+    address="${hit#*:}"
+    email_is_reserved "${address#*@}" && continue
+    report_hit "$file" "$hit_line" "an e-mail address"
+  done < <(grep -nIoE "$EMAIL_RE" "$file" 2>/dev/null || true)
+done
+
+# ── A published command must carry a placeholder, never a live value ───────
+
+# A published command is one a reader copies from. A source file is allowed
+# to hold its own defaults, so this rule is scoped to the markdown the
+# repository publishes.
 is_placeholder() {
   local value="$1"
+
+  # A flag written as FLAG=value carries its value after the "=".
+  value="${value#=}"
 
   # Strip surrounding quotes so a quoted expansion is recognised.
   value="${value%\"}"
   value="${value#\"}"
   value="${value%\'}"
   value="${value#\'}"
+
+  # An explicitly empty value carries nothing to publish.
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
 
   # Angle-bracket placeholders (<team id>) and the YOUR… convention, matched
   # case-insensitively so that `your-team-id` is read as the placeholder it is.
@@ -219,33 +290,27 @@ flag_values() {
     fi
 
     [[ -n "$value" ]] || continue
+
+    # A flag written as FLAG=value carries its value after the "=".
+    value="${value#=}"
+
+    # The next option on the line is not this flag's value.
+    if [[ "$value" == -* ]]; then
+      continue
+    fi
+
     printf '%s\t%s\n' "$lineno" "$value"
   done < <(grep -nIF -- "$flag" "$file" 2>/dev/null || true)
 }
 
+# The published surface, the same one tier 2 scans: a command a reader can
+# copy out of a workflow file or a doc is as copyable as one in a markdown
+# page. The list is read line by line, because it is a newline-separated
+# string and iterating it as an array would expand the whole listing into
+# one word.
 while IFS= read -r file; do
   [[ -n "$file" ]] || continue
   [[ -f "$file" ]] || continue
-
-  # The literal identifiers are checked across the whole tracked tree: every
-  # file in this public repository is world-readable.
-  if ! path_allowed_for "$file" "${ALLOWED_TEAM_ID[@]}"; then
-    scan_for_literal "$file" "$TEAM_ID" "development team ID"
-  fi
-  if ! path_allowed_for "$file" "${ALLOWED_CREDENTIAL[@]}"; then
-    scan_for_literal "$file" "$NOTARY_PROFILE" "notary keychain profile name"
-    scan_for_literal "$file" "$PASSWORD_MANAGER_ITEM" "password-manager item name"
-    scan_for_literal "$file" "$APPLE_ID" "notarization Apple ID"
-  fi
-
-  # The "a published command must carry a placeholder" rule applies to the
-  # documentation, where a reader copies a command from. A source file is
-  # allowed to hold its own defaults — that is what a default is — so this
-  # check is scoped to the markdown the repository publishes.
-  case "$file" in
-    *.md) ;;
-    *) continue ;;
-  esac
 
   for flag in "--apple-id" "--team-id" "store-credentials"; do
     while IFS=$'\t' read -r lineno value; do
@@ -256,7 +321,8 @@ while IFS= read -r file; do
     done < <(flag_values "$file" "$flag")
   done
 
-  for assignment in "DEVELOPMENT_TEAM=" "NOTARY_PROFILE="; do
+  # The YAML form of the same setting is as copy-pasteable as the shell one.
+  for assignment in "DEVELOPMENT_TEAM=" "DEVELOPMENT_TEAM:" "NOTARY_PROFILE=" "NOTARY_PROFILE:"; do
     while IFS=$'\t' read -r lineno value; do
       [[ -n "$value" ]] || continue
       if ! is_placeholder "$value"; then
@@ -264,11 +330,15 @@ while IFS= read -r file; do
       fi
     done < <(flag_values "$file" "$assignment")
   done
-done <<<"$TRACKED_FILES"
+done <<<"$(printf '%s\n' "${PUBLISHED_DOCS[@]}")"
 
 if [[ "$FAILURES" -ne 0 ]]; then
   printf '\nDocumentation identifier audit failed.\n' >&2
   exit 1
 fi
 
-printf 'PASS: the published surface carries no owner notarization identifiers\n'
+if [[ "$TIER1_RAN" -eq 1 ]]; then
+  printf 'PASS: the published surface carries no owner notarization identifiers\n'
+else
+  printf 'PASS: the published documentation carries no owner notarization identifiers (the exact scan needs this machine\x27s signing settings)\n'
+fi

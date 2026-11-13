@@ -24,10 +24,13 @@ the steps ran:
 | `CODE_SIGNING_ALLOWED=YES` | the script's default is `NO`, which produced unsigned artifacts indistinguishable downstream |
 | `NOTARIZE=YES` | |
 | `ALLOW_NOTARIZATION_FAILURE` unset | that flag combined with a public release is exactly how an unnotarized DMG reaches users |
+| the machine-local signing settings are present | the team, notary profile and Apple account live outside this repository, so a machine without them cannot sign or notarize at all |
 
 After building it re-checks the output: the DMG container carries a valid
-signature, the DMG has a stapled ticket, and the app bundle is validly signed.
-Any of those failing aborts before the artifact is written.
+signature, the DMG has a stapled ticket, the app bundle is validly signed,
+and the app bundle carries the publisher team the app pins the downloaded
+transcription server to. Any of those failing aborts before the artifact is
+written.
 
 Every build — public or not — writes `dist/<dmg>.provenance.txt` recording the
 commit, tag, tree state, signing authority, and whether notarization ran. A
@@ -55,9 +58,14 @@ gate verifies that entitlement is present after final signing.
 The build is not tied to this machine beyond credentials. Another Mac needs:
 
 - Xcode with the matching toolchain, and `DEVELOPER_DIR` pointed at it
+- the signing settings file — by default `~/.config/bug-narrator/signing.env`,
+  or whatever `BUGNARRATOR_SIGNING_ENV` names — holding one `NAME="value"` per
+  line for `BUGNARRATOR_DEVELOPMENT_TEAM`, `BUGNARRATOR_NOTARY_PROFILE` and
+  `BUGNARRATOR_NOTARY_APPLE_ID` (an unquoted value, an `export ` prefix and
+  spaces around the `=` are accepted too)
 - the `Developer ID Application` certificate + private key for the team
-  recorded in `scripts/build_dmg.sh`, imported into the login keychain
-- a `notarytool` keychain profile named as in `scripts/build_dmg.sh`
+  named in the machine-local signing settings, imported into the login keychain
+- a `notarytool` keychain profile named as in the machine-local signing settings
 - `python3` (the script bootstraps its own `dmgbuild` virtualenv)
 - Python 3.12 and `ffmpeg` when building the standalone Parakeet server
 - network access for an uncached Parakeet model; packaged smoke testing allows up to 10 minutes for the initial preload
