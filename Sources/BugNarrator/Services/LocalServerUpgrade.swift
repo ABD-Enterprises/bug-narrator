@@ -31,7 +31,9 @@ extension LocalTranscriptionManager {
                   info.pbi_uid == getuid() else { return false }
             var path = [CChar](repeating: 0, count: 4096)
             guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return false }
-            return String(decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == expectedPath && authenticate(pid)
+            let reportedPath = String(decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            let canonicalPath = URL(fileURLWithPath: reportedPath).resolvingSymlinksInPath().standardizedFileURL.path
+            return canonicalPath == expectedPath && authenticate(pid)
         }
         for pid in pids.prefix(Int(count)) where pid != getpid() && matches(pid) {
             try Task.checkCancellation()

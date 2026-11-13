@@ -12,6 +12,7 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         try files.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
         let binary = fixture.destination.appendingPathComponent("bugnarrator-transcription")
         try files.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        try signExecutableFixture(binary)
         let models = fixture.destination.appendingPathComponent("Models")
         try files.createDirectory(at: models, withIntermediateDirectories: true)
         let sentinel = models.appendingPathComponent("fixture-model")
@@ -22,6 +23,8 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         old.executableURL = binary
         old.arguments = ["60"]
         try old.run()
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertTrue(old.isRunning, "Legacy stand-in must be alive before the upgrade")
         defer { if old.isRunning { old.terminate(); old.waitUntilExit() } }
         XCTAssertTrue(LocalTranscriptionManager.requiresUpgrade(fixture.destination))
         try fixture.install { path in
@@ -29,6 +32,8 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         }
         old.waitUntilExit()
         XCTAssertFalse(old.isRunning)
+        XCTAssertEqual(old.terminationReason, .uncaughtSignal)
+        XCTAssertEqual(old.terminationStatus, SIGTERM, "Upgrade must retire the old helper, not wait for its natural exit")
         XCTAssertEqual(try String(contentsOf: binary, encoding: .utf8), "verified server")
         XCTAssertEqual(try String(contentsOf: sentinel, encoding: .utf8), "model fixture")
         XCTAssertEqual(try String(contentsOf: token, encoding: .utf8), "fixture-token")
@@ -41,13 +46,29 @@ final class LocalTranscriptionManagerTests: XCTestCase {
         try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
         let binary = fixture.destination.appendingPathComponent("bugnarrator-transcription")
         try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        try signExecutableFixture(binary)
         let other = Process()
         other.executableURL = binary
         other.arguments = ["60"]
         try other.run()
-        defer { other.terminate(); other.waitUntilExit() }
-        try LocalTranscriptionManager.retireVerifiedProcesses(binary, authenticate: { _ in false })
+        Thread.sleep(forTimeInterval: 0.2)
         XCTAssertTrue(other.isRunning)
+        defer { other.terminate(); other.waitUntilExit() }
+        try LocalTranscriptionManager.retireVerifiedProcesses(binary)
+        XCTAssertTrue(other.isRunning)
+    }
+
+    private func signExecutableFixture(_ url: URL) throws {
+        // Re-sign the copied platform binary so macOS does not kill the fixture
+        // for retaining Apple's platform signature at a different path.
+        let signer = Process()
+        signer.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        signer.arguments = ["--force", "--sign", "-", url.path]
+        signer.standardOutput = FileHandle.nullDevice
+        signer.standardError = FileHandle.nullDevice
+        try signer.run()
+        signer.waitUntilExit()
+        XCTAssertEqual(signer.terminationStatus, 0)
     }
 
     @MainActor
