@@ -51,6 +51,53 @@ final class LocalTranscriptionManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testStartupWaitingForInstallationLaunchesCompatibleHelperOnce() async throws {
+        let fixture = try InstallerFixture()
+        defer { fixture.remove() }
+        MockURLProtocol.requestHandler = { request in
+            let data: Data
+            if request.url!.host == "api.github.com" {
+                data = try JSONSerialization.data(withJSONObject: [["tag_name": "v1.1.2", "draft": false, "prerelease": false, "assets": [
+                    ["name": LocalTranscriptionManager.assetName, "size": 5, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1.1.2/image"],
+                    ["name": LocalTranscriptionManager.assetName + ".sha256", "size": 64, "browser_download_url": "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1.1.2/checksum"]
+                ]]])
+            } else { data = Data("image".utf8) }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let gate = ShutdownTestGate()
+        let entered = expectation(description: "Installer is busy")
+        let launched = expectation(description: "Helper launches after installation")
+        var launches = 0
+        let process = FakeLocalServerProcess()
+        var dependencies = LocalTranscriptionManager.Dependencies.live
+        dependencies.install = { _, _, _, destination in
+            entered.fulfill()
+            await gate.wait()
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try Data("server fixture".utf8).write(to: destination.appendingPathComponent("bugnarrator-transcription"))
+        }
+        dependencies.verify = { _ in }
+        dependencies.launch = { _, _, _, _ in
+            launches += 1
+            launched.fulfill()
+            return process
+        }
+        let manager = LocalTranscriptionManager(directory: fixture.destination, session: makeMockURLSession(), dependencies: dependencies)
+        try XCTSkipUnless(manager.supported, "Server packages require Apple Silicon")
+        await manager.discover()
+        manager.installAndStart()
+        await fulfillment(of: [entered], timeout: 3)
+        manager.ensureInstalledAndStarted()
+        await gate.release()
+        await fulfillment(of: [launched], timeout: 3)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(manager.running)
+        XCTAssertEqual(launches, 1)
+        process.completeExit()
+        await manager.shutdown()
+    }
+
+    @MainActor
     func testPendingQuitBlocksActualRecordingStartAndReleasesOnRejection() async {
         let harness = AppStateHarness()
         defer { harness.cleanup() }

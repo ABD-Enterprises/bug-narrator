@@ -190,8 +190,9 @@ final class LocalTranscriptionManager: ObservableObject {
     }
 
     func start() {
-        guard installed, server == nil, startOperation == nil, provisioningTask == nil, !shuttingDown else { return }
+        guard installed, server == nil, startOperation == nil, !shuttingDown else { return }
         if Self.requiresUpgrade(directory) {
+            guard provisioningTask == nil else { return }
             message = "Updating the local server for this app. Models and recordings will be kept."
             provisioningTask = Task { [weak self] in
                 guard let self else { return }
