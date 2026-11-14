@@ -118,7 +118,7 @@ but the idle cost is the same either way.
 1. Download the latest DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the DMG. It should present a drag-to-Applications install window.
 3. Drag `BugNarrator.app` into `Applications`.
-4. Launch SureForge Capture from `Applications`.
+4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
 5. On first run, expect AI provider setup. Microphone permission is requested the first time you try to start recording.
 6. If you use screenshot capture, expect Screen Recording permission on first use.
 7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane. System Settings lists the app as BugNarrator (in Privacy & Security and Login Items).

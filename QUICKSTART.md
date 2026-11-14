@@ -5,7 +5,7 @@
 1. Download the latest macOS DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the DMG.
 3. Drag `BugNarrator.app` into `Applications`.
-4. Launch SureForge Capture from `Applications`.
+4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
 5. Verify the download against the published `.sha256` checksum on the release page.
 6. If you launch SureForge Capture again while it is already open, the existing menu bar instance should be reactivated instead of creating a second copy.
 

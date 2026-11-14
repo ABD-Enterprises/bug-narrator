@@ -34,7 +34,7 @@ It helps you:
 1. Download the latest macOS release from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the downloaded DMG.
 3. Drag `BugNarrator.app` into `Applications`.
-4. Launch SureForge Capture from `Applications`.
+4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
 
 SureForge Capture releases are signed with a `Developer ID Application` certificate, notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
 
