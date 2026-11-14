@@ -119,10 +119,15 @@ public sealed class JiraExportProvider
 
     private JiraDocument BuildDescription(ExtractedIssue issue, CompletedSession session)
     {
+        // Jira renders the description as structured ADF, so its text is plain text rather
+        // than markdown — but it is still model- and transcript-derived, and a tracker can show
+        // the same text again in notifications and activity feeds. Every untrusted field below
+        // is neutralized before it leaves the app, so no live mention or cross-reference
+        // survives into the issue.
         var blocks = new List<JiraBlock>
         {
-            JiraBlock.Paragraph($"Summary: {issue.Summary}"),
-            JiraBlock.Paragraph($"Evidence: {issue.EvidenceExcerpt}"),
+            JiraBlock.Paragraph($"Summary: {UntrustedMarkdown.NeutralizeMentions(issue.Summary)}"),
+            JiraBlock.Paragraph($"Evidence: {UntrustedMarkdown.NeutralizeMentions(issue.EvidenceExcerpt)}"),
         };
 
         var metadataLines = new List<string>();
@@ -135,14 +140,14 @@ public sealed class JiraExportProvider
 
         if (!string.IsNullOrWhiteSpace(issue.Component))
         {
-            metadataLines.Add($"Component: {issue.Component}");
+            metadataLines.Add($"Component: {UntrustedMarkdown.NeutralizeMentions(issue.Component)}");
         }
 
-        metadataLines.Add($"Deduplication hint: {issue.EffectiveDeduplicationHint}");
+        metadataLines.Add($"Deduplication hint: {UntrustedMarkdown.NeutralizeMentions(issue.EffectiveDeduplicationHint)}");
 
         if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
         {
-            metadataLines.Add($"Transcript section: {issue.SectionTitle}");
+            metadataLines.Add($"Transcript section: {UntrustedMarkdown.NeutralizeMentions(issue.SectionTitle)}");
         }
 
         if (issue.ConfidenceLabel is not null)
@@ -157,7 +162,7 @@ public sealed class JiraExportProvider
 
         if (!string.IsNullOrWhiteSpace(issue.Note))
         {
-            metadataLines.Add($"Note: {issue.Note}");
+            metadataLines.Add($"Note: {UntrustedMarkdown.NeutralizeMentions(issue.Note)}");
         }
 
         if (metadataLines.Count > 0)
@@ -184,11 +189,12 @@ public sealed class JiraExportProvider
         var annotationLines = new List<string>();
         foreach (var export in annotationRenderer.AnnotatedScreenshotExports(issue, session))
         {
-            // Jira emits structured ADF text, so nothing is neutralized here, matching the
-            // surrounding Jira metadata lines and the macOS Jira provider.
+            // The annotation summaries are model-authored text, so they are neutralized like
+            // every other untrusted field in the description.
+            var summaries = UntrustedMarkdown.NeutralizeMentions(export.Summaries);
             annotationLines.Add(export.RenderedFileName is null
-                ? $"{export.ScreenshotFileName} ({export.TimeLabel}) - {export.Summaries}"
-                : $"{export.RenderedFileName} from {export.ScreenshotFileName} ({export.TimeLabel}) - {export.Summaries}");
+                ? $"{export.ScreenshotFileName} ({export.TimeLabel}) - {summaries}"
+                : $"{export.RenderedFileName} from {export.ScreenshotFileName} ({export.TimeLabel}) - {summaries}");
         }
 
         if (annotationLines.Count > 0)
@@ -213,8 +219,10 @@ public sealed class JiraExportProvider
             blocks.Add(JiraBlock.BulletList(screenshots));
         }
 
+        // The session title is built from the transcript, so it is untrusted text like every
+        // other field here.
         blocks.Add(JiraBlock.Paragraph(
-            $"Exported from BugNarrator session \"{session.Title}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}. Review against the raw transcript before triage."));
+            $"Exported from BugNarrator session \"{UntrustedMarkdown.NeutralizeMentions(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}. Review against the raw transcript before triage."));
 
         return new JiraDocument(blocks);
     }
@@ -222,8 +230,9 @@ public sealed class JiraExportProvider
     /// <summary>
     /// Mirrors the macOS `formattedReproductionStep`: the numbered instruction plus any
     /// expected/actual results and references, joined into one bullet entry. Jira emits structured
-    /// ADF rather than markdown, so nothing is neutralized here — matching both the neighbouring
-    /// Windows metadata lines and the macOS Jira provider.
+    /// ADF rather than markdown, so only the live mention and cross-reference triggers are
+    /// neutralized here — matching the surrounding Windows metadata lines and the macOS Jira
+    /// provider.
     /// </summary>
     private static string FormatReproductionStep(
         IssueReproductionStep step,
@@ -232,17 +241,17 @@ public sealed class JiraExportProvider
     {
         var parts = new List<string>
         {
-            $"{index + 1}. {TrackerExportPayloadBudget.Truncated(step.Instruction, TrackerExportPayloadBudget.ListEntryLimit)}",
+            $"{index + 1}. {UntrustedMarkdown.NeutralizeMentions(TrackerExportPayloadBudget.Truncated(step.Instruction, TrackerExportPayloadBudget.ListEntryLimit))}",
         };
 
         if (!string.IsNullOrWhiteSpace(step.ExpectedResult))
         {
-            parts.Add($"Expected: {TrackerExportPayloadBudget.Truncated(step.ExpectedResult, TrackerExportPayloadBudget.ListEntryLimit)}");
+            parts.Add($"Expected: {UntrustedMarkdown.NeutralizeMentions(TrackerExportPayloadBudget.Truncated(step.ExpectedResult, TrackerExportPayloadBudget.ListEntryLimit))}");
         }
 
         if (!string.IsNullOrWhiteSpace(step.ActualResult))
         {
-            parts.Add($"Actual: {TrackerExportPayloadBudget.Truncated(step.ActualResult, TrackerExportPayloadBudget.ListEntryLimit)}");
+            parts.Add($"Actual: {UntrustedMarkdown.NeutralizeMentions(TrackerExportPayloadBudget.Truncated(step.ActualResult, TrackerExportPayloadBudget.ListEntryLimit))}");
         }
 
         var references = new List<string>();

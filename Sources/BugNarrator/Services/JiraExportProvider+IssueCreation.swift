@@ -189,17 +189,33 @@ extension JiraExportProvider {
         }
     }
 
+    /// Neutralizes one untrusted description field.
+    ///
+    /// The Jira description is structured ADF, so the field is plain text and
+    /// only the live mention and cross-reference triggers have to be defanged
+    /// — the block-structure and link escapes a markdown body needs would
+    /// only mangle it.
+    private static func neutralizedDescriptionText(_ value: String) -> String {
+        TrackerExportPayloadBudget.neutralizingUntrustedMentions(value)
+    }
+
     private func makeDescription(
         issue: ExtractedIssue,
         session: TranscriptSession,
         exportFingerprint: String?
     ) throws -> JiraDocument {
+        // Jira renders the description as structured ADF, so its text is plain
+        // text rather than markdown — but it is still model- and
+        // transcript-derived, and a tracker can show the same text again in
+        // notifications and activity feeds. Every untrusted field below is
+        // neutralized before it leaves the app, so no live mention or
+        // cross-reference survives into the issue.
         var content: [JiraBlock] = [
             .paragraph(
-                text: "Summary: \(TrackerExportPayloadBudget.truncated(issue.summary, maxCharacters: TrackerExportPayloadBudget.issueSummaryLimit))"
+                text: "Summary: \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(issue.summary, maxCharacters: TrackerExportPayloadBudget.issueSummaryLimit)))"
             ),
             .paragraph(
-                text: "Evidence: \(TrackerExportPayloadBudget.truncated(issue.evidenceExcerpt, maxCharacters: TrackerExportPayloadBudget.evidenceLimit))"
+                text: "Evidence: \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(issue.evidenceExcerpt, maxCharacters: TrackerExportPayloadBudget.evidenceLimit)))"
             )
         ]
 
@@ -210,11 +226,11 @@ extension JiraExportProvider {
         metadataLines.append("Severity: \(issue.severity.rawValue)")
         if let component = issue.component?.trimmingCharacters(in: .whitespacesAndNewlines),
            !component.isEmpty {
-            metadataLines.append("Component: \(component)")
+            metadataLines.append("Component: \(Self.neutralizedDescriptionText(component))")
         }
-        metadataLines.append("Deduplication hint: \(issue.deduplicationHint)")
+        metadataLines.append("Deduplication hint: \(Self.neutralizedDescriptionText(issue.deduplicationHint))")
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {
-            metadataLines.append("Transcript section: \(sectionTitle)")
+            metadataLines.append("Transcript section: \(Self.neutralizedDescriptionText(sectionTitle))")
         }
         if let confidenceLabel = issue.confidenceLabel {
             metadataLines.append("Confidence: \(confidenceLabel)")
@@ -239,7 +255,7 @@ extension JiraExportProvider {
            !note.isEmpty {
             content.append(
                 .paragraph(
-                    text: "Tracker context: \(TrackerExportPayloadBudget.truncated(note, maxCharacters: TrackerExportPayloadBudget.noteLimit))"
+                    text: "Tracker context: \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(note, maxCharacters: TrackerExportPayloadBudget.noteLimit)))"
                 )
             )
         }
@@ -302,16 +318,16 @@ extension JiraExportProvider {
         index: Int,
         session: TranscriptSession
     ) -> String {
-        var parts = ["\(index + 1). \(TrackerExportPayloadBudget.truncated(step.instruction, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))"]
+        var parts = ["\(index + 1). \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(step.instruction, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))"]
 
         if let expectedResult = step.expectedResult?.trimmingCharacters(in: .whitespacesAndNewlines),
            !expectedResult.isEmpty {
-            parts.append("Expected: \(TrackerExportPayloadBudget.truncated(expectedResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
+            parts.append("Expected: \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(expectedResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))")
         }
 
         if let actualResult = step.actualResult?.trimmingCharacters(in: .whitespacesAndNewlines),
            !actualResult.isEmpty {
-            parts.append("Actual: \(TrackerExportPayloadBudget.truncated(actualResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit))")
+            parts.append("Actual: \(Self.neutralizedDescriptionText(TrackerExportPayloadBudget.truncated(actualResult, maxCharacters: TrackerExportPayloadBudget.listEntryLimit)))")
         }
 
         var references: [String] = []
@@ -332,11 +348,13 @@ extension JiraExportProvider {
 
     private func annotatedScreenshotLines(issue: ExtractedIssue, session: TranscriptSession) throws -> [String] {
         try annotationRenderer.annotatedScreenshotExports(for: issue, session: session).map { export in
+            // The annotation summaries are model-authored text.
+            let summaries = Self.neutralizedDescriptionText(export.summaries)
             if let renderedFileName = export.renderedFileName {
-                return "\(renderedFileName) from \(export.screenshotFileName) (\(export.timeLabel)) - \(export.summaries)"
+                return "\(renderedFileName) from \(export.screenshotFileName) (\(export.timeLabel)) - \(summaries)"
             }
 
-            return "\(export.screenshotFileName) (\(export.timeLabel)) - \(export.summaries)"
+            return "\(export.screenshotFileName) (\(export.timeLabel)) - \(summaries)"
         }
     }
 }

@@ -20,7 +20,8 @@ public static class TrackerExportPayloadBudget
     /// Jira Cloud rejects a <c>summary</c> over 255 characters or containing a newline; GitHub
     /// rejects an issue <c>title</c> over 256. Hard server limits, unlike the body budgets, which
     /// are self-imposed. Jira counts UTF-16 code units — the same unit <see cref="string.Length"/>
-    /// uses — so the cap here is exact for Jira (#1200, macOS #1112).
+    /// uses — so the cap here is exact for Jira (#1200, macOS #1112). The macOS port counts the
+    /// same units now, so the two ports send the same title and neither can exceed the limit.
     /// </summary>
     public const int JiraSummaryLimit = 255;
     public const int GitHubTitleLimit = 256;
@@ -46,25 +47,73 @@ public static class TrackerExportPayloadBudget
     /// one space, the result is trimmed, and anything past <paramref name="maxCharacters"/> is cut
     /// with a single "…" — no "[truncated …]" suffix, which would consume most of a short field.
     /// </summary>
+    /// <remarks>
+    /// The title is untrusted text, so the mentions and cross-references in it are neutralized on
+    /// the way out.
+    ///
+    /// The order matters, and it is the macOS order: the whitespace collapse runs first, the
+    /// neutralization second, the length cap last. Swift's whitespace set includes the
+    /// zero-width space, so a collapse after the neutralization would turn every zero-width
+    /// space back into a plain space and the two ports would produce different titles. The cap
+    /// runs last so the field the tracker receives still fits: the zero-width spaces count
+    /// towards the limit, and cutting before the neutralization could push a title that was
+    /// already at the cap over GitHub's 256 or Jira's 255.
+    /// </remarks>
     public static string TrackerTitle(string? value, int maxCharacters)
     {
-        var collapsed = string.Join(
-            " ",
-            (value ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        if (collapsed.Length <= maxCharacters)
+        var collapsed = CollapsingWhitespace(value);
+        var neutralized = UntrustedMarkdown.NeutralizeMentions(collapsed);
+        if (neutralized.Length <= maxCharacters)
         {
-            return collapsed;
+            return neutralized;
         }
 
         var keep = Math.Max(0, maxCharacters - 1);
         // Length counts UTF-16 units, so an odd cut can land between the halves of an astral
         // character (emoji) and leave a lone surrogate the JSON encoder turns into U+FFFD.
-        if (keep > 0 && char.IsHighSurrogate(collapsed[keep - 1]))
+        if (keep > 0 && char.IsHighSurrogate(neutralized[keep - 1]))
         {
             keep--;
         }
 
-        return collapsed[..keep].TrimEnd() + "…";
+        return TrimTrailingTitleWhitespace(neutralized[..keep]) + "…";
+    }
+
+    /// <summary>
+    /// Every run of whitespace collapses to a single space.
+    /// </summary>
+    /// <remarks>
+    /// The split set is the one the macOS port uses, which is exactly the set
+    /// <c>char.IsWhiteSpace</c> accepts. Swift's own whitespace set also
+    /// includes the zero-width space, so a title that carries one would
+    /// collapse differently on the two ports, and the two ports have to send
+    /// the same title.
+    /// </remarks>
+    public static string CollapsingWhitespace(string? value)
+    {
+        return string.Join(
+            " ",
+            (value ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>
+    /// Trims the characters the macOS title cut trims.
+    /// </summary>
+    /// <remarks>
+    /// This is exactly the set <c>char.IsWhiteSpace</c> accepts, plus the zero-width space.
+    /// Swift's whitespace set already includes U+200B, so a title cut right after a neutralized
+    /// mention ("…@") is trimmed on macOS but not on Windows, and the two ports would send
+    /// different titles for the same issue.
+    /// </remarks>
+    private static string TrimTrailingTitleWhitespace(string value)
+    {
+        var end = value.Length;
+        while (end > 0 && (char.IsWhiteSpace(value[end - 1]) || value[end - 1] == '\u200B'))
+        {
+            end--;
+        }
+
+        return value[..end];
     }
 
     /// <summary>

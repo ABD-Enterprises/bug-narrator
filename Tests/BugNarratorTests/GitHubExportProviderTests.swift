@@ -350,6 +350,75 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown(":--|:--"), "\\:--|:--")
     }
 
+    func testNeutralizingUntrustedMarkdownEscapesInsideACharacterCluster() {
+        // A "[" that is part of a larger cluster - a combining mark or a
+        // variation selector - opens a link label just as a bare one does, so
+        // it has to be escaped inside the cluster as well. The Windows port
+        // works on code units and always escaped it; both ports have to send
+        // the same body.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("[\u{301}click](https://evil.example)"),
+            "\\[\u{301}click](https://evil.example)"
+        )
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("[\u{FE0F}click](https://evil.example)"),
+            "\\[\u{FE0F}click](https://evil.example)"
+        )
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("![\u{301}alt](https://evil.example/x)"),
+            "!\\[\u{301}alt](https://evil.example/x)"
+        )
+        // A block marker that is part of a larger cluster is the marker as far
+        // as a code unit is concerned.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("*\u{301} item"),
+            "\\*\u{301} item"
+        )
+        // A CR followed by LF and then a combining mark is one character
+        // cluster, so a literal search for the line break missed it and the CR
+        // survived into the body.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("a\r\n\u{301}b"),
+            "a\n\u{301}b"
+        )
+    }
+
+    func testIssueBodyKeepsTheDeduplicationHintInsideItsCodeSpan() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        // A backtick that is part of a larger cluster would close the code
+        // span early, and everything after it - a mention included - would be
+        // live markdown in a public issue body.
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            deduplicationHint: "text `\u{301} @victim",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(token: "fixture-github-token", owner: "acme", repository: "bugnarrator", labels: []),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertTrue(
+            payload.body.contains("- Deduplication hint: `text \u{2019}\u{301} @victim`"),
+            "the hint left its code span: \(payload.body)"
+        )
+        // The only backticks left on the line are the two that open and close
+        // the span.
+        let hintLine = payload.body.components(separatedBy: "\n").first { $0.hasPrefix("- Deduplication hint:") } ?? ""
+        XCTAssertEqual(hintLine.filter { $0 == "`" }.count, 2, "a backtick survived the strip: \(hintLine)")
+    }
+
     func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
@@ -984,6 +1053,52 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(
             TrackerExportSupport.retryDelay(attempt: 3, retryAfterSeconds: nil, base: .milliseconds(500)),
             .milliseconds(2000)
+        )
+    }
+
+    func testIssueTitleNeutralizesMentionsAndCrossReferences() async throws {
+        // The title is model- and transcript-derived text like the body, and
+        // GitHub autolinks @mentions in an issue title and in an issue body,
+        // notifies on mentions in the body, and resolves #123 cross-references
+        // in the body too. The body was already neutralized; the title was
+        // the one untrusted field that was not.
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "@security-team rotate #4821 staging keys",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            ),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertFalse(payload.title.contains("@security-team"), "a live mention survived in the exported title: \(payload.title)")
+        XCTAssertFalse(payload.title.contains("#4821"), "a live cross-reference survived in the exported title: \(payload.title)")
+        XCTAssertEqual(
+            payload.title.replacingOccurrences(of: "\u{200B}", with: ""),
+            "@security-team rotate #4821 staging keys",
+            "the title must stay visually identical to what the user reviewed"
         )
     }
 
