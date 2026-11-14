@@ -1305,14 +1305,20 @@ final class JiraExportProviderTests: XCTestCase {
     }
 }
 
-/// The text nodes of a Jira ADF document, the way the Windows port
-/// collects them: every "text" value, in the order the document carries them.
+/// The text nodes of a Jira ADF document, the way the Windows port collects
+/// them: every "text" value. A node that carries both a "text" value and
+/// nested content contributes both, so nothing is silently dropped.
 private func adfTextNodes(_ value: Any) -> [String] {
     if let object = value as? [String: Any] {
-        if let text = object["text"] as? String {
-            return [text]
+        var nodes: [String] = []
+        for (key, child) in object {
+            if key == "text", let text = child as? String {
+                nodes.append(text)
+            } else {
+                nodes.append(contentsOf: adfTextNodes(child))
+            }
         }
-        return object.values.flatMap { adfTextNodes($0) }
+        return nodes
     }
     if let array = value as? [Any] {
         return array.flatMap { adfTextNodes($0) }

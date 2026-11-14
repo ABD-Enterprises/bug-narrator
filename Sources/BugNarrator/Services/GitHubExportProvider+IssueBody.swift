@@ -8,33 +8,42 @@ extension GitHubExportProvider {
     static func neutralizingUntrustedMarkdown(_ text: String) -> String {
         // GitHub treats a lone CR as a line break; splitting on "\n" alone would
         // leave every line-start escape below unapplied after one.
+        //
+        // The regular-expression path, for the same reason as the escapes
+        // below: a literal search matches whole grapheme clusters, and a CR
+        // followed by LF and then a combining mark is one cluster, so the
+        // literal search would miss it and leave the CR in place. The regex
+        // path works on code units, the way the Windows port does.
         let normalized = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\r\n", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "\r", with: "\n", options: .regularExpression)
         let lines = normalized.components(separatedBy: "\n").map { line -> String in
             let escaped = line
                 // First, so an attacker's own backslash cannot pair with one we
                 // add below ("\\[" is a literal backslash followed by a LIVE "[").
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "<", with: "&lt;")
-                .replacingOccurrences(of: ">", with: "&gt;")
+                //
+                // The regular-expression path for every escape below, not the
+                // literal one: a literal search matches whole grapheme
+                // clusters, so a character that is part of a larger cluster -
+                // a combining mark or a variation selector - is never replaced
+                // and the escape it needed never happens. A "[" inside such a
+                // cluster would open a live link label, and an "<" inside one
+                // would open a raw tag. The regex path reaches inside the
+                // cluster, and the Windows port's code-unit replace does the
+                // same, so both ports send the same body.
+                .replacingOccurrences(of: "\\\\", with: "\\\\\\\\", options: .regularExpression)
+                .replacingOccurrences(of: "<", with: "&lt;", options: .regularExpression)
+                .replacingOccurrences(of: ">", with: "&gt;", options: .regularExpression)
                 // A zero-width space after @/# breaks GitHub's mention and issue
                 // autolinks (and defeats `# heading` injection) while leaving the
                 // text visually identical.
-                //
-                // The regular-expression path, not the literal one: a literal
-                // search matches whole grapheme clusters, so an "@" that is
-                // part of a larger cluster - a combining mark or a variation
-                // selector - is never replaced and the
-                // mention survives. The regex path reaches inside the cluster,
-                // and the Windows port's code-unit replace does the same.
                 .replacingOccurrences(of: "@", with: "@\u{200B}", options: .regularExpression)
                 .replacingOccurrences(of: "#", with: "#\u{200B}", options: .regularExpression)
                 // An escaped "[" cannot open a link or image label, so
                 // [text](url), ![alt](url) and [ref]: url all render literally.
                 // Bare URLs are left alone: GitHub autolinks them and the
                 // target is what the reader sees (#1117).
-                .replacingOccurrences(of: "[", with: "\\[")
+                .replacingOccurrences(of: "\\[", with: "\\\\[", options: .regularExpression)
                 // "GH-123" is an issue reference GitHub links just like "#123".
                 .replacingOccurrences(of: #"(?i)(gh-)"#, with: "$1\u{200B}", options: .regularExpression)
             // Block-level syntax is decided by the first NON-SPACE character
@@ -44,7 +53,14 @@ extension GitHubExportProvider {
             let indent = escaped.prefix { $0 == " " }
             let body = String(escaped.dropFirst(indent.count))
             // ":" starts a table delimiter row (":--|:--") with no leading pipe.
-            if let first = body.first, "-*+|=`~_:".contains(first) {
+            //
+            // The first UTF-16 code unit, not the first Character: the Windows
+            // port checks a code unit, and a marker that is part of a larger
+            // cluster - "*" followed by a combining mark - is that marker as
+            // far as a code unit is concerned. Both ports have to make the
+            // same call here, or they send different bodies.
+            if let firstCodeUnit = body.utf16.first,
+               "-*+|=`~_:".utf16.contains(firstCodeUnit) {
                 return indent + "\\" + body
             }
             // "1. x" → "1\. x": the escaped delimiter can no longer start a list.

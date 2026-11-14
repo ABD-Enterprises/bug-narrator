@@ -350,6 +350,39 @@ final class GitHubExportProviderTests: XCTestCase {
         XCTAssertEqual(GitHubExportProvider.neutralizingUntrustedMarkdown(":--|:--"), "\\:--|:--")
     }
 
+    func testNeutralizingUntrustedMarkdownEscapesInsideACharacterCluster() {
+        // A "[" that is part of a larger cluster - a combining mark or a
+        // variation selector - opens a link label just as a bare one does, so
+        // it has to be escaped inside the cluster as well. The Windows port
+        // works on code units and always escaped it; both ports have to send
+        // the same body.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("[\u{301}click](https://evil.example)"),
+            "\\[\u{301}click](https://evil.example)"
+        )
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("[\u{FE0F}click](https://evil.example)"),
+            "\\[\u{FE0F}click](https://evil.example)"
+        )
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("![\u{301}alt](https://evil.example/x)"),
+            "!\\[\u{301}alt](https://evil.example/x)"
+        )
+        // A block marker that is part of a larger cluster is the marker as far
+        // as a code unit is concerned.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("*\u{301} item"),
+            "\\*\u{301} item"
+        )
+        // A CR followed by LF and then a combining mark is one character
+        // cluster, so a literal search for the line break missed it and the CR
+        // survived into the body.
+        XCTAssertEqual(
+            GitHubExportProvider.neutralizingUntrustedMarkdown("a\r\n\u{301}b"),
+            "a\n\u{301}b"
+        )
+    }
+
     func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
