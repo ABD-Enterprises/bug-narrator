@@ -119,7 +119,7 @@ class ServerModelConfigurationTests(unittest.TestCase):
         self.assertEqual(body["error"]["type"], "server_error")
         self.assertEqual(
             body["error"]["message"],
-            "Local transcription failed. Check the local transcription server logs for details.",
+            "Local transcription failed. The details are in the local transcription server's output.",
         )
         self.assertNotIn("Traceback", body["error"]["message"])
         self.assertNotIn("Exception", body["error"]["message"])
@@ -1058,7 +1058,8 @@ server._serve("127.0.0.1", {port})
 
 
 class ServerAuthenticationTests(unittest.TestCase):
-    """Every route refuses a request that does not carry the server's token (#1270).
+    """Every route refuses a request that does not carry the server's token
+    (#1270); the health check's proof challenge is the one exception.
 
     Without the token any process on the machine could drive the model and
     receive the user's microphone audio, and a rogue listener that grabbed the
@@ -1470,6 +1471,121 @@ server.main()
         with self.assertRaises(server.HTTPException) as raised:
             asyncio.run(server.transcribe(file=upload, model="parakeet-tdt-0.6b-v3"))
         self.assertEqual(raised.exception.status_code, 413)
+
+
+class ServerErrorEnvelopeTests(unittest.TestCase):
+    """Every refusal the server sends has to carry the envelope the clients read.
+
+    Both shipped clients read {"error": {"message": ...}} and fall back to the
+    bare status text when they cannot find one, so a refusal in FastAPI's own
+    {"detail": ...} shape loses the actionable message - "the upload exceeds
+    the limit", "missing authorization header".
+
+    These tests drive the ASGI app itself, so they fail when a refusal stops
+    carrying the envelope - whether it is refused by the admission middleware
+    before the router sees the request, or by the handler that renders an
+    HTTPError raised inside a route.
+    """
+
+    def setUp(self):
+        self._previous_token = server._auth_token
+        self._previous_limit = server._max_upload_bytes
+        self.addCleanup(setattr, server, "_auth_token", self._previous_token)
+        self.addCleanup(setattr, server, "_max_upload_bytes", self._previous_limit)
+        server.configure_auth("s3cret-token-value", max_upload_bytes=1024)
+
+    async def _answer(self, scope, body=b""):
+        delivered = False
+        messages = []
+
+        async def receive():
+            nonlocal delivered
+            if delivered:
+                return {"type": "http.disconnect"}
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        async def send(message):
+            messages.append(message)
+
+        await server.app(scope, receive, send)
+        status = next(
+            message["status"] for message in messages if message["type"] == "http.response.start"
+        )
+        payload = b"".join(
+            message.get("body", b"")
+            for message in messages
+            if message["type"] == "http.response.body"
+        )
+        return status, json.loads(payload)
+
+    def _scope(self, path, method="GET", headers=(), content_length=None):
+        all_headers = [(b"host", b"127.0.0.1:8422"), *headers]
+        if content_length is not None:
+            all_headers.append((b"content-length", str(content_length).encode()))
+        return {
+            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+            "method": method, "scheme": "http", "path": path,
+            "raw_path": path.encode(), "query_string": b"",
+            "server": ("127.0.0.1", 8422), "client": ("127.0.0.1", 12345),
+            "headers": all_headers,
+        }
+
+    def _assert_envelope(self, payload, message):
+        self.assertIn("error", payload)
+        self.assertNotIn("detail", payload)
+        self.assertEqual(payload["error"]["message"], message)
+        self.assertEqual(payload["error"]["type"], "invalid_request_error")
+
+    def test_a_refused_request_is_answered_in_the_envelope_the_clients_read(self):
+        # The middleware refuses this before the router sees it, so the
+        # envelope has to be rendered by the refusal itself.
+        status, payload = asyncio.run(self._answer(self._scope("/v1/models")))
+
+        self.assertEqual(status, 401)
+        self._assert_envelope(payload, "Missing Authorization header")
+
+    def test_a_declared_oversized_upload_is_answered_in_the_envelope(self):
+        # Same path: the admission middleware refuses the declared length
+        # before the body is read, so its own answer has to carry the
+        # envelope rather than a bare "detail".
+        scope = self._scope(
+            "/v1/audio/transcriptions",
+            method="POST",
+            headers=[
+                (b"authorization", b"Bearer s3cret-token-value"),
+                (b"content-type", b"multipart/form-data; boundary=boundary"),
+            ],
+            content_length=64 * 1024 * 1024,
+        )
+        status, payload = asyncio.run(self._answer(scope))
+
+        self.assertEqual(status, 413)
+        self._assert_envelope(payload, "The upload exceeds the 1024 byte limit")
+
+    def test_an_oversized_body_is_answered_in_the_envelope(self):
+        # No declared length here, so the refusal comes from the route that
+        # reads the body, and the handler that renders an HTTPError is the one
+        # that has to carry the envelope.
+        body = (
+            b"--boundary\r\n"
+            b'Content-Disposition: form-data; name="file"; filename="clip.wav"\r\n'
+            b"Content-Type: audio/wav\r\n\r\n"
+            + b"x" * 4096
+            + b"\r\n--boundary--\r\n"
+        )
+        scope = self._scope(
+            "/v1/audio/transcriptions",
+            method="POST",
+            headers=[
+                (b"authorization", b"Bearer s3cret-token-value"),
+                (b"content-type", b"multipart/form-data; boundary=boundary"),
+            ],
+        )
+        status, payload = asyncio.run(self._answer(scope, body))
+
+        self.assertEqual(status, 413)
+        self._assert_envelope(payload, "The upload exceeds the 1024 byte limit")
 
 
 class ServerTransportAdmissionTests(unittest.TestCase):

@@ -50,8 +50,9 @@ say -r 175 -o "$AUDIO_PATH" \
     "Bug Narrator local transcription is ready."
 
 # Every route of the packaged server requires the bearer token (#1270). The
-# token is handed over in the environment, the way the app hands it over, and
-# it is presented on every request below.
+# one exception is the health check's proof challenge, which carries a nonce
+# instead of the token. The token is handed over in the environment, the way
+# the app hands it over, and it is presented on every request below.
 TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export BUGNARRATOR_TRANSCRIPTION_TOKEN="$TOKEN"
 

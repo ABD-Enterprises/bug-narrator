@@ -125,13 +125,18 @@ _chunk_duration_seconds = 120
 _ffmpeg_timeout_seconds = 300
 _upload_piece_bytes = 1024 * 1024
 _transcription_failure_message = (
-    "Local transcription failed. Check the local transcription server logs for details."
+    # The detail goes to the server's own output: on Windows that is
+    # server.stderr.log in the install directory, and a server the user
+    # started by hand writes it to the terminal. The message must not promise
+    # a log file the user cannot open.
+    "Local transcription failed. The details are in the local transcription server's output."
 )
 
 # The server is reachable by every process on the machine, so every route
-# requires a bearer token that only the desktop app knows (#1270). The token
-# lives in a per-user file so an app that started the server and an app that
-# found one already running agree on it.
+# requires a bearer token that only the desktop app knows (#1270). The one
+# exception is the health check's proof challenge, which carries a nonce
+# instead of the token. The token lives in a per-user file so an app that
+# started the server and an app that found one already running agree on it.
 TOKEN_FILE_NAME = "bugnarrator-transcription.token"
 TOKEN_ENVIRONMENT_VARIABLE = "BUGNARRATOR_TRANSCRIPTION_TOKEN"
 DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
@@ -254,7 +259,7 @@ def resolve_auth_token(
     except OSError:
         # The client was handed this token directly, so an unwritable file
         # does not stop the server: it still refuses every request that does
-        # not carry the token.
+        # not carry the token (the health check's proof challenge excepted).
         logger.warning(f"Could not write the server token to {path}")
     return token
 
@@ -299,7 +304,8 @@ def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
     """Reject every request that does not carry the server's bearer token.
 
     Without this, any process on the machine could drive the model or, worse,
-    receive the user's microphone audio.
+    receive the user's microphone audio. The health check's proof challenge is
+    the one exception, and it does not use this dependency.
     """
     failure = _authorization_failure(authorization)
     if failure is not None:
@@ -428,7 +434,14 @@ class _BearerTokenMiddleware:
 
     @staticmethod
     async def _respond(scope, receive, send, status: int, detail: str) -> None:
-        response = JSONResponse({"detail": detail}, status_code=status)
+        # The same envelope the app-level handler renders: the clients read
+        # {"error": {"message": ...}} and fall back to the bare status text when
+        # they cannot find one, so a bare "detail" would lose the actionable
+        # message - "the upload exceeds the limit".
+        response = JSONResponse(
+            {"error": {"message": detail, "type": "invalid_request_error"}},
+            status_code=status,
+        )
         await response(scope, receive, send)
 
 

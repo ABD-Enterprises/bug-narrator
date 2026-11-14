@@ -1337,9 +1337,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.hasUsableAIProviderCredential)
         XCTAssertTrue(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(store.openAIBaseURLValue.absoluteString, "http://127.0.0.1:8422")
-        // The local server checks a bearer token on every route, so the
-        // credential the app presents is that token rather than an empty
-        // string (#1270).
+        // The local server checks a bearer token on every route except the
+        // health check's proof challenge, so the credential the app presents
+        // is that token rather than an empty string (#1270).
         XCTAssertNil(store.aiProviderCredentialForUserInitiatedAccess())
         let credential = try await store.verifiedAIProviderCredentialForUserInitiatedAccess()
         XCTAssertFalse(credential?.isEmpty ?? true)

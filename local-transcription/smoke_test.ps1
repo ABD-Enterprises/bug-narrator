@@ -60,9 +60,10 @@ Log "fixture: $audioPath ($((Get-Item $audioPath).Length) bytes)"
 if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $smokeRoot "Models" }
 Log "model cache: $env:HF_HOME"
 
-# Every route of the packaged server requires the bearer token (#1270). The token
-# is handed over in the environment, the way the app hands it over, and it is
-# presented on every request below.
+# Every route of the packaged server requires the bearer token (#1270). The one
+# exception is the health check's proof challenge, which carries a nonce instead
+# of the token. The token is handed over in the environment, the way the app
+# hands it over, and it is presented on every request below.
 $token = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 $env:BUGNARRATOR_TRANSCRIPTION_TOKEN = $token
 $headers = @{ Authorization = "Bearer $token" }
