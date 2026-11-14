@@ -167,9 +167,9 @@ enum TrackerExportPayloadBudget {
     ///
     /// This is exactly the set .NET's `char.IsWhiteSpace` accepts, plus the
     /// zero-width space. Swift's whitespace set already includes U+200B, so a
-    /// title cut right after a neutralized mention ("…@") is trimmed on macOS
-    /// but not on Windows, and the two ports would send different titles for
-    /// the same issue.
+    /// title cut right after a neutralized mention ("…@") ends in a zero-width
+    /// space. Both ports trim it - .NET trims U+200B explicitly - so the two
+    /// ports send the same title for the same issue.
     private static let trailingTitleTrimCharacters = CharacterSet(
         charactersIn: "\u{0009}\u{000A}\u{000B}\u{000C}\u{000D}\u{0020}\u{0085}\u{00A0}\u{1680}"
             + "\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200A}"

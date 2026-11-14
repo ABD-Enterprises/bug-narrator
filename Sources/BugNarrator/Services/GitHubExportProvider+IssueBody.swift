@@ -112,8 +112,14 @@ extension GitHubExportProvider {
         // span early and a blank line ends the paragraph (and the list) outright,
         // dropping the rest of the hint into raw markdown. The hint is a one-line
         // key by intent, so collapse it to one line and strip backticks.
+        //
+        // The regular-expression path, for the same reason as the escapes in the
+        // neutralizer: a literal search matches whole grapheme clusters, so a
+        // backtick that is part of a larger cluster - a combining mark or a
+        // variation selector - would survive, close the code span early and
+        // leave the rest of the hint, mentions included, as live markdown.
         let hint = TrackerExportPayloadBudget.collapsingWhitespace(issue.deduplicationHint)
-            .replacingOccurrences(of: "`", with: "\u{2019}")
+            .replacingOccurrences(of: "`", with: "\u{2019}", options: .regularExpression)
         lines.append("- Deduplication hint: `\(hint)`")
 
         if let sectionTitle = issue.sectionTitle, !sectionTitle.isEmpty {

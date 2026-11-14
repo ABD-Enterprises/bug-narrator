@@ -383,6 +383,42 @@ final class GitHubExportProviderTests: XCTestCase {
         )
     }
 
+    func testIssueBodyKeepsTheDeduplicationHintInsideItsCodeSpan() async throws {
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        // A backtick that is part of a larger cluster would close the code
+        // span early, and everything after it - a mention included - would be
+        // live markdown in a public issue body.
+        let issue = ExtractedIssue(
+            title: "Checkout fails",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            deduplicationHint: "text `\u{301} @victim",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(), transcript: "Transcript", duration: 6, model: "whisper-1", languageHint: nil, prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(token: "fixture-github-token", owner: "acme", repository: "bugnarrator", labels: []),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertTrue(
+            payload.body.contains("- Deduplication hint: `text \u{2019}\u{301} @victim`"),
+            "the hint left its code span: \(payload.body)"
+        )
+        // The only backticks left on the line are the two that open and close
+        // the span.
+        let hintLine = payload.body.components(separatedBy: "\n").first { $0.hasPrefix("- Deduplication hint:") } ?? ""
+        XCTAssertEqual(hintLine.filter { $0 == "`" }.count, 2, "a backtick survived the strip: \(hintLine)")
+    }
+
     func testIssueBodyNeutralizesLinkMasksInEveryUntrustedField() async throws {
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
