@@ -466,6 +466,10 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertFalse(descriptionText.contains("@security-team"), "a live mention survived in the exported description: \(descriptionText)")
         XCTAssertFalse(descriptionText.contains("#4821"), "a live cross-reference survived in the exported description: \(descriptionText)")
         XCTAssertFalse(descriptionText.contains("GH-99"), "a live GH- reference survived in the exported description: \(descriptionText)")
+        // The rest of the request carries no live trigger either.
+        XCTAssertFalse(rendered.contains("@security-team"), "a live mention survived in the exported request: \(rendered)")
+        XCTAssertFalse(rendered.contains("#4821"), "a live cross-reference survived in the exported request: \(rendered)")
+        XCTAssertFalse(rendered.contains("GH-99"), "a live GH- reference survived in the exported request: \(rendered)")
         // The text stays visually identical: only zero-width spaces are added.
         let withoutZeroWidthSpaces = descriptionText.replacingOccurrences(of: "\u{200B}", with: "")
         XCTAssertTrue(withoutZeroWidthSpaces.contains("@security-team"))
