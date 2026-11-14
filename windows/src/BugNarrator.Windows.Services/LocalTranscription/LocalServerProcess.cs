@@ -431,7 +431,9 @@ public sealed class LocalServerProcess : ILocalServerProcess, IDisposable
         {
             // The server refuses every request that does not carry the token.
             // It goes through the environment rather than the command line,
-            // where it would be visible in the process list.
+            // where it would be visible in the process list. The health
+            // check's proof challenge is the one exception, and it carries no
+            // token.
             variables[LocalServerTokenStore.EnvironmentVariable] = token;
         }
 

@@ -38,7 +38,9 @@ from typing import Annotated, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +58,53 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+
+
+@app.exception_handler(HTTPException)
+@app.exception_handler(StarletteHTTPException)
+async def _error_envelope(_request: Request, error: StarletteHTTPException) -> JSONResponse:
+    """Render an HTTP error in the envelope the shipped clients read.
+
+    FastAPI's own body for an HTTP error is {"detail": ...}. Both clients
+    read {"error": {"message": ...}} and fall back to a status-derived
+    message when they cannot find one, so the actionable message - "the
+    upload exceeds the limit" - would be lost.
+
+    Registered for FastAPI's own HTTPException and for Starlette's, which
+    is the class Starlette raises for a route that does not exist (404) or
+    a method the route does not accept (405). FastAPI's class is a
+    subclass of Starlette's and the lookup walks the class hierarchy, so
+    both are registered to make sure neither framework default wins.
+    """
+    return JSONResponse(
+        status_code=error.status_code,
+        content={"error": {"message": str(error.detail), "type": "invalid_request_error"}},
+        headers=error.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_envelope(
+    _request: Request, _error: RequestValidationError
+) -> JSONResponse:
+    """Render a request the server cannot parse in the same envelope.
+
+    FastAPI answers a body that is not the multipart upload it expects -
+    a truncated upload, the wrong content type - with {"detail": [...]}.
+    Both clients read {"error": {"message": ...}}, so the reason would be
+    lost there too. The message is one of the server's own: the validation
+    detail describes the caller's own request, and neither client can read
+    a list of field errors anyway.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "message": "The request is not a valid upload.",
+                "type": "invalid_request_error",
+            }
+        },
+    )
 
 # The header a client sends when it asks the server to prove that it is the
 # server, and the header the answer carries. The client sends a fresh random
@@ -98,15 +147,29 @@ _inference_executor = ThreadPoolExecutor(
     thread_name_prefix="bugnarrator-parakeet",
 )
 _chunk_duration_seconds = 120
+# ffmpeg is given a start offset and a duration, not the whole recording,
+# so it cannot legitimately take longer than the window is long. The window is
+# a length of media, not of wall clock: the format whitelist covers video
+# containers, and a video-bearing window decodes slower than its duration on
+# a loaded machine, so the timeout carries headroom over the window length.
+# Without a timeout a wedged ffmpeg holds the single inference worker forever
+# and takes the local provider down with it, and the temp file it was writing
+# is never unlinked.
+_ffmpeg_timeout_seconds = 300
 _upload_piece_bytes = 1024 * 1024
 _transcription_failure_message = (
-    "Local transcription failed. Check the local transcription server logs for details."
+    # The detail goes to the server's own output: on Windows that is
+    # server.stderr.log in the install directory, and a server the user
+    # started by hand writes it to the terminal. The message must not promise
+    # a log file the user cannot open.
+    "Local transcription failed. The details are in the local transcription server's output."
 )
 
 # The server is reachable by every process on the machine, so every route
-# requires a bearer token that only the desktop app knows (#1270). The token
-# lives in a per-user file so an app that started the server and an app that
-# found one already running agree on it.
+# requires a bearer token that only the desktop app knows (#1270). The one
+# exception is the health check's proof challenge, which carries a nonce
+# instead of the token. The token lives in a per-user file so an app that
+# started the server and an app that found one already running agree on it.
 TOKEN_FILE_NAME = "bugnarrator-transcription.token"
 TOKEN_ENVIRONMENT_VARIABLE = "BUGNARRATOR_TRANSCRIPTION_TOKEN"
 DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
@@ -229,7 +292,7 @@ def resolve_auth_token(
     except OSError:
         # The client was handed this token directly, so an unwritable file
         # does not stop the server: it still refuses every request that does
-        # not carry the token.
+        # not carry the token (the health check's proof challenge excepted).
         logger.warning(f"Could not write the server token to {path}")
     return token
 
@@ -274,7 +337,8 @@ def require_bearer_token(authorization: Optional[str] = Header(None)) -> None:
     """Reject every request that does not carry the server's bearer token.
 
     Without this, any process on the machine could drive the model or, worse,
-    receive the user's microphone audio.
+    receive the user's microphone audio. The health check's proof challenge is
+    the one exception, and it does not use this dependency.
     """
     failure = _authorization_failure(authorization)
     if failure is not None:
@@ -403,7 +467,14 @@ class _BearerTokenMiddleware:
 
     @staticmethod
     async def _respond(scope, receive, send, status: int, detail: str) -> None:
-        response = JSONResponse({"detail": detail}, status_code=status)
+        # The same envelope the app-level handler renders: the clients read
+        # {"error": {"message": ...}} and fall back to the bare status text when
+        # they cannot find one, so a bare "detail" would lose the actionable
+        # message - "the upload exceeds the limit".
+        response = JSONResponse(
+            {"error": {"message": detail, "type": "invalid_request_error"}},
+            status_code=status,
+        )
         await response(scope, receive, send)
 
 
@@ -464,6 +535,63 @@ def get_model(model_name: Optional[str] = None):
         return _model
 
 
+# The health route answers the client's challenge without a token, so every
+# local account on the machine can read that answer. The loader's own error
+# text can name the user's home directory, their model cache or a Windows
+# profile path, and no regex can be relied on to take those out: the path
+# syntax differs per platform, a directory name can contain a space, and a
+# path can arrive wrapped in a file:// URL. So the published answer carries
+# one of two fixed messages and nothing else, and the detail stays in the
+# server's own log, which only the user reads.
+_PUBLIC_MODEL_ERROR_MISSING = (
+    "The model is not available locally. It may still need to be downloaded."
+)
+_PUBLIC_MODEL_ERROR_FAILED = "The model could not be loaded."
+
+
+def _public_model_error(detail: str) -> str:
+    """A message that is safe to publish on the token-free health route.
+
+    Only one of the fixed messages above is returned, so no part of the
+    loader's own text - a home directory, a cache path, a URL, an account
+    name - can reach a caller that only knows the port.
+    """
+    lowered = detail.lower()
+    if "not found" in lowered or "no such file" in lowered or "missing" in lowered:
+        return _PUBLIC_MODEL_ERROR_MISSING
+    return _PUBLIC_MODEL_ERROR_FAILED
+
+
+def _known_model_ids() -> set:
+    """The model ids this server knows, and may publish."""
+    return {
+        _canonical_model_name,
+        *_model_aliases,
+        *_onnx_model_names.keys(),
+        *_onnx_model_names.values(),
+    }
+
+
+def _safe_model_name(value: Optional[str]) -> Optional[str]:
+    """A model name that is safe to publish.
+
+    Only the ids this server knows are published. An operator may point the
+    server at a model in a local directory, and that path names the user's
+    account and cache layout - and a relative path is indistinguishable from
+    an "owner/name" repository id, so nothing else is published either.
+    """
+    if not value:
+        return None
+    if value in _known_model_ids():
+        return value
+    return "custom"
+
+
+def _public_model_name() -> Optional[str]:
+    """The model name the health route publishes."""
+    return _safe_model_name(_model_name)
+
+
 def _load_model_in_background(model_name: Optional[str]) -> None:
     """Load the model without holding up the server's startup.
 
@@ -488,7 +616,7 @@ def _load_model_in_background(model_name: Optional[str]) -> None:
         try:
             _inference_executor.submit(get_model, model_name).result()
         except Exception as exc:  # noqa: BLE001 - the server stays up and says why
-            _model_load_error = str(exc)
+            _model_load_error = _public_model_error(str(exc))
             _model_load_state = "failed"
             logger.error(f"Could not load the model at startup: {exc}")
 
@@ -515,7 +643,7 @@ async def health(
     body = {
         "status": status,
         "model_loaded": _model is not None,
-        "model_name": _model_name,
+        "model_name": _public_model_name(),
         "model_error": _model_load_error,
     }
     if challenge and challenge.strip():
@@ -530,6 +658,10 @@ async def list_models():
         "object": "list",
         "data": [
             {
+                # The route is token-protected, so it may report the operator's
+                # own model id. The app does not read this field - it shows
+                # the model from its own settings - but a caller that holds
+                # the token is already trusted with the model id.
                 "id": _model_name or _default_model_name,
                 "object": "model",
                 "owned_by": "local",
@@ -557,6 +689,25 @@ async def transcribe(
     Returns verbose_json format with segments containing start, end, text,
     and no_speech_prob fields that BugNarrator expects.
     """
+    # The model id is resolved before any audio is decoded and before the
+    # model is touched, and the refusal uses the error envelope the clients
+    # know how to read. The framework parses the multipart form before this
+    # handler runs, so a large upload can already have been spooled to the
+    # framework's temporary file by now: the refusal stops the work, not the
+    # upload.
+    try:
+        model_id = _resolve_model_id(model)
+    except HTTPException:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "message": "This server does not load that model.",
+                    "type": "invalid_request_error",
+                }
+            },
+        )
+
     # File names are client-controlled; only media bytes influence decoding.
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".audio")
     try:
@@ -578,7 +729,6 @@ async def transcribe(
         tmp.close()
 
         file_size_mb = written / (1024 * 1024)
-        model_id = _resolve_model_id(model)
 
         logger.info(
             f"Transcribing uploaded audio ({file_size_mb:.1f} MB) "
@@ -645,10 +795,27 @@ async def transcribe(
             os.unlink(tmp.name)
 
 
+def _allowed_model_ids() -> set:
+    """The model ids a request is allowed to name.
+
+    The canonical id and the default the operator configured for this
+    server - so the id the app was told to use is always one the server
+    accepts, and nothing else is. The aliases the app sends are handled
+    before this set is consulted: they name the server's own default.
+    """
+    return {_canonical_model_name, _default_model_name}
+
+
 def _resolve_model_id(model: Optional[str]) -> str:
     """
     Map model names from BugNarrator's settings to parakeet-mlx model IDs.
-    Passes through any value that already looks like a HuggingFace model ID.
+
+    Only the model this server is built around is accepted. The value ends up
+    as an argument to the model loader, where it is either a Hugging Face
+    repo id or a local directory: the loader turns any hub error into a
+    local path, so an unrestricted value lets a caller read local files
+    (config.json, model.safetensors) and load weights from a repo it
+    chooses, at a revision that is not pinned to a digest.
     """
     if model is None:
         return _default_model_name
@@ -662,8 +829,15 @@ def _resolve_model_id(model: Optional[str]) -> str:
         return _default_model_name
     if value in _model_aliases:
         return _default_model_name
+    if value == _canonical_model_name and _default_model_name != _canonical_model_name:
+        # The operator configured a different model, so a request that names
+        # the canonical id must not pull the upstream repository instead: the
+        # server loads the model it was configured to load, and only that.
+        return _default_model_name
+    if value in _allowed_model_ids():
+        return value
 
-    return value
+    raise HTTPException(status_code=400, detail="Unknown model identifier")
 
 
 def _onnx_model_for(model_id: str) -> str:
@@ -951,13 +1125,24 @@ def _decode_audio_window(audio_path: str, start: int) -> Optional[str]:
     try:
         # Fixed executable and separate argv values; no shell interprets uploaded data.
         # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-        subprocess.run(command, check=True, capture_output=True, env=_child_environment())
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            env=_child_environment(),
+            timeout=_ffmpeg_timeout_seconds,
+        )
         if _wav_data_size(destination) == 0:
             # Seek past the end decodes to nothing (ffmpeg exits 0 with an empty file):
             # the recording is fully consumed.
             _unlink_quietly(destination)
             return None
         return destination
+    except subprocess.TimeoutExpired as error:
+        _unlink_quietly(destination)
+        raise RuntimeError(
+            f"ffmpeg did not finish within {_ffmpeg_timeout_seconds} seconds"
+        ) from error
     except subprocess.CalledProcessError as error:
         _unlink_quietly(destination)
         detail = (error.stderr or b"").decode(errors="replace")
@@ -1148,7 +1333,13 @@ def main():
         # does not start: the app that launched it reports the failure, and a
         # server that stays up without a model would only look healthy.
         _model_load_state = "loading"
-        _inference_executor.submit(get_model, args.model).result()
+        try:
+            _inference_executor.submit(get_model, args.model).result()
+        except HTTPException as error:
+            # A model id the server refuses - control characters, an absurd
+            # length - is the operator's own argument, not a runtime failure:
+            # say so plainly instead of dying with a traceback.
+            raise SystemExit(f"--model was refused: {error.detail}") from error
     elif not args.lazy:
         _load_model_in_background(args.model)
 

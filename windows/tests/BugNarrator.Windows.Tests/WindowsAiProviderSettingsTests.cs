@@ -140,9 +140,9 @@ public sealed class WindowsAiProviderSettingsTests
 
         // Transcription is allowed with no key and the pinned Parakeet model/URL.
         Assert.Null(settings.AiProviderCompatibilityIssue);
-        // The local server checks a bearer token on every route, so the
-        // credential the app presents is that token rather than an empty
-        // string (#1270).
+        // The local server checks a bearer token on every route except the
+        // health check's proof challenge, so the credential the app presents
+        // is that token rather than an empty string (#1270).
         var installDirectory = Path.Combine(Path.GetTempPath(), "bugnarrator-token-" + Guid.NewGuid().ToString("N"));
         try
         {

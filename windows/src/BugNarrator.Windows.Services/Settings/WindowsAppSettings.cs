@@ -251,9 +251,10 @@ public sealed record WindowsAppSettings(
         if (EffectiveAiProviderProfile.Provider == WindowsAiProvider.ParakeetLocal)
         {
             // The local server refuses every request that does not carry its
-            // bearer token, and the request builder already sends the
-            // credential as one. An empty credential means no header at all,
-            // which the server refuses — the safe direction to fail in.
+            // bearer token (the health check's proof challenge excepted), and
+            // the request builder already sends the credential as one. An
+            // empty credential means no header at all, which the server
+            // refuses — the safe direction to fail in.
             return LocalServerTokenStore.Token(installDirectory ?? LocalServerPaths.DefaultInstallDirectory) ?? string.Empty;
         }
 

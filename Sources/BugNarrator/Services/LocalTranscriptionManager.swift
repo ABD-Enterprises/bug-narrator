@@ -247,9 +247,10 @@ final class LocalTranscriptionManager: ObservableObject {
     private func launchVerifiedServer() {
         do {
             // The server refuses every request that does not carry the token,
-            // so it has to be handed the same token the app presents. It goes
-            // through the environment rather than the command line, where it
-            // would be visible in the process list.
+            // so it has to be handed the same token the app presents (the
+            // health check's proof challenge is the one exception, and it
+            // carries no token). It goes through the environment rather than
+            // the command line, where it would be visible in the process list.
             let token = LocalServerTokenStore.token(installDirectory: directory)
             let process = try dependencies.launch(
                 executable,
