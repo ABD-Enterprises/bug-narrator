@@ -124,9 +124,16 @@ final class LocalTranscriptionManager: ObservableObject {
         return nil
     }
 
+    /// The repository moved from ABD-Enterprises/bug-narrator to SureForgeTech/sureforge-capture on 2026-11-14.
+    /// GitHub now reports release assets under the new path; the old path stays trusted for older listings.
+    static let trustedReleasePathPrefixes = [
+        "/SureForgeTech/sureforge-capture/releases/download/",
+        "/ABD-Enterprises/bug-narrator/releases/download/",
+    ]
+
     static func trustedAssetURL(_ url: URL) -> Bool {
         url.scheme == "https" && url.host == "github.com" && url.user == nil && url.password == nil &&
-            url.path.hasPrefix("/ABD-Enterprises/bug-narrator/releases/download/")
+            trustedReleasePathPrefixes.contains(where: { url.path.hasPrefix($0) })
     }
 
     func discover() async {
@@ -137,7 +144,7 @@ final class LocalTranscriptionManager: ObservableObject {
             // App and server releases have independent cadences. Search bounded pages.
             for page in 1...20 {
                 try Task.checkCancellation()
-                let url = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases?per_page=30&page=\(page)")!
+                let url = URL(string: "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases?per_page=30&page=\(page)")!
                 let (data, response) = try await BoundedHTTPResponseReader.data(from: url, using: session)
                 try Self.requireSuccess(response)
                 let releases = try JSONDecoder().decode([Release].self, from: data)

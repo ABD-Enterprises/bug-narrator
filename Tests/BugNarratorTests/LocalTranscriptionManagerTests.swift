@@ -451,6 +451,20 @@ final class LocalTranscriptionManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testAssetURLFromTheMovedRepositoryIsTrusted() {
+        // GitHub reports assets under SureForgeTech/sureforge-capture since the 2026-11-14 move; the old path stays trusted.
+        for address in ["https://github.com/SureForgeTech/sureforge-capture/releases/download/v1.1.2/server.dmg",
+                        "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1.1.2/server.dmg"] {
+            XCTAssertTrue(LocalTranscriptionManager.trustedAssetURL(URL(string: address)!), address)
+        }
+        for address in ["https://github.com/SureForgeTech/sureforge-capture-fork/releases/download/v1/a",
+                        "https://github.com/SureForgeTech/other/releases/download/v1/a",
+                        "https://github.com/SureForgeTech/sureforge-capture/archive/v1/a"] {
+            XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(URL(string: address)!), address)
+        }
+    }
+
+    @MainActor
     func testAssetURLMustBelongToTheRepository() {
         for address in ["http://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/a",
                         "https://example.com/ABD-Enterprises/bug-narrator/releases/download/v1/a",
