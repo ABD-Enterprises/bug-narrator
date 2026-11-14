@@ -21,8 +21,15 @@ extension GitHubExportProvider {
                 // A zero-width space after @/# breaks GitHub's mention and issue
                 // autolinks (and defeats `# heading` injection) while leaving the
                 // text visually identical.
-                .replacingOccurrences(of: "@", with: "@\u{200B}")
-                .replacingOccurrences(of: "#", with: "#\u{200B}")
+                //
+                // The regular-expression path, not the literal one: a literal
+                // search matches whole grapheme clusters, so an "@" that is
+                // part of a larger cluster - a combining mark, a zero-width
+                // joiner, a variation selector - is never replaced and the
+                // mention survives. The regex path reaches inside the cluster,
+                // and the Windows port's code-unit replace does the same.
+                .replacingOccurrences(of: "@", with: "@\u{200B}", options: .regularExpression)
+                .replacingOccurrences(of: "#", with: "#\u{200B}", options: .regularExpression)
                 // An escaped "[" cannot open a link or image label, so
                 // [text](url), ![alt](url) and [ref]: url all render literally.
                 // Bare URLs are left alone: GitHub autolinks them and the
@@ -89,10 +96,7 @@ extension GitHubExportProvider {
         // span early and a blank line ends the paragraph (and the list) outright,
         // dropping the rest of the hint into raw markdown. The hint is a one-line
         // key by intent, so collapse it to one line and strip backticks.
-        let hint = issue.deduplicationHint
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        let hint = TrackerExportPayloadBudget.collapsingWhitespace(issue.deduplicationHint)
             .replacingOccurrences(of: "`", with: "\u{2019}")
         lines.append("- Deduplication hint: `\(hint)`")
 

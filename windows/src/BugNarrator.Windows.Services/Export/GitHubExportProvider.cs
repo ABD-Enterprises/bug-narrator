@@ -139,7 +139,11 @@ public sealed class GitHubExportProvider
             lines.Add($"- Component: {UntrustedMarkdown.Neutralize(issue.Component)}");
         }
 
-        lines.Add($"- Deduplication hint: `{issue.EffectiveDeduplicationHint}`");
+        // The hint is model output, and it goes into a code span: macOS collapses it to one
+        // line and strips backticks first, so a backtick or a blank line in it cannot close the
+        // span early and let the rest of the hint render as markdown — with a live @mention in
+        // it. Mirrored here so the two ports send the same hint.
+        lines.Add($"- Deduplication hint: `{NeutralizedDeduplicationHint(issue.EffectiveDeduplicationHint)}`");
 
         if (!string.IsNullOrWhiteSpace(issue.SectionTitle))
         {
@@ -225,7 +229,9 @@ public sealed class GitHubExportProvider
 
         lines.Add(string.Empty);
         lines.Add("## Source");
-        lines.Add($"Exported from BugNarrator session \"{session.Title}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}.");
+        // The session title is built from the transcript, so it is untrusted text like every
+        // other field here: the body is markdown, so a mention in it would be live.
+        lines.Add($"Exported from BugNarrator session \"{UntrustedMarkdown.Neutralize(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}.");
         lines.Add("Review against the raw transcript before triage.");
 
         return string.Join(Environment.NewLine, lines);
@@ -246,6 +252,15 @@ public sealed class GitHubExportProvider
         }
 
         return lines;
+    }
+
+    /// <summary>
+    /// The deduplication hint as it goes into the body's code span: collapsed to one line and
+    /// with the backticks replaced, exactly as the macOS body renders it.
+    /// </summary>
+    private static string NeutralizedDeduplicationHint(string? value)
+    {
+        return TrackerExportPayloadBudget.CollapsingWhitespace(value).Replace("`", "\u2019");
     }
 
     /// <summary>Step text is model output: truncate to the tracker budget, then neutralize.</summary>

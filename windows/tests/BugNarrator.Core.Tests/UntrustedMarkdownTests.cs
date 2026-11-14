@@ -113,4 +113,29 @@ public sealed class UntrustedMarkdownTests
     {
         Assert.Equal(expected, UntrustedMarkdown.Neutralize(input));
     }
+
+    [Fact]
+    public void NeutralizeMentions_DefangsTheLiveTriggersOnly()
+    {
+        var output = UntrustedMarkdown.NeutralizeMentions("@channel ping #123 and GH-42");
+
+        // xUnit's string assertions normalize invisible characters away, so the zero-width
+        // spaces are checked with plain string operations instead.
+        Assert.True(output.Contains("@\u200B", StringComparison.Ordinal));
+        Assert.True(output.Contains("#\u200B", StringComparison.Ordinal));
+        Assert.True(output.Contains("GH-\u200B", StringComparison.Ordinal));
+        // The text stays visually identical: only zero-width spaces are added.
+        Assert.Equal(
+            "@channel ping #123 and GH-42",
+            output.Replace("\u200B", string.Empty, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NeutralizeMentions_LeavesMarkdownSyntaxAlone()
+    {
+        // The fields this is used for are plain text, not markdown, so the block-structure and
+        // link escapes the GitHub body needs would only mangle them.
+        Assert.Equal("see [docs]", UntrustedMarkdown.NeutralizeMentions("see [docs]"));
+        Assert.Equal("- list item", UntrustedMarkdown.NeutralizeMentions("- list item"));
+    }
 }

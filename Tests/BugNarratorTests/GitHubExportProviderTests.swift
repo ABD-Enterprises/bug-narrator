@@ -987,6 +987,51 @@ final class GitHubExportProviderTests: XCTestCase {
         )
     }
 
+    func testIssueTitleNeutralizesMentionsAndCrossReferences() async throws {
+        // The title is model- and transcript-derived text like the body, and
+        // GitHub autolinks AND notifies @mentions in an issue title and
+        // resolves #123 cross-references there too. The body was already
+        // neutralized; the title was the one untrusted field that was not.
+        let provider = GitHubExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "@security-team rotate #4821 staging keys",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: GitHubExportConfiguration(
+                token: "fixture-github-token",
+                owner: "acme",
+                repository: "bugnarrator",
+                labels: []
+            ),
+            exportFingerprint: "bnexp-fixture"
+        )
+
+        let payload = try JSONDecoder().decode(GitHubIssueRequestPayload.self, from: requestBodyData(from: request))
+        XCTAssertFalse(payload.title.contains("@security-team"), "a live mention survived in the exported title: \(payload.title)")
+        XCTAssertFalse(payload.title.contains("#4821"), "a live cross-reference survived in the exported title: \(payload.title)")
+        XCTAssertEqual(
+            payload.title.replacingOccurrences(of: "\u{200B}", with: ""),
+            "@security-team rotate #4821 staging keys",
+            "the title must stay visually identical to what the user reviewed"
+        )
+    }
+
     private func makeRetryFixtureIssue() -> ExtractedIssue {
         ExtractedIssue(
             title: "Retry fixture issue",
