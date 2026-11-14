@@ -667,8 +667,8 @@ public sealed class IssueExportProviderTests : IDisposable
         // mention in it would notify the account it names.
         Assert.False(body.Contains("@security-team", StringComparison.Ordinal));
         Assert.False(body.Contains("#4821", StringComparison.Ordinal));
-        // Plain string operations, because xUnit's string assertions normalize invisible
-        // characters away and would pass even without the zero-width spaces.
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
         Assert.True(body.Contains("@\u200Bsecurity-team", StringComparison.Ordinal));
     }
 

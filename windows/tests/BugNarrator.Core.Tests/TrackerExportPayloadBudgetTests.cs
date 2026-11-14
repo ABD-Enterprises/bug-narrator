@@ -93,9 +93,8 @@ public sealed class TrackerExportPayloadBudgetTests
             "@security-team rotate #4821 keys GH-99",
             TrackerExportPayloadBudget.GitHubTitleLimit);
 
-        // xUnit's string assertions normalize invisible characters away, so the zero-width
-        // spaces are checked with plain string operations instead: a "does not contain"
-        // assertion would pass even without them.
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
         Assert.True(title.Contains("@\u200B", StringComparison.Ordinal));
         Assert.True(title.Contains("#\u200B", StringComparison.Ordinal));
         Assert.True(title.Contains("GH-\u200B", StringComparison.Ordinal));
@@ -175,8 +174,8 @@ public sealed class TrackerExportPayloadBudgetTests
             "a\u200Bb",
             TrackerExportPayloadBudget.GitHubTitleLimit);
 
-        // Plain string equality, because xUnit's Assert.Equal normalizes invisible characters
-        // away and would pass even if the zero-width space were gone.
+        // Plain string equality, so the assertion does not depend on the assertion
+        // library's comparison semantics.
         Assert.True(title == "a\u200Bb", $"the collapse changed the title: {title}");
     }
 
@@ -197,8 +196,8 @@ public sealed class TrackerExportPayloadBudgetTests
         // Windows: otherwise the two ports send different titles for the same issue.
         var result = TrackerExportPayloadBudget.TrackerTitle("a@b c", 4);
 
-        // Assert.True with plain string operations, because xUnit's Assert.Equal normalizes
-        // invisible characters away and would pass even without the trim.
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
         Assert.True(
             !result.Contains("\u200B", StringComparison.Ordinal),
             $"a zero-width space survived the cut: {result}");

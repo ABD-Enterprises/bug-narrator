@@ -119,8 +119,8 @@ public sealed class UntrustedMarkdownTests
     {
         var output = UntrustedMarkdown.NeutralizeMentions("@channel ping #123 and GH-42");
 
-        // xUnit's string assertions normalize invisible characters away, so the zero-width
-        // spaces are checked with plain string operations instead.
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
         Assert.True(output.Contains("@\u200B", StringComparison.Ordinal));
         Assert.True(output.Contains("#\u200B", StringComparison.Ordinal));
         Assert.True(output.Contains("GH-\u200B", StringComparison.Ordinal));

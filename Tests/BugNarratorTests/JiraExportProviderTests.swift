@@ -451,7 +451,8 @@ final class JiraExportProviderTests: XCTestCase {
         let body = try requestBodyData(from: request)
         let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
-        let description = try XCTUnwrap(fields["description"] as? [String: Any])
+        // The exported description is a structured object, not a string.
+        XCTAssertNotNil(fields["description"] as? [String: Any], "the description must be a structured object")
         let rendered = String(data: body, encoding: .utf8) ?? ""
 
         XCTAssertFalse(rendered.contains("@security-team"), "a live mention survived in the exported description: \(rendered)")
@@ -462,7 +463,6 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(withoutZeroWidthSpaces.contains("@security-team"))
         XCTAssertTrue(withoutZeroWidthSpaces.contains("#4821"))
         XCTAssertTrue(withoutZeroWidthSpaces.contains("GH-99"))
-        _ = description
     }
 
     func testMakeURLRequestSendsASingleLineSummaryWithinJirasLimit() async throws {
