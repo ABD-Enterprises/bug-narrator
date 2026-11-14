@@ -107,7 +107,7 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
     private let session: URLSession
 
     init(
-        endpoint: URL = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases/latest")!,
+        endpoint: URL = URL(string: "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases/latest")!,
         session: URLSession? = nil
     ) {
         self.endpoint = endpoint
