@@ -460,8 +460,9 @@ class ServerModelConfigurationTests(unittest.TestCase):
 
             self.assertEqual(health["model_name"], "custom", f"the path was published: {name}")
 
-        # A model id is published as it is: the app reads it back to show
-        # which model the server loaded.
+        # A model id is published as it is. No client reads it back - the
+        # app shows the model from its own settings - but a caller that
+        # already answered the challenge may read it.
         server._model_name = "mlx-community/parakeet-tdt-0.6b-v3"
         health = asyncio.run(server.health())
 
