@@ -35,18 +35,23 @@ final class AudioRecorderTests: XCTestCase {
         let harness = try AudioRecorderHarness(timeoutNanoseconds: 500_000_000)
         defer { harness.cleanup() }
 
+        // Native recorder construction can take longer than the finalization
+        // deadline on a cold audio service. Prepare it before starting the timer,
+        // on a separate file so it cannot rewrite the corrupt recording fixture.
+        let callbackRecorder = try AVAudioRecorder(
+            url: harness.rootDirectoryURL.appendingPathComponent("delegate-fixture.m4a"),
+            settings: harness.callbackRecorderSettings
+        )
         try await harness.recorder.startRecording()
+        let fileURL = try XCTUnwrap(harness.recordingFileURL)
+        try Data("not playable audio".utf8).write(to: fileURL)
+
         let stopTask = Task {
             try await harness.recorder.stopRecording()
         }
-
         await waitUntil {
             harness.recordingEngine?.stopCallCount == 1
         }
-
-        let fileURL = try XCTUnwrap(harness.recordingFileURL)
-        try Data("not playable audio".utf8).write(to: fileURL)
-        let callbackRecorder = try AVAudioRecorder(url: fileURL, settings: harness.callbackRecorderSettings)
         harness.recorder.audioRecorderDidFinishRecording(callbackRecorder, successfully: true)
 
         do {
