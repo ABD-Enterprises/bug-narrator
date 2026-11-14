@@ -50,9 +50,23 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server._resolve_model_id(" parakeet "),
             "mlx-community/parakeet-tdt-0.6b-v3",
         )
+        # A custom id is accepted when it is the one this server was told to
+        # load. An id a request invents is refused - see the unknown-id test.
+        server.configure_default_model("mlx-community/custom-parakeet")
         self.assertEqual(
             server._resolve_model_id("mlx-community/custom-parakeet"),
             "mlx-community/custom-parakeet",
+        )
+
+    def test_the_canonical_id_resolves_to_the_configured_default(self):
+        # The operator configured a different model, so a request that names
+        # the canonical id must not pull the upstream repository instead: the
+        # server loads the model it was configured to load, and only that.
+        server.configure_default_model("/Users/operator/models/parakeet")
+
+        self.assertEqual(
+            server._resolve_model_id("mlx-community/parakeet-tdt-0.6b-v3"),
+            "/Users/operator/models/parakeet",
         )
 
     def test_model_aliases_resolve_to_configured_default(self):
@@ -307,6 +321,180 @@ class ServerModelConfigurationTests(unittest.TestCase):
             server._parse_wav(handle)
         self.assertLessEqual(handle.tell(), 44)
 
+    def test_a_wedged_ffmpeg_is_stopped_instead_of_blocking_the_inference_worker(self):
+        # ffmpeg is given one window, so it cannot legitimately take longer
+        # than the window is long. Without a timeout a wedged ffmpeg holds the
+        # single inference worker for ever and takes the local provider down
+        # with it.
+        # The window is a length of media, not of wall clock, so the timeout
+        # carries headroom over it.
+        self.assertGreaterEqual(server._ffmpeg_timeout_seconds, 2 * server._chunk_duration_seconds)
+        created = []
+        real_named_temp_file = server.tempfile.NamedTemporaryFile
+
+        def recording_named_temp_file(*args, **kwargs):
+            handle = real_named_temp_file(*args, **kwargs)
+            created.append(handle.name)
+            return handle
+
+        with patch.object(
+            server.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired("ffmpeg", 120),
+        ) as run, patch.object(
+            server.tempfile,
+            "NamedTemporaryFile",
+            side_effect=recording_named_temp_file,
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                server._decode_audio_window("/nonexistent/recording.wav", 0)
+
+        self.assertIn("did not finish", str(caught.exception))
+        # The timeout is the mechanism that bounds a wedged ffmpeg: without the
+        # kwarg the child is never killed, and the handler above would still
+        # pass this test.
+        self.assertEqual(run.call_args.kwargs.get("timeout"), server._ffmpeg_timeout_seconds)
+        # The half-decoded window must not be left behind on disk.
+        self.assertTrue(created)
+        self.assertFalse(server.os.path.exists(created[-1]))
+
+    def test_the_health_answer_carries_no_local_path(self):
+        # The health route answers the client's challenge without a token, so
+        # every local account on the machine can read that answer. The full
+        # detail stays in the server's own log.
+        #
+        # The failure has to go through the server's own path: setting
+        # _model_load_error by hand would only prove the helper works, and
+        # the server could stop calling it without any test noticing.
+        server._model_load_state = "not_loaded"
+        server._model_load_error = None
+        self.addCleanup(setattr, server, "_model_load_state", "not_loaded")
+        self.addCleanup(setattr, server, "_model_load_error", None)
+
+        failure = (
+            "No such file or directory: '/Users/victim/Library/Application Support/"
+            "BugNarrator/LocalTranscription/Models/parakeet/config.json'"
+        )
+        with patch.object(server, "get_model", side_effect=RuntimeError(failure)):
+            server._load_model_in_background("a-model")
+            deadline = time.time() + 5
+            while server._model_load_state != "failed" and time.time() < deadline:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
+                time.sleep(0.02)
+
+        self.assertEqual(server._model_load_state, "failed")
+        health = asyncio.run(server.health())
+
+        self.assertNotIn("/Users/victim", health["model_error"])
+        self.assertNotIn("Application Support", health["model_error"])
+        self.assertNotIn("config.json", health["model_error"])
+        # The published answer is one of the server's own fixed messages, so
+        # no part of the loader's text can reach a caller that only knows
+        # the port.
+        self.assertIn(
+            health["model_error"],
+            (server._PUBLIC_MODEL_ERROR_MISSING, server._PUBLIC_MODEL_ERROR_FAILED),
+        )
+
+    def test_a_url_in_the_model_error_is_not_mistaken_for_a_local_path(self):
+        message = "could not fetch https://huggingface.co/parakeet/config.json"
+
+        # The published answer carries one of the server's own fixed
+        # messages, so neither the URL nor anything else from the loader's
+        # text can reach the token-free health route.
+        published = server._public_model_error(message)
+
+        self.assertEqual(published, server._PUBLIC_MODEL_ERROR_FAILED)
+        self.assertNotIn("huggingface.co", published)
+
+    def test_a_windows_profile_path_never_reaches_the_health_answer(self):
+        # The same server ships on Windows, where the managed model
+        # directory sits under %LocalAppData% and the loader's error text
+        # carries a backslash path with the account name in it.
+        server._model_load_state = "not_loaded"
+        server._model_load_error = None
+        self.addCleanup(setattr, server, "_model_load_state", "not_loaded")
+        self.addCleanup(setattr, server, "_model_load_error", None)
+
+        failure = (
+            "Could not open C:\\Users\\Bob\\AppData\\Local\\BugNarrator\\"
+            "LocalTranscription\\Models\\parakeet\\config.json"
+        )
+        with patch.object(server, "get_model", side_effect=RuntimeError(failure)):
+            server._load_model_in_background("a-model")
+            deadline = time.time() + 5
+            while server._model_load_state != "failed" and time.time() < deadline:
+                # Bounded polling waits for a test server, not production work.
+                # nosemgrep: security.semgrep.python.lang.best-practice.sleep.arbitrary-sleep
+                time.sleep(0.02)
+
+        health = asyncio.run(server.health())
+
+        self.assertNotIn("Bob", health["model_error"])
+        self.assertNotIn("AppData", health["model_error"])
+        self.assertNotIn("\\", health["model_error"])
+        self.assertEqual(health["model_error"], server._PUBLIC_MODEL_ERROR_FAILED)
+
+    def test_the_health_answer_does_not_publish_a_local_path_as_the_model_name(self):
+        # An operator may point the server at a model in a local directory.
+        # That path names the user's account and cache layout, and it may be
+        # absolute, drive-qualified, tilde-relative, relative or wrapped in
+        # a file:// URL, so only a bare model id is published.
+        server._model_name = None
+        self.addCleanup(setattr, server, "_model_name", None)
+
+        for name in (
+            "/Users/operator/models/parakeet",
+            "C:\\Users\\operator\\models\\parakeet",
+            "file:///Users/operator/models/parakeet",
+            "~/models/parakeet",
+            "./models/parakeet",
+            # A relative path is shaped like an "owner/name" repository id, so
+            # only the ids this server knows are published.
+            "models/parakeet",
+            "parakeet-local",
+        ):
+            server._model_name = name
+            health = asyncio.run(server.health())
+
+            self.assertEqual(health["model_name"], "custom", f"the path was published: {name}")
+
+        # A model id is published as it is: the app reads it back to show
+        # which model the server loaded.
+        server._model_name = "mlx-community/parakeet-tdt-0.6b-v3"
+        health = asyncio.run(server.health())
+
+        self.assertEqual(health["model_name"], "mlx-community/parakeet-tdt-0.6b-v3")
+
+        # Every id the server knows is published, not just the canonical one.
+        server._model_name = "nvidia/parakeet-tdt-0.6b-v3"
+        health = asyncio.run(server.health())
+
+        self.assertEqual(health["model_name"], "nvidia/parakeet-tdt-0.6b-v3")
+
+    def test_an_http_error_is_rendered_in_the_envelope_the_clients_read(self):
+        # FastAPI's own body for an HTTP error is {"detail": ...}. Both
+        # shipped clients read {"error": {"message": ...}} and fall back to
+        # the bare status text when they cannot find one, so the actionable
+        # message - "the upload exceeds the limit" - would be lost.
+        limit = server._max_upload_bytes
+        response = asyncio.run(server._error_envelope(
+            None,
+            server.HTTPException(
+                status_code=413,
+                detail=f"The upload exceeds the {limit} byte limit",
+            ),
+        ))
+
+        self.assertEqual(response.status_code, 413)
+        payload = json.loads(response.body)
+        self.assertEqual(
+            payload["error"]["message"],
+            f"The upload exceeds the {limit} byte limit",
+        )
+        self.assertEqual(payload["error"]["type"], "invalid_request_error")
+
     def test_transcription_route_keeps_http_event_loop_async(self):
         self.assertTrue(inspect.iscoroutinefunction(server.transcribe))
 
@@ -329,11 +517,14 @@ class ServerModelConfigurationTests(unittest.TestCase):
                 time.sleep(0.02)
 
         self.assertEqual(server._model_load_state, "failed")
-        self.assertIn("the model is missing", server._model_load_error)
+        # The published error is one of the server's own fixed messages; the
+        # loader's own text stays in the log, which only the user reads.
+        self.assertEqual(server._model_load_error, server._PUBLIC_MODEL_ERROR_MISSING)
+        self.assertNotIn("the model is missing", server._model_load_error)
 
         health = asyncio.run(server.health())
         self.assertEqual(health["status"], "degraded")
-        self.assertIn("the model is missing", health["model_error"])
+        self.assertEqual(health["model_error"], server._PUBLIC_MODEL_ERROR_MISSING)
 
     def test_model_load_and_transcription_share_the_inference_thread(self):
         class RecordingModel:
@@ -703,8 +894,23 @@ server._serve("127.0.0.1", {port})
                     server._resolve_model_id(value)
                 self.assertEqual(caught.exception.status_code, 400)
                 self.assertNotIn(value, caught.exception.detail)
-        self.assertEqual(server._resolve_model_id("owner/model"), "owner/model")
-        self.assertEqual(server._resolve_model_id("/synthetic/model directory"), "/synthetic/model directory")
+
+    def test_a_model_id_the_server_was_not_configured_for_is_refused(self):
+        # The id reaches the model loader as a repo id or a local directory,
+        # and the loader turns any hub error into a local path. An
+        # unrestricted value therefore lets a caller read local files
+        # (config.json, model.safetensors) and load weights from a repo it
+        # chooses, at a revision that is not pinned to a digest.
+        for value in [
+            "owner/model",
+            "/synthetic/model directory",
+            "../../../../Users/victim/model",
+            "attacker/evil-repo",
+        ]:
+            with self.subTest(value=value):
+                with self.assertRaises(server.HTTPException) as caught:
+                    server._resolve_model_id(value)
+                self.assertEqual(caught.exception.status_code, 400)
 
     def test_invalid_multipart_model_never_reaches_logs_or_inference(self):
         async def request(value):
@@ -750,6 +956,17 @@ server._serve("127.0.0.1", {port})
                 self.assertEqual(status, 400)
                 info.assert_not_called()
                 inference.assert_not_called()
+                # The refusal uses the error envelope the clients know how to
+                # read, not a bare "detail" they cannot parse.
+                body = b"".join(
+                    message.get("body", b"")
+                    for message in messages
+                    if message["type"] == "http.response.body"
+                )
+                payload = json.loads(body)
+                self.assertIn("error", payload)
+                self.assertNotIn("detail", payload)
+                self.assertNotIn(value, json.dumps(payload))
 
     def test_runtime_dependencies_are_exactly_pinned(self):
         requirements = (
