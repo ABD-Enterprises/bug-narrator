@@ -38,7 +38,9 @@ from typing import Annotated, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,18 +61,49 @@ app = FastAPI(
 
 
 @app.exception_handler(HTTPException)
-async def _error_envelope(_request: Request, error: HTTPException) -> JSONResponse:
+@app.exception_handler(StarletteHTTPException)
+async def _error_envelope(_request: Request, error: StarletteHTTPException) -> JSONResponse:
     """Render an HTTP error in the envelope the shipped clients read.
 
     FastAPI's own body for an HTTP error is {"detail": ...}. Both clients
-    read {"error": {"message": ...}} and fall back to the bare status text
-    when they cannot find one, so the actionable message - "the upload
-    exceeds the limit" - would be lost.
+    read {"error": {"message": ...}} and fall back to a status-derived
+    message when they cannot find one, so the actionable message - "the
+    upload exceeds the limit" - would be lost.
+
+    Registered for FastAPI's own HTTPException and for Starlette's, which
+    is the class Starlette raises for a route that does not exist (404) or
+    a method the route does not accept (405). FastAPI's class is a
+    subclass of Starlette's and the lookup walks the class hierarchy, so
+    both are registered to make sure neither framework default wins.
     """
     return JSONResponse(
         status_code=error.status_code,
         content={"error": {"message": str(error.detail), "type": "invalid_request_error"}},
         headers=error.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_envelope(
+    _request: Request, _error: RequestValidationError
+) -> JSONResponse:
+    """Render a request the server cannot parse in the same envelope.
+
+    FastAPI answers a body that is not the multipart upload it expects -
+    a truncated upload, the wrong content type - with {"detail": [...]}.
+    Both clients read {"error": {"message": ...}}, so the reason would be
+    lost there too. The message is one of the server's own: the validation
+    detail describes the caller's own request, and neither client can read
+    a list of field errors anyway.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "message": "The request is not a valid upload.",
+                "type": "invalid_request_error",
+            }
+        },
     )
 
 # The header a client sends when it asks the server to prove that it is the
@@ -625,8 +658,10 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                # The route is token-protected, so it may report the operator's own
-                # model id; the app reads it to show which model is loaded.
+                # The route is token-protected, so it may report the operator's
+                # own model id. The app does not read this field - it shows
+                # the model from its own settings - but a caller that holds
+                # the token is already trusted with the model id.
                 "id": _model_name or _default_model_name,
                 "object": "model",
                 "owned_by": "local",

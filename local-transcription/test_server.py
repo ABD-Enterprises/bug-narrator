@@ -1476,10 +1476,10 @@ server.main()
 class ServerErrorEnvelopeTests(unittest.TestCase):
     """Every refusal the server sends has to carry the envelope the clients read.
 
-    Both shipped clients read {"error": {"message": ...}} and fall back to the
-    bare status text when they cannot find one, so a refusal in FastAPI's own
-    {"detail": ...} shape loses the actionable message - "the upload exceeds
-    the limit", "missing authorization header".
+    Both shipped clients read {"error": {"message": ...}} and fall back to a
+    status-derived message when they cannot find one, so a refusal in
+    FastAPI's own {"detail": ...} shape loses the actionable message - "the
+    upload exceeds the limit", "missing authorization header".
 
     These tests drive the ASGI app itself, so they fail when a refusal stops
     carrying the envelope - whether it is refused by the admission middleware
@@ -1586,6 +1586,50 @@ class ServerErrorEnvelopeTests(unittest.TestCase):
 
         self.assertEqual(status, 413)
         self._assert_envelope(payload, "The upload exceeds the 1024 byte limit")
+
+    def test_an_unknown_route_is_answered_in_the_envelope(self):
+        # Starlette raises its own HTTPException for a route that does not
+        # exist, not FastAPI's, so this refusal is rendered by the framework
+        # default unless the envelope is registered for the base class too.
+        scope = self._scope("/v1/no-such-route", headers=[(b"authorization", b"Bearer s3cret-token-value")])
+        status, payload = asyncio.run(self._answer(scope))
+
+        self.assertEqual(status, 404)
+        self._assert_envelope(payload, "Not Found")
+
+    def test_a_wrong_method_is_answered_in_the_envelope(self):
+        scope = self._scope(
+            "/v1/models",
+            method="POST",
+            headers=[(b"authorization", b"Bearer s3cret-token-value")],
+        )
+        status, payload = asyncio.run(self._answer(scope))
+
+        self.assertEqual(status, 405)
+        self._assert_envelope(payload, "Method Not Allowed")
+
+    def test_a_request_that_is_not_the_expected_upload_is_answered_in_the_envelope(self):
+        # A body the server cannot read as its upload fails validation, and
+        # FastAPI answers that with {"detail": [...]} unless it is given its
+        # own handler.
+        scope = self._scope(
+            "/v1/audio/transcriptions",
+            method="POST",
+            headers=[
+                (b"authorization", b"Bearer s3cret-token-value"),
+                (b"content-type", b"multipart/form-data; boundary=boundary"),
+            ],
+        )
+        body = (
+            b"--boundary\r\n"
+            b'Content-Disposition: form-data; name="model"\r\n\r\n'
+            b"parakeet-tdt-0.6b-v3\r\n"
+            b"--boundary--\r\n"
+        )
+        status, payload = asyncio.run(self._answer(scope, body))
+
+        self.assertEqual(status, 422)
+        self._assert_envelope(payload, "The request is not a valid upload.")
 
 
 class ServerTransportAdmissionTests(unittest.TestCase):
