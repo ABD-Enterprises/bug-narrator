@@ -48,7 +48,7 @@ struct OperationalTelemetryRecorder {
         } catch {
             DiagnosticsLogger(category: .settings).warning(
                 "operational_telemetry_write_failed",
-                "BugNarrator could not write a local telemetry event.",
+                "SureForge Capture could not write a local telemetry event.",
                 metadata: ["event": name]
             )
         }

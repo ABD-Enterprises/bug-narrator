@@ -82,9 +82,9 @@ enum LocalServerTokenStore {
         var explanation: String {
             switch self {
             case .fileIsTooReadable:
-                return "The access token file could not be secured, so BugNarrator did not send it."
+                return "The access token file could not be secured, so SureForge Capture did not send it."
             case .couldNotBeStored:
-                return "The access token file could not be written, so BugNarrator did not send it."
+                return "The access token file could not be written, so SureForge Capture did not send it."
             }
         }
     }

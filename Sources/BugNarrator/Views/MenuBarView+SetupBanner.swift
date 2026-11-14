@@ -88,11 +88,11 @@ extension MenuBarView {
 
     var setupBannerDetail: String {
         if appState.needsAPIKeySetup && microphoneSetupIncomplete {
-            return "BugNarrator needs microphone access and a configured AI provider before it can record and transcribe."
+            return "SureForge Capture needs microphone access and a configured AI provider before it can record and transcribe."
         }
 
         if microphoneSetupIncomplete {
-            return "BugNarrator needs microphone access before it can record."
+            return "SureForge Capture needs microphone access before it can record."
         }
 
         return "Configure your AI provider so recordings can be transcribed."

@@ -208,7 +208,7 @@ extension GitHubExportProvider {
 
         lines.append("")
         lines.append("## Source")
-        lines.append("Exported from BugNarrator. Review against the raw transcript before triage.")
+        lines.append("Exported from SureForge Capture. Review against the raw transcript before triage.")
 
         let footer = exportFingerprint.map { "\n\n\(TrackerExportFingerprint.marker(for: $0))" } ?? ""
         return TrackerExportPayloadBudget.hardLimitMarkdown(

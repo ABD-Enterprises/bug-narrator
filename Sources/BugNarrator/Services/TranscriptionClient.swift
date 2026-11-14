@@ -303,7 +303,7 @@ actor TranscriptionClient: TranscriptionServing {
         } catch {
             logger.warning(
                 "transcription_chunking_unavailable",
-                "BugNarrator could not prepare transcription chunks and will fall back to a single upload.",
+                "SureForge Capture could not prepare transcription chunks and will fall back to a single upload.",
                 metadata: ["error": error.localizedDescription]
             )
             return [fallbackChunk]

@@ -34,33 +34,33 @@ enum AppError: LocalizedError, Equatable {
         switch self {
         case .missingAPIKey:
             if provider.requiresAPIKey {
-                return "BugNarrator requires your own \(providerName) API key for transcription and issue extraction. Add it in Settings, then retry transcription."
+                return "SureForge Capture requires your own \(providerName) API key for transcription and issue extraction. Add it in Settings, then retry transcription."
             }
-            return "BugNarrator requires a working \(providerName) setup for transcription and issue extraction. Open Settings, confirm the server connection, then retry transcription."
+            return "SureForge Capture requires a working \(providerName) setup for transcription and issue extraction. Open Settings, confirm the server connection, then retry transcription."
         case .invalidAPIKey:
             if provider.requiresAPIKey {
                 return "The \(providerName) API key was rejected. Open Settings, replace it, and try again."
             }
-            return "BugNarrator could not validate the \(providerName) setup. Open Settings, check the server and base URL, and try again."
+            return "SureForge Capture could not validate the \(providerName) setup. Open Settings, check the server and base URL, and try again."
         case .revokedAPIKey:
             if provider.requiresAPIKey {
                 return "The \(providerName) API key is no longer valid. Open Settings, remove it, and add a new key."
             }
             return "The saved \(providerName) setup is no longer valid. Open Settings, refresh the connection details, and try again."
         case .microphonePermissionDenied:
-            return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again."
+            return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, turn on BugNarrator (SureForge Capture), then try again."
         case .microphonePermissionRestricted:
             return "Microphone access is restricted on this Mac. Check System Settings > Privacy & Security > Microphone and any device-management or parental-control restrictions, then try again."
         case .microphoneUnavailable(let message):
-            return "BugNarrator could not start audio capture. \(message)"
+            return "SureForge Capture could not start audio capture. \(message)"
         case .systemAudioFeatureDisabled:
             return "System audio capture is behind an experimental flag. Enable it in Settings before choosing a system audio mode."
         case .systemAudioConsentRequired:
             return "System audio capture can include meeting audio and other people's voices. Open Settings and acknowledge the recording notice before starting."
         case .systemAudioUnavailable(let message):
-            return "BugNarrator could not start system audio capture. \(message)"
+            return "SureForge Capture could not start system audio capture. \(message)"
         case .screenRecordingPermissionDenied:
-            return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try again."
+            return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try again."
         case .noActiveSession(let message):
             return message
         case .recordingFailure(let message):
@@ -82,9 +82,9 @@ enum AppError: LocalizedError, Equatable {
             return "The request to \(providerName) timed out. Check the connection and try again."
         case .networkFailure:
             if provider == .parakeetLocal {
-                return "BugNarrator could not reach the local transcription server. Download bugnarrator-transcription from the BugNarrator releases page, then run it in Terminal with --preload."
+                return "SureForge Capture could not reach the local transcription server. Download bugnarrator-transcription from the SureForge Capture releases page, then run it in Terminal with --preload."
             }
-            return "BugNarrator could not reach \(providerName). Check the connection and try again."
+            return "SureForge Capture could not reach \(providerName). Check the connection and try again."
         case .rateLimited(let retryAfter):
             if let retryAfter, retryAfter.isFinite, retryAfter >= 0, retryAfter < Double(Int.max) {
                 return "\(providerName) rate limit reached. Try again in \(Int(retryAfter)) seconds."
@@ -107,7 +107,7 @@ enum AppError: LocalizedError, Equatable {
         case .storageFailure(let message):
             return "Could not save local session history. The transcript is still in memory — copy it now from the popover before trying again. Details: \(message)"
         case .diagnosticsFailure(let message):
-            return "BugNarrator could not prepare diagnostics: \(message)"
+            return "SureForge Capture could not prepare diagnostics: \(message)"
         }
     }
 
@@ -189,13 +189,13 @@ enum AppError: LocalizedError, Equatable {
                 ? "Replace your \(provider.displayName) API key before continuing."
                 : "Repair the \(provider.displayName) setup before continuing."
         case .networkTimeout, .networkFailure, .rateLimited:
-            return "BugNarrator could not reach \(provider.displayName)."
+            return "SureForge Capture could not reach \(provider.displayName)."
         case .providerQuotaExhausted:
             return "Your \(provider.displayName) account has no credits left."
         case .exportConfigurationMissing, .exportConfigurationIncompatible:
             return "Finish export setup before continuing."
         case .storageFailure:
-            return "BugNarrator could not save the session. Copy your transcript before retrying."
+            return "SureForge Capture could not save the session. Copy your transcript before retrying."
         default:
             return nil
         }

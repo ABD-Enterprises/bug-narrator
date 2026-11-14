@@ -8,7 +8,7 @@ extension TranscriptView {
                 Text("Similar \(review.destination.rawValue) Issues")
                     .font(.title3.weight(.semibold))
 
-                Text("Review likely duplicates or related bugs before BugNarrator exports the selected issues.")
+                Text("Review likely duplicates or related bugs before SureForge Capture exports the selected issues.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

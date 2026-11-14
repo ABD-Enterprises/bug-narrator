@@ -65,7 +65,7 @@ struct SettingsDiagnosticsPrivacyPane: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Text("Attach the debug bundle and, if relevant, an exported session bundle when reporting an issue. BugNarrator never includes OpenAI, GitHub, or Jira credentials in the debug bundle.")
+                    Text("Attach the debug bundle and, if relevant, an exported session bundle when reporting an issue. SureForge Capture never includes OpenAI, GitHub, or Jira credentials in the debug bundle.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -85,7 +85,7 @@ struct SettingsDiagnosticsPrivacyPane: View {
                         }
                         .disabled(secureControlsDisabled)
 
-                        Text("Creates a local JSON export of BugNarrator sessions, settings metadata, and diagnostics context. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded.")
+                        Text("Creates a local JSON export of SureForge Capture sessions, settings metadata, and diagnostics context. API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are excluded.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -119,7 +119,7 @@ struct SettingsDiagnosticsPrivacyPane: View {
                     Toggle("Record local usage analytics", isOn: $settingsStore.operationalTelemetryEnabled)
                         .help("Records named app events (recordings started, transcriptions completed, errors) to a local file. Nothing is uploaded.")
 
-                    Text("BugNarrator records anonymous usage events to a local file (operational-telemetry.jsonl) to help diagnose issues. The data never leaves this Mac and is included in Export Data. Turn this off to stop recording new events.")
+                    Text("SureForge Capture records anonymous usage events to a local file (operational-telemetry.jsonl) to help diagnose issues. The data never leaves this Mac and is included in Export Data. Turn this off to stop recording new events.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

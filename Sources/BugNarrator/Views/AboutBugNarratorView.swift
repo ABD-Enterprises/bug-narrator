@@ -76,7 +76,7 @@ struct AboutBugNarratorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("BugNarrator is built around one workflow: record a narrated session, review the evidence, refine the issues, then export only what matters.")
+            Text("SureForge Capture is built around one workflow: record a narrated session, review the evidence, refine the issues, then export only what matters.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -94,7 +94,7 @@ struct AboutBugNarratorView: View {
                 title: "GitHub Repository",
                 subtitle: "Source, releases, roadmap, and issue tracking",
                 systemImage: "chevron.left.forwardslash.chevron.right",
-                accessibilityLabel: "Open the BugNarrator GitHub repository",
+                accessibilityLabel: "Open the SureForge Capture GitHub repository",
                 action: appState.openGitHubRepository
             )
 
@@ -102,7 +102,7 @@ struct AboutBugNarratorView: View {
                 title: "Documentation",
                 subtitle: "Read install help, workflow guidance, and troubleshooting notes",
                 systemImage: "book.closed",
-                accessibilityLabel: "Open the BugNarrator documentation",
+                accessibilityLabel: "Open the SureForge Capture documentation",
                 action: appState.openDocumentation
             )
 
@@ -110,7 +110,7 @@ struct AboutBugNarratorView: View {
                 title: "Report an Issue",
                 subtitle: "Open the GitHub new issue form for bugs, regressions, and feature requests",
                 systemImage: "ladybug",
-                accessibilityLabel: "Open the BugNarrator issue tracker",
+                accessibilityLabel: "Open the SureForge Capture issue tracker",
                 action: appState.openIssueReporter
             )
 
@@ -118,7 +118,7 @@ struct AboutBugNarratorView: View {
                 title: "Check for Updates",
                 subtitle: "Open the GitHub Releases page for the latest notarized DMG",
                 systemImage: "arrow.clockwise.circle",
-                accessibilityLabel: "Open the BugNarrator releases page",
+                accessibilityLabel: "Open the SureForge Capture releases page",
                 action: appState.checkForUpdates
             )
         }
@@ -138,7 +138,7 @@ struct AboutBugNarratorView: View {
                     appState.openChangelog()
                 }
                 .buttonStyle(.bordered)
-                .accessibilityLabel("Open the BugNarrator changelog window")
+                .accessibilityLabel("Open the SureForge Capture changelog window")
             }
 
             if changelog.latestHighlights.isEmpty {
@@ -163,7 +163,7 @@ struct AboutBugNarratorView: View {
             Text("Support Development")
                 .font(.headline)
 
-            Text("BugNarrator is free to use. If it saves you time during review and bug triage, you can optionally support ongoing development through the project’s PayPal page.")
+            Text("SureForge Capture is free to use. If it saves you time during review and bug triage, you can optionally support ongoing development through the project’s PayPal page.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -172,7 +172,7 @@ struct AboutBugNarratorView: View {
                 appState.openSupportDevelopment()
             }
             .buttonStyle(.borderedProminent)
-            .accessibilityLabel("Open the BugNarrator support development options")
+            .accessibilityLabel("Open the SureForge Capture support development options")
         }
         .padding(16)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))

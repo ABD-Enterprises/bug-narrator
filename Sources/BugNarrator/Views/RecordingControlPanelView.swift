@@ -39,7 +39,7 @@ struct RecordingControlPanelView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("BugNarrator Controls")
+                Text("SureForge Capture Controls")
                     .font(.headline)
 
                 Text("Recording actions live here.")
@@ -314,7 +314,7 @@ struct RecordingControlPanelView: View {
         case .recording:
             return "Use these controls or any global hotkeys you assigned to capture screenshots whenever you want to mark an important moment."
         case .transcribing:
-            return "The recording is finished. BugNarrator is uploading audio and waiting for transcription."
+            return "The recording is finished. SureForge Capture is uploading audio and waiting for transcription."
         case .success:
             return "Review the transcript in the session library, then start the next session from here."
         case .error:

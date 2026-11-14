@@ -91,7 +91,7 @@ final class PermissionRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(guidance.message.contains("System Settings > Privacy & Security > Microphone"))
         XCTAssertEqual(
             guidance.localTestingNote,
-            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
         )
     }
 
@@ -119,7 +119,7 @@ final class PermissionRecoveryControllerTests: XCTestCase {
 
         XCTAssertEqual(
             result,
-            .failed("BugNarrator could not open Screen & System Audio Recording settings automatically.")
+            .failed("SureForge Capture could not open Screen & System Audio Recording settings automatically.")
         )
         XCTAssertEqual(
             harness.urlHandler.openedURLs,
@@ -206,7 +206,7 @@ final class PermissionRecoveryControllerTests: XCTestCase {
         XCTAssertTrue(harness.appState.microphoneRecoveryGuidance.contains("System Settings > Privacy & Security > Microphone"))
         XCTAssertEqual(
             harness.appState.microphoneRecoveryLocalTestingNote,
-            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
         )
     }
 

@@ -12,7 +12,7 @@ struct SettingsGitHubExportPane: View {
     var body: some View {
         GroupBox("GitHub Export (Experimental)") {
             VStack(alignment: .leading, spacing: 12) {
-                settingsSectionIntro("Configure the repository BugNarrator should use when exporting selected extracted issues to GitHub Issues. This integration is still experimental.")
+                settingsSectionIntro("Configure the repository SureForge Capture should use when exporting selected extracted issues to GitHub Issues. This integration is still experimental.")
 
                 settingsLabeledField(title: "Personal Access Token") {
                     CredentialTokenField(
@@ -218,7 +218,7 @@ struct SettingsJiraExportPane: View {
     var body: some View {
         GroupBox("Jira Export (Experimental)") {
             VStack(alignment: .leading, spacing: 12) {
-                settingsSectionIntro("Configure the Jira Cloud project BugNarrator should use when exporting selected extracted issues. This integration is still experimental.")
+                settingsSectionIntro("Configure the Jira Cloud project SureForge Capture should use when exporting selected extracted issues. This integration is still experimental.")
 
                 settingsLabeledField(title: "Jira Cloud URL") {
                     TextField("your-domain.atlassian.net", text: $settingsStore.jiraBaseURL)

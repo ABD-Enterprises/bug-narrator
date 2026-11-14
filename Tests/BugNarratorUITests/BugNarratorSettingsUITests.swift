@@ -11,12 +11,12 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSettingsApp(scope: "startup-toggle-not-found", launchAtLoginStatus: "not_found")
         defer { app.terminate() }
 
-        let settingsWindow = app.windows["BugNarrator Settings"]
+        let settingsWindow = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
         selectSettingsTab("General", in: app)
 
-        let startupToggle = settingsWindow.checkBoxes["Open BugNarrator at startup"]
+        let startupToggle = settingsWindow.checkBoxes["Open SureForge Capture at startup"]
         XCTAssertTrue(startupToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(startupToggle.isEnabled)
     }
@@ -26,7 +26,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSettingsApp(scope: "at-a-glance-status", aiProvider: "openAI")
         defer { app.terminate() }
 
-        let settingsWindow = app.windows["BugNarrator Settings"]
+        let settingsWindow = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
@@ -39,7 +39,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
     func testSetupTabsFitWindowAndShowProviderSpecificPrivacy() throws {
         let app = launchSettingsApp(scope: "settings-layout-review")
         defer { app.terminate() }
-        let window = app.windows["BugNarrator Settings"]
+        let window = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
@@ -78,7 +78,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSettingsApp(scope: "saved-openai-key-actions", seedCredentials: true, aiProvider: "openAI")
         defer { app.terminate() }
 
-        let settingsWindow = app.windows["BugNarrator Settings"]
+        let settingsWindow = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
@@ -104,7 +104,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSettingsApp(scope: "first-run-local-parakeet-default")
         defer { app.terminate() }
 
-        let settingsWindow = app.windows["BugNarrator Settings"]
+        let settingsWindow = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
         selectSettingsTab("AI Engines", in: app)
@@ -115,7 +115,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Local transcription is selected."].waitForExistence(timeout: 5))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value == %@", "BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Install and start the local server below before recording.")).firstMatch
+            app.staticTexts.matching(NSPredicate(format: "value == %@", "SureForge Capture will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Install and start the local server below before recording.")).firstMatch
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
@@ -138,10 +138,10 @@ final class BugNarratorSettingsUITests: XCTestCase {
         selectAIProvider("OpenAI", in: app, settingsWindow: settingsWindow)
 
         XCTAssertTrue(
-            app.staticTexts["BugNarrator requires your own AI provider configuration."].waitForExistence(timeout: 5)
+            app.staticTexts["SureForge Capture requires your own AI provider configuration."].waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value == %@", "BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")).firstMatch
+            app.staticTexts.matching(NSPredicate(format: "value == %@", "SureForge Capture does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")).firstMatch
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
@@ -154,7 +154,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         XCTAssertTrue(button(matchingAnyOf: ["Save & Validate Key", "Validate Key"], in: app).waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["No key saved"].waitForExistence(timeout: 5))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value == %@", "BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")).firstMatch
+            app.staticTexts.matching(NSPredicate(format: "value == %@", "SureForge Capture stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")).firstMatch
                 .waitForExistence(timeout: 5)
         )
     }
@@ -222,7 +222,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSettingsApp(scope: "settings-dialog-full-coverage", seedCredentials: true, aiProvider: "openAI")
         defer { app.terminate() }
 
-        let settingsWindow = app.windows["BugNarrator Settings"]
+        let settingsWindow = app.windows["SureForge Capture Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
@@ -265,7 +265,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         selectSettingsTab("General", in: app)
         for checkboxLabel in [
             "Auto-copy transcript to clipboard",
-            "Open BugNarrator at startup",
+            "Open SureForge Capture at startup",
             "Debug mode enables verbose local diagnostics"
         ] {
             let checkbox = settingsWindow.checkBoxes[checkboxLabel]
@@ -337,7 +337,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchSessionLibraryApp(scope: "session-library-export-coverage")
         defer { app.terminate() }
 
-        let sessionsWindow = app.windows["BugNarrator Sessions"]
+        let sessionsWindow = app.windows["SureForge Capture Sessions"]
         XCTAssertTrue(sessionsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
         let scrollableContainerCount = sessionsWindow.scrollViews.count + sessionsWindow.tables.count + sessionsWindow.outlines.count
@@ -417,7 +417,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         let app = launchRecordingControlsApp(scope: "recording-controls-coverage")
         defer { app.terminate() }
 
-        let controlsWindow = app.windows["BugNarrator Controls"]
+        let controlsWindow = app.windows["SureForge Capture Controls"]
         XCTAssertTrue(controlsWindow.waitForExistence(timeout: 5))
         waitForSettingsLayout()
 
@@ -713,7 +713,7 @@ final class BugNarratorSettingsUITests: XCTestCase {
         // window's controls report disabled/non-hittable, which makes the
         // segment (and the fields it reveals) flaky to interact with.
         app.activate()
-        let window = app.windows["BugNarrator Settings"]
+        let window = app.windows["SureForge Capture Settings"]
         let tab = window.radioButtons[section]
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "Settings section tab '\(section)' not found")
 

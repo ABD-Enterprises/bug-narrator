@@ -19,7 +19,7 @@ extension MenuBarView {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("BugNarrator")
+                    Text("SureForge Capture")
                         .font(.headline)
 
                     Text("Session status")

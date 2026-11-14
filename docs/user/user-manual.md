@@ -1,14 +1,14 @@
 # User Manual
 
-This is the canonical structured user manual for BugNarrator.
+This is the canonical structured user manual for SureForge Capture.
 
 Detailed companion guide:
 
 - [docs/UserGuide.md](../UserGuide.md)
 
-## What BugNarrator Is
+## What SureForge Capture Is
 
-BugNarrator is a macOS menu bar app for narrated software testing sessions. It helps you:
+SureForge Capture (formerly BugNarrator) is a macOS menu bar app for narrated software testing sessions. It helps you:
 
 - record a spoken review session
 - capture screenshots as evidence during the session
@@ -25,6 +25,8 @@ You need:
 - microphone permission for recording
 - Screen Recording permission if you want screenshots
 
+System Settings lists the app as BugNarrator (in Privacy & Security and Login Items), so turn on BugNarrator there.
+
 ## Install
 
 1. Download the latest DMG from GitHub Releases.
@@ -40,7 +42,7 @@ You need:
 4. Enter the required API key or base URL, or leave the key blank for `Local (Parakeet)`.
 5. Optionally validate the key or connection.
 
-BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs BugNarrator needs. `Local (Parakeet)` transcribes on this Mac through `http://127.0.0.1:8422`, does not use an API key, and does not upload audio. BugNarrator and that local server share a private access token, so no process that cannot read the user's own token file can drive the model or receive the recording. When an older managed local server needs the authenticated protocol, BugNarrator updates it before launch, preserving downloaded models and the shared token. Settings also offers Update local server. A compatible download and verification must succeed before replacement; only verified, same-user managed helper processes are stopped. If the previous helper does not stop, the update leaves the installed server unchanged. Open Activity Monitor, find `bugnarrator-transcription`, stop it (Force Quit if needed), then retry **Update local server** in Settings. If another program occupies the server port, stop that program yourself. If you run this repository's `server.py` by hand, update the source and restart it.
+SureForge Capture does not ship with built-in AI access or credits. `OpenAI` remains the hosted default provider and requires your own API key. `OpenAI-Compatible` and `Local-Compatible` endpoints can also be configured when they expose the APIs SureForge Capture needs. `Local (Parakeet)` transcribes on this Mac through `http://127.0.0.1:8422`, does not use an API key, and does not upload audio. SureForge Capture and that local server share a private access token, so no process that cannot read the user's own token file can drive the model or receive the recording. When an older managed local server needs the authenticated protocol, SureForge Capture updates it before launch, preserving downloaded models and the shared token. Settings also offers Update local server. A compatible download and verification must succeed before replacement; only verified, same-user managed helper processes are stopped. If the previous helper does not stop, the update leaves the installed server unchanged. Open Activity Monitor, find `bugnarrator-transcription`, stop it (Force Quit if needed), then retry **Update local server** in Settings. If another program occupies the server port, stop that program yourself. If you run this repository's `server.py` by hand, update the source and restart it.
 
 `Local (Parakeet)` is transcription-only. Review summary and issue extraction still require an OpenAI-compatible chat provider.
 
@@ -54,13 +56,13 @@ BugNarrator does not ship with built-in AI access or credits. `OpenAI` remains t
 
 The recording controls window stays open until you close it.
 
-If the AI provider configuration is missing, invalid, or revoked when the recording finishes, BugNarrator preserves the finished session in the library so you can restore the configuration and retry transcription later.
+If the AI provider configuration is missing, invalid, or revoked when the recording finishes, SureForge Capture preserves the finished session in the library so you can restore the configuration and retry transcription later.
 
 Finished sessions waiting for transcription retry are surfaced in the menu bar window and at the top of the session-library list after relaunch.
 
 ## Review Workflow
 
-After transcription finishes, BugNarrator opens the session library so you can review:
+After transcription finishes, SureForge Capture opens the session library so you can review:
 
 - Transcript
 - Screenshots
@@ -79,7 +81,7 @@ Current export options:
 
 ## Accessibility
 
-BugNarrator supports keyboard-first use across the menu bar window, recording controls, session library, and settings.
+SureForge Capture supports keyboard-first use across the menu bar window, recording controls, session library, and settings.
 
 - the recording controls window exposes a default action for the main enabled recording button and uses `Esc` to close
 - custom session-library filters, tabs, and export controls announce labels and selected state for VoiceOver

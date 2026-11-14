@@ -103,7 +103,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
                 metadata: ["error": String(describing: type(of: error))]
             )
             throw AppError.exportFailure(
-                "BugNarrator could not read its export history, so exports are paused to avoid creating duplicate issues. Try again, or clear local data in Settings if this persists."
+                "SureForge Capture could not read its export history, so exports are paused to avoid creating duplicate issues. Try again, or clear local data in Settings if this persists."
             )
         }
 
@@ -119,7 +119,7 @@ actor ExportReceiptStore: ExportReceiptStoring {
                 metadata: ["error": String(describing: type(of: error))]
             )
             throw AppError.exportFailure(
-                "BugNarrator's export history file is corrupt, so exports are paused to avoid creating duplicate issues. Clear local data in Settings to reset it."
+                "SureForge Capture's export history file is corrupt, so exports are paused to avoid creating duplicate issues. Clear local data in Settings to reset it."
             )
         }
     }

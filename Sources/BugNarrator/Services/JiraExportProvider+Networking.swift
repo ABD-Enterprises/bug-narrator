@@ -306,10 +306,10 @@ extension JiraExportProvider {
             reason = "The redirect pointed at a plaintext remote host, so the account email, the API "
                 + "token and the issue content would have gone in the clear."
         case nil:
-            reason = "The redirect pointed somewhere BugNarrator does not send the account email, "
+            reason = "The redirect pointed somewhere SureForge Capture does not send the account email, "
                 + "the API token and the issue content."
         }
-        return "Jira answered with a redirect (HTTP \(statusCode)) that BugNarrator did not follow. "
+        return "Jira answered with a redirect (HTTP \(statusCode)) that SureForge Capture did not follow. "
             + reason
             + " Use the final https:// URL of your Jira site."
     }

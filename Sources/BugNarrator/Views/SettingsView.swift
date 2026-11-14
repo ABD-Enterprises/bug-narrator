@@ -57,7 +57,7 @@ struct SettingsView: View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("BugNarrator Settings")
+                    Text("SureForge Capture Settings")
                         .font(.title2.weight(.semibold))
                         .accessibilityIdentifier("settings.heading")
 
@@ -112,7 +112,7 @@ struct SettingsView: View {
                 hasProviderCompatibilityIssue: settingsStore.aiProviderCompatibilityIssue != nil
             )
         }
-        .alert("Delete all local BugNarrator data?", isPresented: $showDeleteAllLocalDataConfirmation) {
+        .alert("Delete all local SureForge Capture data?", isPresented: $showDeleteAllLocalDataConfirmation) {
             Button("Delete All Data", role: .destructive) {
                 Task {
                     await appState.deleteAllLocalData()
@@ -146,7 +146,7 @@ struct SettingsView: View {
                         Text("Local transcription is selected.")
                             .font(.headline)
 
-                        Text("BugNarrator will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Install and start the local server below before recording.")
+                        Text("SureForge Capture will transcribe recordings on this Mac using Parakeet. No API key, no cloud upload, no cost. Install and start the local server below before recording.")
                             .foregroundStyle(.secondary)
 
                         Text("Use the download controls below to install, start, or remove the local server.")
@@ -154,10 +154,10 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     } else {
-                        Text("BugNarrator requires your own AI provider configuration.")
+                        Text("SureForge Capture requires your own AI provider configuration.")
                             .font(.headline)
 
-                        Text("BugNarrator does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")
+                        Text("SureForge Capture does not ship with bundled AI access or credits. Configure your provider below before you transcribe a session or run issue extraction.")
                             .foregroundStyle(.secondary)
 
                         Text("Transcription and issue extraction use the selected provider and may incur charges on that provider account.")

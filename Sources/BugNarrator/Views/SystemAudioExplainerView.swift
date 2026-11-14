@@ -13,11 +13,11 @@ struct SystemAudioExplainerView: View {
 
             explainerRow(
                 title: "What this does",
-                detail: "BugNarrator briefly creates a private virtual audio device to capture what's playing through your speakers. It's removed automatically when the recording ends."
+                detail: "SureForge Capture briefly creates a private virtual audio device to capture what's playing through your speakers. It's removed automatically when the recording ends."
             )
             explainerRow(
                 title: "What you'll see in Audio MIDI Setup",
-                detail: "While recording, a temporary \"BugNarrator\" aggregate device may appear in Audio MIDI Setup. That's expected — it disappears after the session."
+                detail: "While recording, a temporary \"SureForge Capture\" aggregate device may appear in Audio MIDI Setup. That's expected — it disappears after the session."
             )
             explainerRow(
                 title: "How to disable it",

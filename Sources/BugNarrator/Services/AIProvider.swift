@@ -54,9 +54,9 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
         case .openAICompatible:
             return "Enter the enterprise or hosted OpenAI-compatible base URL."
         case .localCompatible:
-            return "Enter the local-compatible base URL. BugNarrator will not assume api.openai.com for this provider."
+            return "Enter the local-compatible base URL. SureForge Capture will not assume api.openai.com for this provider."
         case .parakeetLocal:
-            return "BugNarrator connects to the local Parakeet transcription server on this port."
+            return "SureForge Capture connects to the local Parakeet transcription server on this port."
         }
     }
 

@@ -24,7 +24,7 @@ enum FirstRunFunnel {
     /// What the user is promised when they start without a provider, so the
     /// button is honest rather than silently deferring work.
     static func startWithoutProviderNotice(providerName: String) -> String {
-        "No \(providerName) setup yet — BugNarrator will record and save the session, and keep it ready to transcribe once you add a provider."
+        "No \(providerName) setup yet — SureForge Capture will record and save the session, and keep it ready to transcribe once you add a provider."
     }
 
     /// Whether the menu bar should offer the bundled sample session.

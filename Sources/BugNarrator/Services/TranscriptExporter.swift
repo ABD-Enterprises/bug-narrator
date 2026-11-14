@@ -96,7 +96,7 @@ struct TranscriptExporter {
         openPanel.canCreateDirectories = true
         openPanel.allowsMultipleSelection = false
         openPanel.prompt = "Export Bundle"
-        openPanel.message = "Choose a folder for the exported BugNarrator session bundle."
+        openPanel.message = "Choose a folder for the exported SureForge Capture session bundle."
 
         guard openPanel.runModal() == .OK, let destinationRoot = openPanel.url else {
             return nil
@@ -204,7 +204,7 @@ struct TranscriptExporter {
     }
 
     private static func manifestNotes(missingScreenshotCount: Int) -> [String] {
-        var notes = ["This bundle contains the transcript, review output, and captured screenshots for one BugNarrator session."]
+        var notes = ["This bundle contains the transcript, review output, and captured screenshots for one SureForge Capture session."]
 
         if missingScreenshotCount > 0 {
             notes.append(

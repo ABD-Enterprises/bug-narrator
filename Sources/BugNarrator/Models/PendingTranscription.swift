@@ -72,7 +72,7 @@ enum PendingTranscriptionFailureReason: String, Codable, Equatable {
             if provider == .parakeetLocal {
                 return "Recording saved locally. The local transcription server is not running. Start it, then retry transcription from this session."
             }
-            return "Recording saved locally. BugNarrator could not reach \(provider.displayName), so retry transcription from this session when the connection is available."
+            return "Recording saved locally. SureForge Capture could not reach \(provider.displayName), so retry transcription from this session when the connection is available."
         case .rateLimited:
             return "Recording saved locally. \(provider.displayName) rate limited the request, so wait a moment and retry transcription from this session."
         case .providerQuotaExhausted:

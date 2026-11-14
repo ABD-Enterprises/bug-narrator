@@ -44,7 +44,7 @@ extension JiraExportProvider {
         if !unsupportedRequiredFields.isEmpty {
             let fieldList = unsupportedRequiredFields.map(\.displayName).joined(separator: ", ")
             throw AppError.exportFailure(
-                "Jira requires additional fields before BugNarrator can create issues in \(configuration.projectKey): \(fieldList)."
+                "Jira requires additional fields before SureForge Capture can create issues in \(configuration.projectKey): \(fieldList)."
             )
         }
     }

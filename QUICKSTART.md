@@ -1,13 +1,13 @@
-# BugNarrator Quickstart
+# SureForge Capture Quickstart
 
 ## Install From The DMG
 
 1. Download the latest macOS DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the DMG.
 3. Drag `BugNarrator.app` into `Applications`.
-4. Launch BugNarrator from `Applications`.
+4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
 5. Verify the download against the published `.sha256` checksum on the release page.
-6. If you launch BugNarrator again while it is already open, the existing menu bar instance should be reactivated instead of creating a second copy.
+6. If you launch SureForge Capture again while it is already open, the existing menu bar instance should be reactivated instead of creating a second copy.
 
 ## First Run
 
@@ -24,16 +24,16 @@
 ## Important Notes
 
 - Releases are Developer ID signed, notarized, and stapled, so macOS does not show an "unidentified developer" warning. If you ever see one, **do not bypass it** — the download is not the release. Verify the checksum and report it.
-- BugNarrator does not include a built-in OpenAI API key.
+- SureForge Capture does not include a built-in OpenAI API key.
 - Global hotkeys start disabled until you assign them yourself.
 - OpenAI transcription and issue extraction use your own OpenAI account and may cost money.
-- The app runs a microphone preflight before recording starts. If access is denied, restricted, or audio capture cannot actually be prepared, BugNarrator blocks recording early and explains what to fix.
-- If you deny microphone access, BugNarrator gives you an `Open Microphone Settings` recovery button.
+- The app runs a microphone preflight before recording starts. If access is denied, restricted, or audio capture cannot actually be prepared, SureForge Capture blocks recording early and explains what to fix.
+- If you deny microphone access, SureForge Capture gives you an `Open Microphone Settings` recovery button. System Settings lists the app as BugNarrator (in Privacy & Security and Login Items).
 - If you are testing unsigned local builds from Xcode, keep launching the same app copy when possible. macOS can treat different build paths as different apps for microphone approval.
 - Screenshot capture may ask for Screen Recording permission on first use. If you deny it, recording can still continue without screenshots.
-- If OpenAI rejects your key, BugNarrator sends you back to `Settings` so you can replace it.
+- If OpenAI rejects your key, SureForge Capture sends you back to `Settings` so you can replace it.
 - If support asks for diagnostics, hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
-- For manual testing sessions, use the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide) so BugNarrator captures better repro steps and summaries.
+- For manual testing sessions, use the [Tester Narration Guide](docs/UserGuide.md#tester-narration-guide) so SureForge Capture captures better repro steps and summaries.
 - GitHub and Jira issue export are available, but both integrations are currently experimental.
-- BugNarrator intentionally runs as a single-instance app to prevent duplicate menu bar items and competing session state.
+- SureForge Capture intentionally runs as a single-instance app to prevent duplicate menu bar items and competing session state.
 - To build or package the app from source, see [docs/Distribution.md](docs/Distribution.md).

@@ -8,7 +8,7 @@ import XCTest
 /// foreign one, so the literals are frozen.
 final class SystemAudioAggregateDeviceTests: XCTestCase {
     func testIdentityConstantsAreExactLiterals() {
-        XCTAssertEqual(SystemAudioAggregateDeviceIdentity.name, "BugNarrator System Audio")
+        XCTAssertEqual(SystemAudioAggregateDeviceIdentity.name, "SureForge Capture System Audio")
         XCTAssertEqual(SystemAudioAggregateDeviceIdentity.uidPrefix, "BugNarrator.SystemAudio.")
     }
 

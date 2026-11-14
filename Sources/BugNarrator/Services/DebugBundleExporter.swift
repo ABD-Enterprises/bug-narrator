@@ -31,7 +31,7 @@ struct DebugBundleExporter {
         openPanel.canCreateDirectories = true
         openPanel.allowsMultipleSelection = false
         openPanel.prompt = "Export Debug Bundle"
-        openPanel.message = "Choose a folder for the BugNarrator debug bundle."
+        openPanel.message = "Choose a folder for the SureForge Capture debug bundle."
 
         guard openPanel.runModal() == .OK, let destinationRoot = openPanel.url else {
             return nil

@@ -1492,7 +1492,7 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(
             store.localProviderUnreachableMessage,
-            "BugNarrator cannot use the local transcription server's token file. The access token file could not be secured, so BugNarrator did not send it. The server may already be running; fix the token file, or choose another provider."
+            "SureForge Capture cannot use the local transcription server's token file. The access token file could not be secured, so SureForge Capture did not send it. The server may already be running; fix the token file, or choose another provider."
         )
     }
 
@@ -1630,7 +1630,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.aiProviderConfigurationIsReady)
         XCTAssertEqual(
             store.aiProviderCompatibilityIssue,
-            "BugNarrator could not verify the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
+            "SureForge Capture could not verify the local transcription server at http://127.0.0.1:8422. Install and start the local server in AI Engines settings, or choose another provider."
         )
     }
 
@@ -1812,7 +1812,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(secondStore.maskedSelectedAIProviderCredential, "No key saved")
         XCTAssertEqual(
             secondStore.selectedAIProviderCredentialStorageDescription,
-            "BugNarrator never ships with an API key. Paste your own OpenAI-Compatible credential to enable transcription."
+            "SureForge Capture never ships with an API key. Paste your own OpenAI-Compatible credential to enable transcription."
         )
     }
 
@@ -2252,7 +2252,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.maskedAPIKey, "Saved key locked")
         XCTAssertEqual(
             store.apiKeyStorageDescription,
-            "Stored in your macOS Keychain. BugNarrator will only prompt to unlock it when you validate the key or run an action that needs it."
+            "Stored in your macOS Keychain. SureForge Capture will only prompt to unlock it when you validate the key or run an action that needs it."
         )
         XCTAssertTrue(
             keychain.readRequests.contains {
@@ -2420,7 +2420,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items."
+            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items, where it is listed as BugNarrator."
         )
     }
 
@@ -2443,7 +2443,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator as a Login Item."
+            "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator (SureForge Capture) as a Login Item."
         )
     }
 
@@ -2466,7 +2466,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "Open at Startup is unavailable for this app copy. Install BugNarrator in Applications and use a signed build if you want BugNarrator to launch automatically."
+            "Open at Startup is unavailable for this app copy. Install BugNarrator.app (SureForge Capture) in Applications and use a signed build if you want SureForge Capture to launch automatically."
         )
     }
 
@@ -2494,7 +2494,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .error)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "BugNarrator couldn't update the Open at Startup setting. The login item could not be registered."
+            "SureForge Capture couldn't update the Open at Startup setting. The login item could not be registered."
         )
     }
 
@@ -2522,7 +2522,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .error)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
+            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items, where it is listed as BugNarrator. Details: The login item could not be updated."
         )
     }
 

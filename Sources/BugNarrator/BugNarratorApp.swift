@@ -187,7 +187,7 @@ struct BugNarratorApp: App {
             ]
             DiagnosticsLogger(category: .settings).warning(
                 "unclean_exit_detected",
-                "BugNarrator detected that the previous launch did not terminate cleanly.",
+                "SureForge Capture detected that the previous launch did not terminate cleanly.",
                 metadata: metadata
             )
             telemetryRecorder.record("unclean_exit_detected", metadata: metadata)
@@ -249,7 +249,7 @@ struct BugNarratorApp: App {
                 Button("Show Welcome Tour") {
                     windowCoordinator.showWelcomeWindow()
                 }
-                Button("BugNarrator User Guide") {
+                Button("SureForge Capture User Guide") {
                     NSWorkspace.shared.open(BugNarratorLinks.documentation)
                 }
                 Button("Report a Bug") {
@@ -261,7 +261,7 @@ struct BugNarratorApp: App {
             }
         }
 
-        Window("BugNarrator Sessions", id: WindowCoordinator.SceneID.transcript) {
+        Window("SureForge Capture Sessions", id: WindowCoordinator.SceneID.transcript) {
             TranscriptView(
                 appState: appState,
                 recordingTimer: appState.recordingTimer,
@@ -270,12 +270,12 @@ struct BugNarratorApp: App {
         }
         .defaultSize(width: 1120, height: 720)
 
-        Window("BugNarrator Settings", id: WindowCoordinator.SceneID.settings) {
+        Window("SureForge Capture Settings", id: WindowCoordinator.SceneID.settings) {
             SettingsView(appState: appState, settingsStore: settingsStore)
         }
         .defaultSize(width: 760, height: 900)
 
-        Window("About BugNarrator", id: WindowCoordinator.SceneID.about) {
+        Window("About SureForge Capture", id: WindowCoordinator.SceneID.about) {
             AboutBugNarratorView(appState: appState)
         }
         .defaultSize(width: 620, height: 720)
@@ -285,12 +285,12 @@ struct BugNarratorApp: App {
         }
         .defaultSize(width: 760, height: 760)
 
-        Window("Welcome to BugNarrator", id: WindowCoordinator.SceneID.welcome) {
+        Window("Welcome to SureForge Capture", id: WindowCoordinator.SceneID.welcome) {
             WelcomeView(appState: appState, settingsStore: settingsStore)
         }
         .defaultSize(width: 560, height: 520)
 
-        Window("Support BugNarrator", id: WindowCoordinator.SceneID.support) {
+        Window("Support SureForge Capture", id: WindowCoordinator.SceneID.support) {
             SupportView(appState: appState)
         }
         .defaultSize(width: 520, height: 460)

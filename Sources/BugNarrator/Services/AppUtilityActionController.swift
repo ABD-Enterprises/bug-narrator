@@ -179,7 +179,7 @@ final class AppUtilityActionController {
 
     private func openExternalURL(_ url: URL, label: String) -> AppUtilityActionResult {
         guard urlHandler.open(url) else {
-            return .failed(message: "BugNarrator could not open the \(label).")
+            return .failed(message: "SureForge Capture could not open the \(label).")
         }
 
         settingsLogger.info(
