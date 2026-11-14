@@ -299,7 +299,7 @@ extension JiraExportProvider {
             content.append(.bulletList(items: screenshotLines))
         }
 
-        content.append(.paragraph(text: "Exported from BugNarrator. Review against the raw transcript before triage."))
+        content.append(.paragraph(text: "Exported from SureForge Capture. Review against the raw transcript before triage."))
         let footer = exportFingerprint.map { JiraBlock.paragraph(text: TrackerExportFingerprint.marker(for: $0)) }
 
         var limitedContent = hardLimit(

@@ -16,10 +16,10 @@ enum RecordingSetupCopy {
     /// Menu bar setup banner body.
     static func menuBannerDescription(for provider: AIProvider) -> String {
         if provider.requiresAPIKey {
-            return "BugNarrator sends transcription requests to \(provider.displayName). Add your own API key in Settings before recording — transcription and issue extraction cannot run without it. Provider usage may incur charges on your account."
+            return "SureForge Capture sends transcription requests to \(provider.displayName). Add your own API key in Settings before recording — transcription and issue extraction cannot run without it. Provider usage may incur charges on your account."
         }
 
-        return "BugNarrator is configured to use \(provider.displayName) for transcription. Finish setup before recording — the local server and base URL must be reachable from this Mac."
+        return "SureForge Capture is configured to use \(provider.displayName) for transcription. Finish setup before recording — the local server and base URL must be reachable from this Mac."
     }
 
     /// Empty session library setup body.

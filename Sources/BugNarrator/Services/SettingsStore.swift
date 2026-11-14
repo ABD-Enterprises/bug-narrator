@@ -350,7 +350,7 @@ final class SettingsStore: ObservableObject {
                 "debug_mode_changed",
                 debugMode
                     ? "Debug mode was enabled. Verbose diagnostics are now recorded locally."
-                    : "Debug mode was disabled. BugNarrator will keep logging info, warnings, and errors.",
+                    : "Debug mode was disabled. SureForge Capture will keep logging info, warnings, and errors.",
                 metadata: ["debug_mode": debugMode ? "enabled" : "disabled"]
             )
         }
@@ -1069,7 +1069,7 @@ final class SettingsStore: ObservableObject {
 
     var localProviderUnreachableMessage: String {
         if let tokenProblem = localProviderTokenProblem {
-            return "BugNarrator cannot use the local transcription server's token file. \(tokenProblem.explanation) The server may already be running; fix the token file, or choose another provider."
+            return "SureForge Capture cannot use the local transcription server's token file. \(tokenProblem.explanation) The server may already be running; fix the token file, or choose another provider."
         }
         let reported: String
         if let modelError = localProviderModelError, !modelError.isEmpty {
@@ -1077,7 +1077,7 @@ final class SettingsStore: ObservableObject {
         } else {
             reported = ""
         }
-        return "BugNarrator could not verify the local transcription server at \(openAIBaseURLValue.absoluteString).\(reported) \(localProviderSetupDetail)"
+        return "SureForge Capture could not verify the local transcription server at \(openAIBaseURLValue.absoluteString).\(reported) \(localProviderSetupDetail)"
     }
 
 
@@ -1681,8 +1681,8 @@ final class SettingsStore: ObservableObject {
             logger.info(
                 "launch_at_login_updated",
                 enabled
-                    ? "BugNarrator will open automatically at login."
-                    : "BugNarrator will no longer open automatically at login.",
+                    ? "SureForge Capture will open automatically at login."
+                    : "SureForge Capture will no longer open automatically at login.",
                 metadata: ["status": status.logValue]
             )
         } catch {
@@ -1705,14 +1705,14 @@ final class SettingsStore: ObservableObject {
         let errorDetails = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !errorDetails.isEmpty else {
-            return status.message ?? "BugNarrator couldn't update the Open at Startup setting."
+            return status.message ?? "SureForge Capture couldn't update the Open at Startup setting."
         }
 
         if let statusMessage = status.message {
             return "\(statusMessage) Details: \(errorDetails)"
         }
 
-        return "BugNarrator couldn't update the Open at Startup setting. \(errorDetails)"
+        return "SureForge Capture couldn't update the Open at Startup setting. \(errorDetails)"
     }
 
     private func syncLaunchAtLoginState(_ status: LaunchAtLoginStatus) {

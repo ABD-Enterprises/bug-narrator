@@ -12,7 +12,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
         let description = harness.settingsStore.apiKeyStorageDescription
 
         XCTAssertTrue(
-            description.contains("BugNarrator never ships with an API key."),
+            description.contains("SureForge Capture never ships with an API key."),
             "Expected empty-state prompt, got: \(description)"
         )
     }
@@ -25,7 +25,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
 
         XCTAssertEqual(
             description,
-            "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
+            "Not saved yet. SureForge Capture will only prompt to use Keychain when you validate the key or run an action that needs it."
         )
     }
 
@@ -38,7 +38,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
         let description = harness.settingsStore.selectedAIProviderCredentialStorageDescription
 
         XCTAssertTrue(
-            description.contains("BugNarrator never ships with an API key."),
+            description.contains("SureForge Capture never ships with an API key."),
             "Expected empty-state prompt, got: \(description)"
         )
     }
@@ -51,7 +51,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
 
         XCTAssertEqual(
             description,
-            "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
+            "Not saved yet. SureForge Capture will only prompt to use Keychain when you validate the key or run an action that needs it."
         )
     }
 
@@ -77,7 +77,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
 
         XCTAssertEqual(
             description,
-            "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
+            "Not saved yet. SureForge Capture will only prompt to use Keychain when you validate the key or run an action that needs it."
         )
     }
 
@@ -103,7 +103,7 @@ final class SettingsStoreDisplayTests: XCTestCase {
 
         XCTAssertEqual(
             description,
-            "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
+            "Not saved yet. SureForge Capture will only prompt to use Keychain when you validate the key or run an action that needs it."
         )
     }
 }

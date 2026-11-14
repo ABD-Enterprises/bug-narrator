@@ -6,7 +6,7 @@ extension SettingsStore {
         if aiProvider.requiresAPIKey {
             return storageDescription(
                 for: apiKeyPersistenceState,
-                empty: "BugNarrator never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
+                empty: "SureForge Capture never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
             )
         }
 
@@ -31,7 +31,7 @@ extension SettingsStore {
         if aiProvider.requiresAPIKey {
             return storageDescription(
                 for: persistenceState,
-                empty: "BugNarrator never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
+                empty: "SureForge Capture never ships with an API key. Paste your own \(aiProvider.displayName) credential to enable transcription."
             )
         }
 
@@ -67,11 +67,11 @@ extension SettingsStore {
         case .keychain:
             return "Stored securely in your macOS Keychain."
         case .keychainLocked:
-            return "Stored in your macOS Keychain. BugNarrator will only prompt to unlock it when you validate the key or run an action that needs it."
+            return "Stored in your macOS Keychain. SureForge Capture will only prompt to unlock it when you validate the key or run an action that needs it."
         case .sessionOnly:
-            return "Keychain storage was unavailable, so this value is only kept in memory until you quit BugNarrator."
+            return "Keychain storage was unavailable, so this value is only kept in memory until you quit SureForge Capture."
         case .pendingSave:
-            return "Not saved yet. BugNarrator will only prompt to use Keychain when you validate the key or run an action that needs it."
+            return "Not saved yet. SureForge Capture will only prompt to use Keychain when you validate the key or run an action that needs it."
         }
     }
 

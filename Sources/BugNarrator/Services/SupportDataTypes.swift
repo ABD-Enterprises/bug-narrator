@@ -34,9 +34,9 @@ enum SupportDataActionFailure {
     var fallback: (String) -> AppError {
         switch self {
         case .debugBundleExport:
-            return { _ in .diagnosticsFailure("BugNarrator could not create the debug bundle.") }
+            return { _ in .diagnosticsFailure("SureForge Capture could not create the debug bundle.") }
         case .privacyDataExport:
-            return { _ in .exportFailure("BugNarrator could not create the data export.") }
+            return { _ in .exportFailure("SureForge Capture could not create the data export.") }
         case .localDataDeletion:
             return { .storageFailure($0) }
         }

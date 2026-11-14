@@ -25,7 +25,7 @@ final class ApplicationTerminationControllerTests: XCTestCase {
         XCTAssertEqual(reply, .terminateCancel)
         XCTAssertEqual(harness.cancelReasons, ["Quit was requested while recording, so pending screenshot selection was cancelled."])
         XCTAssertEqual(harness.recordingControlsShownCount, 1)
-        XCTAssertEqual(harness.toasts.map(\.message), ["Stop recording before quitting BugNarrator."])
+        XCTAssertEqual(harness.toasts.map(\.message), ["Stop recording before quitting SureForge Capture."])
         XCTAssertEqual(harness.toasts.map(\.style), [.informational])
     }
 
@@ -39,7 +39,7 @@ final class ApplicationTerminationControllerTests: XCTestCase {
         XCTAssertEqual(reply, .terminateCancel)
         XCTAssertEqual(harness.cancelReasons, ["Quit was requested while transcription was finishing, so pending screenshot selection was cancelled."])
         XCTAssertEqual(harness.recordingControlsShownCount, 1)
-        XCTAssertEqual(harness.toasts.map(\.message), ["Wait for transcription to finish saving before quitting BugNarrator."])
+        XCTAssertEqual(harness.toasts.map(\.message), ["Wait for transcription to finish saving before quitting SureForge Capture."])
         XCTAssertEqual(harness.toasts.map(\.style), [.informational])
     }
 

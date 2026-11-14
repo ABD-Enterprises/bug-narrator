@@ -31,11 +31,11 @@ enum LaunchAtLoginStatus: Equatable {
         case .disabled, .enabled:
             return nil
         case .requiresApproval:
-            return "BugNarrator is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items."
+            return "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items."
         case .notFound:
-            return "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator as a Login Item."
+            return "Open at Startup is not registered with macOS yet. Turn it on to register SureForge Capture as a Login Item."
         case .unavailable:
-            return "Open at Startup is unavailable for this app copy. Install BugNarrator in Applications and use a signed build if you want BugNarrator to launch automatically."
+            return "Open at Startup is unavailable for this app copy. Install SureForge Capture in Applications and use a signed build if you want SureForge Capture to launch automatically."
         }
     }
 

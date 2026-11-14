@@ -67,7 +67,7 @@ final class PostTranscriptionPipelineController {
 
         transcriptionLogger.info(
             .transcriptionCompleted,
-            "BugNarrator finished transcription and created a transcript session.",
+            "SureForge Capture finished transcription and created a transcript session.",
             metadata: [
                 "session_id": session.id.uuidString,
                 "marker_count": "\(session.markerCount)",

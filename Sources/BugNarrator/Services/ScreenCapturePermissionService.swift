@@ -30,7 +30,7 @@ struct SystemScreenCapturePermissionAccess: ScreenCapturePermissionAccessing {
             try? await Task.sleep(nanoseconds: 150_000_000)
             permissionsLogger.info(
                 "screen_recording_permission_requested",
-                "Requesting Screen Recording access from macOS after activating BugNarrator."
+                "Requesting Screen Recording access from macOS after activating SureForge Capture."
             )
             let granted = CGRequestScreenCaptureAccess()
             let finalState: ScreenCapturePermissionState = granted ? .granted : currentPermissionState()
@@ -80,31 +80,31 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
         case .notDetermined:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screen Recording access will be requested when you capture a screenshot.",
-                message: "BugNarrator only needs Screen Recording access for screenshots. Recording can continue without screenshots."
+                message: "SureForge Capture only needs Screen Recording access for screenshots. Recording can continue without screenshots."
             )
         case .granted:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screen Recording access is available.",
-                message: "BugNarrator can capture screenshots in this app copy."
+                message: "SureForge Capture can capture screenshots in this app copy."
             )
         case .denied:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screen Recording access is blocked.",
-                message: "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable BugNarrator, then try the screenshot again."
+                message: "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try the screenshot again."
             )
         case .unavailable:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screen capture is unavailable.",
-                message: "BugNarrator could not prepare screen capture on this Mac. Recording can continue without screenshots."
+                message: "SureForge Capture could not prepare screen capture on this Mac. Recording can continue without screenshots."
             )
         case .captureSetupFailed:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screenshot capture could not start.",
-                message: "BugNarrator has Screen Recording access, but macOS still could not prepare a screenshot. Recording can continue without screenshots."
+                message: "SureForge Capture has Screen Recording access, but macOS still could not prepare a screenshot. Recording can continue without screenshots."
             )
         case .unknownError:
             return ScreenCaptureRecoveryGuidance(
-                headline: "BugNarrator could not confirm screenshot access.",
+                headline: "SureForge Capture could not confirm screenshot access.",
                 message: "Try the screenshot again. If the problem continues, relaunch the app and include a debug bundle with your bug report."
             )
         }
@@ -149,7 +149,7 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
         case .notDetermined:
             permissionsLogger.warning(
                 "screen_recording_permission_not_determined_after_request",
-                "Screen Recording access remained undecided after BugNarrator requested it."
+                "Screen Recording access remained undecided after SureForge Capture requested it."
             )
             return .needsUserAction(.screenRecordingPermissionDenied)
         case .denied:
@@ -167,15 +167,15 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
         case .captureSetupFailed:
             permissionsLogger.error(
                 "screen_capture_setup_failed",
-                "BugNarrator could not prepare screenshot capture even though permission appears granted."
+                "SureForge Capture could not prepare screenshot capture even though permission appears granted."
             )
-            return .failure(.screenshotCaptureFailure("BugNarrator could not prepare screenshot capture. Recording can continue without screenshots."))
+            return .failure(.screenshotCaptureFailure("SureForge Capture could not prepare screenshot capture. Recording can continue without screenshots."))
         case .unknownError:
             permissionsLogger.error(
                 "screen_capture_permission_unknown_error",
-                "BugNarrator could not confirm Screen Recording availability."
+                "SureForge Capture could not confirm Screen Recording availability."
             )
-            return .failure(.screenshotCaptureFailure("BugNarrator could not confirm Screen Recording availability. Recording can continue without screenshots."))
+            return .failure(.screenshotCaptureFailure("SureForge Capture could not confirm Screen Recording availability. Recording can continue without screenshots."))
         }
     }
 

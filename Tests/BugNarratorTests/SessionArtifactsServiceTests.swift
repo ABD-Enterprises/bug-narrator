@@ -141,7 +141,7 @@ final class SessionArtifactsServiceTests: XCTestCase {
     // MARK: - Honest deletion reporting (#960)
 
     /// The service used to swallow the error with `try?` and log
-    /// "Removed a BugNarrator-managed artifacts directory" regardless, so a
+    /// "Removed an app-managed artifacts directory" regardless, so a
     /// failed deletion produced a success log while the spec promises deletion
     /// removes managed screenshots.
     func testFailedRemovalIsReportedRatherThanLoggedAsSuccess() throws {

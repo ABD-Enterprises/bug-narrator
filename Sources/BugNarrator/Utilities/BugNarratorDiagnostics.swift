@@ -83,7 +83,7 @@ actor DiagnosticsLogStore {
     func recentLogText(limit: Int = 200) -> String {
         let lines = recentEntries(limit: limit).map { $0.formattedLine() }
         if lines.isEmpty {
-            return "No recent BugNarrator diagnostics logs were captured."
+            return "No recent SureForge Capture diagnostics logs were captured."
         }
 
         return lines.joined(separator: "\n") + "\n"
@@ -151,7 +151,7 @@ actor DiagnosticsLogStore {
         )
         let lines = Array(entries.suffix(limit)).map { $0.formattedLine() }
         if lines.isEmpty {
-            return "No recent BugNarrator diagnostics logs were captured."
+            return "No recent SureForge Capture diagnostics logs were captured."
         }
 
         return lines.joined(separator: "\n") + "\n"

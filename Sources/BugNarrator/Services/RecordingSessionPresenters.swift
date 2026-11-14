@@ -38,7 +38,7 @@ final class RecordingSessionStartStatusPresenter {
             recordingLogger.debug(.sessionStartIgnored, "The start request was ignored because another recording transition is already in progress.")
 
         case .busy:
-            recordingLogger.warning(.sessionStartRejected, "The start request was rejected because BugNarrator is already busy.")
+            recordingLogger.warning(.sessionStartRejected, "The start request was rejected because SureForge Capture is already busy.")
 
         case .restored(let recordingSession):
             recordingLogger.warning(

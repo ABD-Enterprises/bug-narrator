@@ -8,7 +8,7 @@ enum BoundedHTTPResponseReader {
 
     struct ReplyTooLarge: LocalizedError {
         var errorDescription: String? {
-            "The server reply exceeded BugNarrator’s size limit. The request was stopped to protect memory."
+            "The server reply exceeded SureForge Capture’s size limit. The request was stopped to protect memory."
         }
     }
 

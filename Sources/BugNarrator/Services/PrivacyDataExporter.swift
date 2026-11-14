@@ -22,7 +22,7 @@ struct PrivacyDataExporter {
         openPanel.canCreateDirectories = true
         openPanel.allowsMultipleSelection = false
         openPanel.prompt = "Export Data"
-        openPanel.message = "Choose a folder for your BugNarrator data export."
+        openPanel.message = "Choose a folder for your SureForge Capture data export."
 
         guard openPanel.runModal() == .OK, let destinationRoot = openPanel.url else {
             return nil
@@ -86,7 +86,7 @@ struct PrivacyDataExporter {
                     "diagnostics.json"
                 ],
                 notes: [
-                    "This export includes local BugNarrator session data.",
+                    "This export includes local SureForge Capture session data.",
                     "OpenAI API keys, GitHub tokens, Jira credentials, and Keychain-only secrets are not included.",
                     "Settings metadata and local diagnostics context are included in sanitized form.",
                     "Screenshot files remain referenced by their existing session metadata; files outside this export are not copied."

@@ -34,7 +34,7 @@ final class AppUtilityActionControllerTests: XCTestCase {
 
         let result = harness.controller.openIssueReporter()
 
-        XCTAssertEqual(result, .failed(message: "BugNarrator could not open the issue tracker."))
+        XCTAssertEqual(result, .failed(message: "SureForge Capture could not open the issue tracker."))
         XCTAssertEqual(harness.urlHandler.openedURLs, [BugNarratorLinks.issues])
     }
 
@@ -48,15 +48,15 @@ final class AppUtilityActionControllerTests: XCTestCase {
     }
 
     func testFailureStatusPreservesActiveWorkPhases() {
-        let message = "BugNarrator could not open the documentation."
+        let message = "SureForge Capture could not open the documentation."
 
         XCTAssertEqual(
             AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .recording),
-            .recording("BugNarrator could not open the documentation. Recording is still active.")
+            .recording("SureForge Capture could not open the documentation. Recording is still active.")
         )
         XCTAssertEqual(
             AppUtilityActionResultPresenter.failureStatus(message: message, statusPhase: .transcribing),
-            .transcribing("BugNarrator could not open the documentation. Background work is still in progress.")
+            .transcribing("SureForge Capture could not open the documentation. Background work is still in progress.")
         )
     }
 
@@ -89,15 +89,15 @@ final class AppUtilityActionControllerTests: XCTestCase {
         presenter.present(PermissionSettingsOpenResult.opened(BugNarratorLinks.microphonePrivacySettings))
         XCTAssertTrue(statuses.isEmpty)
 
-        presenter.present(AppUtilityActionResult.failed(message: "BugNarrator could not open the issue tracker."))
+        presenter.present(AppUtilityActionResult.failed(message: "SureForge Capture could not open the issue tracker."))
         phase = .recording
-        presenter.present(PermissionSettingsOpenResult.failed("BugNarrator could not open System Settings."))
+        presenter.present(PermissionSettingsOpenResult.failed("SureForge Capture could not open System Settings."))
 
         XCTAssertEqual(
             statuses,
             [
-                .error("BugNarrator could not open the issue tracker."),
-                .recording("BugNarrator could not open System Settings. Recording is still active.")
+                .error("SureForge Capture could not open the issue tracker."),
+                .recording("SureForge Capture could not open System Settings. Recording is still active.")
             ]
         )
     }

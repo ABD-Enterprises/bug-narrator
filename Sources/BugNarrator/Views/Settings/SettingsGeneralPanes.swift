@@ -9,10 +9,10 @@ struct SettingsWorkflowDefaultsPane: View {
     var body: some View {
         GroupBox("Workflow Defaults") {
             VStack(alignment: .leading, spacing: 10) {
-                settingsSectionIntro("Control what BugNarrator does automatically after recording, transcription, and support workflows.")
+                settingsSectionIntro("Control what SureForge Capture does automatically after recording, transcription, and support workflows.")
 
                 Toggle("Auto-copy transcript to clipboard", isOn: $settingsStore.autoCopyTranscript)
-                Toggle("Open BugNarrator at startup", isOn: $settingsStore.openAtStartup)
+                Toggle("Open SureForge Capture at startup", isOn: $settingsStore.openAtStartup)
                     .disabled(!settingsStore.openAtStartupControlIsEnabled)
                 Toggle("Debug mode enables verbose local diagnostics", isOn: $settingsStore.debugMode)
 
@@ -26,11 +26,11 @@ struct SettingsWorkflowDefaultsPane: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Text("When transcription cannot finish after a recording stops, BugNarrator saves the recording locally as a pending session so you can retry transcription.")
+                Text("When transcription cannot finish after a recording stops, SureForge Capture saves the recording locally as a pending session so you can retry transcription.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Text("When debug mode is on, BugNarrator records extra local diagnostics, keeps successful temp audio files, and adds more validation notes to exported debug bundles.")
+                Text("When debug mode is on, SureForge Capture records extra local diagnostics, keeps successful temp audio files, and adds more validation notes to exported debug bundles.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -58,7 +58,7 @@ struct SettingsGlobalHotkeysPane: View {
     var body: some View {
         GroupBox("Global Hotkeys") {
             VStack(alignment: .leading, spacing: 12) {
-                settingsSectionIntro("Hotkeys are optional. BugNarrator starts with every shortcut unassigned, so choose only the ones you want to use.")
+                settingsSectionIntro("Hotkeys are optional. SureForge Capture starts with every shortcut unassigned, so choose only the ones you want to use.")
 
                 hotkeyRow(action: .startRecording, shortcut: $settingsStore.startRecordingHotkeyShortcut)
                 hotkeyRow(action: .stopRecording, shortcut: $settingsStore.stopRecordingHotkeyShortcut)
@@ -78,7 +78,7 @@ struct SettingsGlobalHotkeysPane: View {
                     }
                 }
 
-                Text("Hotkeys use Carbon and do not require Accessibility access. Screenshot hotkeys only work while a session is recording. If you choose a shortcut that is already assigned to another BugNarrator action, the new assignment is rejected until you clear or change the conflicting shortcut.")
+                Text("Hotkeys use Carbon and do not require Accessibility access. Screenshot hotkeys only work while a session is recording. If you choose a shortcut that is already assigned to another SureForge Capture action, the new assignment is rejected until you clear or change the conflicting shortcut.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

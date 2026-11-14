@@ -18,10 +18,10 @@ struct SupportView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Support BugNarrator Development")
+            Text("Support SureForge Capture Development")
                 .font(.largeTitle.weight(.bold))
 
-            Text("BugNarrator is free to use. If it helps your development workflow, you can optionally support continued development through PayPal.")
+            Text("SureForge Capture is free to use. If it helps your development workflow, you can optionally support continued development through PayPal.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -66,7 +66,7 @@ struct SupportView: View {
             Text("Help & Resources")
                 .font(.headline)
 
-            Link("BugNarrator User Guide", destination: BugNarratorLinks.documentation)
+            Link("SureForge Capture User Guide", destination: BugNarratorLinks.documentation)
             Link("Report a Bug", destination: BugNarratorLinks.issues)
             Link("Visit Repository", destination: BugNarratorLinks.repository)
         }
@@ -80,7 +80,7 @@ struct SupportView: View {
             Text("Thanks for supporting open-source developer tools.")
                 .font(.headline)
 
-            Text("BugNarrator never processes payments inside the app and does not store any financial data. The button above opens the PayPal donation page in your default browser.")
+            Text("SureForge Capture never processes payments inside the app and does not store any financial data. The button above opens the PayPal donation page in your default browser.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

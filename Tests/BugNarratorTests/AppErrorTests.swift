@@ -45,7 +45,7 @@ final class AppErrorTests: XCTestCase {
         )
         XCTAssertEqual(
             error.recoveryHeadline,
-            "BugNarrator could not save the session. Copy your transcript before retrying."
+            "SureForge Capture could not save the session. Copy your transcript before retrying."
         )
     }
 

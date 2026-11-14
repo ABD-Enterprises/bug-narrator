@@ -25,7 +25,7 @@ enum SessionLibraryEmptyState: Equatable {
     var description: String {
         switch self {
         case .noSessionsYet:
-            return "Start and stop a feedback session to begin building your BugNarrator session library."
+            return "Start and stop a feedback session to begin building your SureForge Capture session library."
         case .noSessionsInFilter(let filter):
             if filter == .retryNeeded {
                 return "No saved sessions are currently waiting for transcription retry."

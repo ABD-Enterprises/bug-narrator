@@ -17,7 +17,7 @@ struct AudioUploadPolicy {
             let size = ByteCountFormatter.string(fromByteCount: inspection.fileSizeBytes, countStyle: .file)
             let limit = ByteCountFormatter.string(fromByteCount: Int64(Self.maximumSingleUploadBytes), countStyle: .file)
             throw AppError.transcriptionFailure(
-                "The recorded audio chunk is \(size), which is larger than BugNarrator's \(limit) safe upload limit. Shorten the recording or use a lower-bitrate source."
+                "The recorded audio chunk is \(size), which is larger than SureForge Capture's \(limit) safe upload limit. Shorten the recording or use a lower-bitrate source."
             )
         }
 

@@ -74,7 +74,7 @@ struct AISetupSectionsView: View {
                             .textFieldStyle(.roundedBorder)
                             .disabled(secureControlsDisabled)
                             .accessibilityLabel("AI provider base URL")
-                            .help("The endpoint BugNarrator sends transcription requests to. Leave blank for the default.")
+                            .help("The endpoint SureForge Capture sends transcription requests to. Leave blank for the default.")
                     }
                 }
 
@@ -166,7 +166,7 @@ struct AISetupSectionsView: View {
                                 : .secondary
                         )
 
-                    Text("BugNarrator stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")
+                    Text("SureForge Capture stores the provider credential in your macOS Keychain when available and never bundles it with the app or source code.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -177,7 +177,7 @@ struct AISetupSectionsView: View {
 
         GroupBox("Transcription Defaults") {
             VStack(alignment: .leading, spacing: 12) {
-                sectionIntro("Choose the default transcription model and language hints BugNarrator sends to the selected provider.")
+                sectionIntro("Choose the default transcription model and language hints SureForge Capture sends to the selected provider.")
 
                 labeledField(title: "Model") {
                     modelSelection(
@@ -226,7 +226,7 @@ struct AISetupSectionsView: View {
 
         GroupBox("Issue Extraction") {
             VStack(alignment: .leading, spacing: 12) {
-                sectionIntro("Configure how BugNarrator turns finished transcripts into reviewable draft issues.")
+                sectionIntro("Configure how SureForge Capture turns finished transcripts into reviewable draft issues.")
 
                 labeledField(title: "Extraction Model") {
                     if settingsStore.supportsIssueExtraction {

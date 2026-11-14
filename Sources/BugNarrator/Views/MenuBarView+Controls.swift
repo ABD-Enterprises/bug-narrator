@@ -48,7 +48,7 @@ extension MenuBarView {
                         .foregroundStyle(.secondary)
                 }
             case .transcribing:
-                Text("The control window can stay open while BugNarrator uploads audio and prepares the transcript.")
+                Text("The control window can stay open while SureForge Capture uploads audio and prepares the transcript.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             case .success:
@@ -117,7 +117,7 @@ extension MenuBarView {
                 Label("Screenshot access is not enabled", systemImage: "camera.viewfinder")
                     .font(.footnote.weight(.semibold))
 
-                Text("Recording can continue without screenshots. Enable Screen Recording if you want BugNarrator to capture screenshots during a session.")
+                Text("Recording can continue without screenshots. Enable Screen Recording if you want SureForge Capture to capture screenshots during a session.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

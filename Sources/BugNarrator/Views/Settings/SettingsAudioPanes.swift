@@ -18,7 +18,7 @@ struct SettingsRecordingAudioPane: View {
     var body: some View {
         GroupBox("Recording Audio") {
             VStack(alignment: .leading, spacing: 12) {
-                settingsSectionIntro("Choose what audio BugNarrator records when a session starts.")
+                settingsSectionIntro("Choose what audio SureForge Capture records when a session starts.")
 
                 Toggle("System audio capture modes (experimental)", isOn: $settingsStore.systemAudioCaptureEnabled)
                     .disabled(secureControlsDisabled)
@@ -43,7 +43,7 @@ struct SettingsRecordingAudioPane: View {
                     )
                     .disabled(secureControlsDisabled)
 
-                    Text("System audio captures whatever your Mac is playing — including other people on a call. Many places require every participant's consent to record, so getting it is your responsibility, not BugNarrator's. Finished sessions are stored locally, and \(settingsStore.aiProvider == .parakeetLocal ? "audio is processed on this Mac" : "recorded audio is sent to \(settingsStore.aiProvider.displayName)") only when transcription runs.")
+                    Text("System audio captures whatever your Mac is playing — including other people on a call. Many places require every participant's consent to record, so getting it is your responsibility, not SureForge Capture's. Finished sessions are stored locally, and \(settingsStore.aiProvider == .parakeetLocal ? "audio is processed on this Mac" : "recorded audio is sent to \(settingsStore.aiProvider.displayName)") only when transcription runs.")
                         .font(.footnote)
                         .foregroundStyle(
                             settingsStore.hasAcceptedSystemAudioRecordingConsent
@@ -51,7 +51,7 @@ struct SettingsRecordingAudioPane: View {
                                 : Color.orange
                         )
                 } else if settingsStore.systemAudioCaptureEnabled {
-                    Text("System audio modes need two things before you can record: tick the consent notice that appears once you pick a system-audio source, and grant BugNarrator access under System Settings > Privacy & Security > Screen & System Audio Recording (macOS prompts once, the first time capture starts).")
+                    Text("System audio modes need two things before you can record: tick the consent notice that appears once you pick a system-audio source, and grant SureForge Capture access under System Settings > Privacy & Security > Screen & System Audio Recording (macOS prompts once, the first time capture starts).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -89,25 +89,25 @@ struct SettingsPermissionsPane: View {
     var body: some View {
         GroupBox("Permissions") {
             VStack(alignment: .leading, spacing: 10) {
-                settingsSectionIntro("BugNarrator only asks for the permissions it needs for recording and screenshots.")
+                settingsSectionIntro("SureForge Capture only asks for the permissions it needs for recording and screenshots.")
 
-                Text("BugNarrator asks for microphone access only when you start recording.")
+                Text("SureForge Capture asks for microphone access only when you start recording.")
                     .foregroundStyle(.secondary)
 
-                Text("BugNarrator asks for Screen & System Audio Recording access only when a system audio mode starts.")
+                Text("SureForge Capture asks for Screen & System Audio Recording access only when a system audio mode starts.")
                     .foregroundStyle(.secondary)
 
-                Text("BugNarrator asks for Screen Recording access only when you capture a screenshot. Recording can continue without screenshots if you skip this permission.")
+                Text("SureForge Capture asks for Screen Recording access only when you capture a screenshot. Recording can continue without screenshots if you skip this permission.")
                     .foregroundStyle(.secondary)
 
-                Text("If you deny a permission, BugNarrator shows recovery buttons in the menu bar window so you can reopen the right System Settings pane.")
+                Text("If you deny a permission, SureForge Capture shows recovery buttons in the menu bar window so you can reopen the right System Settings pane.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
                 if microphonePermissionBlocked {
                     permissionRecoveryRow(
                         title: "Microphone access is blocked.",
-                        message: "Open System Settings, enable BugNarrator for Microphone access, then start recording again.",
+                        message: "Open System Settings, enable SureForge Capture for Microphone access, then start recording again.",
                         buttonTitle: "Open Microphone Settings",
                         action: appState.openMicrophonePrivacySettings
                     )

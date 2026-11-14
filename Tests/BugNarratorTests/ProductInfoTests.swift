@@ -40,7 +40,7 @@ final class ProductInfoTests: XCTestCase {
     func testMetadataFallsBackToDefaultsWhenBundleValuesAreMissing() {
         let metadata = BugNarratorMetadata(infoDictionary: [:])
 
-        XCTAssertEqual(metadata.appName, "BugNarrator")
+        XCTAssertEqual(metadata.appName, "SureForge Capture")
         XCTAssertEqual(metadata.version, "1.0")
         XCTAssertEqual(metadata.build, "1")
         XCTAssertEqual(metadata.versionDescription, "Version 1.0 (1)")

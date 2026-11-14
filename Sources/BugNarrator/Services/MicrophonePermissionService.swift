@@ -28,7 +28,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
         case .denied, .restricted:
             permissionsLogger.warning(
                 "microphone_permission_refreshing_blocked_state",
-                "Microphone access looked blocked, so BugNarrator will reactivate and refresh the app-level permission state before finalizing the result.",
+                "Microphone access looked blocked, so SureForge Capture will reactivate and refresh the app-level permission state before finalizing the result.",
                 metadata: ["state": initialState.diagnosticsValue]
             )
 
@@ -38,7 +38,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
             let refreshedState = currentPermissionState()
             permissionsLogger.debug(
                 "microphone_permission_state_refreshed",
-                "Re-read the app-level microphone permission state after activating BugNarrator.",
+                "Re-read the app-level microphone permission state after activating SureForge Capture.",
                 metadata: ["state": refreshedState.diagnosticsValue]
             )
 
@@ -55,7 +55,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
 
                 permissionsLogger.warning(
                     "microphone_permission_blocked",
-                    "Microphone access is still blocked after BugNarrator refreshed and retried the app-level permission request.",
+                    "Microphone access is still blocked after SureForge Capture refreshed and retried the app-level permission request.",
                     metadata: ["state": postRequestState.diagnosticsValue]
                 )
                 return postRequestState
@@ -103,7 +103,7 @@ final class SystemMicrophonePermissionAccess: MicrophonePermissionAccessing {
         if logMismatch, audioPermission != capturePermission {
             permissionsLogger.warning(
                 "microphone_permission_mismatch",
-                "Microphone permission sources disagreed. BugNarrator will use the combined state that still allows a system prompt when one source remains undecided.",
+                "Microphone permission sources disagreed. SureForge Capture will use the combined state that still allows a system prompt when one source remains undecided.",
                 metadata: [
                     "audio_permission": audioPermission.diagnosticsValue,
                     "capture_permission": capturePermission.diagnosticsValue,
@@ -166,26 +166,26 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         runtimeEnvironment: AppRuntimeEnvironment
     ) -> MicrophoneRecoveryGuidance {
         let localTestingNote = runtimeEnvironment.isLocalTestingBuild
-            ? "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
+            ? "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows SureForge Capture enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
             : nil
 
         switch status {
         case .notDetermined:
             return MicrophoneRecoveryGuidance(
                 headline: "Microphone access will be requested when you start recording.",
-                message: "BugNarrator needs microphone access to record a feedback session. Start recording to trigger the macOS permission prompt.",
+                message: "SureForge Capture needs microphone access to record a feedback session. Start recording to trigger the macOS permission prompt.",
                 localTestingNote: localTestingNote
             )
         case .granted:
             return MicrophoneRecoveryGuidance(
                 headline: "Microphone access is available.",
-                message: "BugNarrator can use the microphone on this app copy.",
+                message: "SureForge Capture can use the microphone on this app copy.",
                 localTestingNote: runtimeEnvironment.isLocalTestingBuild ? localTestingNote : nil
             )
         case .denied:
             return MicrophoneRecoveryGuidance(
                 headline: "Microphone access is blocked.",
-                message: "Open System Settings > Privacy & Security > Microphone, enable BugNarrator, then try again.",
+                message: "Open System Settings > Privacy & Security > Microphone, enable SureForge Capture, then try again.",
                 localTestingNote: localTestingNote
             )
         case .restricted:
@@ -197,18 +197,18 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         case .unavailable:
             return MicrophoneRecoveryGuidance(
                 headline: "Audio capture is unavailable.",
-                message: "BugNarrator could not prepare audio capture. Check that an input device is connected and available, then try again.",
+                message: "SureForge Capture could not prepare audio capture. Check that an input device is connected and available, then try again.",
                 localTestingNote: localTestingNote
             )
         case .captureSetupFailed:
             return MicrophoneRecoveryGuidance(
                 headline: "Microphone capture could not start.",
-                message: "BugNarrator can see microphone permission, but macOS still refused recorder setup. Quit the app, reconnect your input device if needed, and try again.",
+                message: "SureForge Capture can see microphone permission, but macOS still refused recorder setup. Quit the app, reconnect your input device if needed, and try again.",
                 localTestingNote: localTestingNote
             )
         case .unknownError:
             return MicrophoneRecoveryGuidance(
-                headline: "BugNarrator could not confirm microphone access.",
+                headline: "SureForge Capture could not confirm microphone access.",
                 message: "Relaunch the app and try again. If the problem continues, export a debug bundle and include it with your bug report.",
                 localTestingNote: localTestingNote
             )
@@ -237,7 +237,7 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         case .notDetermined:
             permissionsLogger.warning(
                 "microphone_permission_not_determined_after_request",
-                "Microphone access remained undecided after BugNarrator requested it."
+                "Microphone access remained undecided after SureForge Capture requested it."
             )
             return .needsUserAction(.microphonePermissionDenied)
         case .denied:
@@ -252,12 +252,12 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         case .captureSetupFailed:
             permissionsLogger.error(
                 "microphone_capture_setup_failed",
-                "BugNarrator could not prepare the recorder even though microphone permission appears granted."
+                "SureForge Capture could not prepare the recorder even though microphone permission appears granted."
             )
             return .failure(.microphoneUnavailable("Check that an input device is connected and available, then try again."))
         case .unknownError:
-            permissionsLogger.error("microphone_permission_unknown_error", "BugNarrator could not confirm microphone availability.")
-            return .failure(.microphoneUnavailable("BugNarrator could not confirm microphone availability. Relaunch the app and try again."))
+            permissionsLogger.error("microphone_permission_unknown_error", "SureForge Capture could not confirm microphone availability.")
+            return .failure(.microphoneUnavailable("SureForge Capture could not confirm microphone availability. Relaunch the app and try again."))
         }
     }
 

@@ -17,7 +17,7 @@ struct SystemAudioAggregateDeviceCleanupSummary: Equatable {
 /// is how BugNarrator recognizes aggregate devices it owns during cleanup, so it
 /// is the ownership contract and is frozen by tests.
 enum SystemAudioAggregateDeviceIdentity {
-    static let name = "BugNarrator System Audio"
+    static let name = "SureForge Capture System Audio"
     static let uidPrefix = "BugNarrator.SystemAudio."
 
     static func makeUID() -> String {

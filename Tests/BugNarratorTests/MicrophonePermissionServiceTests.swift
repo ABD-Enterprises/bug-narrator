@@ -122,7 +122,7 @@ final class MicrophonePermissionServiceTests: XCTestCase {
         XCTAssertTrue(guidance.message.contains("System Settings > Privacy & Security > Microphone"))
         XCTAssertEqual(
             guidance.localTestingNote,
-            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other BugNarrator copies and retest the same app bundle path or the signed DMG build."
+            "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows SureForge Capture enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
         )
     }
 }
