@@ -47,8 +47,8 @@ final class SettingsStore: ObservableObject {
     /// stays up when it cannot load its model, so "unreachable" would be a lie.
     @Published private(set) var localProviderModelError: String?
     /// Why the app cannot present the local server its access token, when it
-    /// cannot. The server then refuses every request, so without this the
-    /// user is told the server could not be reached.
+    /// cannot. The app then cannot authenticate to the server, so without
+    /// this the user is told the server could not be reached.
     @Published private(set) var localProviderTokenProblem: LocalServerTokenStore.TokenUnavailable?
 
     @Published var openAIBaseURL: String = "" {

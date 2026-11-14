@@ -28,11 +28,12 @@ public static class LocalServerPaths
 /// <remarks>
 /// The server is an HTTP endpoint on loopback that any process on the machine
 /// can reach, so it refuses every request that does not carry the token. The
-/// app and the server have to agree on one token, and the token file next to
-/// the managed install is where they agree: the app creates the token before
-/// it starts the server and hands the same value over through the environment,
-/// and a server that was started on its own writes the same file so the app
-/// can find it.
+/// one exception is the health check's proof challenge, which carries a nonce
+/// instead of the token. The app and the server have to agree on one token,
+/// and the token file next to the managed install is where they agree: the
+/// app creates the token before it starts the server and hands the same value
+/// over through the environment, and a server that was started on its own
+/// writes the same file so the app can find it.
 ///
 /// The path, the file name and the environment variable are pinned by
 /// <c>contract-fixtures/local-server-token.json</c>, which the macOS port and
@@ -84,7 +85,7 @@ public static class LocalServerTokenStore
     /// <summary>
     /// The token to present to the server, creating and storing one when there
     /// is none yet. Returns null when the token cannot be stored, in which case
-    /// the server refuses every request and the app must not talk to it.
+    /// the app cannot authenticate to the server and must not talk to it.
     /// </summary>
     public static string? Token(string installDirectory)
     {

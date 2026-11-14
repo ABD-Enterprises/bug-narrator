@@ -720,8 +720,9 @@ final class AppStateTests: XCTestCase {
         let requestedAPIKeys = await harness.transcriptionClient.requestedAPIKeys
         let requestedModels = await harness.transcriptionClient.requestedModels
         let requestedBaseURLs = await harness.transcriptionClient.requestedBaseURLs
-        // The local server checks a bearer token, so the credential the app
-        // presents is that token rather than an empty string (#1270).
+        // The local server checks a bearer token on every route except the
+        // health check's proof challenge, so the credential the app presents
+        // is that token rather than an empty string (#1270).
         XCTAssertEqual(
             requestedAPIKeys,
             [LocalServerTokenStore.storedToken(installDirectory: harness.localServerInstallDirectory) ?? ""]

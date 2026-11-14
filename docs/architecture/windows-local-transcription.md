@@ -18,16 +18,16 @@ lines), `SettingsStore.swift` (reachability probe, lines ~760–815),
 
 | Concern | macOS behaviour |
 | --- | --- |
-| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok","model_loaded":…}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). **Every route requires `Authorization: Bearer <token>`** — the token is created when there is none and kept in a per-user file next to the managed install, so nothing else on the machine can drive the model or receive the recording (#1270). The check runs in front of the router, so a request that is refused is refused from its headers alone and its body is never written to disk. The upload is streamed to disk under a hard size limit and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
+| Server | `local-transcription/server.py`: FastAPI + uvicorn, `GET /health` → `{"status":"ok","model_loaded":…}`, `GET /v1/models`, `POST /v1/audio/transcriptions` (OpenAI-compatible multipart). **Every route requires `Authorization: Bearer <token>`**, except the health check's challenge, which carries a nonce instead of the token and is answered with a proof only a peer that knows the token can produce — the token is created when there is none and kept in a per-user file next to the managed install, so nothing else on the machine can drive the model or receive the recording (#1270). The check runs in front of the router, so a request that is refused is refused from its headers alone and its body is never written to disk. The upload is streamed to disk under a hard size limit and audio is decoded and transcribed one 120 s window at a time, releasing the MLX cache after each window (bounded memory on long recordings, #1229). Default port 8422. |
 | Inference | `parakeet-mlx` (Apple MLX). **Apple Silicon only** — `build_standalone.sh` refuses non-arm64. |
 | Packaging | PyInstaller-style standalone binary `bugnarrator-transcription`, shipped as a signed + notarized DMG release asset (`bugnarrator-transcription-macos-arm64.dmg`, ~136 MB) plus a `.sha256` manifest, on its own release cadence. |
 | Discovery of a package | `discover()` pages the GitHub Releases API (≤20 pages × 30) for the first non-draft, non-prerelease release carrying both assets, size-bounded, and only from `https://github.com/ABD-Enterprises/bug-narrator/releases/download/`. |
 | Install | Download manifest + image, SHA-256 + size check, `codesign --verify --strict -R <publisher requirement>` on the image and on the binary, `hdiutil attach` read-only, copy to `~/Library/Application Support/BugNarrator/LocalTranscription/`, verify again, atomic move. Install dir must not be a symlink. |
 | Launch | Verify the binary's signature again, then run it through `/bin/sh` job control in its own process group (so TERM/KILL reaches uvicorn's children), stdout discarded, stderr captured for the exit message, `Models/` under the install dir as the weights cache. The bearer token is handed over in the environment (`BUGNARRATOR_TRANSCRIPTION_TOKEN`), never on the command line. |
-| Health / readiness | `SettingsStore` polls `GET {baseURL}/health` every 2 s with a 2 s timeout while the provider is Parakeet, presenting the server's bearer token; the answer must be 200 with `status == "ok"` **and** `model_loaded == true`, so a stub that answers `{"status":"ok"}` is not mistaken for a Parakeet server (#1270). `aiProviderConfigurationIsReady` requires `reachable`. The "Check Server" button uses the same probe. The typed base URL is ignored for Parakeet. |
+| Health / readiness | `SettingsStore` polls `GET {baseURL}/health` every 2 s with a 2 s timeout while the provider is Parakeet, answering the server's proof challenge with a nonce — never the bearer token — and accepting the answer only when the server returns the proof that only a holder of the token can produce; the answer must be 200 with `status == "ok"` **and** `model_loaded == true`, so a stub that answers `{"status":"ok"}` is not mistaken for a Parakeet server (#1270). `aiProviderConfigurationIsReady` requires `reachable`. The "Check Server" button uses the same probe. The typed base URL is ignored for Parakeet. |
 | Stop / shutdown | `stop()` on `NSApplication.willTerminate`; `shutdown()` awaits in-flight install/start and then the process exit. TERM, 2 s grace for uvicorn to drain an in-flight request, then KILL (#1128). |
 | Remove | Deletes the install dir including the model cache. |
-| Already-running server | Not launched by BugNarrator: nothing special — the app never starts a second copy because `start()` requires `installed && server == nil`, and it does **not** adopt or stop a foreign server. A foreign process on the port cannot answer the health probe, because it does not hold the bearer token, so it is never treated as the server (#1270). |
+| Already-running server | Not launched by BugNarrator: nothing special — the app never starts a second copy because `start()` requires `installed && server == nil`, and it does **not** adopt or stop a foreign server. A foreign process on the port cannot answer the health probe, because it cannot produce the proof, so it is never treated as the server (#1270). |
 | Failure surface | `message` string in Settings (download failed, checksum failed, verification failed, exited with status N + stderr tail). |
 
 ## 2. Constraints that differ on Windows
@@ -135,9 +135,11 @@ pins the path, the file name and the variable name).
 ### 3.4 Health check
 
 Identical to macOS: `GET /health` must return HTTP 200 with JSON
-`status == "ok"` **and** `model_loaded == true`, and the request must carry
-`Authorization: Bearer <token>` — a listener that cannot present the token is
-not the server and must never be treated as one. 2 s timeout, no caching, 2 s
+`status == "ok"` **and** `model_loaded == true`, and the request must answer
+the server's proof challenge — the app sends a nonce, never the token, and
+accepts the answer only when the server returns the proof that only a holder
+of the token can produce. A listener that cannot answer the challenge is not
+the server and must never be treated as one. 2 s timeout, no caching, 2 s
 cadence, only while the provider is Parakeet. `aiProviderConfigurationIsReady` for Parakeet =
 no compatibility issue **and** reachable. Recording start (the
 `RecordingLifecycleService` preflight) refuses with the existing
@@ -185,7 +187,7 @@ and not running.
 | Behaviour | Decision | Reason |
 | --- | --- | --- |
 | Server HTTP protocol (`/health`, `/v1/models`, `/v1/audio/transcriptions`), port 8422, model aliases, chunking, failure message | Identical | Client code and contract fixtures are shared; WIN-034 already pins the URL and model. |
-| Bearer token on every route, including the health check, and the per-user token file that carries it | Identical | `contract-fixtures/local-server-token.json` pins the path, file name and environment variable for both ports and the Python server, so the three cannot drift apart silently. |
+| Bearer token on every route — with the health check's proof challenge as the one exception — and the per-user token file that carries it | Identical | `contract-fixtures/local-server-token.json` pins the path, file name and environment variable for both ports and the Python server, so the three cannot drift apart silently. |
 | Health probe semantics (2 s timeout, 2 s cadence, `status == "ok"`), readiness = reachable | Identical | Same "fail before transcription" guarantee. |
 | No adoption of a foreign server; never start a second copy when 8422 answers | Identical (made explicit in UI) | Same safety posture; explicit message avoids a silent no-op. |
 | Signed-asset discovery bounded to the project's GitHub Releases download path, size caps, checksum manifest | Identical | Supply-chain posture must not be weaker on Windows. |
