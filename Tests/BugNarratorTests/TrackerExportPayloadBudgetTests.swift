@@ -116,8 +116,8 @@ final class TrackerExportPayloadBudgetTests: XCTestCase {
 
     func testAMentionIsNeutralizedEvenWhenTheNextCharacterExtendsTheCluster() {
         // A literal search matches whole grapheme clusters, so an "@" that is
-        // part of a larger cluster - a combining mark, a zero-width joiner, a
-        // variation selector - used to survive untouched.
+        // part of a larger cluster - a combining mark or a variation selector
+        // - used to survive untouched.
         let result = TrackerExportPayloadBudget.trackerTitle("@\u{0301}teamuser", maxCharacters: 255)
 
         XCTAssertTrue(result.contains("@\u{200B}"), "the mention was not neutralized: \(result)")

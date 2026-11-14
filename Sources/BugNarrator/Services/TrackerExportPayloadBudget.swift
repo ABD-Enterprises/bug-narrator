@@ -49,9 +49,9 @@ enum TrackerExportPayloadBudget {
     /// The live mention and cross-reference triggers in untrusted text.
     ///
     /// Every model- or transcript-derived field that reaches a tracker is run
-    /// through this on the way out. GitHub autolinks **and notifies**
-    /// `@mentions` in an issue title and in an issue body, and resolves
-    /// `#123` cross-references there too; a tracker can render the same text
+    /// through this on the way out. GitHub autolinks `@mentions` in an issue
+    /// title and in an issue body, notifies on mentions in the body, and
+    /// resolves `#123` cross-references in the body too; a tracker can render the same text
     /// again in notifications, activity feeds and search results. A third
     /// party who only controls what is on the recorded screen could
     /// otherwise put a name in the transcript and have the user's export ping
@@ -71,8 +71,8 @@ enum TrackerExportPayloadBudget {
             //
             // The regular-expression path, not the literal one: a literal
             // search matches whole grapheme clusters, so an "@" that is part
-            // of a larger cluster - a combining mark, a zero-width joiner, a
-            // variation selector - is never replaced and the mention
+            // of a larger cluster - a combining mark or a variation selector -
+            // is never replaced and the mention
             // survives. The regex path reaches inside the cluster, and the
             // Windows port's code-unit replace does the same.
             .replacingOccurrences(of: "@", with: "@\u{200B}", options: .regularExpression)

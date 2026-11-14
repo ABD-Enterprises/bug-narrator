@@ -989,9 +989,10 @@ final class GitHubExportProviderTests: XCTestCase {
 
     func testIssueTitleNeutralizesMentionsAndCrossReferences() async throws {
         // The title is model- and transcript-derived text like the body, and
-        // GitHub autolinks AND notifies @mentions in an issue title and
-        // resolves #123 cross-references there too. The body was already
-        // neutralized; the title was the one untrusted field that was not.
+        // GitHub autolinks @mentions in an issue title and in an issue body,
+        // notifies on mentions in the body, and resolves #123 cross-references
+        // in the body too. The body was already neutralized; the title was
+        // the one untrusted field that was not.
         let provider = GitHubExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
             title: "@security-team rotate #4821 staging keys",

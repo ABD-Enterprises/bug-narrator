@@ -71,8 +71,8 @@ public static partial class UntrustedMarkdown
     /// </summary>
     /// <remarks>
     /// Every model- and transcript-derived field that reaches a tracker is run through this on the
-    /// way out. GitHub autolinks <b>and notifies</b> <c>@mentions</c> in an issue title and in an
-    /// issue body and resolves <c>#123</c> cross-references there too; a tracker can render the
+    /// way out. GitHub autolinks <c>@mentions</c> in an issue title and in an issue body, notifies
+    /// on mentions in the body, and resolves <c>#123</c> cross-references in the body too; a tracker can render the
     /// same text again in notifications, activity feeds and search results. A third party who
     /// only controls what is on the recorded screen could otherwise put a name in the transcript
     /// and have the user's export ping arbitrary accounts in their repository, or forge a

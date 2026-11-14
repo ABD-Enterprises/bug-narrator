@@ -24,8 +24,8 @@ extension GitHubExportProvider {
                 //
                 // The regular-expression path, not the literal one: a literal
                 // search matches whole grapheme clusters, so an "@" that is
-                // part of a larger cluster - a combining mark, a zero-width
-                // joiner, a variation selector - is never replaced and the
+                // part of a larger cluster - a combining mark or a variation
+                // selector - is never replaced and the
                 // mention survives. The regex path reaches inside the cluster,
                 // and the Windows port's code-unit replace does the same.
                 .replacingOccurrences(of: "@", with: "@\u{200B}", options: .regularExpression)
