@@ -28,7 +28,7 @@
 - Global hotkeys start disabled until you assign them yourself.
 - OpenAI transcription and issue extraction use your own OpenAI account and may cost money.
 - The app runs a microphone preflight before recording starts. If access is denied, restricted, or audio capture cannot actually be prepared, SureForge Capture blocks recording early and explains what to fix.
-- If you deny microphone access, SureForge Capture gives you an `Open Microphone Settings` recovery button.
+- If you deny microphone access, SureForge Capture gives you an `Open Microphone Settings` recovery button. System Settings lists the app as BugNarrator (in Privacy & Security and Login Items).
 - If you are testing unsigned local builds from Xcode, keep launching the same app copy when possible. macOS can treat different build paths as different apps for microphone approval.
 - Screenshot capture may ask for Screen Recording permission on first use. If you deny it, recording can still continue without screenshots.
 - If OpenAI rejects your key, SureForge Capture sends you back to `Settings` so you can replace it.

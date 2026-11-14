@@ -62,7 +62,7 @@ extension MenuBarView {
 
     var screenRecordingRecoverySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recording can continue without screenshots. To capture them again, enable SureForge Capture in Privacy & Security > Screen & System Audio Recording.")
+            Text("Recording can continue without screenshots. To capture them again, turn on BugNarrator (SureForge Capture) in Privacy & Security > Screen & System Audio Recording.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -91,7 +91,7 @@ extension MenuBarView {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             } else {
-                Text("System audio capture uses macOS Screen & System Audio Recording permission. Enable SureForge Capture there, then try again.")
+                Text("System audio capture uses macOS Screen & System Audio Recording permission. Turn on BugNarrator (SureForge Capture) there, then try again.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

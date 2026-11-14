@@ -225,7 +225,7 @@ final class SystemAudioRecorder: AudioRecording {
     }
 
     private nonisolated static func noCapturedSystemAudioMessage() -> String {
-        "System audio capture started but produced no audio frames. If you meant to record your voice, switch Settings > Audio > Audio Source to Mic only. If you meant to record app or meeting audio, confirm the app is playing audio and enable SureForge Capture under System Settings > Privacy & Security > Screen & System Audio Recording."
+        "System audio capture started but produced no audio frames. If you meant to record your voice, switch Settings > Audio > Audio Source to Mic only. If you meant to record app or meeting audio, confirm the app is playing audio and turn on BugNarrator (SureForge Capture) under System Settings > Privacy & Security > Screen & System Audio Recording."
     }
 
     private func makeRecoverableRecordingURL() -> URL {
@@ -243,7 +243,7 @@ final class SystemAudioRecorder: AudioRecording {
     private func systemAudioRecoveryMessage(details: String) -> String {
         let trimmedDetails = details.trimmingCharacters(in: .whitespacesAndNewlines)
         let suffix = trimmedDetails.isEmpty ? "" : " \(trimmedDetails)"
-        return "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try again.\(suffix)"
+        return "Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try again.\(suffix)"
     }
 
     private func logAggregateDeviceCleanupSummary(_ summary: SystemAudioAggregateDeviceCleanupSummary) {

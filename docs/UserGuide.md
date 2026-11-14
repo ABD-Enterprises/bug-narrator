@@ -277,7 +277,7 @@ SureForge Capture keeps diagnostics local until you explicitly export or copy th
 
 - use SureForge Capture's `Open Microphone Settings` button if it appears in the menu bar window
 - or open `System Settings > Privacy & Security > Microphone`
-- verify microphone permission is granted to SureForge Capture
+- verify microphone permission is turned on for BugNarrator (SureForge Capture); System Settings lists the app as BugNarrator
 - if SureForge Capture says microphone access is restricted, also check device-management, parental-control, or workplace policy restrictions
 - if SureForge Capture says audio capture is unavailable even though permission is enabled, check that an input device is connected and not already failing at the macOS level
 - if you are testing from Xcode or `DerivedData`, keep launching the same local app copy or switch to the signed DMG build; macOS may treat different local build paths as different apps for microphone approval
@@ -313,7 +313,7 @@ SureForge Capture keeps diagnostics local until you explicitly export or copy th
 - press `Esc` if you want to cancel the selection without saving anything; SureForge Capture keeps recording and shows a lightweight cancellation message instead of a blocking error
 - use SureForge Capture's `Open Screen Recording Settings` button if it appears in the menu bar window
 - or open `System Settings > Privacy & Security > Screen & System Audio Recording`
-- confirm Screen Recording permission is granted if macOS prompted for it
+- confirm Screen Recording permission is turned on for BugNarrator (SureForge Capture) if macOS prompted for it; System Settings lists the app as BugNarrator
 - remember that this permission is only needed for screenshots; audio recording and transcription can still continue without it
 - remember that audio recording can continue even if screenshots are unavailable
 - try another screenshot to rule out a temporary storage failure

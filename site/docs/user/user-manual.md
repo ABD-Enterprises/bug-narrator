@@ -30,6 +30,8 @@ You need:
 - microphone permission for recording
 - Screen Recording permission if you want screenshots
 
+System Settings lists the app as BugNarrator (in Privacy & Security and Login Items), so turn on BugNarrator there.
+
 ## Install
 
 1. Download the latest DMG from GitHub Releases.

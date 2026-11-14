@@ -176,11 +176,11 @@ final class SystemAudioTapSession {
     }
 
     private static func recoveryMessage(_ details: String) -> String {
-        "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try again. \(details)"
+        "Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try again. \(details)"
     }
 
     private static func tapPermissionRecoveryMessage(status: OSStatus) -> String {
-        "macOS refused to create the system audio tap. This usually means System Audio Recording permission has not been granted to SureForge Capture yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try again. (Core Audio status \(status).)"
+        "macOS refused to create the system audio tap. This usually means System Audio Recording permission has not been granted to BugNarrator (SureForge Capture) yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try again. (Core Audio status \(status).)"
     }
 
     private func installFormatChangeListener(writer: SystemAudioFileWriter) throws {

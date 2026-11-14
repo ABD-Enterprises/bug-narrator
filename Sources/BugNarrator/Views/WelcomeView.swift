@@ -203,7 +203,7 @@ struct WelcomeView: View {
             .help("Asks macOS for microphone access. You can also grant it later, the first time you record.")
         case .denied, .restricted:
             VStack(alignment: .leading, spacing: 8) {
-                Text("macOS is currently blocking microphone access for SureForge Capture. Turn it back on in System Settings, then return here.")
+                Text("macOS is currently blocking microphone access for SureForge Capture. Turn on BugNarrator (SureForge Capture) in System Settings, then return here.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

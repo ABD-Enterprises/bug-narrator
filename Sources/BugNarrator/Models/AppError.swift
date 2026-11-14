@@ -48,7 +48,7 @@ enum AppError: LocalizedError, Equatable {
             }
             return "The saved \(providerName) setup is no longer valid. Open Settings, refresh the connection details, and try again."
         case .microphonePermissionDenied:
-            return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, enable SureForge Capture, then try again."
+            return "Microphone permission was denied. Open System Settings > Privacy & Security > Microphone, turn on BugNarrator (SureForge Capture), then try again."
         case .microphonePermissionRestricted:
             return "Microphone access is restricted on this Mac. Check System Settings > Privacy & Security > Microphone and any device-management or parental-control restrictions, then try again."
         case .microphoneUnavailable(let message):
@@ -60,7 +60,7 @@ enum AppError: LocalizedError, Equatable {
         case .systemAudioUnavailable(let message):
             return "SureForge Capture could not start system audio capture. \(message)"
         case .screenRecordingPermissionDenied:
-            return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try again."
+            return "Screenshot capture requires Screen Recording permission. Recording can continue without screenshots. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try again."
         case .noActiveSession(let message):
             return message
         case .recordingFailure(let message):

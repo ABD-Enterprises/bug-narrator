@@ -166,7 +166,7 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         runtimeEnvironment: AppRuntimeEnvironment
     ) -> MicrophoneRecoveryGuidance {
         let localTestingNote = runtimeEnvironment.isLocalTestingBuild
-            ? "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows SureForge Capture enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
+            ? "Local unsigned builds can need microphone approval again if you switch to a different app copy or rebuild into a new path. If System Settings already shows BugNarrator enabled, quit any other SureForge Capture copies and retest the same app bundle path or the signed DMG build."
             : nil
 
         switch status {
@@ -185,7 +185,7 @@ final class MicrophonePermissionService: MicrophonePermissionServicing {
         case .denied:
             return MicrophoneRecoveryGuidance(
                 headline: "Microphone access is blocked.",
-                message: "Open System Settings > Privacy & Security > Microphone, enable SureForge Capture, then try again.",
+                message: "Open System Settings > Privacy & Security > Microphone, turn on BugNarrator (SureForge Capture), then try again.",
                 localTestingNote: localTestingNote
             )
         case .restricted:

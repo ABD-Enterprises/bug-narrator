@@ -2420,7 +2420,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items."
+            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items, where it is listed as BugNarrator."
         )
     }
 
@@ -2443,7 +2443,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "Open at Startup is not registered with macOS yet. Turn it on to register SureForge Capture as a Login Item."
+            "Open at Startup is not registered with macOS yet. Turn it on to register BugNarrator (SureForge Capture) as a Login Item."
         )
     }
 
@@ -2466,7 +2466,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .warning)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "Open at Startup is unavailable for this app copy. Install SureForge Capture in Applications and use a signed build if you want SureForge Capture to launch automatically."
+            "Open at Startup is unavailable for this app copy. Install BugNarrator.app (SureForge Capture) in Applications and use a signed build if you want SureForge Capture to launch automatically."
         )
     }
 
@@ -2522,7 +2522,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAtStartupStatusTone, .error)
         XCTAssertEqual(
             store.openAtStartupStatusMessage,
-            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items. Details: The login item could not be updated."
+            "SureForge Capture is enabled to open at login, but macOS still requires approval in System Settings > General > Login Items, where it is listed as BugNarrator. Details: The login item could not be updated."
         )
     }
 

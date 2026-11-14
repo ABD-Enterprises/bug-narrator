@@ -51,7 +51,7 @@ struct SettingsRecordingAudioPane: View {
                                 : Color.orange
                         )
                 } else if settingsStore.systemAudioCaptureEnabled {
-                    Text("System audio modes need two things before you can record: tick the consent notice that appears once you pick a system-audio source, and grant SureForge Capture access under System Settings > Privacy & Security > Screen & System Audio Recording (macOS prompts once, the first time capture starts).")
+                    Text("System audio modes need two things before you can record: tick the consent notice that appears once you pick a system-audio source, and turn on BugNarrator (SureForge Capture) under System Settings > Privacy & Security > Screen & System Audio Recording (macOS prompts once, the first time capture starts).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -107,7 +107,7 @@ struct SettingsPermissionsPane: View {
                 if microphonePermissionBlocked {
                     permissionRecoveryRow(
                         title: "Microphone access is blocked.",
-                        message: "Open System Settings, enable SureForge Capture for Microphone access, then start recording again.",
+                        message: "Open System Settings, turn on BugNarrator (SureForge Capture) for Microphone access, then start recording again.",
                         buttonTitle: "Open Microphone Settings",
                         action: appState.openMicrophonePrivacySettings
                     )

@@ -121,7 +121,7 @@ but the idle cost is the same either way.
 4. Launch SureForge Capture from `Applications`.
 5. On first run, expect AI provider setup. Microphone permission is requested the first time you try to start recording.
 6. If you use screenshot capture, expect Screen Recording permission on first use.
-7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
+7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane. System Settings lists the app as BugNarrator (in Privacy & Security and Login Items).
 8. If you try to launch SureForge Capture a second time, macOS should bring the existing SureForge Capture instance forward instead of opening another menu bar copy.
 
 SureForge Capture releases are signed with a `Developer ID Application` certificate, notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
@@ -214,7 +214,7 @@ SureForge Capture now runs a microphone preflight before recording starts. It re
 - access restricted
 - audio capture unavailable even though permission looks enabled
 
-If access is denied, recording is blocked until you re-enable SureForge Capture in `System Settings > Privacy & Security > Microphone`. If access is restricted, the app tells you to check device-management or parental-control restrictions. If permission looks granted but audio capture still cannot be prepared, SureForge Capture reports that as a microphone availability problem instead of a generic recording failure.
+If access is denied, recording is blocked until you turn BugNarrator (SureForge Capture) back on in `System Settings > Privacy & Security > Microphone`. If access is restricted, the app tells you to check device-management or parental-control restrictions. If permission looks granted but audio capture still cannot be prepared, SureForge Capture reports that as a microphone availability problem instead of a generic recording failure.
 
 For local testing from Xcode or `DerivedData`, macOS may treat different app bundle paths as different apps. If microphone behavior looks inconsistent while testing unsigned builds, keep launching the same local app copy or use the signed DMG build for steadier permission behavior.
 

@@ -90,7 +90,7 @@ final class ScreenCapturePermissionService: ScreenCapturePermissionServicing {
         case .denied:
             return ScreenCaptureRecoveryGuidance(
                 headline: "Screen Recording access is blocked.",
-                message: "Open System Settings > Privacy & Security > Screen & System Audio Recording, enable SureForge Capture, then try the screenshot again."
+                message: "Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on BugNarrator (SureForge Capture), then try the screenshot again."
             )
         case .unavailable:
             return ScreenCaptureRecoveryGuidance(
