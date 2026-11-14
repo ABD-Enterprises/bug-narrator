@@ -913,6 +913,35 @@ server._serve("127.0.0.1", {port})
                     server._resolve_model_id(value)
                 self.assertEqual(caught.exception.status_code, 400)
 
+    def test_a_refused_model_stops_a_server_that_was_asked_to_preload_it(self):
+        # A model id the server refuses is the operator's own argument, not a
+        # runtime failure, so a server that was asked to preload it says what
+        # was wrong and stops instead of dying with a traceback.
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / server.TOKEN_FILE_NAME
+            script = f"""
+import sys
+sys.argv = ["server", "--preload", "--model", "bad" + chr(1) + "model", "--token-file", r"{token_file}"]
+import server
+server.main()
+"""
+            environment = dict(os.environ)
+            environment["PYTHONUNBUFFERED"] = "1"
+            # Fixed test interpreter and fixture script; no user input or shell.
+            # nosemgrep: security.semgrep.python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+            process = subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=Path(__file__).parent,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=120,
+            )
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("--model was refused", process.stderr)
+        self.assertIn("printable", process.stderr)
+        self.assertNotIn("Traceback", process.stderr)
+
     def test_invalid_multipart_model_never_reaches_logs_or_inference(self):
         async def request(value):
             body = (
