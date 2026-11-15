@@ -1,5 +1,6 @@
 using BugNarrator.Windows.Services.Http;
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -28,22 +29,33 @@ public sealed class LocalServerPackageCatalog
 {
     public const string AssetName = "bugnarrator-transcription-windows-x64.zip";
     public const string ChecksumAssetName = AssetName + ".sha256";
-    public const string ReleasesEndpoint = "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases";
-    public const string TrustedDownloadPrefix = "/ABD-Enterprises/bug-narrator/releases/download/";
+    public const string ReleasesEndpoint = "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases";
+    public const string TrustedDownloadPrefix = "/SureForgeTech/sureforge-capture/releases/download/";
     public const int PageSize = 30;
     public const int MaxPages = 20;
     public const long MaxImageBytes = 1_000_000_000;
     public const long MaxChecksumBytes = 4096;
 
     private readonly HttpClient httpClient;
+    private readonly Architecture architecture;
 
-    public LocalServerPackageCatalog(HttpClient? httpClient = null)
+    public LocalServerPackageCatalog(HttpClient? httpClient = null, Architecture? architecture = null)
     {
         this.httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        this.architecture = architecture ?? RuntimeInformation.ProcessArchitecture;
     }
 
-    public static LocalServerPackage? SelectPackage(IReadOnlyList<LocalServerRelease> releases)
+    public static string? AssetNameForArchitecture(Architecture architecture) => architecture switch
     {
+        Architecture.X64 => AssetName,
+        Architecture.Arm64 => "bugnarrator-transcription-windows-arm64.zip",
+        _ => null,
+    };
+
+    public static LocalServerPackage? SelectPackage(IReadOnlyList<LocalServerRelease> releases, Architecture? architecture = null)
+    {
+        var assetName = AssetNameForArchitecture(architecture ?? RuntimeInformation.ProcessArchitecture);
+        if (assetName is null) return null;
         foreach (var release in releases)
         {
             if (release.Draft || release.Prerelease || release.Assets is null)
@@ -51,8 +63,8 @@ public sealed class LocalServerPackageCatalog
                 continue;
             }
 
-            var image = release.Assets.FirstOrDefault(asset => asset.Name == AssetName);
-            var checksum = release.Assets.FirstOrDefault(asset => asset.Name == ChecksumAssetName);
+            var image = release.Assets.FirstOrDefault(asset => asset.Name == assetName);
+            var checksum = release.Assets.FirstOrDefault(asset => asset.Name == assetName + ".sha256");
             if (image is null || checksum is null)
             {
                 continue;
@@ -74,7 +86,9 @@ public sealed class LocalServerPackageCatalog
         return Uri.TryCreate(value, UriKind.Absolute, out var url)
             && url.Scheme == Uri.UriSchemeHttps
             && url.Host == "github.com"
+            && url.IsDefaultPort
             && string.IsNullOrEmpty(url.UserInfo)
+            && string.IsNullOrEmpty(url.Query) && string.IsNullOrEmpty(url.Fragment)
             && url.AbsolutePath.StartsWith(TrustedDownloadPrefix, StringComparison.Ordinal);
     }
 
@@ -84,6 +98,10 @@ public sealed class LocalServerPackageCatalog
     /// </summary>
     public async Task<(LocalServerPackage? Package, string Message)> DiscoverAsync(CancellationToken cancellationToken = default)
     {
+        if (AssetNameForArchitecture(architecture) is null)
+        {
+            return (null, "No local server package supports this process architecture. Choose another transcription provider.");
+        }
         try
         {
             for (var page = 1; page <= MaxPages; page++)
@@ -101,7 +119,7 @@ public sealed class LocalServerPackageCatalog
                 var body = await ResponseBodyReader.ReadAsync(response, cancellationToken);
                 var releases = JsonSerializer.Deserialize<List<LocalServerRelease>>(body)
                     ?? [];
-                if (SelectPackage(releases) is { } found)
+                if (SelectPackage(releases, architecture) is { } found)
                 {
                     return (found, string.Empty);
                 }
