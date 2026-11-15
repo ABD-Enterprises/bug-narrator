@@ -135,9 +135,9 @@ public sealed record ReleaseUpdateOutcome(
     /// <summary>Copy verbatim from ReleaseUpdateOutcome.userMessage in the macOS app.</summary>
     public string UserMessage => Kind switch
     {
-        ReleaseUpdateOutcomeKind.UpToDate => $"BugNarrator {Current} is the latest release.",
-        ReleaseUpdateOutcomeKind.UpdateAvailable => $"BugNarrator {Latest} is available — you are on {Current}. Opening the download page.",
-        _ => $"BugNarrator could not check for updates: {Reason}",
+        ReleaseUpdateOutcomeKind.UpToDate => $"SureForge Capture {Current} is the latest release.",
+        ReleaseUpdateOutcomeKind.UpdateAvailable => $"SureForge Capture {Latest} is available — you are on {Current}. Opening the download page.",
+        _ => $"SureForge Capture could not check for updates: {Reason}",
     };
 }
 
@@ -154,7 +154,7 @@ public interface ILatestReleaseFeed
 /// </summary>
 public sealed class GitHubLatestReleaseFeed : ILatestReleaseFeed
 {
-    public const string Endpoint = "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases";
+    public const string Endpoint = "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases";
     public const int PageSize = 30;
     public const int MaxPages = 20;
     private static readonly Regex VersionTagPattern = new(
@@ -250,7 +250,7 @@ public sealed class GitHubLatestReleaseFeed : ILatestReleaseFeed
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "github.com" && uri.IsDefaultPort
         && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment)
-        && Uri.UnescapeDataString(uri.AbsolutePath) == $"/ABD-Enterprises/bug-narrator/releases/tag/{tag}";
+        && Uri.UnescapeDataString(uri.AbsolutePath) == $"/SureForgeTech/sureforge-capture/releases/tag/{tag}";
 
     private sealed record GitHubReleasePayload(
         [property: JsonPropertyName("tag_name")] string? TagName,
