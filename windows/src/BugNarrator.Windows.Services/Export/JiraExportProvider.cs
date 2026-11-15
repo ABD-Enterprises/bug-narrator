@@ -222,7 +222,7 @@ public sealed class JiraExportProvider
         // The session title is built from the transcript, so it is untrusted text like every
         // other field here.
         blocks.Add(JiraBlock.Paragraph(
-            $"Exported from BugNarrator session \"{UntrustedMarkdown.NeutralizeMentions(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}. Review against the raw transcript before triage."));
+            $"Exported from SureForge Capture session \"{UntrustedMarkdown.NeutralizeMentions(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}. Review against the raw transcript before triage."));
 
         return new JiraDocument(blocks);
     }

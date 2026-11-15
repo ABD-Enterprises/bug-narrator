@@ -231,7 +231,7 @@ public sealed class GitHubExportProvider
         lines.Add("## Source");
         // The session title is built from the transcript, so it is untrusted text like every
         // other field here: the body is markdown, so a mention in it would be live.
-        lines.Add($"Exported from BugNarrator session \"{UntrustedMarkdown.Neutralize(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}.");
+        lines.Add($"Exported from SureForge Capture session \"{UntrustedMarkdown.Neutralize(session.Title)}\" recorded {session.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}.");
         lines.Add("Review against the raw transcript before triage.");
 
         return string.Join(Environment.NewLine, lines);
