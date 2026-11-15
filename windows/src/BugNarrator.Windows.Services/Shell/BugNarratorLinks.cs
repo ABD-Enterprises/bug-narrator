@@ -6,10 +6,10 @@ namespace BugNarrator.Windows.Services.Shell;
 /// </summary>
 public static class BugNarratorLinks
 {
-    public const string Repository = "https://github.com/ABD-Enterprises/bug-narrator";
-    public const string Documentation = "https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md";
-    public const string Issues = "https://github.com/ABD-Enterprises/bug-narrator/issues/new";
-    public const string Releases = "https://github.com/ABD-Enterprises/bug-narrator/releases";
+    public const string Repository = "https://github.com/SureForgeTech/sureforge-capture";
+    public const string Documentation = "https://github.com/SureForgeTech/sureforge-capture/blob/main/docs/UserGuide.md";
+    public const string Issues = "https://github.com/SureForgeTech/sureforge-capture/issues/new";
+    public const string Releases = "https://github.com/SureForgeTech/sureforge-capture/releases";
     public const string SupportDevelopment = "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8";
 }
 
