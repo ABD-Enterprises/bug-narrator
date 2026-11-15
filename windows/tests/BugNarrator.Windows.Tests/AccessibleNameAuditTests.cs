@@ -31,6 +31,84 @@ namespace BugNarrator.Windows.Tests;
 public sealed class AccessibleNameAuditTests
 {
     [Theory]
+    [InlineData(932, 552)]
+    [InlineData(1132, 672)]
+    public void SessionLibrary_ConstrainedLayoutKeepsNavigationAndActionsReachable(double width, double height)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = harness.Build("SessionLibraryWindow");
+            try
+            {
+                var content = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+                var descendants = Descendants(content).ToArray();
+                var dateFilter = descendants.OfType<ComboBox>().Single(combo => combo.Items.OfType<ComboBoxItem>()
+                    .Any(item => Equals(item.Content, "Custom Date Range")));
+                dateFilter.SelectedItem = dateFilter.Items.OfType<ComboBoxItem>().Single(item => Equals(item.Content, "Custom Date Range"));
+                var offer = descendants.OfType<Border>().Single(border => AutomationProperties.GetName(border) == "Issue extraction offer");
+                offer.Visibility = Visibility.Visible;
+                var sessions = descendants.OfType<ListBox>().Single(list => AutomationProperties.GetName(list) == "Sessions");
+                for (var index = 0; index < 30; index++) sessions.Items.Add($"Session {index}");
+
+                content.Measure(new Size(width, height));
+                content.Arrange(new Rect(0, 0, width, height));
+                content.UpdateLayout();
+
+                foreach (var control in descendants.OfType<Button>().Where(button => Equals(button.Content, "Refresh") || Equals(button.Content, "Delete Session"))
+                    .Cast<FrameworkElement>().Append(sessions))
+                {
+                    var bounds = control.TransformToAncestor(content).TransformBounds(new Rect(control.RenderSize));
+                    Assert.True(bounds.Top >= 0 && bounds.Bottom <= height, $"{control.GetType().Name} outside viewport: {bounds}");
+                    Assert.True(bounds.Left >= 0 && bounds.Right <= width);
+                    Assert.True(control.ActualHeight > 0);
+                }
+
+                // Optional filters and the extraction offer scroll independently of the session list.
+                var filterScroll = descendants.OfType<ScrollViewer>().Single(scroll => Descendants(scroll).Contains(dateFilter));
+                Assert.True(filterScroll.ScrollableHeight > 0);
+                filterScroll.ScrollToEnd();
+                content.UpdateLayout();
+                var notNow = Descendants(offer).OfType<Button>().Single(button => Equals(button.Content, "Not Now"));
+                var offerBounds = notNow.TransformToAncestor(filterScroll).TransformBounds(new Rect(notNow.RenderSize));
+                Assert.InRange(offerBounds.Bottom, 0, filterScroll.ActualHeight);
+                filterScroll.ScrollToTop();
+                content.UpdateLayout();
+                var filterBounds = dateFilter.TransformToAncestor(filterScroll).TransformBounds(new Rect(dateFilter.RenderSize));
+                Assert.InRange(filterBounds.Top, 0, filterScroll.ActualHeight);
+            }
+            finally { window.Close(); }
+            return true;
+        });
+    }
+
+    [Theory]
+    [InlineData("RecordingControlsWindow")]
+    [InlineData("SessionLibraryWindow")]
+    [InlineData("SettingsWindow")]
+    [InlineData("AboutWindow")]
+    [InlineData("WelcomeWindow")]
+    public void ProductWindows_ShowCurrentIdentityAndUserGuidance(string windowName)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = harness.Build(windowName);
+            try
+            {
+                Assert.Contains("SureForge Capture", window.Title);
+                var text = string.Join("\n", Descendants(window).OfType<TextBlock>().Select(block => block.Text));
+                Assert.DoesNotContain("Source-of-truth", text);
+                Assert.DoesNotContain("Milestone 6", text);
+                Assert.DoesNotContain("shell placeholder", text);
+                if (window is AboutWindow) Assert.Contains(ReleaseUpdateChecker.CurrentVersion(), text);
+            }
+            finally { window.Close(); }
+            return true;
+        });
+    }
+
+    [Theory]
     [InlineData(96, 440, 80)]
     [InlineData(192, 220, 190)]
     public void AnnotationPreview_DragAndKeyboardRespectTheAspectFitImageAndClampMovement(double dpiX, double expectedWidth, double expectedLeft)

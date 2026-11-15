@@ -49,10 +49,10 @@ public sealed record TrayPresentationState(
             RecordingWorkflowState.Saving => "Status: Saving Session",
             RecordingWorkflowState.Completed => "Status: Session Saved",
             RecordingWorkflowState.Failed => "Status: Needs Attention",
-            _ => "Status: BugNarrator"
+            _ => "Status: SureForge Capture"
         };
 
-        var iconText = $"BugNarrator - {statusLabel["Status: ".Length..]}";
+        var iconText = $"SureForge Capture - {statusLabel["Status: ".Length..]}";
         if (iconText.Length > 63)
         {
             iconText = iconText[..63];

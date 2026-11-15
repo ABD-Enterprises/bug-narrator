@@ -96,7 +96,7 @@ public sealed class WindowsAppShell : IDisposable
                 if (snapshot.HasProblems)
                 {
                     trayShell.ShowWarning(
-                        "BugNarrator Hotkeys",
+                        "SureForge Capture Hotkeys",
                         "Some saved global hotkeys are not active. Open Settings to review them.");
                 }
             }
@@ -159,7 +159,7 @@ public sealed class WindowsAppShell : IDisposable
             catch (Exception exception)
             {
                 diagnostics.Error("updates", "release check failed unexpectedly", exception);
-                trayShell.ShowStatus($"BugNarrator could not check for updates: {exception.Message}");
+                trayShell.ShowStatus($"SureForge Capture could not check for updates: {exception.Message}");
             }
             finally
             {
@@ -255,13 +255,13 @@ public sealed class WindowsAppShell : IDisposable
                 if (result.Status == ScreenshotCaptureResultStatus.Failed
                     || result.Status == ScreenshotCaptureResultStatus.Unavailable)
                 {
-                    trayShell.ShowWarning("BugNarrator Screenshot", result.Message);
+                    trayShell.ShowWarning("SureForge Capture Screenshot", result.Message);
                 }
             }
             catch (Exception exception)
             {
                 diagnostics.Error("tray", "capture screenshot request failed", exception);
-                trayShell.ShowWarning("BugNarrator Screenshot", exception.Message);
+                trayShell.ShowWarning("SureForge Capture Screenshot", exception.Message);
             }
         });
     }
@@ -355,7 +355,7 @@ public sealed class WindowsAppShell : IDisposable
             catch (Exception exception)
             {
                 diagnostics.Error("tray", "start recording request failed", exception);
-                trayShell.ShowWarning("BugNarrator Recording", exception.Message);
+                trayShell.ShowWarning("SureForge Capture Recording", exception.Message);
             }
         });
     }
@@ -371,7 +371,7 @@ public sealed class WindowsAppShell : IDisposable
             catch (Exception exception)
             {
                 diagnostics.Error("tray", "stop recording request failed", exception);
-                trayShell.ShowWarning("BugNarrator Recording", exception.Message);
+                trayShell.ShowWarning("SureForge Capture Recording", exception.Message);
             }
         });
     }

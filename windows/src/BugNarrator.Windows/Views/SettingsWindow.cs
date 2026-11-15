@@ -93,7 +93,7 @@ public sealed class SettingsWindow : Window
             draftHotkeys[action] = WindowsHotkeyShortcut.NotSet;
         }
 
-        Title = "BugNarrator Settings";
+        Title = "SureForge Capture Settings";
         Width = 780;
         Height = 820;
         MinWidth = 680;
@@ -215,7 +215,7 @@ public sealed class SettingsWindow : Window
         {
             Margin = new Thickness(0, 0, 0, 4),
             // The macOS label (SettingsGeneralPanes.swift).
-            Content = "Open BugNarrator at startup",
+            Content = "Open SureForge Capture at startup",
         };
         launchAtLoginStatusTextBlock = new TextBlock
         {
@@ -365,13 +365,6 @@ public sealed class SettingsWindow : Window
                         Text = "Configure AI provider settings, optional global hotkeys, and the experimental export integrations for the Windows app.",
                         TextWrapping = TextWrapping.Wrap,
                     },
-                    new TextBlock
-                    {
-                        Margin = new Thickness(0, 16, 0, 0),
-                        Foreground = Brushes.DimGray,
-                        Text = "Source-of-truth docs: windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md and docs/CROSS_PLATFORM_GUIDELINES.md",
-                        TextWrapping = TextWrapping.Wrap,
-                    },
                     BuildOpenAiSettingsSection(),
                     BuildHotkeySettingsSection(),
                     BuildGitHubSettingsSection(),
@@ -409,7 +402,7 @@ public sealed class SettingsWindow : Window
                     BuildHint("Optional. Leave blank for OpenAI. Use an OpenAI-compatible base URL such as https://api.openai.com/v1 or a trusted enterprise/local endpoint."),
                     BuildLabel("Transcription Model"),
                     modelTextBox,
-                    BuildHint("Defaults to whisper-1 to match the current BugNarrator product baseline."),
+                    BuildHint("Defaults to whisper-1 to match the current SureForge Capture product baseline."),
                     BuildLabel("Language Hint"),
                     languageHintTextBox,
                     BuildHint("Optional. Leave blank to let OpenAI auto-detect the spoken language."),
@@ -429,7 +422,7 @@ public sealed class SettingsWindow : Window
                     systemAudioConsentCheckBox,
                     BuildLabel("Microphone Input Device"),
                     audioInputDeviceComboBox,
-                    BuildHint("Choose a specific Windows microphone when recording from the microphone. If the saved device disappears, BugNarrator will ask you to choose another instead of silently using the wrong microphone."),
+                    BuildHint("Choose a specific Windows microphone when recording from the microphone. If the saved device disappears, SureForge Capture will ask you to choose another instead of silently using the wrong microphone."),
                     statusTextBlock,
                 },
             },
@@ -455,7 +448,7 @@ public sealed class SettingsWindow : Window
                         FontWeight = FontWeights.SemiBold,
                         Text = "Global Hotkeys (Optional)",
                     },
-                    BuildHint("Hotkeys start as Not Set. Assign them only if you want global shortcuts while BugNarrator stays in the tray."),
+                    BuildHint("Hotkeys start as Not Set. Assign them only if you want global shortcuts while SureForge Capture stays in the tray."),
                     BuildHint("Shortcut changes apply when you click Save. Duplicate assignments are rejected, and unavailable OS-level shortcuts are saved with a visible warning."),
                     BuildHotkeyRow(WindowsHotkeyAction.StartRecording),
                     BuildHotkeyRow(WindowsHotkeyAction.StopRecording),

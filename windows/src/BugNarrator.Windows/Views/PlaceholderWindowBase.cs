@@ -25,7 +25,11 @@ public abstract class PlaceholderWindowBase : Window
         Content = new Border
         {
             Padding = new Thickness(24),
-            Child = new StackPanel
+            Child = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = new StackPanel
             {
                 Children =
                 {
@@ -41,19 +45,13 @@ public abstract class PlaceholderWindowBase : Window
                         Text = description,
                         TextWrapping = TextWrapping.Wrap,
                     },
-                    new TextBlock
-                    {
-                        Margin = new Thickness(0, 16, 0, 0),
-                        Foreground = Brushes.DimGray,
-                        Text = "Source-of-truth docs: windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md and docs/CROSS_PLATFORM_GUIDELINES.md",
-                        TextWrapping = TextWrapping.Wrap,
-                    },
                     new Border
                     {
                         Margin = new Thickness(0, 24, 0, 0),
                         Padding = new Thickness(0),
                         Child = content,
                     },
+                },
                 },
             },
         };

@@ -1,3 +1,4 @@
+using BugNarrator.Windows.Services.Shell;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -7,12 +8,12 @@ public sealed class AboutWindow : PlaceholderWindowBase
 {
     public AboutWindow()
         : base(
-            title: "About BugNarrator",
-            heading: "About BugNarrator",
-            description: "This Windows shell keeps the same product direction as the native macOS app while accepting phased parity between platforms.",
+            title: "About SureForge Capture",
+            heading: "About SureForge Capture",
+            description: "Turn narrated testing into clear, actionable findings.",
             content: BuildContent(),
             width: 480,
-            height: 300)
+            height: 340)
     {
     }
 
@@ -24,19 +25,19 @@ public sealed class AboutWindow : PlaceholderWindowBase
             {
                 new TextBlock
                 {
-                    Text = "Workflow target: record -> review -> refine -> export",
+                    Text = "Record your narration and capture screenshots. Review the evidence, refine draft issues, and export your findings.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 new TextBlock
                 {
                     Margin = new Thickness(0, 12, 0, 0),
-                    Text = "Platform: Windows WPF shell placeholder",
+                    Text = $"Version {ReleaseUpdateChecker.CurrentVersion()} · Windows",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 new TextBlock
                 {
                     Margin = new Thickness(0, 12, 0, 0),
-                    Text = "GitHub and Jira export remain experimental.",
+                    Text = "Sessions stay on this PC. Audio and transcripts are sent to your selected AI provider only when you use its features. GitHub and Jira export are experimental.",
                     TextWrapping = TextWrapping.Wrap,
                 },
             },
