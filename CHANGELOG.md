@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [INTERNAL] Pull requests are now welcome with a DCO sign-off (`git commit -s`): `CONTRIBUTING.md` says so, and a new `dco` workflow checks the sign-off on pull requests from outside contributors.
 - [INTERNAL] The copyright holder is now SureForgeTech in `NOTICE`, the notice at the end of `LICENSE`, the app's About copyright line (`NSHumanReadableCopyright` and its built-in default) and the docs site footer; the Apache 2.0 licence text is unchanged.
 
 - [INTERNAL] CONTRIBUTING.md now says issues are welcome and outside pull requests are not accepted for now, links the SureForgeTech guide for writing a good issue, and points issue links at the SureForgeTech repository.
