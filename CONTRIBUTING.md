@@ -1,20 +1,22 @@
 # Contributing
 
-BugNarrator is not currently accepting outside code contributions or pull requests.
+## How to contribute
 
-## What Is Welcome
+Issues are welcome: bug reports, questions and ideas. Pull requests from
+outside contributors are not accepted for now, so that the project keeps a
+single copyright holder; a pull request from outside may be closed without
+review. Open an issue describing the change instead.
 
-- bug reports through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
-- focused feature requests through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
-- reproducible diagnostics such as debug bundles, session bundles, and screenshots when relevant
+- Open bug reports and feature requests in
+  [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues/new).
+  Reproducible diagnostics such as debug bundles, session bundles and
+  screenshots help when relevant.
+- For how to write a good issue, see the
+  [SureForgeTech contributing guide](https://github.com/SureForgeTech/.github/blob/main/CONTRIBUTING.md).
+- Do not report security problems in a public issue; follow
+  [SECURITY.md](SECURITY.md).
 
-## Current Policy
-
-- please do not open pull requests for BugNarrator at this time
-- GitHub issues are the right place for bug reports and product feedback
-- if contribution policy changes later, this document will be updated
-
-## Validation Evidence
+## For maintainers: validation evidence
 
 Local run output — `scripts/validate.sh` status files, `xcodebuild` test logs,
 release smoke logs, accessibility snapshots — is written under `artifacts/`,
