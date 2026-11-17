@@ -4,6 +4,7 @@
 
 - [INTERNAL] The copyright holder is now SureForgeTech in `NOTICE`, the notice at the end of `LICENSE`, the app's About copyright line (`NSHumanReadableCopyright` and its built-in default) and the docs site footer; the Apache 2.0 licence text is unchanged.
 
+- [INTERNAL] CONTRIBUTING.md now says issues are welcome and outside pull requests are not accepted for now, links the SureForgeTech guide for writing a good issue, and points issue links at the SureForgeTech repository.
 - [FIX] Windows local transcription discovers packages from the moved repository and selects the native ARM64 or x64 server with its matching checksum.
 
 - [FIX] Local transcription setup again finds its signed server download after the repository moved to SureForgeTech/sureforge-capture: GitHub now reports downloads under the new address, which the app had refused. The app's update check, help links and release search point at the new repository; the old address is still accepted.
