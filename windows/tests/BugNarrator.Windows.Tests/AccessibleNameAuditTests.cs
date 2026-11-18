@@ -100,10 +100,11 @@ public sealed class AccessibleNameAuditTests
                 Assert.Contains("SureForge Capture", window.Title);
                 var text = string.Join("\n", Descendants(window).OfType<TextBlock>().Select(block => block.Text));
                 // The on-disk data folder is still named "BugNarrator" — a stored path, not product
-                // copy — and the local-server section shows that install location. Strip paths
-                // before the product-name check so a real directory name is not read as the old
-                // product name in the UI.
-                Assert.DoesNotContain("BugNarrator", Regex.Replace(text, @"[A-Za-z]:\\[^\s""]*", "<path>"));
+                // copy — and the local-server section shows that install location. Strip drive-letter
+                // paths before the product-name check so a real directory name is not read as the old
+                // product name in the UI. The match runs to the end of the path segment, so a user
+                // name with a space in it does not leave the folder name behind.
+                Assert.DoesNotContain("BugNarrator", Regex.Replace(text, @"[A-Za-z]:\\(?:[^\\""\r\n]+\\)*[^\\""\r\n]*", "<path>"));
                 Assert.DoesNotContain("Source-of-truth", text);
                 Assert.DoesNotContain("Milestone 6", text);
                 Assert.DoesNotContain("shell placeholder", text);
