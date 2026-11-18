@@ -26,6 +26,12 @@
 # recursion is broken by VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK, which the
 # nested invocation inherits.
 #
+# What the third step proves is that the validation fails when the check
+# fails. The validation runs under "set -euo pipefail", so a failing check
+# that is not swallowed stops the run; the forms that swallow a failure —
+# "|| true", a discarded status, an inverted test — are all caught, because
+# the nested run would then pass.
+#
 # BUGNARRATOR_VERSION_CHECK substitutes the version check. It exists so the
 # third step can inject a check that fails; it is never set in CI.
 
@@ -40,21 +46,28 @@ fail() {
 }
 
 DEFAULT_CHECK="$ROOT/scripts/check_version_consistency.sh"
-CHECK="${BUGNARRATOR_VERSION_CHECK:-$DEFAULT_CHECK}"
+
+# The substitution is honoured ONLY inside the nested validation this gate
+# runs for its own third step. Outside it — in any ordinary validation run —
+# the real check always runs, so an inherited environment variable cannot make
+# the gate pass while the tree is inconsistent.
+if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" == "1" && -n "${BUGNARRATOR_VERSION_CHECK:-}" ]]; then
+    CHECK="$BUGNARRATOR_VERSION_CHECK"
+else
+    CHECK="$DEFAULT_CHECK"
+fi
 
 # ── 1. The check must exist and be executable ─────────────────────────────
 # The check is what the gate exists to enforce, so a missing one is a failure
 # rather than a check that quietly does nothing.
-if [[ "$CHECK" == "$DEFAULT_CHECK" ]]; then
-    [[ -x "$CHECK" ]] || fail 'scripts/check_version_consistency.sh is missing or not executable'
-fi
+[[ -x "$CHECK" ]] || fail "$CHECK is missing or not executable"
 
 # ── 2. The real tree must agree right now ─────────────────────────────────
 VERSION_STATUS_FILE="$ROOT/artifacts/validation/version-status.txt"
 mkdir -p "$ROOT/artifacts/validation"
 
 if ! "$CHECK"; then
-    printf 'FAIL: the version sources are inconsistent\\n' >"$VERSION_STATUS_FILE"
+    printf 'FAIL: the version sources are inconsistent\n' >"$VERSION_STATUS_FILE"
     fail 'the version sources are inconsistent'
 fi
 
@@ -115,7 +128,10 @@ if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" != "1" ]]; then
     chmod +x "$stub"
 
     validation_output="$workspace/validation-output.txt"
-    if env VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 BUGNARRATOR_VERSION_CHECK="$stub" \
+    # AI_VALIDATOR_BASE_REF takes precedence over the argument, so it is cleared:
+    # an inherited base ref would make the nested run fail at the diff step
+    # instead of at the version contract.
+    if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 BUGNARRATOR_VERSION_CHECK="$stub" \
         "$ROOT/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
         fail 'the validation passed although the version check failed'
     fi
