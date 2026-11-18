@@ -3,11 +3,11 @@
 # Fails if the app version is not consistent across its sources of truth:
 #   - VERSION                              (human-facing marketing version)
 #   - project.yml MARKETING_VERSION        (XcodeGen → Info.plist CFBundleShortVersionString)
-#   - project.yml CURRENT_PROJECT_VERSION  (build number; must be a positive integer)
+#   - project.yml CURRENT_PROJECT_VERSION  (build number; must be a number)
 #   - CHANGELOG-archive.md latest released heading
 #
 # VERSION is the source of truth. Run scripts/bump_version.sh to change it; this
-# check guards against the three files drifting apart (e.g. a release shipping
+# check guards against the sources drifting apart (e.g. a release shipping
 # with a stale VERSION file).
 
 set -euo pipefail
@@ -56,7 +56,7 @@ if [[ "$VERSION_FILE_VALUE" != "$CHANGELOG_VERSION" ]]; then
 fi
 
 if ! [[ "$CURRENT_PROJECT_VERSION" =~ ^[0-9]+$ ]]; then
-    echo "invalid: project.yml CURRENT_PROJECT_VERSION ($CURRENT_PROJECT_VERSION) is not a positive integer" >&2
+    echo "invalid: project.yml CURRENT_PROJECT_VERSION ($CURRENT_PROJECT_VERSION) is not a number" >&2
     errors=1
 fi
 

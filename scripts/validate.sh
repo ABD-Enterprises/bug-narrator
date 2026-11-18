@@ -265,6 +265,25 @@ else
   : "$semgrep_outcome"
 fi
 
+# The version contract: VERSION, project.yml and the latest released heading
+# have to agree. Only the release-time scripts compared them, so a drift was
+# found while a release was being cut rather than on the push that caused it,
+# and CI reported green while the version contract was broken.
+#
+# The gate proves by running that the validation fails when the check fails.
+# It therefore sits after the diff step: a validation with an unresolvable
+# base ref has to fail at the diff step first, and a gate before it would
+# change what that failure looks like. The nested validation the gate runs
+# uses HEAD as its base ref, so it scans no files and reaches the gate in a
+# couple of seconds.
+if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-version-consistency-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
+  exit 1
+fi
+
 # Always run the cloud-portable Swift parse check. It self-skips with a clean
 # exit when no Swift toolchain is available, and fails the build only on
 # syntax errors — never on missing toolchains or missing imports.
