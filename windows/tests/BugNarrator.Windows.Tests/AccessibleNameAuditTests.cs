@@ -82,7 +82,7 @@ public sealed class AccessibleNameAuditTests
                 // without moving the filters.
                 var lastIndex = sessions.Items.Count - 1;
                 var filterOffsetBefore = filterScroll.VerticalOffset;
-                var listScroll = FindScrollViewer(sessions);
+                var listScroll = FindListScrollViewer(sessions);
                 Assert.NotNull(listScroll);
                 Assert.True(listScroll!.ScrollableHeight > 0, "the session list does not scroll on its own");
                 listScroll.ScrollToEnd();
@@ -92,7 +92,7 @@ public sealed class AccessibleNameAuditTests
                 var lastBounds = lastContainer!.TransformToAncestor(listScroll).TransformBounds(new Rect(lastContainer.RenderSize));
                 Assert.True(lastBounds.Top >= 0 && lastBounds.Bottom <= listScroll.ActualHeight,
                     $"the last session is outside the list viewport: {lastBounds}");
-                Assert.Equal(filterOffsetBefore, filterScroll.VerticalOffset);
+                Assert.Equal(filterOffsetBefore, filterScroll.VerticalOffset, 3);
             }
             finally { window.Close(); }
             return true;
@@ -110,7 +110,7 @@ public sealed class AccessibleNameAuditTests
         OnStaThread(() =>
         {
             using var harness = new WindowHarness();
-            var window = harness.Build("SessionLibraryWindow");
+            var window = (SessionLibraryWindow)harness.Build("SessionLibraryWindow");
             try
             {
                 // Load the sessions so the library is not empty, then search for nothing.
@@ -120,6 +120,14 @@ public sealed class AccessibleNameAuditTests
                 var content = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
                 var descendants = Descendants(content).ToArray();
                 var refresh = descendants.OfType<Button>().Single(button => Equals(button.Content, "Refresh"));
+
+                // The no-results branch is what this test is about, so pin it: the message is
+                // visible and it does not repeat the query.
+                // The bounded no-results message, not the library status line, which also starts
+                // with "No sessions matched".
+                var emptyState = descendants.OfType<TextBlock>().Single(block => block.Text.StartsWith("No sessions matched your search", StringComparison.Ordinal));
+                Assert.Equal(Visibility.Visible, emptyState.Visibility);
+                Assert.DoesNotContain(new string('x', 400), emptyState.Text);
 
                 content.Measure(new Size(932, 552));
                 content.Arrange(new Rect(0, 0, 932, 552));
@@ -349,6 +357,14 @@ public sealed class AccessibleNameAuditTests
     /// The scroll viewer inside a control's template. The session list scrolls inside its own
     /// template, which the logical tree the audit walks does not include.
     /// </summary>
+    private static ScrollViewer? FindListScrollViewer(ListBox list)
+    {
+        // The list's own scroll viewer is a template part; the visual walk is the fallback for a
+        // theme whose part is named differently.
+        return list.Template?.FindName("PART_ScrollViewer", list) as ScrollViewer
+            ?? FindScrollViewer(list);
+    }
+
     private static ScrollViewer? FindScrollViewer(DependencyObject parent)
     {
         for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
@@ -379,8 +395,10 @@ public sealed class AccessibleNameAuditTests
         target.BringIntoView();
         content.UpdateLayout();
         var bounds = target.TransformToAncestor(filterScroll).TransformBounds(new Rect(target.RenderSize));
+        // A scrolled-to element lands exactly on the viewport edge, so the comparison carries a
+        // rounding tolerance rather than demanding a bit-exact boundary.
         Assert.True(
-            bounds.Top >= 0 && bounds.Bottom <= filterScroll.ActualHeight,
+            bounds.Top >= -0.5 && bounds.Bottom <= filterScroll.ActualHeight + 0.5,
             $"{target.GetType().Name} does not fit in the filter viewport: {bounds}");
     }
 
