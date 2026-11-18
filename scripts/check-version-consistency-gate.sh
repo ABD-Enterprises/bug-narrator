@@ -25,13 +25,17 @@
 #      has to fail because of the version contract.
 #
 # The third question is answered by running the validation in a clone whose
-# version sources are broken. That clone's own gate must not run a proof of
-# its own, so this gate sets VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK for it,
-# and skips its own proof when that flag is set. The nesting is therefore
-# bounded by the plumbing rather than by the version check's behaviour: a
-# check that had rotted into tolerating the clone's drift would make the
-# clone's validation pass, and this gate would fail, rather than the nesting
-# growing without bound.
+# version sources are broken. The clone's own gate then stops at its
+# real-tree check — the clone's VERSION disagrees with its project.yml — and
+# never reaches a proof of its own, so the nesting is one level deep.
+#
+# That depends on the version check failing, so the gate also carries its own
+# limit: VALIDATE_VERSION_GATE_DEPTH says how deep the nesting already is,
+# and the gate refuses to clone past MAX_PROOF_DEPTH. A version check that had
+# rotted into tolerating the clone's drift would otherwise make each clone's
+# validation pass and the gate clone again, without limit. With the limit, it
+# makes the gate fail loudly instead, and the proof is never skipped by an
+# ambient setting: the limit can only make the gate fail, never pass.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -54,6 +58,11 @@ fail() {
 }
 
 CHECK="$ROOT/scripts/check_version_consistency.sh"
+
+# How many levels of proof may be nested. Each level clones the repository, so
+# the limit is also what bounds the cost and the temporary disk a broken
+# version check can cost.
+readonly MAX_PROOF_DEPTH=2
 
 
 # ── 1. The real tree must agree right now ─────────────────────────────────
@@ -114,8 +123,16 @@ printf '1.1.0\n' >"$workspace/VERSION"
 # The released heading is a source too: a check that stopped comparing it
 # would let a release ship a stale version heading unnoticed, so the archive
 # has to drift on its own. VERSION agrees with project.yml here, so only the
-# archive is wrong.
-printf '## 9.9.9\n' >"$workspace/CHANGELOG-archive.md"
+# archive is wrong. The fixture keeps the shape of the good one — a title and
+# a heading — so a check that rejects it has to reject the heading, not the
+# shape.
+cat >"$workspace/CHANGELOG-archive.md" <<'MARKDOWN'
+# Changelog archive
+
+## 9.9.9
+
+- The released version.
+MARKDOWN
 if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
     fail 'the version check accepted a released heading that does not match VERSION'
 fi
@@ -143,9 +160,15 @@ fi
 # so it exercises the committed validation, the committed gate and the
 # committed check. That is the state CI validates. The working tree's own
 # version sources are covered by step 1, which runs against them directly.
-if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" == "1" ]]; then
-    printf 'PASS: the gate runs the version-consistency check, and the check catches drift\n'
-    exit 0
+depth="${VALIDATE_VERSION_GATE_DEPTH:-0}"
+if ! [[ "$depth" =~ ^[0-9]+$ ]]; then
+    fail "VALIDATE_VERSION_GATE_DEPTH is not a number: '$depth'"
+fi
+if (( depth >= MAX_PROOF_DEPTH )); then
+    # Reaching the limit means the version check is not failing on a broken
+    # tree. That is a defect in the check, and the gate says so rather than
+    # letting the nesting grow.
+    fail "the version check did not fail on a broken tree at depth $depth; the nesting limit was reached"
 fi
 
 # The proof uses a genuinely broken tree rather than a simulated failure: a
@@ -154,9 +177,8 @@ fi
 # version sources from the tree it is run in, so the check really fails there.
 #
 # The clone is validated with HEAD as its base ref, so it scans no files and
-# reaches the gate quickly. The clone's gate skips its own proof because the
-# flag is set for it, so the nesting is one level deep however the version
-# check behaves.
+# reaches the gate quickly. The clone's gate runs one level deeper than this
+# one, so the nesting stays inside the limit above.
 #
 # The proof costs a clone of the repository and a validation run inside it, so
 # it grows with the size of the tree.
@@ -170,7 +192,7 @@ fi
 printf '0.0.0\n' >"$clone/VERSION"
 
 validation_output="$workspace/validation-output.txt"
-if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 \
+if env -u AI_VALIDATOR_BASE_REF VALIDATE_VERSION_GATE_DEPTH="$((depth + 1))" \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
     fail 'the validation passed although the version contract was broken'
 fi
