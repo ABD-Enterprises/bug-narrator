@@ -1,4 +1,5 @@
 using BugNarrator.Windows.Services.LocalTranscription;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace BugNarrator.Windows.Tests;
@@ -18,10 +19,21 @@ public sealed class LocalServerProcessTests : IDisposable
 
     public LocalServerProcessTests()
     {
+        // Git's sh can pass its CTRL+C-ignore flag to the test host and then to ping.
+        // Reset that inherited flag so the graceful-stop fixture actually handles the signal.
+        // This changes only the test process; production delivery and the timing assertion stay intact.
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(SetConsoleCtrlHandler(IntPtr.Zero, false), $"LocalServerProcessTests could not restore Ctrl+C handling (error {Marshal.GetLastWin32Error()})");
+        }
         // The install directory is the parent of Models: the stderr log lands in the test root.
         models = Path.Combine(root, "Models");
         Directory.CreateDirectory(root);
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetConsoleCtrlHandler(IntPtr handler, [MarshalAs(UnmanagedType.Bool)] bool add);
 
     public void Dispose()
     {
