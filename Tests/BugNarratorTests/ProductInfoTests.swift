@@ -26,7 +26,7 @@ final class ProductInfoTests: XCTestCase {
                 "CFBundleDisplayName": "BugNarrator",
                 "CFBundleShortVersionString": "1.2.3",
                 "CFBundleVersion": "45",
-                "NSHumanReadableCopyright": "© 2026 ABD Enterprises"
+                "NSHumanReadableCopyright": "© 2026 SureForgeTech"
             ]
         )
 
@@ -34,7 +34,7 @@ final class ProductInfoTests: XCTestCase {
         XCTAssertEqual(metadata.version, "1.2.3")
         XCTAssertEqual(metadata.build, "45")
         XCTAssertEqual(metadata.versionDescription, "Version 1.2.3 (45)")
-        XCTAssertEqual(metadata.copyrightLine, "© 2026 ABD Enterprises")
+        XCTAssertEqual(metadata.copyrightLine, "© 2026 SureForgeTech")
     }
 
     func testMetadataFallsBackToDefaultsWhenBundleValuesAreMissing() {

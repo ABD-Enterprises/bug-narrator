@@ -742,9 +742,9 @@ packaging==26.3 \
     #   pooch
     #   pyinstaller
     #   pyinstaller-hooks-contrib
-parakeet-mlx==0.5.3 \
-    --hash=sha256:64c1f0f48445f6a1b99e6ddc2670f9b4d7218e0237ba883a8cfa850b24dca7c8 \
-    --hash=sha256:b06b7345d68127b581ee0ba07691654e60d44004c401c9acfefcefbb4de50ea7
+parakeet-mlx==0.7.0 \
+    --hash=sha256:768552ddc362af86e0a5911585f8e151cec48d40035193b077af91513b8e56e3 \
+    --hash=sha256:ea3335732e64cd2eff38412e26a2ccf70526ad7239085a6625c370703248b998
     # via -r local-transcription/requirements.txt
 pip==26.2.2 \
     --hash=sha256:3a8e5c800492787f33a4114ef54444546c340df428974ebba17e0fd47e11af2f \

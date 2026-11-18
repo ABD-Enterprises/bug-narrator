@@ -131,9 +131,24 @@ final class LocalTranscriptionManager: ObservableObject {
         "/ABD-Enterprises/bug-narrator/releases/download/",
     ]
 
+    /// Judges the address as written, not as parsed. `URL.path` decodes percent escapes, so an
+    /// encoded `..` or `/` used to pass the prefix test and then name a different path once the
+    /// client or the server normalized it. The written form must begin with the exact origin
+    /// (no user, no port, not even `:443`), and the path must hold no escape, no backslash and no
+    /// empty, `.` or `..` segment. Release tags and the asset names this app asks for need none of those.
     static func trustedAssetURL(_ url: URL) -> Bool {
-        url.scheme == "https" && url.host == "github.com" && url.user == nil && url.password == nil &&
-            trustedReleasePathPrefixes.contains(where: { url.path.hasPrefix($0) })
+        guard url.scheme == "https", url.host == "github.com", url.port == nil,
+              url.user == nil, url.password == nil else { return false }
+        let written = url.absoluteString
+        let origin = "https://github.com"
+        guard written.hasPrefix(origin + "/") else { return false }
+        let afterOrigin = written.dropFirst(origin.count)
+        let path = afterOrigin.prefix(while: { $0 != "?" && $0 != "#" })
+        guard let prefix = trustedReleasePathPrefixes.first(where: { path.hasPrefix($0) }) else { return false }
+        guard !path.contains("%"), !path.contains("\\"),
+              path.unicodeScalars.allSatisfy({ $0.value > 0x20 && $0.value < 0x7F }) else { return false }
+        let segments = path.dropFirst(prefix.count).split(separator: "/", omittingEmptySubsequences: false)
+        return segments.count >= 2 && segments.allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
     }
 
     func discover() async {
