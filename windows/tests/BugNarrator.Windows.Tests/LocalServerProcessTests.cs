@@ -24,7 +24,7 @@ public sealed class LocalServerProcessTests : IDisposable
         // This changes only the test process; production delivery and the timing assertion stay intact.
         if (OperatingSystem.IsWindows())
         {
-            Assert.True(SetConsoleCtrlHandler(IntPtr.Zero, false), $"Could not enable Ctrl+C handling (error {Marshal.GetLastWin32Error()})");
+            Assert.True(SetConsoleCtrlHandler(IntPtr.Zero, false), $"LocalServerProcessTests could not restore Ctrl+C handling (error {Marshal.GetLastWin32Error()})");
         }
         // The install directory is the parent of Models: the stderr log lands in the test root.
         models = Path.Combine(root, "Models");
