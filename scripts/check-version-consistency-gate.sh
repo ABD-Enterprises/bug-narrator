@@ -1,13 +1,33 @@
 #!/usr/bin/env bash
 #
-# Pins that the validation gate runs the version-consistency check, and that
-# the check actually catches drift.
+# Pins that the validation gate fails when the version contract is broken.
 #
-# The version sources (VERSION, project.yml's MARKETING_VERSION and the
-# latest released heading in the changelog archive) were only compared by the
-# release-time scripts, so a drift was found while a release was being cut
-# rather than on the push that caused it, and CI reported green while the
-# version contract was broken.
+# The version sources (VERSION, project.yml's MARKETING_VERSION and
+# CURRENT_PROJECT_VERSION, and the latest released heading in the changelog
+# archive) were only compared by the release-time scripts, so a drift was
+# found while a release was being cut rather than on the push that caused it,
+# and CI reported green while the version contract was broken.
+#
+# This gate has to answer three questions, and it answers them by running
+# things rather than by reading them:
+#
+#   1. Is the version contract true of the tree right now? The check is run
+#      against the real sources, and a disagreement fails the gate.
+#   2. Does the check actually catch drift, or has it rotted into one that
+#      always agrees? The check is run against a throwaway set of version
+#      sources that are deliberately wrong.
+#   3. Does the validation actually fail when the check fails? A gate that
+#      silently stopped running the check would look exactly like a gate that
+#      passes, so the validation is run with a check that always fails and has
+#      to fail too.
+#
+# The third question is answered by running the validation, so the validation
+# skips this gate's own third step when it is invoked from here. The
+# recursion is broken by VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK, which the
+# nested invocation inherits.
+#
+# BUGNARRATOR_VERSION_CHECK substitutes the version check. It exists so the
+# third step can inject a check that fails; it is never set in CI.
 
 set -euo pipefail
 
@@ -19,24 +39,32 @@ fail() {
     exit 1
 }
 
-# The gate has to INVOKE the check, not merely mention it: a gate that silently
-# stopped running the check would look exactly like a gate that passes. The
-# pattern therefore matches the script as a command — a quoted path at the start
-# of a line, after an optional "if" — and not the existence test, which is
-# written as [[ -x "..." ]].
-if ! grep -Eq '^[[:space:]]*(if[[:space:]]+)?"[^"]*check_version_consistency\.sh"' "$ROOT/scripts/validate.sh"; then
-    fail 'scripts/validate.sh does not run scripts/check_version_consistency.sh'
+DEFAULT_CHECK="$ROOT/scripts/check_version_consistency.sh"
+CHECK="${BUGNARRATOR_VERSION_CHECK:-$DEFAULT_CHECK}"
+
+# ── 1. The check must exist and be executable ─────────────────────────────
+# The check is what the gate exists to enforce, so a missing one is a failure
+# rather than a check that quietly does nothing.
+if [[ "$CHECK" == "$DEFAULT_CHECK" ]]; then
+    [[ -x "$CHECK" ]] || fail 'scripts/check_version_consistency.sh is missing or not executable'
 fi
 
-CHECK="$ROOT/scripts/check_version_consistency.sh"
-[[ -x "$CHECK" ]] || fail 'scripts/check_version_consistency.sh is missing or not executable'
+# ── 2. The real tree must agree right now ─────────────────────────────────
+VERSION_STATUS_FILE="$ROOT/artifacts/validation/version-status.txt"
+mkdir -p "$ROOT/artifacts/validation"
 
-# The check reads the three version sources from the directory above the
-# script, so a throwaway copy of it sees a throwaway set of sources.
+if ! "$CHECK"; then
+    printf 'FAIL: the version sources are inconsistent\\n' >"$VERSION_STATUS_FILE"
+    fail 'the version sources are inconsistent'
+fi
+
+# ── 3. The check must catch drift, not merely agree ───────────────────────
+# The check reads the version sources from the directory above the script, so
+# a throwaway copy of it sees a throwaway set of sources.
 workspace="$(mktemp -d)"
 trap 'rm -rf "$workspace"' EXIT
 mkdir -p "$workspace/scripts"
-cp "$CHECK" "$workspace/scripts/check_version_consistency.sh"
+cp "$DEFAULT_CHECK" "$workspace/scripts/check_version_consistency.sh"
 chmod +x "$workspace/scripts/check_version_consistency.sh"
 
 printf '1.1.0\n' >"$workspace/VERSION"
@@ -77,4 +105,28 @@ if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
     fail 'the version check accepted a build number that is not a positive integer'
 fi
 
+# ── 4. The validation has to fail when the check fails ────────────────────
+# This is the step a grep cannot do. Whether the validation runs the check and
+# fails on a broken version contract is a property of running it, not of
+# looking at it.
+if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" != "1" ]]; then
+    stub="$workspace/failing-version-check.sh"
+    printf '#!/usr/bin/env bash\nexit 1\n' >"$stub"
+    chmod +x "$stub"
+
+    validation_output="$workspace/validation-output.txt"
+    if env VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 BUGNARRATOR_VERSION_CHECK="$stub" \
+        "$ROOT/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
+        fail 'the validation passed although the version check failed'
+    fi
+
+    # The validation has to have failed for this reason, not for some other
+    # one: a base ref it could not diff, for instance.
+    if ! grep -q 'the version sources are inconsistent' "$validation_output"; then
+        cat "$validation_output" >&2
+        fail 'the validation failed for another reason than the version check'
+    fi
+fi
+
+printf 'PASS: VERSION, the app version and the latest release agree\n' | tee "$VERSION_STATUS_FILE"
 printf 'PASS: the gate runs the version-consistency check, and the check catches drift\n'

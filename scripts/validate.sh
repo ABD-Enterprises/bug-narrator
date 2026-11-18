@@ -48,7 +48,6 @@ EFFORT_LEAK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-status.txt"
 EFFORT_LEAK_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/effort-leak-output.txt"
 REPO_DOCS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/repo-docs-status.txt"
 VERSION_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/version-status.txt"
-VERSION_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/version-output.txt"
 DOC_IDENTIFIERS_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/doc-identifiers-status.txt"
 DOC_IDENTIFIERS_OUTPUT_FILE="${VALIDATION_ARTIFACT_DIR}/doc-identifiers-output.txt"
 SHELLCHECK_STATUS_FILE="${VALIDATION_ARTIFACT_DIR}/shell-lint-status.txt"
@@ -65,7 +64,6 @@ rm -f \
   "$REPO_DOCS_STATUS_FILE" \
   "$REPO_DOCS_OUTPUT_FILE" \
   "$VERSION_STATUS_FILE" \
-  "$VERSION_OUTPUT_FILE" \
   "$DOC_IDENTIFIERS_STATUS_FILE" \
   "$DOC_IDENTIFIERS_OUTPUT_FILE" \
   "$SHELLCHECK_STATUS_FILE" \
@@ -269,6 +267,23 @@ else
   : "$semgrep_outcome"
 fi
 
+# The version contract: VERSION, project.yml and the latest released heading
+# have to agree. Only the release-time scripts compared them, so a drift was
+# found while a release was being cut rather than on the push that caused it,
+# and CI reported green while the version contract was broken.
+#
+# The gate proves by running that the validation fails when the check fails, so
+# it sits after the diff step and before the expensive checks: its own run of
+# the validation has to reach this point in order to fail, and a later placement
+# would make every validation run pay for a whole validation.
+if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-version-consistency-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
+  exit 1
+fi
+
 # Always run the cloud-portable Swift parse check. It self-skips with a clean
 # exit when no Swift toolchain is available, and fails the build only on
 # syntax errors — never on missing toolchains or missing imports.
@@ -329,30 +344,6 @@ printf 'PASS: the published surface carries no owner notarization identifiers\n'
 
 if [[ -x "$ROOT/scripts/check-agent-rules-sync.sh" ]]; then
   if ! "$ROOT/scripts/check-agent-rules-sync.sh"; then
-    exit 1
-  fi
-fi
-
-# VERSION, project.yml's MARKETING_VERSION and the latest released heading in
-# the changelog archive have to agree. Only the release-time scripts checked
-# that, so the drift was found at release time rather than on the push that
-# caused it — and CI reported green while the version contract was broken.
-if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
-  printf 'FAIL: scripts/check-version-consistency-gate.sh is missing or not executable\n' >&2
-  exit 1
-fi
-if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
-  exit 1
-fi
-
-if [[ -x "$ROOT/scripts/check_version_consistency.sh" ]]; then
-  if "$ROOT/scripts/check_version_consistency.sh" >"$VERSION_OUTPUT_FILE" 2>&1; then
-    # Echoed, not only written to the status file: CI neither prints nor uploads the
-    # artifacts directory, so a check that only writes a status file leaves no trace in the log.
-    printf 'PASS: VERSION, the app version and the latest release agree\n' \
-      | tee "$VERSION_STATUS_FILE"
-  else
-    cat "$VERSION_OUTPUT_FILE" >&2
     exit 1
   fi
 fi
