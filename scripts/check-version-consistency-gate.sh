@@ -25,9 +25,13 @@
 #      has to fail because of the version contract.
 #
 # The third question is answered by running the validation in a clone whose
-# version sources are broken. The recursion cannot start, because that
-# clone's own gate stops at its unconditional real-tree check — the clone's
-# VERSION disagrees with its project.yml — before it reaches its own proof.
+# version sources are broken. That clone's own gate must not run a proof of
+# its own, so this gate sets VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK for it,
+# and skips its own proof when that flag is set. The nesting is therefore
+# bounded by the plumbing rather than by the version check's behaviour: a
+# check that had rotted into tolerating the clone's drift would make the
+# clone's validation pass, and this gate would fail, rather than the nesting
+# growing without bound.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -107,6 +111,23 @@ fi
 
 printf '1.1.0\n' >"$workspace/VERSION"
 
+# The released heading is a source too: a check that stopped comparing it
+# would let a release ship a stale version heading unnoticed, so the archive
+# has to drift on its own. VERSION agrees with project.yml here, so only the
+# archive is wrong.
+printf '## 9.9.9\n' >"$workspace/CHANGELOG-archive.md"
+if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
+    fail 'the version check accepted a released heading that does not match VERSION'
+fi
+
+cat >"$workspace/CHANGELOG-archive.md" <<'MARKDOWN'
+# Changelog archive
+
+## 1.1.0
+
+- The released version.
+MARKDOWN
+
 # A build number that is not a number has to be caught too.
 sed -i.bak 's/CURRENT_PROJECT_VERSION: 47/CURRENT_PROJECT_VERSION: forty-seven/' "$workspace/project.yml"
 if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
@@ -118,17 +139,24 @@ fi
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
 #
+# The proof covers the committed tree: the clone is made from the repository,
+# so it exercises the committed validation, the committed gate and the
+# committed check. That is the state CI validates. The working tree's own
+# version sources are covered by step 1, which runs against them directly.
+if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" == "1" ]]; then
+    printf 'PASS: the gate runs the version-consistency check, and the check catches drift\n'
+    exit 0
+fi
+
 # The proof uses a genuinely broken tree rather than a simulated failure: a
 # clone of the repository whose VERSION disagrees with project.yml, validated
 # in the clone. The clone is what makes it a proof — the validation reads the
 # version sources from the tree it is run in, so the check really fails there.
 #
 # The clone is validated with HEAD as its base ref, so it scans no files and
-# reaches the gate quickly. The clone's own gate stops there: its
-# unconditional real-tree check fails on the clone's broken VERSION, so the
-# clone's validation fails before the clone's gate would run a proof of its
-# own. That is what terminates the nesting — not a flag, and not a limit on
-# how deep it may go.
+# reaches the gate quickly. The clone's gate skips its own proof because the
+# flag is set for it, so the nesting is one level deep however the version
+# check behaves.
 #
 # The proof costs a clone of the repository and a validation run inside it, so
 # it grows with the size of the tree.
@@ -142,7 +170,7 @@ fi
 printf '0.0.0\n' >"$clone/VERSION"
 
 validation_output="$workspace/validation-output.txt"
-if env -u AI_VALIDATOR_BASE_REF \
+if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
     fail 'the validation passed although the version contract was broken'
 fi
