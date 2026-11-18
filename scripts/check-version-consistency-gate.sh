@@ -12,28 +12,32 @@
 # things rather than by reading them:
 #
 #   1. Is the version contract true of the tree right now? The check is run
-#      against the real sources, and a disagreement fails the gate.
+#      against the real sources, and a disagreement fails the gate. This step
+#      is unconditional: nothing in the environment can stand in for the real
+#      check, so a drifted tree cannot be hidden.
 #   2. Does the check actually catch drift, or has it rotted into one that
 #      always agrees? The check is run against a throwaway set of version
 #      sources that are deliberately wrong.
 #   3. Does the validation actually fail when the check fails? A gate that
 #      silently stopped running the check would look exactly like a gate that
-#      passes, so the validation is run with a check that always fails and has
-#      to fail too.
+#      passes, so the validation is run in an instance that reports the
+#      contract as broken, and has to fail too.
 #
 # The third question is answered by running the validation, so the validation
 # skips this gate's own third step when it is invoked from here. The
 # recursion is broken by VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK, which the
 # nested invocation inherits.
 #
-# What the third step proves is that the validation fails when the check
-# fails. The validation runs under "set -euo pipefail", so a failing check
-# that is not swallowed stops the run; the forms that swallow a failure —
-# "|| true", a discarded status, an inverted test — are all caught, because
-# the nested run would then pass.
+# The nested instance reports the contract as broken on purpose: it is the
+# simulation of "the check failed". That is why the flag that selects it also
+# makes the gate fail, so an environment that sets the flag without being
+# inside a nested run fails the validation rather than weakening it.
 #
-# BUGNARRATOR_VERSION_CHECK substitutes the version check. It exists so the
-# third step can inject a check that fails; it is never set in CI.
+# What the third step proves is that the validation fails when the contract is
+# reported as broken. The validation runs under "set -euo pipefail", so a
+# failing check that is not swallowed stops the run; the forms that swallow a
+# failure — "|| true", a discarded status, an inverted test — are all caught,
+# because the nested run would then pass.
 
 set -euo pipefail
 
@@ -45,24 +49,15 @@ fail() {
     exit 1
 }
 
-DEFAULT_CHECK="$ROOT/scripts/check_version_consistency.sh"
+CHECK="$ROOT/scripts/check_version_consistency.sh"
+NESTED="${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}"
 
-# The substitution is honoured ONLY inside the nested validation this gate
-# runs for its own third step. Outside it — in any ordinary validation run —
-# the real check always runs, so an inherited environment variable cannot make
-# the gate pass while the tree is inconsistent.
-if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" == "1" && -n "${BUGNARRATOR_VERSION_CHECK:-}" ]]; then
-    CHECK="$BUGNARRATOR_VERSION_CHECK"
-else
-    CHECK="$DEFAULT_CHECK"
-fi
+# ── 1. The real tree must agree right now ─────────────────────────────────
+# This is the unconditional step. The check is what the gate exists to
+# enforce, so a missing one is a failure rather than a check that quietly
+# does nothing, and the check always runs against the real sources.
+[[ -x "$CHECK" ]] || fail 'scripts/check_version_consistency.sh is missing or not executable'
 
-# ── 1. The check must exist and be executable ─────────────────────────────
-# The check is what the gate exists to enforce, so a missing one is a failure
-# rather than a check that quietly does nothing.
-[[ -x "$CHECK" ]] || fail "$CHECK is missing or not executable"
-
-# ── 2. The real tree must agree right now ─────────────────────────────────
 VERSION_STATUS_FILE="$ROOT/artifacts/validation/version-status.txt"
 mkdir -p "$ROOT/artifacts/validation"
 
@@ -71,13 +66,22 @@ if ! "$CHECK"; then
     fail 'the version sources are inconsistent'
 fi
 
+# ── 2. The nested instance reports the contract as broken ──────────────────
+# The nested validation has to fail at the version contract, so that the
+# third step can show that a broken contract fails the validation. The nested
+# instance is the one that VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK selects.
+if [[ "$NESTED" == "1" ]]; then
+    printf 'FAIL: the version contract was reported as broken (simulated)\n' >&2
+    fail 'the version contract was reported as broken (simulated)'
+fi
+
 # ── 3. The check must catch drift, not merely agree ───────────────────────
 # The check reads the version sources from the directory above the script, so
 # a throwaway copy of it sees a throwaway set of sources.
 workspace="$(mktemp -d)"
 trap 'rm -rf "$workspace"' EXIT
 mkdir -p "$workspace/scripts"
-cp "$DEFAULT_CHECK" "$workspace/scripts/check_version_consistency.sh"
+cp "$CHECK" "$workspace/scripts/check_version_consistency.sh"
 chmod +x "$workspace/scripts/check_version_consistency.sh"
 
 printf '1.1.0\n' >"$workspace/VERSION"
@@ -112,36 +116,34 @@ fi
 
 printf '1.1.0\n' >"$workspace/VERSION"
 
-# A build number that is not a positive integer has to be caught too.
+# A build number that is not a number has to be caught too.
 sed -i.bak 's/CURRENT_PROJECT_VERSION: 47/CURRENT_PROJECT_VERSION: forty-seven/' "$workspace/project.yml"
 if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
-    fail 'the version check accepted a build number that is not a positive integer'
+    fail 'the version check accepted a build number that is not a number'
 fi
 
-# ── 4. The validation has to fail when the check fails ────────────────────
+# ── 4. The validation has to fail when the contract is broken ──────────────
 # This is the step a grep cannot do. Whether the validation runs the check and
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
-if [[ "${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}" != "1" ]]; then
-    stub="$workspace/failing-version-check.sh"
-    printf '#!/usr/bin/env bash\nexit 1\n' >"$stub"
-    chmod +x "$stub"
+#
+# The nested validation uses HEAD as its base ref, so it scans no files and
+# reaches the gate in a couple of seconds. It inherits
+# VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK's own nested validation as well, and
+# that one inherits this flag, which is what stops the recursion: the flag is
+# inherited rather than cleared, so every nested instance stays a nested
+# instance.
+validation_output="$workspace/validation-output.txt"
+if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 \
+    "$ROOT/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
+    fail 'the validation passed although the version contract was broken'
+fi
 
-    validation_output="$workspace/validation-output.txt"
-    # AI_VALIDATOR_BASE_REF takes precedence over the argument, so it is cleared:
-    # an inherited base ref would make the nested run fail at the diff step
-    # instead of at the version contract.
-    if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 BUGNARRATOR_VERSION_CHECK="$stub" \
-        "$ROOT/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
-        fail 'the validation passed although the version check failed'
-    fi
-
-    # The validation has to have failed for this reason, not for some other
-    # one: a base ref it could not diff, for instance.
-    if ! grep -q 'the version sources are inconsistent' "$validation_output"; then
-        cat "$validation_output" >&2
-        fail 'the validation failed for another reason than the version check'
-    fi
+# The validation has to have failed for this reason, not for some other one:
+# a base ref it could not diff, for instance.
+if ! grep -q 'the version contract was reported as broken' "$validation_output"; then
+    cat "$validation_output" >&2
+    fail 'the validation failed for another reason than the version contract'
 fi
 
 printf 'PASS: VERSION, the app version and the latest release agree\n' | tee "$VERSION_STATUS_FILE"

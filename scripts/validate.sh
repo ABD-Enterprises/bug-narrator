@@ -270,10 +270,12 @@ fi
 # found while a release was being cut rather than on the push that caused it,
 # and CI reported green while the version contract was broken.
 #
-# The gate proves by running that the validation fails when the check fails, so
-# it sits after the diff step and before the expensive checks: its own run of
-# the validation has to reach this point in order to fail, and a later placement
-# would make every validation run pay for a whole validation.
+# The gate proves by running that the validation fails when the check fails.
+# It therefore sits after the diff step: a validation with an unresolvable
+# base ref has to fail at the diff step first, and a gate before it would
+# change what that failure looks like. The nested validation the gate runs
+# uses HEAD as its base ref, so it scans no files and reaches the gate in a
+# couple of seconds.
 if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
   printf 'FAIL: scripts/check-version-consistency-gate.sh is missing or not executable\n' >&2
   exit 1
