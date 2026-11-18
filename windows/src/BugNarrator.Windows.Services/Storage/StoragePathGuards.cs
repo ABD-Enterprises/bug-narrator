@@ -117,7 +117,7 @@ internal static class StoragePathGuards
         if (!IsPathUnderRoot(rootDirectory, normalizedCandidatePath))
         {
             throw new InvalidOperationException(
-                $"Refusing to use a {subject} path outside the expected BugNarrator storage root: {candidatePath}");
+                $"Refusing to use a {subject} path outside the expected SureForge Capture storage root: {candidatePath}");
         }
 
         return normalizedCandidatePath;

@@ -3,7 +3,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace BugNarrator.Windows.Services.LocalTranscription;
 
-/// <summary>Verifies that an executable is signed by the BugNarrator publisher; throws <see cref="LocalServerFailure"/> otherwise.</summary>
+/// <summary>Verifies that an executable is signed by the expected publisher; throws <see cref="LocalServerFailure"/> otherwise.</summary>
 public interface IAuthenticodeVerifier
 {
     void Verify(string executablePath);
@@ -27,7 +27,7 @@ public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
         if (status != 0)
         {
             throw new LocalServerFailure(status == TrustENoSignature
-                ? "The local server executable is not signed by the BugNarrator publisher. Remove and reinstall it."
+                ? "The local server executable is not signed by the expected publisher. Remove and reinstall it."
                 : $"The local server executable's signature could not be verified (0x{status:X8}). Remove and reinstall it.");
         }
 
@@ -45,7 +45,7 @@ public sealed class AuthenticodeVerifier : IAuthenticodeVerifier
         {
             if (!SignedBy(certificate.SubjectName, PublisherOrganization))
             {
-                throw new LocalServerFailure("The local server executable is not signed by the BugNarrator publisher. Remove and reinstall it.");
+                throw new LocalServerFailure("The local server executable is not signed by the expected publisher. Remove and reinstall it.");
             }
         }
     }

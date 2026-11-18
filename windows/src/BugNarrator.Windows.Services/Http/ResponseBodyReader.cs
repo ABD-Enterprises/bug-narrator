@@ -30,7 +30,7 @@ public static class ResponseBodyReader
         cancellationToken.ThrowIfCancellationRequested();
         if (content.Headers.ContentLength is long declared && declared > SuccessBodyByteLimit)
         {
-            throw new InvalidOperationException("The server reply exceeded BugNarrator's size limit.");
+            throw new InvalidOperationException("The server reply exceeded SureForge Capture's size limit.");
         }
         using var stream = await content.ReadAsStreamAsync(cancellationToken);
         using var payload = new MemoryStream();
@@ -43,7 +43,7 @@ public static class ResponseBodyReader
             if (count == 0) break;
             if (payload.Length + count > SuccessBodyByteLimit)
             {
-                throw new InvalidOperationException("The server reply exceeded BugNarrator's size limit.");
+                throw new InvalidOperationException("The server reply exceeded SureForge Capture's size limit.");
             }
             payload.Write(buffer, 0, count);
         }

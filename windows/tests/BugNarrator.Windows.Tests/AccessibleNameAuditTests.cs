@@ -98,6 +98,7 @@ public sealed class AccessibleNameAuditTests
             {
                 Assert.Contains("SureForge Capture", window.Title);
                 var text = string.Join("\n", Descendants(window).OfType<TextBlock>().Select(block => block.Text));
+                Assert.DoesNotContain("BugNarrator", text);
                 Assert.DoesNotContain("Source-of-truth", text);
                 Assert.DoesNotContain("Milestone 6", text);
                 Assert.DoesNotContain("shell placeholder", text);

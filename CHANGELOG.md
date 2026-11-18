@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] The Windows error and settings messages now say SureForge Capture, like the rest of the shipped product surfaces: the recovery, connection, upload-limit, reply-size, local-server-signature, local-provider-hint and storage-root messages. The storage folder name, the token service name, the signing-publisher pin, the exported-bundle identifiers and the tracker headers are unchanged.
 - [FIX] Keep Windows Session Library navigation and actions reachable in smaller windows, and align visible product names and guidance with SureForge Capture.
 - [INTERNAL] Windows local-server shutdown tests reset the Ctrl+C-ignore flag inherited from Git shells, preserving the graceful-exit timing check during pre-push validation.
 - [INTERNAL] Prepare the corrupt-audio test fixture before its finalization timer starts, keeping the timeout and error checks unchanged.

@@ -210,6 +210,27 @@ public sealed class WindowsAiProviderSettingsTests
         Assert.Null(settings.AiProviderCredentialForIssueExtraction("sk-test"));
     }
 
+    [Fact]
+    public void ProviderHints_NeverNameTheOldProduct()
+    {
+        // The shipped surfaces say SureForge Capture. A user who sees the old name
+        // cannot tell an old build from a different product, so no provider hint or
+        // description may carry it. Hints that do name the product must use the new name.
+        foreach (var profile in WindowsAiProviderProfile.All)
+        {
+            Assert.DoesNotContain("BugNarrator", profile.BaseUrlHint);
+            Assert.DoesNotContain("BugNarrator", profile.SetupDescription);
+        }
+
+        var localCompatible = WindowsAiProviderProfile.All
+            .Single(profile => profile.Provider == WindowsAiProvider.LocalCompatible);
+        Assert.Contains("SureForge Capture", localCompatible.BaseUrlHint);
+
+        var parakeetLocal = WindowsAiProviderProfile.All
+            .Single(profile => profile.Provider == WindowsAiProvider.ParakeetLocal);
+        Assert.Contains("SureForge Capture", parakeetLocal.BaseUrlHint);
+    }
+
     private static string SwiftPath(string folder, string file, [CallerFilePath] string sourceFilePath = "")
     {
         // <root>/windows/tests/BugNarrator.Windows.Tests/<this file>
