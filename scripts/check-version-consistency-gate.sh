@@ -30,12 +30,12 @@
 # never reaches a proof of its own, so the nesting is one level deep.
 #
 # That depends on the version check failing, so the gate also carries its own
-# limit: VALIDATE_VERSION_GATE_DEPTH says how deep the nesting already is,
-# and the gate refuses to clone past MAX_PROOF_DEPTH. A version check that had
-# rotted into tolerating the clone's drift would otherwise make each clone's
-# validation pass and the gate clone again, without limit. With the limit, it
-# makes the gate fail loudly instead, and the proof is never skipped by an
-# ambient setting: the limit can only make the gate fail, never pass.
+# limit. How deep the nesting already is travels in a file inside the tree
+# rather than in the environment, so a validator that runs the gate under a
+# clean environment cannot reset the count and make the limit unreachable.
+# Past MAX_PROOF_DEPTH the gate fails loudly: a version check that had rotted
+# into tolerating the clone's drift would otherwise make each clone's
+# validation pass and the gate clone again, without limit.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -64,6 +64,18 @@ CHECK="$ROOT/scripts/check_version_consistency.sh"
 # version check can cost.
 readonly MAX_PROOF_DEPTH=2
 
+# How deep the tree this gate runs in already is. It is carried by a file
+# inside the tree rather than by the environment, because a validator that
+# runs the gate under a clean environment would otherwise reset the count at
+# every level and the limit would never be reached. The file lives under the
+# gitignored artifacts directory, so a clone never inherits one.
+readonly DEPTH_MARKER="artifacts/validation/version-gate-depth"
+
+# Written when this gate finds the version sources inconsistent, so that a
+# nested validation can be attributed to the version contract rather than to
+# whatever else may have failed first.
+readonly BROKEN_MARKER="artifacts/validation/version-contract-broken"
+
 
 # ── 1. The real tree must agree right now ─────────────────────────────────
 # This is the unconditional step. The check is what the gate exists to
@@ -76,6 +88,8 @@ mkdir -p "$ROOT/artifacts/validation"
 
 if ! "$CHECK"; then
     printf 'FAIL: the version sources are inconsistent\n' >"$VERSION_STATUS_FILE"
+    mkdir -p "$ROOT/$(dirname "$BROKEN_MARKER")"
+    printf 'the version sources are inconsistent\n' >"$ROOT/$BROKEN_MARKER"
     fail 'the version sources are inconsistent'
 fi
 
@@ -156,13 +170,23 @@ fi
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
 #
-# The proof covers the committed tree: the clone is made from the repository,
-# so it exercises the committed validation, the committed gate and the
-# committed check. That is the state CI validates. The working tree's own
-# version sources are covered by step 1, which runs against them directly.
-depth="${VALIDATE_VERSION_GATE_DEPTH:-0}"
-if ! [[ "$depth" =~ ^[0-9]+$ ]]; then
-    fail "VALIDATE_VERSION_GATE_DEPTH is not a number: '$depth'"
+# The proof runs the same scripts this gate is running, so it answers the
+# question about the validator that is actually in use. The clone carries the
+# repository, and the working tree's scripts are copied over it, so the clone
+# validates exactly what this gate validates. The working tree's own version
+# sources are covered by step 1, which runs against them directly.
+depth=0
+depth_file="$ROOT/$DEPTH_MARKER"
+if [[ -e "$depth_file" ]]; then
+    if git -C "$ROOT" ls-files --error-unmatch -- "$DEPTH_MARKER" >/dev/null 2>&1; then
+        # The marker belongs to a throwaway clone. A tracked one would reset the
+        # count in every clone and defeat the limit.
+        fail "the version-gate depth marker is tracked; it must never be committed"
+    fi
+    depth="$(tr -d '[:space:]' <"$depth_file")"
+    if ! [[ "$depth" =~ ^[0-9]+$ ]] || (( depth > 99 )); then
+        fail "the version-gate depth marker is not a usable depth: '$depth'"
+    fi
 fi
 if (( depth >= MAX_PROOF_DEPTH )); then
     # Reaching the limit means the version check is not failing on a broken
@@ -192,15 +216,30 @@ fi
 printf '0.0.0\n' >"$clone/VERSION"
 
 validation_output="$workspace/validation-output.txt"
-if env -u AI_VALIDATOR_BASE_REF VALIDATE_VERSION_GATE_DEPTH="$((depth + 1))" \
+# The clone has to validate the same scripts this gate is, or the proof would
+# be about a different validator than the one that is running. A clone carries
+# the committed tree, so the working tree's scripts are copied over it.
+cp -a "$ROOT/scripts/." "$clone/scripts/"
+
+mkdir -p "$clone/$(dirname "$DEPTH_MARKER")"
+printf '%s\n' "$((depth + 1))" >"$clone/$DEPTH_MARKER"
+
+if env -u AI_VALIDATOR_BASE_REF \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
     fail 'the validation passed although the version contract was broken'
 fi
 
-# The validation has to have failed for this reason, not for some other one:
-# a base ref it could not diff, for instance.
-if ! grep -q 'the version sources are inconsistent' "$validation_output"; then
+# The validation has to have failed for this reason, not for some other one.
+# The clone's own gate writes the marker when it finds the contract broken, so
+# the attribution cannot be satisfied by an unrelated failure that happens to
+# print a similar phrase.
+if [[ ! -e "$clone/$BROKEN_MARKER" ]]; then
     cat "$validation_output" >&2
+    # The nesting limit is a real reason, not an unrelated one, and it is the
+    # reason that matters when the version check has rotted.
+    if grep -q 'the nesting limit was reached' "$validation_output"; then
+        fail 'the version check did not fail on a broken tree; the nesting limit was reached'
+    fi
     fail 'the validation failed for another reason than the version contract'
 fi
 
