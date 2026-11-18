@@ -697,6 +697,12 @@ public sealed class SessionLibraryWindow : Window
         ApplyCurrentQuery();
     }
 
+    /// <summary>Sets the search box text the way a user typing in it would.</summary>
+    internal void ApplySearchTextForTests(string text)
+    {
+        searchTextBox.Text = text;
+    }
+
     internal void ApplyRecoveredSession(CompletedSession recoveredSession)
     {
         allSessions = allSessions
@@ -1394,7 +1400,10 @@ public sealed class SessionLibraryWindow : Window
 
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
-            return $"No sessions matched \"{query.SearchText.Trim()}\". Try a different search term or clear search.";
+            // The query is already visible in the Search box. Repeating it here let a long
+            // pasted query grow this row until it pushed Refresh and Delete out of the window,
+            // and this row is outside the scrolling filter area, so the message stays bounded.
+            return "No sessions matched your search. Try a different search term or clear search.";
         }
 
         return query.DateRange switch
