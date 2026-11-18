@@ -59,7 +59,7 @@ public sealed record RecoveryBlocker(
     {
         IOException or UnauthorizedAccessException => new(
             RecoveryBlockerCategory.Storage,
-            "BugNarrator could not write to its sessions folder. Free up disk space or check the folder's permissions, then try again.",
+            "SureForge Capture could not write to its sessions folder. Free up disk space or check the folder's permissions, then try again.",
             RecoveryDestination.RecordingControls),
         _ => new(
             RecoveryBlockerCategory.Other,

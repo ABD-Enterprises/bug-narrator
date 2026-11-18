@@ -100,7 +100,7 @@ public sealed class OpenAiTranscriptionClient : ITranscriptionClient
     }
 
     private static string OversizedMessage(long bytes) =>
-        $"The recorded audio is {bytes / (1024.0 * 1024.0):0.#} MB, which is larger than BugNarrator's 24 MB safe upload limit. Shorten the recording or use a lower-bitrate source.";
+        $"The recorded audio is {bytes / (1024.0 * 1024.0):0.#} MB, which is larger than SureForge Capture's 24 MB safe upload limit. Shorten the recording or use a lower-bitrate source.";
 
     private async Task<string> TranscribeSingleFileAsync(
         string audioFilePath,

@@ -15,7 +15,7 @@ public sealed class TrayPresentationStateTests
         var presentation = TrayPresentationState.FromRecordingState(state);
 
         Assert.Equal("Status: Ready", presentation.StatusLabel);
-        Assert.Equal("BugNarrator - Ready", presentation.IconText);
+        Assert.Equal("SureForge Capture - Ready", presentation.IconText);
         Assert.True(presentation.CanStartRecording);
         Assert.False(presentation.CanStopRecording);
         Assert.False(presentation.CanCaptureScreenshot);
@@ -35,7 +35,7 @@ public sealed class TrayPresentationStateTests
         var presentation = TrayPresentationState.FromRecordingState(state);
 
         Assert.Equal("Status: Recording", presentation.StatusLabel);
-        Assert.Equal("BugNarrator - Recording", presentation.IconText);
+        Assert.Equal("SureForge Capture - Recording", presentation.IconText);
         Assert.False(presentation.CanStartRecording);
         Assert.True(presentation.CanStopRecording);
         Assert.True(presentation.CanCaptureScreenshot);
@@ -55,7 +55,7 @@ public sealed class TrayPresentationStateTests
         var presentation = TrayPresentationState.FromRecordingState(state);
 
         Assert.Equal("Status: Needs Attention", presentation.StatusLabel);
-        Assert.Equal("BugNarrator - Needs Attention", presentation.IconText);
+        Assert.Equal("SureForge Capture - Needs Attention", presentation.IconText);
         Assert.True(presentation.CanStartRecording);
         Assert.False(presentation.CanStopRecording);
         Assert.False(presentation.CanCaptureScreenshot);

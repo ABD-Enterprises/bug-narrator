@@ -60,7 +60,7 @@ public sealed class WelcomeWindow : Window
         this.diagnostics = diagnostics;
         this.openSettings = openSettings;
 
-        Title = "Welcome to BugNarrator";
+        Title = "Welcome to SureForge Capture";
         Width = 560;
         Height = 520;
         MinWidth = 520;
@@ -106,7 +106,7 @@ public sealed class WelcomeWindow : Window
             Margin = new Thickness(24, 24, 24, 16),
             Children =
             {
-                new TextBlock { FontSize = 24, FontWeight = FontWeights.Bold, Text = "Welcome to BugNarrator" },
+                new TextBlock { FontSize = 24, FontWeight = FontWeights.Bold, Text = "Welcome to SureForge Capture" },
                 new TextBlock
                 {
                     Margin = new Thickness(0, 8, 0, 0),
@@ -240,7 +240,7 @@ public sealed class WelcomeWindow : Window
     private void RenderProviderStep(OnboardingSnapshot snapshot)
     {
         bodyPanel.Children.Add(BuildHeading(FirstRunFunnel.Title(OnboardingStep.Provider)));
-        bodyPanel.Children.Add(BuildBody("BugNarrator sends your recording to an AI provider to transcribe it and pull out the issues. Pick a provider and paste a key — or choose a local engine that needs no key at all."));
+        bodyPanel.Children.Add(BuildBody("SureForge Capture sends your recording to an AI provider to transcribe it and pull out the issues. Pick a provider and paste a key — or choose a local engine that needs no key at all."));
         if (FirstRunFunnel.IsComplete(OnboardingStep.Provider, snapshot))
         {
             bodyPanel.Children.Add(BuildDone("Provider ready."));
@@ -256,13 +256,13 @@ public sealed class WelcomeWindow : Window
         open.ToolTip = "Settings opens on the AI provider section while a provider still needs configuring.";
         open.Click += (_, _) => openSettings();
         bodyPanel.Children.Add(open);
-        bodyPanel.Children.Add(BuildBody("This is the only step that gates recording. The other two make BugNarrator nicer to use, and you can skip them."));
+        bodyPanel.Children.Add(BuildBody("This is the only step that gates recording. The other two make SureForge Capture nicer to use, and you can skip them."));
     }
 
     private void RenderMicrophoneStep(OnboardingSnapshot snapshot)
     {
         bodyPanel.Children.Add(BuildHeading(FirstRunFunnel.Title(OnboardingStep.Microphone)));
-        bodyPanel.Children.Add(BuildBody("BugNarrator records your narration, so Windows needs to allow it to use the microphone."));
+        bodyPanel.Children.Add(BuildBody("SureForge Capture records your narration, so Windows needs to allow it to use the microphone."));
         if (FirstRunFunnel.IsComplete(OnboardingStep.Microphone, snapshot))
         {
             bodyPanel.Children.Add(BuildDone("Microphone access granted."));
@@ -289,7 +289,7 @@ public sealed class WelcomeWindow : Window
     private void RenderHotkeysStep(OnboardingSnapshot snapshot)
     {
         bodyPanel.Children.Add(BuildHeading(FirstRunFunnel.Title(OnboardingStep.Hotkeys)));
-        bodyPanel.Children.Add(BuildBody("Global shortcuts let you start, stop, and grab a screenshot without leaving the app you are testing. BugNarrator ships with none bound, so nothing of yours is overwritten."));
+        bodyPanel.Children.Add(BuildBody("Global shortcuts let you start, stop, and grab a screenshot without leaving the app you are testing. SureForge Capture ships with none bound, so nothing of yours is overwritten."));
 
         foreach (var (action, shortcut) in settings.GetHotkeyAssignments())
         {
@@ -441,7 +441,7 @@ public sealed class WelcomeWindow : Window
 
         // Names only the steps that actually block recording — skipping the hotkey step costs nothing.
         var names = string.Join(", ", blocking.Select(FirstRunFunnel.Title));
-        var message = $"BugNarrator cannot transcribe a recording until this is done: {names}. "
+        var message = $"SureForge Capture cannot transcribe a recording until this is done: {names}. "
             + "You can finish it later in Settings, or reopen this tour from the tray menu's Show Welcome Tour.";
         var answer = MessageBox.Show(this, message, "Skip setup?", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer == MessageBoxResult.OK)

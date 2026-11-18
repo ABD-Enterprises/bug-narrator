@@ -23,7 +23,7 @@ internal static class RemoteServiceRequestGuard
         catch (HttpRequestException exception)
         {
             throw new InvalidOperationException(
-                $"BugNarrator could not reach {serviceName}. Check the network connection and try again.",
+                $"SureForge Capture could not reach {serviceName}. Check the network connection and try again.",
                 exception);
         }
     }

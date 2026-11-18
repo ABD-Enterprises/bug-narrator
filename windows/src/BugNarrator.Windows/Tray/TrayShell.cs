@@ -29,7 +29,7 @@ public sealed class TrayShell : IDisposable
         {
             ContextMenuStrip = contextMenu,
             Icon = Drawing.SystemIcons.Application,
-            Text = "BugNarrator",
+            Text = "SureForge Capture",
             Visible = false,
         };
 

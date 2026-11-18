@@ -39,7 +39,7 @@ public sealed class RecordingControlsWindow : Window
         this.diagnostics = diagnostics;
         this.openSessionLibrary = openSessionLibrary;
 
-        Title = "BugNarrator Controls";
+        Title = "SureForge Capture Controls";
         Width = 460;
         MinWidth = 420;
         MinHeight = 300;

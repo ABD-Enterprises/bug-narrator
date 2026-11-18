@@ -31,6 +31,149 @@ namespace BugNarrator.Windows.Tests;
 public sealed class AccessibleNameAuditTests
 {
     [Theory]
+    [InlineData(932, 552)]
+    [InlineData(1132, 672)]
+    public void SessionLibrary_ConstrainedLayoutKeepsNavigationAndActionsReachable(double width, double height)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = harness.Build("SessionLibraryWindow");
+            try
+            {
+                var content = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+                var descendants = Descendants(content).ToArray();
+                var dateFilter = descendants.OfType<ComboBox>().Single(combo => combo.Items.OfType<ComboBoxItem>()
+                    .Any(item => Equals(item.Content, "Custom Date Range")));
+                dateFilter.SelectedItem = dateFilter.Items.OfType<ComboBoxItem>().Single(item => Equals(item.Content, "Custom Date Range"));
+                var offer = descendants.OfType<Border>().Single(border => AutomationProperties.GetName(border) == "Issue extraction offer");
+                offer.Visibility = Visibility.Visible;
+                var sessions = descendants.OfType<ListBox>().Single(list => AutomationProperties.GetName(list) == "Sessions");
+                for (var index = 0; index < 30; index++) sessions.Items.Add($"Session {index}");
+
+                content.Measure(new Size(width, height));
+                content.Arrange(new Rect(0, 0, width, height));
+                content.UpdateLayout();
+
+                foreach (var control in descendants.OfType<Button>().Where(button => Equals(button.Content, "Refresh") || Equals(button.Content, "Delete Session"))
+                    .Cast<FrameworkElement>().Append(sessions))
+                {
+                    var bounds = control.TransformToAncestor(content).TransformBounds(new Rect(control.RenderSize));
+                    Assert.True(bounds.Top >= 0 && bounds.Bottom <= height, $"{control.GetType().Name} outside viewport: {bounds}");
+                    Assert.True(bounds.Left >= 0 && bounds.Right <= width);
+                    Assert.True(control.ActualHeight > 0);
+                }
+
+                // Optional filters and the extraction offer scroll independently of the session list.
+                var filterScroll = descendants.OfType<ScrollViewer>().Single(scroll => Descendants(scroll).Contains(dateFilter));
+                Assert.True(filterScroll.ScrollableHeight > 0);
+                var notNow = Descendants(offer).OfType<Button>().Single(button => Equals(button.Content, "Not Now"));
+                AssertFitsInFilter(filterScroll, notNow, content);
+                foreach (var picker in descendants.OfType<DatePicker>())
+                {
+                    AssertFitsInFilter(filterScroll, picker, content);
+                }
+                filterScroll.ScrollToTop();
+                content.UpdateLayout();
+                var filterBounds = dateFilter.TransformToAncestor(filterScroll).TransformBounds(new Rect(dateFilter.RenderSize));
+                Assert.InRange(filterBounds.Top, 0, filterScroll.ActualHeight);
+
+                // ── F2: the session list scrolls on its own, so the last session is reachable
+                // without moving the filters.
+                var lastIndex = sessions.Items.Count - 1;
+                var filterOffsetBefore = filterScroll.VerticalOffset;
+                var listScroll = FindListScrollViewer(sessions);
+                Assert.NotNull(listScroll);
+                Assert.True(listScroll!.ScrollableHeight > 0, "the session list does not scroll on its own");
+                listScroll.ScrollToEnd();
+                content.UpdateLayout();
+                var lastContainer = sessions.ItemContainerGenerator.ContainerFromIndex(lastIndex) as FrameworkElement;
+                Assert.NotNull(lastContainer);
+                var lastBounds = lastContainer!.TransformToAncestor(listScroll).TransformBounds(new Rect(lastContainer.RenderSize));
+                Assert.True(lastBounds.Top >= 0 && lastBounds.Bottom <= listScroll.ActualHeight,
+                    $"the last session is outside the list viewport: {lastBounds}");
+                Assert.Equal(filterOffsetBefore, filterScroll.VerticalOffset, 3);
+            }
+            finally { window.Close(); }
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// A long pasted search that matches nothing must not push Refresh out of the window.
+    /// The no-results message used to repeat the whole query, and that message sits outside
+    /// the scrolling filter area, so the row grew until the actions fell below the window.
+    /// </summary>
+    [Fact]
+    public void SessionLibrary_LongUnmatchedSearchKeepsTheActionsReachable()
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = (SessionLibraryWindow)harness.Build("SessionLibraryWindow");
+            try
+            {
+                // Load the sessions so the library is not empty, then search for nothing.
+                window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+                window.ApplySearchTextForTests(new string('x', 400));
+
+                var content = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+                var descendants = Descendants(content).ToArray();
+                var refresh = descendants.OfType<Button>().Single(button => Equals(button.Content, "Refresh"));
+
+                // The no-results branch is what this test is about, so pin it: the message is
+                // visible and it does not repeat the query.
+                // The bounded no-results message, not the library status line, which also starts
+                // with "No sessions matched".
+                var emptyState = descendants.OfType<TextBlock>().Single(block => block.Text.StartsWith("No sessions matched your search", StringComparison.Ordinal));
+                Assert.Equal(Visibility.Visible, emptyState.Visibility);
+                Assert.DoesNotContain(new string('x', 400), emptyState.Text);
+
+                content.Measure(new Size(932, 552));
+                content.Arrange(new Rect(0, 0, 932, 552));
+                content.UpdateLayout();
+
+                var bounds = refresh.TransformToAncestor(content).TransformBounds(new Rect(refresh.RenderSize));
+                Assert.True(bounds.Top >= 0 && bounds.Bottom <= 552, $"Refresh outside viewport: {bounds}");
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData("RecordingControlsWindow")]
+    [InlineData("SessionLibraryWindow")]
+    [InlineData("SettingsWindow")]
+    [InlineData("AboutWindow")]
+    [InlineData("WelcomeWindow")]
+    public void ProductWindows_ShowCurrentIdentityAndUserGuidance(string windowName)
+    {
+        OnStaThread(() =>
+        {
+            using var harness = new WindowHarness();
+            var window = harness.Build(windowName);
+            try
+            {
+                Assert.Contains("SureForge Capture", window.Title);
+                var text = string.Join("\n", UserFacingText(window));
+                // The on-disk data folder is still named "BugNarrator" — a stored path, not product
+                // copy — and the local-server section shows that install location. Replace exactly
+                // that path, so a real directory name is not read as the old product name while
+                // every other word of the window copy is still checked.
+                var copy = text.Replace(FakeLocalServerManager.InstallDirectoryPath, "<install path>");
+                Assert.DoesNotContain("BugNarrator", copy);
+                Assert.DoesNotContain("Source-of-truth", text);
+                Assert.DoesNotContain("Milestone 6", text);
+                Assert.DoesNotContain("shell placeholder", text);
+                if (window is AboutWindow) Assert.Contains(ReleaseUpdateChecker.CurrentVersion(), text);
+            }
+            finally { window.Close(); }
+            return true;
+        });
+    }
+
+    [Theory]
     [InlineData(96, 440, 80)]
     [InlineData(192, 220, 190)]
     public void AnnotationPreview_DragAndKeyboardRespectTheAspectFitImageAndClampMovement(double dpiX, double expectedWidth, double expectedLeft)
@@ -208,6 +351,88 @@ public sealed class AccessibleNameAuditTests
             }
             return true;
         });
+    }
+
+    /// <summary>
+    /// The scroll viewer inside a control's template. The session list scrolls inside its own
+    /// template, which the logical tree the audit walks does not include.
+    /// </summary>
+    private static ScrollViewer? FindListScrollViewer(ListBox list)
+    {
+        // The list's own scroll viewer lives in its template. The theme decides what the part is
+        // called, so try the names WPF's ListBox templates use and fall back to the visual tree.
+        foreach (var partName in new[] { "PART_ContentHost", "PART_ScrollViewer" })
+        {
+            if (list.Template?.FindName(partName, list) is ScrollViewer named)
+            {
+                return named;
+            }
+        }
+
+        return FindScrollViewer(list);
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject parent)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is ScrollViewer scroll)
+            {
+                return scroll;
+            }
+
+            var nested = FindScrollViewer(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Scrolls the target into the filter viewport and asserts that its whole bounds fit there.
+    /// A clipped action can pass a check that only looks at one edge, so the full bounds are
+    /// required once the target has been scrolled into view.
+    /// </summary>
+    private static void AssertFitsInFilter(ScrollViewer filterScroll, FrameworkElement target, FrameworkElement content)
+    {
+        target.BringIntoView();
+        content.UpdateLayout();
+        var bounds = target.TransformToAncestor(filterScroll).TransformBounds(new Rect(target.RenderSize));
+        // A scrolled-to element lands exactly on the viewport edge, so the comparison carries a
+        // rounding tolerance rather than demanding a bit-exact boundary.
+        Assert.True(
+            bounds.Top >= -0.5 && bounds.Bottom <= filterScroll.ActualHeight + 0.5,
+            $"{target.GetType().Name} does not fit in the filter viewport: {bounds}");
+    }
+
+    /// <summary>
+    /// The text a user reads: every TextBlock's text and every control's own content string.
+    /// Control content counts because a label can live in a CheckBox or Button content rather
+    /// than in a TextBlock, and the old product name would be just as visible there.
+    /// </summary>
+    private static IEnumerable<string> UserFacingText(DependencyObject root)
+    {
+        foreach (var node in Descendants(root))
+        {
+            if (node is TextBlock block)
+            {
+                yield return block.Text;
+            }
+            else if (node is ContentControl { Content: string content })
+            {
+                yield return content;
+            }
+        }
+    }
+
+    /// <summary>The user-facing text that still carries the old product name.</summary>
+    private static IEnumerable<string> LegacyBrandText(DependencyObject root)
+    {
+        return UserFacingText(root).Where(text => text.Contains("BugNarrator", StringComparison.Ordinal));
     }
 
     private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
@@ -568,7 +793,9 @@ public sealed class AccessibleNameAuditTests
                     new FakeHotkeyService(), diagnostics, new FakeDeviceCatalog(), new FakeLaunchAtLogin(),
                     new FakeLocalServerManager(), new FakeLocalServerProbe()),
                 "RecordingControlsWindow" => new RecordingControlsWindow(new FakeLifecycleService(), diagnostics, () => { }),
-                "SessionLibraryWindow" => new SessionLibraryWindow(new FakeSessionStore(), new FakeReviewActions(), new FakeSettingsStore(), diagnostics),
+                "SessionLibraryWindow" => new SessionLibraryWindow(
+                    new FakeSessionStore { Sessions = [ReviewSessionTestData.CreateCompletedSession(rootDirectory)] },
+                    new FakeReviewActions(), new FakeSettingsStore(), diagnostics),
                 "AboutWindow" => new AboutWindow(),
                 "HotkeyCaptureWindow" => new HotkeyCaptureWindow(WindowsHotkeyAction.StartRecording),
                 "WelcomeWindow" => BuildWelcomeWindowWithEveryStepRendered(diagnostics),
@@ -587,14 +814,17 @@ public sealed class AccessibleNameAuditTests
                 new FakeSettingsStore(), new FakeSecretStore(), new FakeHotkeyService(),
                 new FakeMicrophonePreflight(), new FakeDeviceCatalog(), diagnostics, () => { });
             var earlierViolations = new List<AccessibleNameAudit.Violation>();
+            var earlierBrandViolations = new List<string>();
             for (var step = 0; step < FirstRunFunnel.Steps.Count - 1; step++)
             {
                 window.RenderStepForAudit(step);
                 earlierViolations.AddRange(AccessibleNameAudit.Run(window));
+                earlierBrandViolations.AddRange(LegacyBrandText(window).Select(text => $"step {step}: {text}"));
             }
 
             window.RenderStepForAudit(FirstRunFunnel.Steps.Count - 1);
             Assert.True(earlierViolations.Count == 0, string.Join("\n", earlierViolations));
+            Assert.True(earlierBrandViolations.Count == 0, string.Join("\n", earlierBrandViolations));
             return window;
         }
 
@@ -640,7 +870,10 @@ public sealed class AccessibleNameAuditTests
         public BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerState State { get; set; } =
             new(Package: null, Progress: null, Busy: false, Installed: false, Running: false, Message: string.Empty);
         public event EventHandler<BugNarrator.Windows.Services.LocalTranscription.LocalTranscriptionServerState>? StateChanged { add { } remove { } }
-        public string InstallDirectory => @"C:\Users\tester\AppData\Local\BugNarrator\LocalTranscription";
+        // The on-disk data folder keeps the old name on purpose: it is a stored path, not
+        // product copy. Published so the identity check can replace exactly this path.
+        public const string InstallDirectoryPath = @"C:\Users\tester\AppData\Local\BugNarrator\LocalTranscription";
+        public string InstallDirectory => InstallDirectoryPath;
         public int Stops { get; private set; }
         public int Starts { get; private set; }
         public Task DiscoverAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

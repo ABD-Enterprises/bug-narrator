@@ -77,7 +77,7 @@ public sealed class SessionLibraryWindow : Window
         this.reviewSessionActionService = reviewSessionActionService;
         this.diagnostics = diagnostics;
 
-        Title = "BugNarrator Session Library";
+        Title = "SureForge Capture Session Library";
         Width = 1180;
         Height = 760;
         MinWidth = 980;
@@ -163,7 +163,7 @@ public sealed class SessionLibraryWindow : Window
 
         sessionListBox = new ListBox
         {
-            MinHeight = 320,
+            MinHeight = 100,
         };
         System.Windows.Automation.AutomationProperties.SetName(sessionListBox, "Sessions");
         sessionListBox.SelectionChanged += OnSessionSelectionChanged;
@@ -354,63 +354,77 @@ public sealed class SessionLibraryWindow : Window
         };
         refreshButton.Click += async (_, _) => await RefreshSessionsAsync();
 
-        var sidebar = new StackPanel
+        var filters = new StackPanel
         {
             Children =
             {
-                new TextBlock
+                BuildLabel("Filter"),
+                dateRangeComboBox,
+                customDateRangePanel,
+                BuildLabel("Sort"),
+                sortOrderComboBox,
+                BuildLabel("Search"),
+                searchTextBox,
+                libraryStatusTextBlock,
+                issueExtractionOfferBanner,
+            },
+        };
+        var sessionBrowser = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+            },
+            Children =
+            {
+                new ScrollViewer
                 {
-                    FontSize = 28,
-                    FontWeight = FontWeights.Bold,
-                    Text = "Session Library",
+                    MaxHeight = 240,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    Content = filters,
                 },
-                new TextBlock
+                CreateRowChild(sessionListBox, 1),
+                CreateRowChild(emptyStateTextBlock, 2),
+                CreateRowChild(sampleSessionButton, 3),
+                CreateRowChild(new WrapPanel { Children = { refreshButton, deleteSessionButton } }, 4),
+            },
+        };
+        var sidebar = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
+            },
+            Children =
+            {
+                new StackPanel
                 {
-                    Margin = new Thickness(0, 12, 0, 0),
-                    Text = "Windows now includes the Milestone 6 review loop plus a parity pass on the session library with richer date filters and permanent local session deletion.",
-                    TextWrapping = TextWrapping.Wrap,
+                    Children =
+                    {
+                        new TextBlock { FontSize = 28, FontWeight = FontWeights.Bold, Text = "Session Library" },
+                        new TextBlock
+                        {
+                            Margin = new Thickness(0, 8, 0, 0),
+                            Text = "Find a session, review the evidence, and export your findings.",
+                            TextWrapping = TextWrapping.Wrap,
+                        },
+                    },
                 },
-                new TextBlock
-                {
-                    Margin = new Thickness(0, 16, 0, 0),
-                    Foreground = Brushes.DimGray,
-                    Text = "Source-of-truth docs: windows/docs/WINDOWS_IMPLEMENTATION_ROADMAP.md and docs/CROSS_PLATFORM_GUIDELINES.md",
-                    TextWrapping = TextWrapping.Wrap,
-                },
-                new Border
+                CreateRowChild(new Border
                 {
                     Margin = new Thickness(0, 20, 0, 0),
                     Padding = new Thickness(16),
                     BorderBrush = Brushes.LightGray,
                     BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(8),
-                    Child = new StackPanel
-                    {
-                        Children =
-                        {
-                            BuildLabel("Filter"),
-                            dateRangeComboBox,
-                            customDateRangePanel,
-                            BuildLabel("Sort"),
-                            sortOrderComboBox,
-                            BuildLabel("Search"),
-                            searchTextBox,
-                            libraryStatusTextBlock,
-                            issueExtractionOfferBanner,
-                            sessionListBox,
-                            emptyStateTextBlock,
-                            sampleSessionButton,
-                            new WrapPanel
-                            {
-                                Children =
-                                {
-                                    refreshButton,
-                                    deleteSessionButton,
-                                },
-                            },
-                        },
-                    },
-                },
+                    Child = sessionBrowser,
+                }, 1),
             },
         };
 
@@ -683,6 +697,12 @@ public sealed class SessionLibraryWindow : Window
         ApplyCurrentQuery();
     }
 
+    /// <summary>Sets the search box text the way a user typing in it would.</summary>
+    internal void ApplySearchTextForTests(string text)
+    {
+        searchTextBox.Text = text;
+    }
+
     internal void ApplyRecoveredSession(CompletedSession recoveredSession)
     {
         allSessions = allSessions
@@ -772,7 +792,7 @@ public sealed class SessionLibraryWindow : Window
                     {
                         Margin = new Thickness(0, 4, 0, 8),
                         TextWrapping = TextWrapping.Wrap,
-                        Text = "BugNarrator can turn a transcript into draft bugs, UX issues, and follow-up questions. It sends the transcript to your AI provider, which may incur charges on your account.",
+                        Text = "SureForge Capture can turn a transcript into draft bugs, UX issues, and follow-up questions. It sends the transcript to your AI provider, which may incur charges on your account.",
                     },
                     new StackPanel { Orientation = Orientation.Horizontal, Children = { turnOn, notNow } },
                 },
@@ -1380,7 +1400,10 @@ public sealed class SessionLibraryWindow : Window
 
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
-            return $"No sessions matched \"{query.SearchText.Trim()}\". Try a different search term or clear search.";
+            // The query is already visible in the Search box. Repeating it here let a long
+            // pasted query grow this row until it pushed Refresh and Delete out of the window,
+            // and this row is outside the scrolling filter area, so the message stays bounded.
+            return "No sessions matched your search. Try a different search term or clear search.";
         }
 
         return query.DateRange switch
@@ -1399,7 +1422,7 @@ public sealed class SessionLibraryWindow : Window
     {
         return session.Screenshots.Count switch
         {
-            0 => $"Delete \"{session.Title}\" permanently from the local BugNarrator session library?",
+            0 => $"Delete \"{session.Title}\" permanently from the local SureForge Capture session library?",
             1 => $"Delete \"{session.Title}\" permanently? This also removes 1 locally stored screenshot and the rest of the session artifacts.",
             _ => $"Delete \"{session.Title}\" permanently? This also removes {session.Screenshots.Count} locally stored screenshots and the rest of the session artifacts.",
         };
