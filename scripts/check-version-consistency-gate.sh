@@ -18,16 +18,16 @@
 #   2. Does the check actually catch drift, or has it rotted into one that
 #      always agrees? The check is run against a throwaway set of version
 #      sources that are deliberately wrong.
-#   3. Does the validation actually fail when the check fails? A gate that
-#      silently stopped running the check would look exactly like a gate that
-#      passes, so the validation is run against a genuinely broken tree — a
-#      clone whose VERSION disagrees with project.yml — and has to fail, and
+#   3. Does the validation actually fail when the contract is broken? A gate
+#      that silently stopped running the check would look exactly like a gate
+#      that passes, so the validation is run against a genuinely broken tree —
+#      a clone whose VERSION disagrees with project.yml — and has to fail, and
 #      has to fail because of the version contract.
 #
-# The third question is answered by running the validation, so the validation
-# skips this gate's own third step when it is invoked from here. The
-# recursion is broken by VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK, which the
-# nested invocation inherits.
+# The third question is answered by running the validation in a clone whose
+# version sources are broken. The recursion cannot start, because that
+# clone's own gate stops at its unconditional real-tree check — the clone's
+# VERSION disagrees with its project.yml — before it reaches its own proof.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -66,7 +66,7 @@ if ! "$CHECK"; then
     fail 'the version sources are inconsistent'
 fi
 
-# ── 3. The check must catch drift, not merely agree ───────────────────────
+# ── 2. The check must catch drift, not merely agree ───────────────────────
 # The check reads the version sources from the directory above the script, so
 # a throwaway copy of it sees a throwaway set of sources.
 workspace="$(mktemp -d)"
@@ -113,7 +113,7 @@ if "$workspace/scripts/check_version_consistency.sh" >/dev/null 2>&1; then
     fail 'the version check accepted a build number that is not a number'
 fi
 
-# ── 4. The validation has to fail when the contract is broken ──────────────
+# ── 3. The validation has to fail when the contract is broken ──────────────
 # This is the step a grep cannot do. Whether the validation runs the check and
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
@@ -124,10 +124,14 @@ fi
 # version sources from the tree it is run in, so the check really fails there.
 #
 # The clone is validated with HEAD as its base ref, so it scans no files and
-# reaches the gate in a couple of seconds. It runs with
-# VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1, which stops its own gate from
-# running this proof again; the flag is inherited rather than cleared, so
-# every nested instance stays a nested instance and the recursion terminates.
+# reaches the gate quickly. The clone's own gate stops there: its
+# unconditional real-tree check fails on the clone's broken VERSION, so the
+# clone's validation fails before the clone's gate would run a proof of its
+# own. That is what terminates the nesting — not a flag, and not a limit on
+# how deep it may go.
+#
+# The proof costs a clone of the repository and a validation run inside it, so
+# it grows with the size of the tree.
 clone="$workspace/clone"
 if ! git clone --quiet --no-local "$ROOT" "$clone" 2>"$workspace/clone-error.txt"; then
     cat "$workspace/clone-error.txt" >&2
@@ -138,7 +142,7 @@ fi
 printf '0.0.0\n' >"$clone/VERSION"
 
 validation_output="$workspace/validation-output.txt"
-if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 \
+if env -u AI_VALIDATOR_BASE_REF \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
     fail 'the validation passed although the version contract was broken'
 fi

@@ -7,7 +7,7 @@
 #   - CHANGELOG-archive.md latest released heading
 #
 # VERSION is the source of truth. Run scripts/bump_version.sh to change it; this
-# check guards against the three files drifting apart (e.g. a release shipping
+# check guards against the sources drifting apart (e.g. a release shipping
 # with a stale VERSION file).
 
 set -euo pipefail
