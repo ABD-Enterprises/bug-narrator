@@ -3,6 +3,7 @@
 ## Unreleased
 
 - [INTERNAL] Windows local-server shutdown tests reset the Ctrl+C-ignore flag inherited from Git shells, preserving the graceful-exit timing check during pre-push validation.
+- [INTERNAL] Prepare the corrupt-audio test fixture before its finalization timer starts, keeping the timeout and error checks unchanged.
 - [INTERNAL] Pull requests are now welcome with a DCO sign-off (`git commit -s`): `CONTRIBUTING.md` says so, and a new `dco` workflow checks the sign-off on pull requests from outside contributors.
 - [INTERNAL] The copyright holder is now SureForgeTech in `NOTICE`, the notice at the end of `LICENSE`, the app's About copyright line (`NSHumanReadableCopyright` and its built-in default) and the docs site footer; the Apache 2.0 licence text is unchanged.
 
