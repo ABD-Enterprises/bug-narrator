@@ -26,7 +26,7 @@ final class PermissionRecoveryController {
     ) -> PermissionRecoveryRefreshOutcome {
         permissionsLogger.debug(
             "permission_recovery_refresh_started",
-            "Refreshing permission recovery state after BugNarrator became active.",
+            "Refreshing permission recovery state after SureForge Capture became active.",
             metadata: [
                 "microphone_status": microphonePermissionService.currentStatus().rawValue,
                 "screen_capture_status": screenCapturePermissionService.currentStatus().rawValue
@@ -73,7 +73,7 @@ final class PermissionRecoveryController {
                 BugNarratorLinks.securityPrivacySettings,
                 BugNarratorLinks.systemSettingsApp
             ],
-            failureMessage: "BugNarrator could not open Microphone settings automatically."
+            failureMessage: "SureForge Capture could not open Microphone settings automatically."
         )
     }
 
@@ -84,7 +84,7 @@ final class PermissionRecoveryController {
                 BugNarratorLinks.securityPrivacySettings,
                 BugNarratorLinks.systemSettingsApp
             ],
-            failureMessage: "BugNarrator could not open Screen Recording settings automatically."
+            failureMessage: "SureForge Capture could not open Screen Recording settings automatically."
         )
     }
 
@@ -95,7 +95,7 @@ final class PermissionRecoveryController {
                 BugNarratorLinks.securityPrivacySettings,
                 BugNarratorLinks.systemSettingsApp
             ],
-            failureMessage: "BugNarrator could not open Screen & System Audio Recording settings automatically."
+            failureMessage: "SureForge Capture could not open Screen & System Audio Recording settings automatically."
         )
     }
 
@@ -105,7 +105,7 @@ final class PermissionRecoveryController {
         ) as? String else {
             permissionsLogger.error(
                 "runtime_configuration_missing_microphone_usage_description",
-                "BugNarrator is missing NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
+                "SureForge Capture is missing NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
             )
             return
         }
@@ -113,7 +113,7 @@ final class PermissionRecoveryController {
         if microphoneUsageDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             permissionsLogger.error(
                 "runtime_configuration_empty_microphone_usage_description",
-                "BugNarrator has an empty NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
+                "SureForge Capture has an empty NSMicrophoneUsageDescription. macOS microphone prompting will not work correctly."
             )
         }
     }
@@ -121,7 +121,7 @@ final class PermissionRecoveryController {
     func logLaunchPermissionSnapshot() {
         permissionsLogger.info(
             "launch_permission_snapshot",
-            "Captured the initial permission state snapshot for this BugNarrator app copy.",
+            "Captured the initial permission state snapshot for this SureForge Capture app copy.",
             metadata: [
                 "bundle_path": runtimeEnvironment.bundlePath,
                 "is_local_testing_build": runtimeEnvironment.isLocalTestingBuild ? "yes" : "no",

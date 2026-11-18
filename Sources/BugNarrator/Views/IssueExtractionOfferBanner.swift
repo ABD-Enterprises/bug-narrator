@@ -22,7 +22,7 @@ struct IssueExtractionOfferBanner: View {
                     Text("Extract issues from your sessions?")
                         .font(.footnote.weight(.semibold))
 
-                    Text("BugNarrator can turn a transcript into draft bugs, UX issues, and follow-up questions. It sends the transcript to your AI provider, which may incur charges on your account.")
+                    Text("SureForge Capture can turn a transcript into draft bugs, UX issues, and follow-up questions. It sends the transcript to your AI provider, which may incur charges on your account.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

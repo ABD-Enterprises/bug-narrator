@@ -122,7 +122,7 @@ final class ReleaseUpdateCheckTests: XCTestCase {
     func testUpToDateOpensNothing() async {
         let outcome = await check(current: "1.0.41", feed: .success(release("v1.0.41")))
         XCTAssertNil(outcome.urlToOpen(fallback: fallback))
-        XCTAssertEqual(outcome.userMessage, "BugNarrator 1.0.41 is the latest release.")
+        XCTAssertEqual(outcome.userMessage, "SureForge Capture 1.0.41 is the latest release.")
     }
 
     func testUnparseableTagIsUndetermined() async {

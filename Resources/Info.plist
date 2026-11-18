@@ -11,7 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>SureForge Capture</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
@@ -21,7 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>© 2026 ABD Enterprises</string>
+	<string>© 2026 SureForgeTech</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
@@ -29,9 +29,9 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BugNarrator records microphone audio so you can narrate software testing sessions while working in other apps.</string>
+	<string>SureForge Capture records microphone audio so you can narrate software testing sessions while working in other apps.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>BugNarrator can record system audio only when you choose a system audio mode for a session.</string>
+	<string>SureForge Capture can record system audio only when you choose a system audio mode for a session.</string>
 	<!-- The Developer ID team the app is signed with, injected by the build
 	     from the owner's machine-local signing settings. The app uses it to
 	     pin the publisher of the transcription server it downloads, so the

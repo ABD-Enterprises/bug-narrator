@@ -62,7 +62,7 @@ extension MenuBarView {
 
     var screenRecordingRecoverySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recording can continue without screenshots. To capture them again, enable BugNarrator in Privacy & Security > Screen & System Audio Recording.")
+            Text("Recording can continue without screenshots. To capture them again, turn on BugNarrator (SureForge Capture) in Privacy & Security > Screen & System Audio Recording.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -91,7 +91,7 @@ extension MenuBarView {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             } else {
-                Text("System audio capture uses macOS Screen & System Audio Recording permission. Enable BugNarrator there, then try again.")
+                Text("System audio capture uses macOS Screen & System Audio Recording permission. Turn on BugNarrator (SureForge Capture) there, then try again.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -110,8 +110,8 @@ extension MenuBarView {
         let provider = appState.settingsStore.aiProvider
         return VStack(alignment: .leading, spacing: 8) {
             Text(provider.requiresAPIKey
-                ? "Open Settings to add or replace your \(provider.displayName) API key. BugNarrator stores it in your macOS Keychain when available."
-                : "Open Settings to confirm the \(provider.displayName) server and base URL. BugNarrator keeps this local provider setup on this Mac."
+                ? "Open Settings to add or replace your \(provider.displayName) API key. SureForge Capture stores it in your macOS Keychain when available."
+                : "Open Settings to confirm the \(provider.displayName) server and base URL. SureForge Capture keeps this local provider setup on this Mac."
             )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -142,7 +142,7 @@ extension MenuBarView {
 
     var storageRecoverySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("The transcript is still available in BugNarrator. Copy it now, then fix local storage and save it to history.")
+            Text("The transcript is still available in SureForge Capture. Copy it now, then fix local storage and save it to history.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

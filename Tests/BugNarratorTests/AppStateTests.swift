@@ -136,7 +136,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "BugNarrator requires your own OpenAI API key for transcription and issue extraction. Add it in Settings, then retry transcription."
+            "SureForge Capture requires your own OpenAI API key for transcription and issue extraction. Add it in Settings, then retry transcription."
         )
         XCTAssertEqual(harness.appState.currentError, .missingAPIKey)
         XCTAssertEqual(harness.audioRecorder.startCallCount, 0)
@@ -231,7 +231,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(reply, .terminateCancel)
         XCTAssertTrue(didOpenRecordingControls)
         XCTAssertEqual(harness.appState.status.phase, .recording)
-        XCTAssertEqual(harness.appState.transientToast?.message, "Stop recording before quitting BugNarrator.")
+        XCTAssertEqual(harness.appState.transientToast?.message, "Stop recording before quitting SureForge Capture.")
     }
 
     func testDuplicateStartWhileAlreadyRecordingDoesNotStartTwice() async {
@@ -409,7 +409,7 @@ final class AppStateTests: XCTestCase {
         harness.appState.copyDebugInfo()
 
         let copied = try XCTUnwrap(harness.clipboardService.copiedStrings.last)
-        XCTAssertTrue(copied.contains("BugNarrator Version"))
+        XCTAssertTrue(copied.contains("SureForge Capture Version"))
         XCTAssertTrue(copied.contains("Transcription Model: whisper-1"))
         XCTAssertTrue(copied.contains("Issue Extraction Model: gpt-4.1-mini"))
         XCTAssertTrue(copied.contains("Session ID: \(session.id.uuidString)"))
@@ -442,7 +442,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .error)
         XCTAssertEqual(
             harness.appState.status.detail,
-            AppError.exportFailure("BugNarrator could not create the data export.").userMessage
+            AppError.exportFailure("SureForge Capture could not create the data export.").userMessage
         )
 
         let event = try lastAppErrorTelemetry(in: harness)
@@ -720,8 +720,9 @@ final class AppStateTests: XCTestCase {
         let requestedAPIKeys = await harness.transcriptionClient.requestedAPIKeys
         let requestedModels = await harness.transcriptionClient.requestedModels
         let requestedBaseURLs = await harness.transcriptionClient.requestedBaseURLs
-        // The local server checks a bearer token, so the credential the app
-        // presents is that token rather than an empty string (#1270).
+        // The local server checks a bearer token on every route except the
+        // health check's proof challenge, so the credential the app presents
+        // is that token rather than an empty string (#1270).
         XCTAssertEqual(
             requestedAPIKeys,
             [LocalServerTokenStore.storedToken(installDirectory: harness.localServerInstallDirectory) ?? ""]
@@ -926,7 +927,7 @@ final class AppStateTests: XCTestCase {
         harness.appState.openDocumentation()
 
         XCTAssertEqual(harness.appState.status.phase, .error)
-        XCTAssertEqual(harness.appState.status.detail, "BugNarrator could not open the documentation.")
+        XCTAssertEqual(harness.appState.status.detail, "SureForge Capture could not open the documentation.")
     }
 
     func testProjectInfoActionFailureDuringRecordingPreservesRecordingState() async {
@@ -941,7 +942,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(harness.appState.status.phase, .recording)
         XCTAssertEqual(
             harness.appState.status.detail,
-            "BugNarrator could not open the documentation. Recording is still active."
+            "SureForge Capture could not open the documentation. Recording is still active."
         )
     }
 

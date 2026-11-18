@@ -149,7 +149,7 @@ final class WindowCoordinator {
             }
         )
         let panel = makeWindow(
-            title: "BugNarrator Controls",
+            title: "SureForge Capture Controls",
             size: recordingControlSize,
             rootView: rootView
         )

@@ -134,7 +134,7 @@ struct TranscriptView: View {
                 ContentUnavailableView {
                     Label("No sessions yet", systemImage: "waveform")
                 } description: {
-                    Text("Open the recording controls to capture your first BugNarrator session.")
+                    Text("Open the recording controls to capture your first SureForge Capture session.")
                 } actions: {
                     Button("Open Recording Controls") {
                         appState.openRecordingControls()
@@ -206,10 +206,10 @@ struct TranscriptView: View {
         }
 
         if screenshotCount > 0 {
-            return "This permanently removes the selected session and deletes \(screenshotCount) locally stored screenshot\(screenshotCount == 1 ? "" : "s"). Exported files outside BugNarrator are not removed."
+            return "This permanently removes the selected session and deletes \(screenshotCount) locally stored screenshot\(screenshotCount == 1 ? "" : "s"). Exported files outside SureForge Capture are not removed."
         }
 
-        return "This permanently removes the selected session from BugNarrator."
+        return "This permanently removes the selected session from SureForge Capture."
     }
 
 

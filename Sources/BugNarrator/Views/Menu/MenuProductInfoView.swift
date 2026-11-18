@@ -19,16 +19,16 @@ struct MenuProductInfoView: View {
                 .foregroundStyle(.secondary)
 
             infoButton(
-                title: "About BugNarrator",
+                title: "About SureForge Capture",
                 systemImage: "info.circle",
-                accessibilityLabel: "Open the BugNarrator about window",
+                accessibilityLabel: "Open the SureForge Capture about window",
                 action: appState.openAbout
             )
 
             infoButton(
                 title: "What’s New",
                 systemImage: "sparkles.rectangle.stack",
-                accessibilityLabel: "Open the BugNarrator changelog",
+                accessibilityLabel: "Open the SureForge Capture changelog",
                 action: appState.openChangelog
             )
 
@@ -41,14 +41,14 @@ struct MenuProductInfoView: View {
             infoButton(
                 title: "View Documentation",
                 systemImage: "book.closed",
-                accessibilityLabel: "Open the BugNarrator documentation",
+                accessibilityLabel: "Open the SureForge Capture documentation",
                 action: appState.openDocumentation
             )
 
             infoButton(
                 title: "Report an Issue",
                 systemImage: "ladybug",
-                accessibilityLabel: "Open the BugNarrator issue tracker",
+                accessibilityLabel: "Open the SureForge Capture issue tracker",
                 action: appState.openIssueReporter
             )
 
@@ -56,7 +56,7 @@ struct MenuProductInfoView: View {
                 infoButton(
                     title: "Export Debug Bundle",
                     systemImage: "archivebox",
-                    accessibilityLabel: "Export a BugNarrator debug bundle",
+                    accessibilityLabel: "Export a SureForge Capture debug bundle",
                     action: {
                         Task {
                             await appState.exportDebugBundle()
@@ -68,14 +68,14 @@ struct MenuProductInfoView: View {
             infoButton(
                 title: "Support Development",
                 systemImage: "heart",
-                accessibilityLabel: "Open the BugNarrator support development window",
+                accessibilityLabel: "Open the SureForge Capture support development window",
                 action: appState.openSupportDevelopment
             )
 
             infoButton(
                 title: "Check for Updates",
                 systemImage: "arrow.clockwise",
-                accessibilityLabel: "Open the BugNarrator releases page",
+                accessibilityLabel: "Open the SureForge Capture releases page",
                 action: appState.checkForUpdates
             )
         }

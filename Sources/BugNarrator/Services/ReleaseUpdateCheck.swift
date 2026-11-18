@@ -81,11 +81,11 @@ enum ReleaseUpdateOutcome: Equatable {
     var userMessage: String {
         switch self {
         case .upToDate(let current):
-            return "BugNarrator \(current) is the latest release."
+            return "SureForge Capture \(current) is the latest release."
         case .updateAvailable(let latest, let current, _):
-            return "BugNarrator \(latest) is available — you are on \(current). Opening the download page."
+            return "SureForge Capture \(latest) is available — you are on \(current). Opening the download page."
         case .undetermined(let reason):
-            return "BugNarrator could not check for updates: \(reason)"
+            return "SureForge Capture could not check for updates: \(reason)"
         }
     }
 }
@@ -107,7 +107,7 @@ struct GitHubLatestReleaseFeed: LatestReleaseFeeding {
     private let session: URLSession
 
     init(
-        endpoint: URL = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases/latest")!,
+        endpoint: URL = URL(string: "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases/latest")!,
         session: URLSession? = nil
     ) {
         self.endpoint = endpoint

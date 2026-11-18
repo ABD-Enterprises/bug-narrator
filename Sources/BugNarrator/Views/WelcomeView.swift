@@ -96,7 +96,7 @@ struct WelcomeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Welcome to BugNarrator")
+            Text("Welcome to SureForge Capture")
                 .font(.largeTitle.weight(.bold))
 
             Text("Record what you are testing, narrate the problem out loud, and get a written transcript with the issues already pulled out. Three quick things and you are recording.")
@@ -164,7 +164,7 @@ struct WelcomeView: View {
     @ViewBuilder
     private var providerStep: some View {
         stepBody(
-            detail: "BugNarrator sends your recording to an AI provider to transcribe it and pull out the issues. Pick a provider and paste a key — or choose a local engine that needs no key at all.",
+            detail: "SureForge Capture sends your recording to an AI provider to transcribe it and pull out the issues. Pick a provider and paste a key — or choose a local engine that needs no key at all.",
             isComplete: OnboardingFlow.isComplete(.provider, in: snapshot),
             completeMessage: "Provider ready."
         )
@@ -181,7 +181,7 @@ struct WelcomeView: View {
         }
         .help("Settings opens on the AI Engines pane while a provider still needs configuring.")
 
-        Text("This is the only step that gates recording. The other two make BugNarrator nicer to use, and you can skip them.")
+        Text("This is the only step that gates recording. The other two make SureForge Capture nicer to use, and you can skip them.")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -190,7 +190,7 @@ struct WelcomeView: View {
     @ViewBuilder
     private var microphoneStep: some View {
         stepBody(
-            detail: "BugNarrator records your narration, so macOS needs to grant it microphone access.",
+            detail: "SureForge Capture records your narration, so macOS needs to grant it microphone access.",
             isComplete: OnboardingFlow.isComplete(.microphone, in: snapshot),
             completeMessage: "Microphone access granted."
         )
@@ -203,7 +203,7 @@ struct WelcomeView: View {
             .help("Asks macOS for microphone access. You can also grant it later, the first time you record.")
         case .denied, .restricted:
             VStack(alignment: .leading, spacing: 8) {
-                Text("macOS is currently blocking microphone access for BugNarrator. Turn it back on in System Settings, then return here.")
+                Text("macOS is currently blocking microphone access for SureForge Capture. Turn on BugNarrator (SureForge Capture) in System Settings, then return here.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -220,7 +220,7 @@ struct WelcomeView: View {
     @ViewBuilder
     private var hotkeyStep: some View {
         stepBody(
-            detail: "Global shortcuts let you start, stop, and grab a screenshot without leaving the app you are testing. BugNarrator ships with none bound, so nothing of yours is overwritten.",
+            detail: "Global shortcuts let you start, stop, and grab a screenshot without leaving the app you are testing. SureForge Capture ships with none bound, so nothing of yours is overwritten.",
             isComplete: OnboardingFlow.isComplete(.hotkeys, in: snapshot),
             completeMessage: "At least one capture hotkey is assigned."
         )
@@ -319,7 +319,7 @@ struct WelcomeView: View {
         }
 
         let names = blocking.map(\.title).joined(separator: ", ")
-        return "BugNarrator cannot transcribe a recording until this is done: \(names). You can finish it later in Settings, or reopen this tour from Help › Show Welcome Tour."
+        return "SureForge Capture cannot transcribe a recording until this is done: \(names). You can finish it later in Settings, or reopen this tour from Help › Show Welcome Tour."
     }
 
     // MARK: - Actions

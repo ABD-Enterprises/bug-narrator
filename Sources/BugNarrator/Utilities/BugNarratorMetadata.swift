@@ -2,8 +2,8 @@ import Foundation
 
 struct BugNarratorMetadata: Equatable {
     static let defaultTagline = "Narrated software testing, turned into actionable issues."
-    static let defaultDescription = "BugNarrator helps developers, testers, and product owners narrate software walkthroughs, capture evidence, and turn spoken testing sessions into actionable issues."
-    static let defaultCopyright = "© 2026 ABD Enterprises"
+    static let defaultDescription = "SureForge Capture helps developers, testers, and product owners narrate software walkthroughs, capture evidence, and turn spoken testing sessions into actionable issues."
+    static let defaultCopyright = "© 2026 SureForgeTech"
 
     let appName: String
     let tagline: String
@@ -14,7 +14,7 @@ struct BugNarratorMetadata: Equatable {
 
     init(
         infoDictionary: [String: Any],
-        defaultName: String = "BugNarrator",
+        defaultName: String = "SureForge Capture",
         tagline: String = BugNarratorMetadata.defaultTagline,
         productDescription: String = BugNarratorMetadata.defaultDescription
     ) {

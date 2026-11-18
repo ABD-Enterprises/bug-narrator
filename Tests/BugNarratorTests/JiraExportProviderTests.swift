@@ -365,6 +365,118 @@ final class JiraExportProviderTests: XCTestCase {
         XCTAssertTrue(payloadString.contains("modal-shot-annotated"))
     }
 
+    func testSummaryNeutralizesMentionsAndCrossReferences() async throws {
+        // The summary is model- and transcript-derived text like every other
+        // untrusted field that reaches a tracker, and a tracker shows a
+        // summary to other people, so it is neutralized too. What a tracker
+        // does with a mention in a summary is not claimed here.
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "@security-team rotate #4821 staging keys",
+            category: .bug,
+            summary: "Summary",
+            evidenceExcerpt: "Evidence",
+            timestamp: nil
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        let summary = try XCTUnwrap(fields["summary"] as? String)
+
+        XCTAssertFalse(summary.contains("@security-team"), "a live mention survived in the exported summary: \(summary)")
+        XCTAssertFalse(summary.contains("#4821"), "a live cross-reference survived in the exported summary: \(summary)")
+        XCTAssertEqual(
+            summary.replacingOccurrences(of: "\u{200B}", with: ""),
+            "@security-team rotate #4821 staging keys",
+            "the summary must stay visually identical to what the user reviewed"
+        )
+    }
+
+    func testDescriptionNeutralizesMentionsAndCrossReferences() async throws {
+        // The Jira description is model- and transcript-derived text too, and a
+        // tracker can show it again in notifications and activity feeds, so no
+        // live mention may survive in it either.
+        let provider = JiraExportProvider(session: makeMockURLSession())
+        let issue = ExtractedIssue(
+            title: "Save button clips in the modal",
+            category: .bug,
+            component: "@security-team",
+            summary: "The modal mentions @security-team",
+            evidenceExcerpt: "Evidence references #4821",
+            timestamp: nil,
+            sectionTitle: "GH-99 section",
+            note: "Tracker note mentions @security-team"
+        )
+        let session = TranscriptSession(
+            createdAt: Date(),
+            transcript: "Transcript",
+            duration: 6,
+            model: "whisper-1",
+            languageHint: nil,
+            prompt: nil,
+            issueExtraction: IssueExtractionResult(summary: "Summary", issues: [issue])
+        )
+        let request = try await provider.makeURLRequest(
+            issue: issue,
+            session: session,
+            configuration: JiraExportConfiguration(
+                baseURL: URL(string: "https://acme.atlassian.net")!,
+                email: "you@example.com",
+                apiToken: "fixture-jira-token",
+                projectKey: "FM",
+                issueType: "Task"
+            )
+        )
+
+        let body = try requestBodyData(from: request)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try XCTUnwrap(payload["fields"] as? [String: Any])
+        // The exported description is a structured object, not a string.
+        let description = try XCTUnwrap(
+            fields["description"] as? [String: Any],
+            "the description must be a structured object"
+        )
+        // The description on its own, so the assertions below are about the
+        // description and not about some other field of the request. These
+        // are the ADF text nodes, the way the Windows port collects them.
+        let descriptionText = adfTextNodes(description).joined(separator: "\n")
+        let rendered = String(data: body, encoding: .utf8) ?? ""
+
+        XCTAssertFalse(descriptionText.contains("@security-team"), "a live mention survived in the exported description: \(descriptionText)")
+        XCTAssertFalse(descriptionText.contains("#4821"), "a live cross-reference survived in the exported description: \(descriptionText)")
+        XCTAssertFalse(descriptionText.contains("GH-99"), "a live GH- reference survived in the exported description: \(descriptionText)")
+        // The rest of the request carries no live trigger either.
+        XCTAssertFalse(rendered.contains("@security-team"), "a live mention survived in the exported request: \(rendered)")
+        XCTAssertFalse(rendered.contains("#4821"), "a live cross-reference survived in the exported request: \(rendered)")
+        XCTAssertFalse(rendered.contains("GH-99"), "a live GH- reference survived in the exported request: \(rendered)")
+        // The text stays visually identical: only zero-width spaces are added.
+        let withoutZeroWidthSpaces = descriptionText.replacingOccurrences(of: "\u{200B}", with: "")
+        XCTAssertTrue(withoutZeroWidthSpaces.contains("@security-team"))
+        XCTAssertTrue(withoutZeroWidthSpaces.contains("#4821"))
+        XCTAssertTrue(withoutZeroWidthSpaces.contains("GH-99"))
+    }
+
     func testMakeURLRequestSendsASingleLineSummaryWithinJirasLimit() async throws {
         let provider = JiraExportProvider(session: makeMockURLSession())
         let issue = ExtractedIssue(
@@ -485,7 +597,8 @@ final class JiraExportProviderTests: XCTestCase {
     func testUntrustedSummaryStaysLiteralInJiraADF() async throws {
         // Jira descriptions are built as ADF text nodes, so untrusted content is
         // stored verbatim (no Markdown interpretation). Assert it round-trips
-        // literally rather than being parsed as markup.
+        // literally rather than being parsed as markup, and that the live
+        // mention triggers are defanged on the way out.
         let provider = JiraExportProvider(session: makeMockURLSession())
         let hostile = "@channel ping #999 <script>alert(1)</script>"
         let issue = ExtractedIssue(
@@ -523,9 +636,14 @@ final class JiraExportProviderTests: XCTestCase {
         let description = try XCTUnwrap(fields["description"] as? [String: Any])
         let descriptionData = try JSONSerialization.data(withJSONObject: description)
         let descriptionString = try XCTUnwrap(String(data: descriptionData, encoding: .utf8))
-        // The literal hostile text is present as a JSON string value (text node).
-        XCTAssertTrue(descriptionString.contains("@channel ping"))
+        // The literal hostile text is present as a JSON string value (text node):
+        // ADF renders it literally, so nothing is escaped away.
+        XCTAssertTrue(descriptionString.contains("channel ping"))
         XCTAssertTrue(descriptionString.contains("alert(1)"))
+        // The live mention triggers do not survive: a zero-width space breaks
+        // them while leaving the text visually identical.
+        XCTAssertFalse(descriptionString.contains("@channel"), "a live mention survived in the exported description: \(descriptionString)")
+        XCTAssertFalse(descriptionString.contains("#999"), "a live cross-reference survived in the exported description: \(descriptionString)")
     }
 
     func testFindOpenIssuesMapsRateLimitToDistinctMessage() async throws {
@@ -1185,6 +1303,27 @@ final class JiraExportProviderTests: XCTestCase {
             issueType: "Task"
         )
     }
+}
+
+/// The text nodes of a Jira ADF document, the way the Windows port collects
+/// them: every "text" value. A node that carries both a "text" value and
+/// nested content contributes both, so nothing is silently dropped.
+private func adfTextNodes(_ value: Any) -> [String] {
+    if let object = value as? [String: Any] {
+        var nodes: [String] = []
+        for (key, child) in object {
+            if key == "text", let text = child as? String {
+                nodes.append(text)
+            } else {
+                nodes.append(contentsOf: adfTextNodes(child))
+            }
+        }
+        return nodes
+    }
+    if let array = value as? [Any] {
+        return array.flatMap { adfTextNodes($0) }
+    }
+    return []
 }
 
 private func makeScreenshotFileURL(named fileName: String) -> URL {

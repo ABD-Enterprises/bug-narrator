@@ -47,10 +47,10 @@ struct ChangelogView: View {
                     appState.checkForUpdates()
                 }
                 .buttonStyle(.bordered)
-                .accessibilityLabel("Open the BugNarrator releases page")
+                .accessibilityLabel("Open the SureForge Capture releases page")
             }
 
-            Text("Release notes for BugNarrator. Use this as a lightweight in-app view of the bundled changelog.")
+            Text("Release notes for SureForge Capture. Use this as a lightweight in-app view of the bundled changelog.")
                 .font(.body)
                 .foregroundStyle(.secondary)
 

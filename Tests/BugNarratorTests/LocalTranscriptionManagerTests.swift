@@ -451,6 +451,20 @@ final class LocalTranscriptionManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testAssetURLFromTheMovedRepositoryIsTrusted() {
+        // GitHub reports assets under SureForgeTech/sureforge-capture since the 2026-11-14 move; the old path stays trusted.
+        for address in ["https://github.com/SureForgeTech/sureforge-capture/releases/download/v1.1.2/server.dmg",
+                        "https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1.1.2/server.dmg"] {
+            XCTAssertTrue(LocalTranscriptionManager.trustedAssetURL(URL(string: address)!), address)
+        }
+        for address in ["https://github.com/SureForgeTech/sureforge-capture-fork/releases/download/v1/a",
+                        "https://github.com/SureForgeTech/other/releases/download/v1/a",
+                        "https://github.com/SureForgeTech/sureforge-capture/archive/v1/a"] {
+            XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(URL(string: address)!), address)
+        }
+    }
+
+    @MainActor
     func testAssetURLMustBelongToTheRepository() {
         for address in ["http://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/a",
                         "https://example.com/ABD-Enterprises/bug-narrator/releases/download/v1/a",
@@ -458,6 +472,57 @@ final class LocalTranscriptionManagerTests: XCTestCase {
                         "https://user@github.com/ABD-Enterprises/bug-narrator/releases/download/v1/a"] {
             XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(URL(string: address)!))
         }
+    }
+
+    @MainActor
+    func testAssetURLIsJudgedAsWrittenSoNothingEscapesTheReleasePath() {
+        let prefixes = ["https://github.com/SureForgeTech/sureforge-capture/releases/download/",
+                        "https://github.com/ABD-Enterprises/bug-narrator/releases/download/"]
+        for prefix in prefixes {
+            for accepted in ["v1.1.2/server.dmg", "v1.1.2/server.dmg.sha256", "server/v1.1.2/server.dmg"] {
+                XCTAssertTrue(LocalTranscriptionManager.trustedAssetURL(URL(string: prefix + accepted)!), prefix + accepted)
+            }
+            for rejected in ["../../../../other/project/releases/download/v1/a",
+                             "v1/../../../../../other/project/a",
+                             "v1/./a",
+                             "%2e%2e/%2e%2e/%2e%2e/%2e%2e/other/project/a",
+                             "%2E%2E/%2E%2E/a",
+                             "%2e%2E/.%2e/%2E./a",
+                             "v1/..%2f..%2f..%2fother/a",
+                             "v1/..%2F..%2Fa",
+                             "v1/..%5c..%5ca",
+                             "v1/%61",
+                             "v1/a%00",
+                             "v1//a",
+                             "v1/",
+                             "v1",
+                             ""] {
+                guard let url = URL(string: prefix + rejected) else { continue }
+                XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(url), prefix + rejected)
+            }
+        }
+        // A query or fragment cannot smuggle a path, and does not hide one either.
+        XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(
+            URL(string: "https://github.com/other/project/a?/SureForgeTech/sureforge-capture/releases/download/v1/a")!))
+        XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(
+            URL(string: "https://github.com/SureForgeTech/sureforge-capture/releases/download/v1/..?x=1")!))
+    }
+
+    @MainActor
+    func testAssetURLRejectsAPortUserInfoAndOtherOrigins() {
+        let path = "/SureForgeTech/sureforge-capture/releases/download/v1.1.2/server.dmg"
+        for origin in ["https://github.com:443", "https://github.com:8443", "https://github.com:80", "https://github.com:",
+                       "https://user@github.com", "https://user:secret@github.com", "https://:secret@github.com", "https://@github.com",
+                       "https://github.com@example.com", "https://github.com.", "https://github.com.example.com",
+                       "https://GitHub.com", "https://www.github.com", "HTTPS://github.com", "http://github.com"] {
+            guard let url = URL(string: origin + path) else { continue }
+            XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(url), origin)
+        }
+        XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(
+            URL(string: "https://github.com\\@example.com" + path) ?? URL(string: "https://example.com" + path)!))
+        // A relative address is judged by where it resolves, not by how it is spelled.
+        let base = URL(string: "https://example.com/")!
+        XCTAssertFalse(LocalTranscriptionManager.trustedAssetURL(URL(string: path, relativeTo: base)!))
     }
 
     func testChecksumRejectsTamperingAndWrongSize() throws {

@@ -5,8 +5,9 @@ import XCTest
 
 /// The bearer token the local transcription server requires (#1270).
 ///
-/// The server refuses every request that does not carry the token, so the app
-/// and the server have to agree on one. The token file next to the managed
+/// The server refuses every request that does not carry the token — the health
+/// check's proof challenge is the one exception — so the app and the server
+/// have to agree on one. The token file next to the managed
 /// install is where they agree, and the contract fixture keeps the macOS,
 /// Windows and Python sides from drifting apart.
 final class LocalServerTokenStoreTests: XCTestCase {

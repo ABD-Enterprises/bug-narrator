@@ -330,7 +330,7 @@ final class AppState: ObservableObject {
 
         settingsLogger.info(
             "app_state_initialized",
-            "BugNarrator finished initializing application state.",
+            "SureForge Capture finished initializing application state.",
             metadata: [
                 "has_openai_key": settingsStore.hasAPIKey ? "yes" : "no",
                 "ai_provider": settingsStore.aiProvider.rawValue,

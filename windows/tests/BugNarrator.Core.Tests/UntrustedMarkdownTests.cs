@@ -82,6 +82,26 @@ public sealed class UntrustedMarkdownTests
         Assert.Equal("\\[a](x) \\[b](y)", UntrustedMarkdown.Neutralize("[a](x) [b](y)"));
     }
 
+    [Fact]
+    public void Neutralize_EscapesInsideACharacterCluster()
+    {
+        // A "[" that is part of a larger cluster - a combining mark or a
+        // variation selector - opens a link label just as a bare one does, so
+        // it has to be escaped inside the cluster as well. The macOS port
+        // missed this until it worked on code units too; both ports have to
+        // send the same body.
+        Assert.Equal("\\[\u0301click](https://evil.example)", UntrustedMarkdown.Neutralize("[\u0301click](https://evil.example)"));
+        Assert.Equal("\\[\uFE0Fclick](https://evil.example)", UntrustedMarkdown.Neutralize("[\uFE0Fclick](https://evil.example)"));
+        Assert.Equal("!\\[\u0301alt](https://evil.example/x)", UntrustedMarkdown.Neutralize("![\u0301alt](https://evil.example/x)"));
+        // A block marker that is part of a larger cluster is the marker as far
+        // as a code unit is concerned.
+        Assert.Equal("\\*\u0301 item", UntrustedMarkdown.Neutralize("*\u0301 item"));
+        // A CR followed by LF and then a combining mark is one character
+        // cluster, so a literal search for the line break missed it and the CR
+        // survived into the body.
+        Assert.Equal("a\n\u0301b", UntrustedMarkdown.Neutralize("a\r\n\u0301b"));
+    }
+
     [Theory]
     [InlineData("  ===", "  \\===")]
     [InlineData(" - [ ] task", " \\- \\[ ] task")]
@@ -112,5 +132,30 @@ public sealed class UntrustedMarkdownTests
     public void Neutralize_TreatsALoneCarriageReturnAsALineBreak(string input, string expected)
     {
         Assert.Equal(expected, UntrustedMarkdown.Neutralize(input));
+    }
+
+    [Fact]
+    public void NeutralizeMentions_DefangsTheLiveTriggersOnly()
+    {
+        var output = UntrustedMarkdown.NeutralizeMentions("@channel ping #123 and GH-42");
+
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
+        Assert.True(output.Contains("@\u200B", StringComparison.Ordinal));
+        Assert.True(output.Contains("#\u200B", StringComparison.Ordinal));
+        Assert.True(output.Contains("GH-\u200B", StringComparison.Ordinal));
+        // The text stays visually identical: only zero-width spaces are added.
+        Assert.Equal(
+            "@channel ping #123 and GH-42",
+            output.Replace("\u200B", string.Empty, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NeutralizeMentions_LeavesMarkdownSyntaxAlone()
+    {
+        // The fields this is used for are plain text, not markdown, so the block-structure and
+        // link escapes the GitHub body needs would only mangle them.
+        Assert.Equal("see [docs]", UntrustedMarkdown.NeutralizeMentions("see [docs]"));
+        Assert.Equal("- list item", UntrustedMarkdown.NeutralizeMentions("- list item"));
     }
 }

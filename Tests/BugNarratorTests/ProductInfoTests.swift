@@ -8,15 +8,15 @@ final class ProductInfoTests: XCTestCase {
         // edit to BugNarratorLinks is caught in CI.
         XCTAssertEqual(
             BugNarratorLinks.documentation.absoluteString,
-            "https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md"
+            "https://github.com/SureForgeTech/sureforge-capture/blob/main/docs/UserGuide.md"
         )
         XCTAssertEqual(
             BugNarratorLinks.issues.absoluteString,
-            "https://github.com/ABD-Enterprises/bug-narrator/issues/new"
+            "https://github.com/SureForgeTech/sureforge-capture/issues/new"
         )
         XCTAssertEqual(
             BugNarratorLinks.repository.absoluteString,
-            "https://github.com/ABD-Enterprises/bug-narrator"
+            "https://github.com/SureForgeTech/sureforge-capture"
         )
     }
 
@@ -26,7 +26,7 @@ final class ProductInfoTests: XCTestCase {
                 "CFBundleDisplayName": "BugNarrator",
                 "CFBundleShortVersionString": "1.2.3",
                 "CFBundleVersion": "45",
-                "NSHumanReadableCopyright": "© 2026 ABD Enterprises"
+                "NSHumanReadableCopyright": "© 2026 SureForgeTech"
             ]
         )
 
@@ -34,23 +34,23 @@ final class ProductInfoTests: XCTestCase {
         XCTAssertEqual(metadata.version, "1.2.3")
         XCTAssertEqual(metadata.build, "45")
         XCTAssertEqual(metadata.versionDescription, "Version 1.2.3 (45)")
-        XCTAssertEqual(metadata.copyrightLine, "© 2026 ABD Enterprises")
+        XCTAssertEqual(metadata.copyrightLine, "© 2026 SureForgeTech")
     }
 
     func testMetadataFallsBackToDefaultsWhenBundleValuesAreMissing() {
         let metadata = BugNarratorMetadata(infoDictionary: [:])
 
-        XCTAssertEqual(metadata.appName, "BugNarrator")
+        XCTAssertEqual(metadata.appName, "SureForge Capture")
         XCTAssertEqual(metadata.version, "1.0")
         XCTAssertEqual(metadata.build, "1")
         XCTAssertEqual(metadata.versionDescription, "Version 1.0 (1)")
     }
 
     func testProjectLinksUseExpectedPublicURLs() {
-        XCTAssertEqual(BugNarratorLinks.repository.absoluteString, "https://github.com/ABD-Enterprises/bug-narrator")
-        XCTAssertEqual(BugNarratorLinks.documentation.absoluteString, "https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md")
-        XCTAssertEqual(BugNarratorLinks.issues.absoluteString, "https://github.com/ABD-Enterprises/bug-narrator/issues/new")
-        XCTAssertEqual(BugNarratorLinks.releases.absoluteString, "https://github.com/ABD-Enterprises/bug-narrator/releases")
+        XCTAssertEqual(BugNarratorLinks.repository.absoluteString, "https://github.com/SureForgeTech/sureforge-capture")
+        XCTAssertEqual(BugNarratorLinks.documentation.absoluteString, "https://github.com/SureForgeTech/sureforge-capture/blob/main/docs/UserGuide.md")
+        XCTAssertEqual(BugNarratorLinks.issues.absoluteString, "https://github.com/SureForgeTech/sureforge-capture/issues/new")
+        XCTAssertEqual(BugNarratorLinks.releases.absoluteString, "https://github.com/SureForgeTech/sureforge-capture/releases")
         XCTAssertEqual(BugNarratorLinks.supportDevelopment.absoluteString, "https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8")
     }
 

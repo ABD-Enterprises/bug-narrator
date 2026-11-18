@@ -59,15 +59,15 @@ struct MenuBarLabelView: View {
     private var accessibilityLabel: String {
         switch status.phase {
         case .idle:
-            return "BugNarrator idle"
+            return "SureForge Capture idle"
         case .recording:
-            return "BugNarrator recording, elapsed time \(recordingTimer.elapsedTimeString)"
+            return "SureForge Capture recording, elapsed time \(recordingTimer.elapsedTimeString)"
         case .transcribing:
-            return "BugNarrator transcribing"
+            return "SureForge Capture transcribing"
         case .success:
-            return "BugNarrator success"
+            return "SureForge Capture success"
         case .error:
-            return "BugNarrator error"
+            return "SureForge Capture error"
         }
     }
 }

@@ -63,7 +63,7 @@ struct SessionArtifactsService: SessionArtifactsManaging {
     }
 
     /// Returns what actually happened. This used to swallow the error with
-    /// `try?` and then log "Removed a BugNarrator-managed artifacts directory"
+    /// `try?` and then log "Removed an app-managed artifacts directory"
     /// unconditionally — so a failed deletion produced a success log, while the
     /// product spec promises deletion removes managed screenshots (#960).
     @discardableResult
@@ -71,7 +71,7 @@ struct SessionArtifactsService: SessionArtifactsManaging {
         guard isManagedArtifactsDirectory(directoryURL) else {
             logger.warning(
                 "artifacts_directory_rejected",
-                "Skipped cleanup for a directory outside BugNarrator-managed artifacts storage.",
+                "Skipped cleanup for a directory outside app-managed artifacts storage.",
                 metadata: ["directory_name": directoryURL.lastPathComponent]
             )
             return .rejectedUnmanagedDirectory
@@ -86,7 +86,7 @@ struct SessionArtifactsService: SessionArtifactsManaging {
         } catch {
             logger.error(
                 "artifacts_directory_remove_failed",
-                "Failed to remove a BugNarrator-managed artifacts directory; its screenshots and audio are still on disk.",
+                "Failed to remove an app-managed artifacts directory; its screenshots and audio are still on disk.",
                 metadata: [
                     "directory_name": directoryURL.lastPathComponent,
                     "error": error.localizedDescription
@@ -97,7 +97,7 @@ struct SessionArtifactsService: SessionArtifactsManaging {
 
         logger.debug(
             "artifacts_directory_removed",
-            "Removed a BugNarrator-managed artifacts directory.",
+            "Removed an app-managed artifacts directory.",
             metadata: ["directory_name": directoryURL.lastPathComponent]
         )
         return .removed

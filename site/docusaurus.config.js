@@ -72,7 +72,7 @@ const config = {
           ]
         }
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} BugNarrator`
+      copyright: `Copyright © ${new Date().getFullYear()} SureForgeTech`
     }
   }
 };

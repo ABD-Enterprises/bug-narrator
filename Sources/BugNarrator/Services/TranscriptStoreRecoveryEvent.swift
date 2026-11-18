@@ -21,7 +21,7 @@ struct TranscriptStoreRecoveryEvent: Equatable {
             return "Session history could not be read from the primary or backup store. A new empty library was opened."
         case .retentionEviction:
             let sessionWord = recoveredSessionCount == 1 ? "session" : "sessions"
-            return "BugNarrator keeps the 500 most recent sessions. \(recoveredSessionCount) older \(sessionWord), and the screenshots and audio recorded with \(recoveredSessionCount == 1 ? "it" : "them"), were removed to stay within that limit."
+            return "SureForge Capture keeps the 500 most recent sessions. \(recoveredSessionCount) older \(sessionWord), and the screenshots and audio recorded with \(recoveredSessionCount == 1 ? "it" : "them"), were removed to stay within that limit."
         }
     }
 }

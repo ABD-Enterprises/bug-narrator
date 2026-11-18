@@ -181,7 +181,7 @@ final class SupportDataControllerTests: XCTestCase {
             code: 1,
             userInfo: [NSLocalizedDescriptionKey: "Archive failed"]
         )
-        let expectedError = AppError.diagnosticsFailure("BugNarrator could not create the debug bundle.")
+        let expectedError = AppError.diagnosticsFailure("SureForge Capture could not create the debug bundle.")
 
         harness.presenter.presentDebugBundleExportFailure(error)
 
@@ -198,7 +198,7 @@ final class SupportDataControllerTests: XCTestCase {
             code: 1,
             userInfo: [NSLocalizedDescriptionKey: "Archive failed"]
         )
-        let expectedError = AppError.exportFailure("BugNarrator could not create the data export.")
+        let expectedError = AppError.exportFailure("SureForge Capture could not create the data export.")
 
         harness.presenter.presentPrivacyDataExportFailure(error)
 

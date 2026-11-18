@@ -1,17 +1,19 @@
-# BugNarrator
+# SureForge Capture
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black)](https://www.apple.com/macos/)
 
 **Narrate a whole testing session, anywhere on your Mac, and get back many filed issues and a transcript you can search months later.**
 
-BugNarrator is a macOS menu bar tool for narrated software testing sessions. It captures transcripts, screenshot-backed timeline markers, screenshots, and extracted issues.
+SureForge Capture (formerly BugNarrator) is a macOS menu bar tool for narrated software testing sessions. It captures transcripts, screenshot-backed timeline markers, screenshots, and extracted issues.
 
 Three things together, which is the part that is hard to copy: a long exploratory **session** rather than one clip per ticket; **desktop-wide** capture rather than browser-bound; and **local-first** storage, with a local transcription option so audio need never leave the machine.
 
-BugNarrator intentionally runs as a single-instance menu bar app. If you launch it again while it is already running, the existing instance is reactivated and the second copy exits so you do not end up with duplicate menu bar items or competing session state.
+SureForge Capture intentionally runs as a single-instance menu bar app. If you launch it again while it is already running, the existing instance is reactivated and the second copy exits so you do not end up with duplicate menu bar items or competing session state.
 
-## Download BugNarrator
+## Download SureForge Capture
+
+The app is now called SureForge Capture. The download and the app file (`BugNarrator.app`) keep the old name, so an installed copy keeps its permissions, settings and updates.
 
 - [Download the latest macOS DMG](https://github.com/ABD-Enterprises/bug-narrator/releases/latest/download/BugNarrator-macOS.dmg)
 - [View the latest release page](https://github.com/ABD-Enterprises/bug-narrator/releases/latest)
@@ -20,9 +22,9 @@ If the direct DMG link is not live yet, use the release page and download the ne
 
 ## Support Development
 
-BugNarrator is free to use. If it helps your workflow, consider supporting development.
+SureForge Capture is free to use. If it helps your workflow, consider supporting development.
 
-- [Support BugNarrator on PayPal](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
+- [Support SureForge Capture on PayPal](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
 ## Help And Project Links
 
@@ -38,11 +40,11 @@ BugNarrator is free to use. If it helps your workflow, consider supporting devel
 - [Report a bug or request a feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
 - [View the release history](CHANGELOG-archive.md)
 
-## What BugNarrator Does
+## What SureForge Capture Does
 
 The canonical product contract lives in [docs/architecture/product-spec.md](docs/architecture/product-spec.md). Use that spec for behavior, terminology, artifact contracts, and cross-platform parity expectations.
 
-BugNarrator is built for software-review and software-testing workflows where you want to keep clicking through an app while speaking your notes out loud.
+SureForge Capture is built for software-review and software-testing workflows where you want to keep clicking through an app while speaking your notes out loud.
 
 The product is organized around one durable workflow:
 
@@ -57,12 +59,12 @@ It can:
 - extract draft bugs, UX issues, enhancements, and follow-up questions
 - export selected issues to GitHub Issues or Jira Cloud with experimental integrations
 - export a local session bundle with transcript and screenshot artifacts
-- keep a searchable session library with date filters and deletion (the 500 most recent sessions are retained; older ones are removed along with their screenshots and audio, and BugNarrator tells you when that happens)
+- keep a searchable session library with date filters and deletion (the 500 most recent sessions are retained; older ones are removed along with their screenshots and audio, and SureForge Capture tells you when that happens)
 - stay responsive with larger local histories by caching session-library metadata for faster filtering, search, and selection changes
 
 ## Bring Your Own AI Provider
 
-BugNarrator does not ship with built-in AI access or credits.
+SureForge Capture does not ship with built-in AI access or credits.
 
 OpenAI is the hosted default provider. In `Settings`, you can also choose `OpenAI-Compatible`, `Local-Compatible`, or `Local (Parakeet)`.
 
@@ -71,7 +73,7 @@ Important:
 - `OpenAI` requires your own OpenAI API key and uses `https://api.openai.com` unless you override it
 - `OpenAI-Compatible` is for enterprise gateways or hosted providers that expose compatible transcription and chat endpoints
 - `Local-Compatible` is for local or self-hosted OpenAI-compatible endpoints such as LM Studio or Ollama
-- `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio; the server refuses every request that does not carry the private access token it shares with BugNarrator, so no process that cannot read the user's own token file can drive the model or receive the recording
+- `Local (Parakeet)` transcribes on this Mac through the local server at `http://localhost:8422`, does not use an API key, and does not upload audio; the server refuses every request that does not carry the private access token it shares with SureForge Capture — except the health check, which answers a proof challenge instead of the token — so no process that cannot read the user's own token file can drive the model or receive the recording
 
 #### Installing the local Parakeet server
 
@@ -88,12 +90,12 @@ Python, no build step:
 ./bugnarrator-transcription --preload
 ```
 
-3. In BugNarrator, choose `Local (Parakeet)`. It uses `http://localhost:8422`
+3. In SureForge Capture, choose `Local (Parakeet)`. It uses `http://localhost:8422`
    automatically and needs no API key.
 
 Leave that Terminal window running while you record. Apple Silicon only; the
 first `--preload` downloads the speech model. Long recordings are processed in
-bounded local chunks and can take several minutes; BugNarrator waits for the
+bounded local chunks and can take several minutes; SureForge Capture waits for the
 active local inference instead of starting duplicate retries.
 
 Memory stays bounded on long recordings: the upload is streamed to disk, each
@@ -116,17 +118,17 @@ but the idle cost is the same either way.
 1. Download the latest DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
 2. Open the DMG. It should present a drag-to-Applications install window.
 3. Drag `BugNarrator.app` into `Applications`.
-4. Launch BugNarrator from `Applications`.
+4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
 5. On first run, expect AI provider setup. Microphone permission is requested the first time you try to start recording.
 6. If you use screenshot capture, expect Screen Recording permission on first use.
-7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane.
-8. If you try to launch BugNarrator a second time, macOS should bring the existing BugNarrator instance forward instead of opening another menu bar copy.
+7. If a permission is denied, use the recovery buttons in the menu bar window to reopen the correct System Settings pane. System Settings lists the app as BugNarrator (in Privacy & Security and Login Items).
+8. If you try to launch SureForge Capture a second time, macOS should bring the existing SureForge Capture instance forward instead of opening another menu bar copy.
 
-BugNarrator releases are signed with a `Developer ID Application` certificate, notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
+SureForge Capture releases are signed with a `Developer ID Application` certificate, notarized by Apple, and stapled, so macOS will not show the "unidentified developer" warning. A first launch of any downloaded app still shows the standard one-time "downloaded from the Internet" confirmation. If macOS reports an unidentified developer, do not bypass it — verify the DMG against the published `.sha256` checksum and report it.
 
 ## Quick Start
 
-1. Launch BugNarrator and open the menu bar item.
+1. Launch SureForge Capture and open the menu bar item.
 2. Open `Settings`.
 3. Choose an AI provider. Use `OpenAI` for hosted transcription and issue extraction, or `Local (Parakeet)` for local transcription after the local Parakeet server is installed and running.
 4. Optionally click `Validate Key` or `Validate Connection`.
@@ -142,7 +144,7 @@ BugNarrator releases are signed with a `Developer ID Application` certificate, n
 
 ### Recording
 
-BugNarrator records in the background while you switch apps and continue normal mouse or keyboard interaction. It does not type live dictation into the frontmost app.
+SureForge Capture records in the background while you switch apps and continue normal mouse or keyboard interaction. It does not type live dictation into the frontmost app.
 
 Click `Show Recording Controls` from the menu bar to open the persistent recording controls window. That window is the primary place to:
 
@@ -154,7 +156,7 @@ It stays open until you close it, even after recording stops, so you can reuse t
 
 ### Screenshot Capture
 
-Screenshots are captured only when you request them. On macOS 14 and later, BugNarrator uses ScreenCaptureKit and a drag-to-select overlay so you can choose the exact region you want to capture instead of saving every display. Each screenshot is attached to the current session, creates an automatic timeline marker at the same timestamp, and appears later in the `Screenshots` tab with a thumbnail, timestamp, and linked marker label when available.
+Screenshots are captured only when you request them. On macOS 14 and later, SureForge Capture uses ScreenCaptureKit and a drag-to-select overlay so you can choose the exact region you want to capture instead of saving every display. Each screenshot is attached to the current session, creates an automatic timeline marker at the same timestamp, and appears later in the `Screenshots` tab with a thumbnail, timestamp, and linked marker label when available.
 
 ### Review Summary
 
@@ -162,7 +164,7 @@ The review summary gives you a compact pass over the session before you read the
 
 ### Issue Extraction
 
-BugNarrator can turn the session transcript into draft review items in categories such as:
+SureForge Capture can turn the session transcript into draft review items in categories such as:
 
 - Bug
 - UX Issue
@@ -205,14 +207,14 @@ Configure your Jira Cloud URL, email, API token, project key, and issue type in 
 
 ### Microphone
 
-BugNarrator now runs a microphone preflight before recording starts. It requests permission only when needed, blocks recording before any fake recording state appears, and distinguishes between:
+SureForge Capture now runs a microphone preflight before recording starts. It requests permission only when needed, blocks recording before any fake recording state appears, and distinguishes between:
 
 - access not granted yet
 - access denied
 - access restricted
 - audio capture unavailable even though permission looks enabled
 
-If access is denied, recording is blocked until you re-enable BugNarrator in `System Settings > Privacy & Security > Microphone`. If access is restricted, the app tells you to check device-management or parental-control restrictions. If permission looks granted but audio capture still cannot be prepared, BugNarrator reports that as a microphone availability problem instead of a generic recording failure.
+If access is denied, recording is blocked until you turn BugNarrator (SureForge Capture) back on in `System Settings > Privacy & Security > Microphone`. If access is restricted, the app tells you to check device-management or parental-control restrictions. If permission looks granted but audio capture still cannot be prepared, SureForge Capture reports that as a microphone availability problem instead of a generic recording failure.
 
 For local testing from Xcode or `DerivedData`, macOS may treat different app bundle paths as different apps. If microphone behavior looks inconsistent while testing unsigned builds, keep launching the same local app copy or use the signed DMG build for steadier permission behavior.
 
@@ -222,7 +224,7 @@ Screenshot capture may prompt for Screen Recording permission on first use. That
 
 ### Accessibility
 
-BugNarrator does not require Accessibility permission for its core workflow because it does not simulate typing into other apps.
+SureForge Capture does not require Accessibility permission for its core workflow because it does not simulate typing into other apps.
 
 ## Privacy And Data Handling
 
@@ -260,11 +262,11 @@ Data sent to the configured AI provider:
 
 Issue extraction is shaped to what the provider can accept. Hosted providers (OpenAI, OpenAI-Compatible) get JSON response mode, plus screenshot images if you opted in, with a 60-second budget. The Local-Compatible provider gets neither — most local models reject `image_url` parts and `response_format: json_object` outright — and gets 120 seconds, because a local model being slow is not a failure.
 
-BugNarrator does not continuously upload audio while you are still recording.
+SureForge Capture does not continuously upload audio while you are still recording.
 
-"Check for Updates" reads BugNarrator's public GitHub releases feed to see whether a newer version exists. The request is unauthenticated and carries no identifiers — nothing about you or your install is sent, and it happens only when you click it.
+"Check for Updates" reads SureForge Capture's public GitHub releases feed to see whether a newer version exists. The request is unauthenticated and carries no identifiers — nothing about you or your install is sent, and it happens only when you click it.
 
-BugNarrator sends no telemetry off your Mac. There is no remote log collection, no analytics service, and no crash reporter.
+SureForge Capture sends no telemetry off your Mac. There is no remote log collection, no analytics service, and no crash reporter.
 
 It does keep a local-only operational log at `~/Library/Application Support/BugNarrator/operational-telemetry.jsonl`, recording named events such as recordings started, transcriptions completed, app errors, and unclean-exit detection. That file stays on disk and is never transmitted; it is read only when you explicitly copy debug info, export a debug bundle, or run Export Data. Turn it off with **Settings > Diagnostics & Privacy > "Record local usage analytics"**, and delete the file at any time.
 
@@ -274,7 +276,7 @@ Transcripts are **not** copied to the clipboard unless you ask. **Settings > Gen
 
 If you need help or want to file a GitHub issue:
 
-1. Open BugNarrator and reproduce the problem.
+1. Open SureForge Capture and reproduce the problem.
 2. Hold `Option` while the menu bar window is open to reveal `Export Debug Bundle`.
 3. Export a safe local diagnostics bundle.
 4. Attach the debug bundle and, if relevant, a session bundle or screenshots.
@@ -322,7 +324,7 @@ For the canonical structured release and deployment docs, see:
 - [docs/operations/deployment.md](docs/operations/deployment.md)
 - [docs/release/release-process.md](docs/release/release-process.md)
 
-BugNarrator includes a repeatable local packaging script:
+SureForge Capture includes a repeatable local packaging script:
 
 ```bash
 ./scripts/build_dmg.sh
@@ -359,13 +361,13 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 
 ## Contribution Policy
 
-BugNarrator is not currently accepting outside code contributions or pull requests.
+SureForge Capture is not currently accepting outside code contributions or pull requests.
 
 Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
 
 ## License
 
-BugNarrator is licensed under the Apache License 2.0.
+SureForge Capture is licensed under the Apache License 2.0.
 
 This license allows users to freely use, modify, and distribute the software, including for commercial purposes, as long as attribution and license terms are preserved.
 

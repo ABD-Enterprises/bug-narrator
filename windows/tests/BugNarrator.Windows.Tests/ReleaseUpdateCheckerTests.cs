@@ -80,7 +80,7 @@ public sealed class ReleaseUpdateCheckerTests
 
         Assert.Equal(ReleaseUpdateOutcome.UpToDate("1.0.41"), outcome);
         Assert.Null(outcome.UrlToOpen(Fallback));
-        Assert.Equal("BugNarrator 1.0.41 is the latest release.", outcome.UserMessage);
+        Assert.Equal("SureForge Capture 1.0.41 is the latest release.", outcome.UserMessage);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public sealed class ReleaseUpdateCheckerTests
         var swift = File.ReadAllText(Path.Combine(RepositoryRoot(), "Sources", "BugNarrator", "Services", "ReleaseUpdateCheck.swift"));
 
         Assert.DoesNotContain("/latest", GitHubLatestReleaseFeed.Endpoint, StringComparison.Ordinal);
-        Assert.Contains("\"BugNarrator \\(current) is the latest release.\"", swift, StringComparison.Ordinal);
+        Assert.Contains("\"SureForge Capture \\(current) is the latest release.\"", swift, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -251,13 +251,13 @@ public sealed class ReleaseUpdateCheckerTests
     }
 
     [Theory]
-    [InlineData("http://github.com/ABD-Enterprises/bug-narrator/releases/tag/v9.0.0")]
-    [InlineData("https://example.com/ABD-Enterprises/bug-narrator/releases/tag/v9.0.0")]
+    [InlineData("http://github.com/SureForgeTech/sureforge-capture/releases/tag/v9.0.0")]
+    [InlineData("https://example.com/SureForgeTech/sureforge-capture/releases/tag/v9.0.0")]
     [InlineData("https://github.com/other/project/releases/tag/v9.0.0")]
-    [InlineData("https://user@github.com/ABD-Enterprises/bug-narrator/releases/tag/v9.0.0")]
-    [InlineData("https://github.com:8443/ABD-Enterprises/bug-narrator/releases/tag/v9.0.0")]
-    [InlineData("https://github.com/ABD-Enterprises/bug-narrator/releases/tag/v8.0.0")]
-    [InlineData("https://github.com/ABD-Enterprises/bug-narrator/releases/tag/v9.0.0?redirect=elsewhere")]
+    [InlineData("https://user@github.com/SureForgeTech/sureforge-capture/releases/tag/v9.0.0")]
+    [InlineData("https://github.com:8443/SureForgeTech/sureforge-capture/releases/tag/v9.0.0")]
+    [InlineData("https://github.com/SureForgeTech/sureforge-capture/releases/tag/v8.0.0")]
+    [InlineData("https://github.com/SureForgeTech/sureforge-capture/releases/tag/v9.0.0?redirect=elsewhere")]
     [InlineData("javascript:alert(1)")]
     public async Task Feed_SkipsUntrustedOrMismatchedReleaseLinks(string url)
     {
@@ -361,7 +361,7 @@ public sealed class ReleaseUpdateCheckerTests
     }
 
     private static string ReleaseUrl(string tag) =>
-        $"https://github.com/ABD-Enterprises/bug-narrator/releases/tag/{tag}";
+        $"https://github.com/SureForgeTech/sureforge-capture/releases/tag/{tag}";
 
     private static object ReleasePayload(
         string tag,

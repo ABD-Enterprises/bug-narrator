@@ -607,6 +607,134 @@ public sealed class IssueExportProviderTests : IDisposable
         Assert.DoesNotContain(privateText, log, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task JiraBuildRequest_NeutralizesMentionsAndCrossReferencesInTheDescription()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            Summary = "The save button mentions @security-team",
+            EvidenceExcerpt = "Evidence references #4821",
+            Component = "@ops",
+            SectionTitle = "GH-99 section",
+            Note = "Tracker note mentions @security-team",
+        };
+        var provider = new JiraExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new JiraExportConfiguration(
+                new Uri("https://acme.atlassian.net/"), "you@example.com", "t", "BN", "Task"));
+
+        var body = await request.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        var text = CollectText(document.RootElement.GetProperty("fields").GetProperty("description"));
+
+        // The description is model- and transcript-derived text too, and a tracker can show it
+        // again in notifications and activity feeds, so no live mention may survive in it.
+        Assert.False(text.Contains("@security-team", StringComparison.Ordinal));
+        Assert.False(text.Contains("#4821", StringComparison.Ordinal));
+        Assert.False(text.Contains("GH-99", StringComparison.Ordinal));
+        // The text stays visually identical: only zero-width spaces are added.
+        var withoutZeroWidthSpaces = text.Replace("\u200B", string.Empty, StringComparison.Ordinal);
+        Assert.Contains("@security-team", withoutZeroWidthSpaces, StringComparison.Ordinal);
+        Assert.Contains("#4821", withoutZeroWidthSpaces, StringComparison.Ordinal);
+        Assert.Contains("GH-99", withoutZeroWidthSpaces, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_NeutralizesTheSessionTitleInTheBody()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult()) with
+        {
+            Title = "Tester reviews @security-team #4821",
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            session.IssueExtraction!.Issues[0],
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        // The session title is built from the transcript, and the body is markdown: a live
+        // mention in it would notify the account it names.
+        Assert.False(body.Contains("@security-team", StringComparison.Ordinal));
+        Assert.False(body.Contains("#4821", StringComparison.Ordinal));
+        // Plain string operations, so the assertion does not depend on the assertion
+        // library's comparison semantics.
+        Assert.True(body.Contains("@\u200Bsecurity-team", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GitHubBuildRequest_CannotBreakOutOfTheDeduplicationHintCodeSpan()
+    {
+        var session = ReviewSessionTestData.CreateCompletedSession(
+            rootDirectory,
+            issueExtraction: ReviewSessionTestData.CreateIssueExtractionResult());
+        var issue = session.IssueExtraction!.Issues[0] with
+        {
+            DeduplicationHint = "hint ` then @security-team",
+        };
+        var provider = new GitHubExportProvider(diagnostics);
+
+        using var request = provider.BuildRequest(
+            issue,
+            session,
+            new GitHubExportConfiguration("t", "acme", "bugnarrator", []));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync())
+            .RootElement.GetProperty("body").GetString()!;
+
+        // The hint is model output and it goes into a code span. A backtick in it would close
+        // the span early and let the rest of the hint render as markdown, with a live
+        // @mention in it. macOS collapses the hint to one line and strips backticks; so does
+        // Windows now.
+        var hintLine = body
+            .Split('\n')
+            .First(line => line.Contains("- Deduplication hint:", StringComparison.Ordinal));
+        Assert.Equal(2, hintLine.Count(character => character == '`'));
+        Assert.Contains("hint ’ then", hintLine, StringComparison.Ordinal);
+    }
+
+    /// <summary>Collects every text node of a Jira ADF document, in order.</summary>
+    private static string CollectText(JsonElement element)
+    {
+        var builder = new StringBuilder();
+        CollectText(element, builder);
+        return builder.ToString();
+    }
+
+    private static void CollectText(JsonElement element, StringBuilder builder)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.NameEquals("text") && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    builder.AppendLine(property.Value.GetString());
+                }
+                else
+                {
+                    CollectText(property.Value, builder);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                CollectText(item, builder);
+            }
+        }
+    }
+
     private static byte[] TinyPngBytes() => Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
 

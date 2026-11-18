@@ -124,9 +124,31 @@ final class LocalTranscriptionManager: ObservableObject {
         return nil
     }
 
+    /// The repository moved from ABD-Enterprises/bug-narrator to SureForgeTech/sureforge-capture on 2026-11-14.
+    /// GitHub now reports release assets under the new path; the old path stays trusted for older listings.
+    static let trustedReleasePathPrefixes = [
+        "/SureForgeTech/sureforge-capture/releases/download/",
+        "/ABD-Enterprises/bug-narrator/releases/download/",
+    ]
+
+    /// Judges the address as written, not as parsed. `URL.path` decodes percent escapes, so an
+    /// encoded `..` or `/` used to pass the prefix test and then name a different path once the
+    /// client or the server normalized it. The written form must begin with the exact origin
+    /// (no user, no port, not even `:443`), and the path must hold no escape, no backslash and no
+    /// empty, `.` or `..` segment. Release tags and the asset names this app asks for need none of those.
     static func trustedAssetURL(_ url: URL) -> Bool {
-        url.scheme == "https" && url.host == "github.com" && url.user == nil && url.password == nil &&
-            url.path.hasPrefix("/ABD-Enterprises/bug-narrator/releases/download/")
+        guard url.scheme == "https", url.host == "github.com", url.port == nil,
+              url.user == nil, url.password == nil else { return false }
+        let written = url.absoluteString
+        let origin = "https://github.com"
+        guard written.hasPrefix(origin + "/") else { return false }
+        let afterOrigin = written.dropFirst(origin.count)
+        let path = afterOrigin.prefix(while: { $0 != "?" && $0 != "#" })
+        guard let prefix = trustedReleasePathPrefixes.first(where: { path.hasPrefix($0) }) else { return false }
+        guard !path.contains("%"), !path.contains("\\"),
+              path.unicodeScalars.allSatisfy({ $0.value > 0x20 && $0.value < 0x7F }) else { return false }
+        let segments = path.dropFirst(prefix.count).split(separator: "/", omittingEmptySubsequences: false)
+        return segments.count >= 2 && segments.allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
     }
 
     func discover() async {
@@ -137,7 +159,7 @@ final class LocalTranscriptionManager: ObservableObject {
             // App and server releases have independent cadences. Search bounded pages.
             for page in 1...20 {
                 try Task.checkCancellation()
-                let url = URL(string: "https://api.github.com/repos/ABD-Enterprises/bug-narrator/releases?per_page=30&page=\(page)")!
+                let url = URL(string: "https://api.github.com/repos/SureForgeTech/sureforge-capture/releases?per_page=30&page=\(page)")!
                 let (data, response) = try await BoundedHTTPResponseReader.data(from: url, using: session)
                 try Self.requireSuccess(response)
                 let releases = try JSONDecoder().decode([Release].self, from: data)
@@ -247,9 +269,10 @@ final class LocalTranscriptionManager: ObservableObject {
     private func launchVerifiedServer() {
         do {
             // The server refuses every request that does not carry the token,
-            // so it has to be handed the same token the app presents. It goes
-            // through the environment rather than the command line, where it
-            // would be visible in the process list.
+            // so it has to be handed the same token the app presents (the
+            // health check's proof challenge is the one exception, and it
+            // carries no token). It goes through the environment rather than
+            // the command line, where it would be visible in the process list.
             let token = LocalServerTokenStore.token(installDirectory: directory)
             let process = try dependencies.launch(
                 executable,

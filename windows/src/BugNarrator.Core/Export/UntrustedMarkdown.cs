@@ -66,6 +66,40 @@ public static partial class UntrustedMarkdown
         return string.Join("\n", lines);
     }
 
+    /// <summary>
+    /// Neutralizes the live mention and cross-reference triggers in untrusted text.
+    /// </summary>
+    /// <remarks>
+    /// Every model- and transcript-derived field that reaches a tracker is run through this on the
+    /// way out. GitHub autolinks <c>@mentions</c> in an issue title and in an issue body, notifies
+    /// on mentions in the body, and resolves <c>#123</c> cross-references in the body too; a tracker can render the
+    /// same text again in notifications, activity feeds and search results. A third party who
+    /// only controls what is on the recorded screen could otherwise put a name in the transcript
+    /// and have the user's export ping arbitrary accounts in their repository, or forge a
+    /// cross-reference to an unrelated issue.
+    ///
+    /// Only the live triggers are defanged. The fields this is used for — a tracker's
+    /// single-line title and Jira's structured ADF description — are plain text, not markdown, so
+    /// the block-structure, link and entity escapes the GitHub body needs
+    /// (<see cref="Neutralize"/>) would only mangle them. A line-for-line counterpart of the
+    /// macOS <c>TrackerExportPayloadBudget.neutralizingUntrustedMentions</c>.
+    /// </remarks>
+    public static string NeutralizeMentions(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text ?? string.Empty;
+        }
+
+        // A zero-width space after @/# breaks the mention and issue autolinks while leaving the
+        // text visually identical.
+        var neutralized = text
+            .Replace("@", "@" + ZeroWidthSpace)
+            .Replace("#", "#" + ZeroWidthSpace);
+        // "GH-123" is an issue reference GitHub links just like "#123"; keep the author's case.
+        return IssueReferencePrefix().Replace(neutralized, "$1" + ZeroWidthSpace);
+    }
+
     [GeneratedRegex("(?i)(gh-)")]
     private static partial Regex IssueReferencePrefix();
 

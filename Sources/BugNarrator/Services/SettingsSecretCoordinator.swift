@@ -51,7 +51,7 @@ final class SettingsSecretCoordinator {
             if let value = sessionOnlySecrets[slot], !value.isEmpty {
                 logger.warning(
                     "secret_fallback_to_memory",
-                    "Keychain access failed, so BugNarrator fell back to an in-memory secure value.",
+                    "Keychain access failed, so SureForge Capture fell back to an in-memory secure value.",
                     metadata: ["slot": slot.redactionSafeName]
                 )
                 return LoadedSecret(value: value, state: .sessionOnly)
@@ -60,7 +60,7 @@ final class SettingsSecretCoordinator {
             if case KeychainError.interactionRequired = error {
                 logger.debug(
                     "secret_locked",
-                    "A secure value remains in Keychain, but BugNarrator skipped the unlock prompt until a user-initiated action needs it.",
+                    "A secure value remains in Keychain, but SureForge Capture skipped the unlock prompt until a user-initiated action needs it.",
                     metadata: [
                         "slot": slot.redactionSafeName,
                         "allow_interaction": allowInteraction ? "yes" : "no"

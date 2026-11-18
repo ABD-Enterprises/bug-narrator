@@ -71,8 +71,8 @@ final class ApplicationTerminationController {
         recordingLogger.warning(
             isTranscribing ? "termination_blocked_while_transcribing" : "termination_blocked_while_recording",
             isTranscribing
-                ? "BugNarrator blocked an app termination request while a stopped recording was still being transcribed."
-                : "BugNarrator blocked an app termination request while a recording session was still active.",
+                ? "SureForge Capture blocked an app termination request while a stopped recording was still being transcribed."
+                : "SureForge Capture blocked an app termination request while a recording session was still active.",
             metadata: ["session_id": activeRecordingSession()?.sessionID.uuidString ?? "starting"]
         )
         cancelPendingScreenshotSelection(
@@ -83,8 +83,8 @@ final class ApplicationTerminationController {
         showRecordingControls()
         showToast(
             isTranscribing
-                ? "Wait for transcription to finish saving before quitting BugNarrator."
-                : "Stop recording before quitting BugNarrator.",
+                ? "Wait for transcription to finish saving before quitting SureForge Capture."
+                : "Stop recording before quitting SureForge Capture.",
             .informational
         )
         return .terminateCancel
@@ -94,7 +94,7 @@ final class ApplicationTerminationController {
         let recordingSession = activeRecordingSession()
         settingsLogger.info(
             "application_will_terminate",
-            "BugNarrator is preparing for application shutdown.",
+            "SureForge Capture is preparing for application shutdown.",
             metadata: [
                 "status_phase": statusPhase().debugName,
                 "has_active_recording_session": recordingSession == nil ? "no" : "yes",
@@ -106,7 +106,7 @@ final class ApplicationTerminationController {
         if let recordingSession {
             recordingLogger.warning(
                 "application_terminating_during_recording",
-                "BugNarrator is terminating while a recording session is still active.",
+                "SureForge Capture is terminating while a recording session is still active.",
                 metadata: ["session_id": recordingSession.sessionID.uuidString]
             )
         }

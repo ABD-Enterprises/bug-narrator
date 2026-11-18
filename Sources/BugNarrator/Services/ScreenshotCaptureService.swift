@@ -149,7 +149,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            throw AppError.screenshotCaptureFailure("BugNarrator could not prepare the screenshot image.")
+            throw AppError.screenshotCaptureFailure("SureForge Capture could not prepare the screenshot image.")
         }
 
         context.interpolationQuality = .high
@@ -167,7 +167,7 @@ struct ScreenshotCaptureService: ScreenshotCapturing {
         }
 
         guard let image = context.makeImage() else {
-            throw AppError.screenshotCaptureFailure("BugNarrator could not finish the screenshot image.")
+            throw AppError.screenshotCaptureFailure("SureForge Capture could not finish the screenshot image.")
         }
 
         return image

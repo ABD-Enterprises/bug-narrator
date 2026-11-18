@@ -311,7 +311,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_DRAFT: ${{ inputs.draft }}
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
-          RELEASE_NOTES: "Signed Windows builds of the local Parakeet transcription server. BugNarrator discovers the x64 asset automatically from Settings > Local (Parakeet) Server; the arm64 asset is for Windows on ARM machines. Model weights download on first start."
+          RELEASE_NOTES: "Signed Windows builds of the local Parakeet transcription server. SureForge Capture (formerly BugNarrator) picks the asset for its processor, x64 or arm64, automatically from Settings > Local (Parakeet) Server. Model weights download on first start."
         run: |
           set -euo pipefail
           files=(assets/bugnarrator-transcription-windows-*.zip assets/bugnarrator-transcription-windows-*.zip.sha256)
