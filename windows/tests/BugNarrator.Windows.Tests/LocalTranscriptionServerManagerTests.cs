@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,8 +15,9 @@ namespace BugNarrator.Windows.Tests;
 /// </summary>
 public sealed class LocalTranscriptionServerManagerTests : IDisposable
 {
-    private const string ImageUrl = "https://github.com/ABD-Enterprises/bug-narrator/releases/download/server-v1/" + LocalServerPackageCatalog.AssetName;
-    private const string ChecksumUrl = ImageUrl + ".sha256";
+    private static readonly string NativeAssetName = LocalServerPackageCatalog.AssetNameForArchitecture(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture)!;
+    private static readonly string ImageUrl = "https://github.com/SureForgeTech/sureforge-capture/releases/download/server-v1/" + NativeAssetName;
+    private static readonly string ChecksumUrl = ImageUrl + ".sha256";
 
     private readonly string root = Path.Combine(Path.GetTempPath(), "BugNarrator.Windows.Tests", Guid.NewGuid().ToString("N"));
     private readonly string installDirectory;
@@ -35,6 +37,45 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
     }
 
     // ---- catalog ----
+
+    [Theory]
+    [InlineData(Architecture.X64, "bugnarrator-transcription-windows-x64.zip")]
+    [InlineData(Architecture.Arm64, "bugnarrator-transcription-windows-arm64.zip")]
+    public async Task Discover_SelectsTheNativePackageAndMatchingChecksum(Architecture architecture, string expectedName)
+    {
+        LocalServerAsset Asset(string name) => new(name, 1000,
+            "https://github.com/SureForgeTech/sureforge-capture/releases/download/server-v1/" + name);
+        var x64 = "bugnarrator-transcription-windows-x64.zip";
+        var arm64 = "bugnarrator-transcription-windows-arm64.zip";
+        var releases = new[] { Release(false, false, Asset(x64), Asset(x64 + ".sha256"), Asset(arm64), Asset(arm64 + ".sha256")) };
+        var handler = new FakeHandler(request =>
+        {
+            Assert.Equal("https://api.github.com/repos/SureForgeTech/sureforge-capture/releases?per_page=30&page=1", request.RequestUri!.AbsoluteUri);
+            return Json(JsonSerializer.Serialize(releases));
+        });
+        using var client = new HttpClient(handler);
+
+        var result = await new LocalServerPackageCatalog(client, architecture).DiscoverAsync();
+
+        Assert.NotNull(result.Package);
+        Assert.Equal(expectedName, result.Package.Image.Name);
+        Assert.Equal(expectedName + ".sha256", result.Package.Checksum.Name);
+        // A package for another architecture, or a checksum for another image, is not a fallback.
+        var wrong = expectedName == x64 ? arm64 : x64;
+        Assert.Null(LocalServerPackageCatalog.SelectPackage([Release(false, false, Asset(wrong), Asset(wrong + ".sha256"))], architecture));
+        Assert.Null(LocalServerPackageCatalog.SelectPackage([Release(false, false, Asset(expectedName), Asset(wrong + ".sha256"))], architecture));
+    }
+
+    [Fact]
+    public async Task Discover_UnsupportedArchitectureRefusesBeforeNetworkAccess()
+    {
+        var handler = new FakeHandler(_ => throw new InvalidOperationException("Unexpected network request"));
+        using var client = new HttpClient(handler);
+        var result = await new LocalServerPackageCatalog(client, Architecture.X86).DiscoverAsync();
+        Assert.Null(result.Package);
+        Assert.Contains("architecture", result.Message);
+        Assert.Equal(0, handler.Calls);
+    }
 
     [Fact]
     public async Task PackageCatalog_RefusesAnOversizedReplyBeforeEagerBuffering()
@@ -69,11 +110,15 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
     }
 
     [Theory]
-    [InlineData("https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/x.zip", true)]
-    [InlineData("http://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/x.zip", false)]
-    [InlineData("https://evil.example/ABD-Enterprises/bug-narrator/releases/download/v1/x.zip", false)]
+    [InlineData("https://github.com/SureForgeTech/sureforge-capture/releases/download/v1/x.zip", true)]
+    [InlineData("http://github.com/SureForgeTech/sureforge-capture/releases/download/v1/x.zip", false)]
+    [InlineData("https://evil.example/SureForgeTech/sureforge-capture/releases/download/v1/x.zip", false)]
     [InlineData("https://github.com/Someone-Else/bug-narrator/releases/download/v1/x.zip", false)]
-    [InlineData("https://user:pw@github.com/ABD-Enterprises/bug-narrator/releases/download/v1/x.zip", false)]
+    [InlineData("https://user:pw@github.com/SureForgeTech/sureforge-capture/releases/download/v1/x.zip", false)]
+    [InlineData("https://github.com:8443/SureForgeTech/sureforge-capture/releases/download/v1/x.zip", false)]
+    [InlineData("https://github.com/SureForgeTech/sureforge-capture/releases/download/v1/x.zip?redirect=elsewhere", false)]
+    [InlineData("https://github.com/SureForgeTech/sureforge-capture/releases/download/v1/x.zip#fragment", false)]
+    [InlineData("https://github.com/ABD-Enterprises/bug-narrator/releases/download/v1/x.zip", false)]
     [InlineData("not a url", false)]
     public void TrustedAssetUrl_OnlyAcceptsTheProjectsOwnReleaseDownloads(string url, bool expected)
     {
@@ -204,7 +249,7 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         }
 
         var size = new FileInfo(zip).Length;
-        var manifest = Sha256(zip) + "  " + LocalServerPackageCatalog.AssetName;
+        var manifest = Sha256(zip) + "  " + NativeAssetName;
 
         var failure = Assert.Throws<LocalServerFailure>(() => new LocalServerInstaller(new FakeVerifier()).Install(zip, manifest, size, installDirectory));
 
@@ -225,7 +270,7 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         }
 
         var size = new FileInfo(zip).Length;
-        var manifest = Sha256(zip) + "  " + LocalServerPackageCatalog.AssetName;
+        var manifest = Sha256(zip) + "  " + NativeAssetName;
 
         var failure = Assert.Throws<LocalServerFailure>(() => new LocalServerInstaller(new FakeVerifier(), limit).Install(zip, manifest, size, installDirectory));
 
@@ -288,8 +333,8 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         var (zip, _, size) = BuildPackage("exe-bytes");
         var handler = new FakeHandler(request => request.RequestUri!.AbsoluteUri switch
         {
-            ChecksumUrl => Text(new string('a', 8192)),
-            ImageUrl => Bytes(File.ReadAllBytes(zip)),
+            var url when url == ChecksumUrl => Text(new string('a', 8192)),
+            var url when url == ImageUrl => Bytes(File.ReadAllBytes(zip)),
             _ => Json(JsonSerializer.Serialize(new[] { Release(false, false, ImageAsset(size), ChecksumAsset(70)) })),
         });
         var manager = CreateManager(handler);
@@ -322,8 +367,8 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         var (zip, manifest, size) = BuildPackage("exe-bytes");
         var handler = new FakeHandler(request => request.RequestUri!.AbsoluteUri switch
         {
-            ChecksumUrl => Text(manifest),
-            ImageUrl => Bytes(File.ReadAllBytes(zip)),
+            var url when url == ChecksumUrl => Text(manifest),
+            var url when url == ImageUrl => Bytes(File.ReadAllBytes(zip)),
             _ => Json(JsonSerializer.Serialize(new[] { Release(false, false, ImageAsset(size), ChecksumAsset(manifest.Length)) })),
         });
         var launches = new List<(string Exe, string Models)>();
@@ -349,8 +394,8 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         var (zip, _, size) = BuildPackage("exe-bytes");
         var handler = new FakeHandler(request => request.RequestUri!.AbsoluteUri switch
         {
-            ChecksumUrl => Text(new string('a', 64)),
-            ImageUrl => Bytes(File.ReadAllBytes(zip)),
+            var url when url == ChecksumUrl => Text(new string('a', 64)),
+            var url when url == ImageUrl => Bytes(File.ReadAllBytes(zip)),
             _ => Json(JsonSerializer.Serialize(new[] { Release(false, false, ImageAsset(size), ChecksumAsset(64)) })),
         });
         var manager = CreateManager(handler);
@@ -474,7 +519,7 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
             writer.Write(executableContent);
         }
 
-        return (zip, Sha256(zip) + "  " + LocalServerPackageCatalog.AssetName + "\n", new FileInfo(zip).Length);
+        return (zip, Sha256(zip) + "  " + NativeAssetName + "\n", new FileInfo(zip).Length);
     }
 
     private static string Sha256(string file)
@@ -483,9 +528,9 @@ public sealed class LocalTranscriptionServerManagerTests : IDisposable
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
-    private static LocalServerAsset ImageAsset(long size) => new(LocalServerPackageCatalog.AssetName, size, ImageUrl);
+    private static LocalServerAsset ImageAsset(long size) => new(NativeAssetName, size, ImageUrl);
 
-    private static LocalServerAsset ChecksumAsset(long size) => new(LocalServerPackageCatalog.ChecksumAssetName, size, ChecksumUrl);
+    private static LocalServerAsset ChecksumAsset(long size) => new(NativeAssetName + ".sha256", size, ChecksumUrl);
 
     private static LocalServerRelease Release(bool draft, bool prerelease, params LocalServerAsset[] assets) => new(draft, prerelease, assets);
 
