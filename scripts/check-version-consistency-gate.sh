@@ -20,24 +20,24 @@
 #      sources that are deliberately wrong.
 #   3. Does the validation actually fail when the check fails? A gate that
 #      silently stopped running the check would look exactly like a gate that
-#      passes, so the validation is run in an instance that reports the
-#      contract as broken, and has to fail too.
+#      passes, so the validation is run against a genuinely broken tree — a
+#      clone whose VERSION disagrees with project.yml — and has to fail, and
+#      has to fail because of the version contract.
 #
 # The third question is answered by running the validation, so the validation
 # skips this gate's own third step when it is invoked from here. The
 # recursion is broken by VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK, which the
 # nested invocation inherits.
 #
-# The nested instance reports the contract as broken on purpose: it is the
-# simulation of "the check failed". That is why the flag that selects it also
-# makes the gate fail, so an environment that sets the flag without being
-# inside a nested run fails the validation rather than weakening it.
+# What the third step proves is that the validation fails when the version
+# check fails. The validation runs under "set -euo pipefail", so a failing
+# check that is not swallowed stops the run; the forms that swallow a failure
+# — "|| true", a discarded status, an inverted test — are all caught,
+# because the broken tree would then pass.
 #
-# What the third step proves is that the validation fails when the contract is
-# reported as broken. The validation runs under "set -euo pipefail", so a
-# failing check that is not swallowed stops the run; the forms that swallow a
-# failure — "|| true", a discarded status, an inverted test — are all caught,
-# because the nested run would then pass.
+# What no gate can do is survive its own deletion: removing this script from
+# scripts/validate.sh removes the check with it. Every check in this
+# repository has that property.
 
 set -euo pipefail
 
@@ -50,7 +50,7 @@ fail() {
 }
 
 CHECK="$ROOT/scripts/check_version_consistency.sh"
-NESTED="${VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK:-0}"
+
 
 # ── 1. The real tree must agree right now ─────────────────────────────────
 # This is the unconditional step. The check is what the gate exists to
@@ -64,15 +64,6 @@ mkdir -p "$ROOT/artifacts/validation"
 if ! "$CHECK"; then
     printf 'FAIL: the version sources are inconsistent\n' >"$VERSION_STATUS_FILE"
     fail 'the version sources are inconsistent'
-fi
-
-# ── 2. The nested instance reports the contract as broken ──────────────────
-# The nested validation has to fail at the version contract, so that the
-# third step can show that a broken contract fails the validation. The nested
-# instance is the one that VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK selects.
-if [[ "$NESTED" == "1" ]]; then
-    printf 'FAIL: the version contract was reported as broken (simulated)\n' >&2
-    fail 'the version contract was reported as broken (simulated)'
 fi
 
 # ── 3. The check must catch drift, not merely agree ───────────────────────
@@ -127,21 +118,34 @@ fi
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
 #
-# The nested validation uses HEAD as its base ref, so it scans no files and
-# reaches the gate in a couple of seconds. It inherits
-# VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK's own nested validation as well, and
-# that one inherits this flag, which is what stops the recursion: the flag is
-# inherited rather than cleared, so every nested instance stays a nested
-# instance.
+# The proof uses a genuinely broken tree rather than a simulated failure: a
+# clone of the repository whose VERSION disagrees with project.yml, validated
+# in the clone. The clone is what makes it a proof — the validation reads the
+# version sources from the tree it is run in, so the check really fails there.
+#
+# The clone is validated with HEAD as its base ref, so it scans no files and
+# reaches the gate in a couple of seconds. It runs with
+# VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1, which stops its own gate from
+# running this proof again; the flag is inherited rather than cleared, so
+# every nested instance stays a nested instance and the recursion terminates.
+clone="$workspace/clone"
+if ! git clone --quiet --no-local "$ROOT" "$clone" 2>"$workspace/clone-error.txt"; then
+    cat "$workspace/clone-error.txt" >&2
+    fail 'could not clone the repository to prove the validation fails on a broken version contract'
+fi
+
+# A VERSION that disagrees with project.yml and with the released heading.
+printf '0.0.0\n' >"$clone/VERSION"
+
 validation_output="$workspace/validation-output.txt"
 if env -u AI_VALIDATOR_BASE_REF VALIDATE_SKIP_VERSION_CHECK_SELF_CHECK=1 \
-    "$ROOT/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
+    "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
     fail 'the validation passed although the version contract was broken'
 fi
 
 # The validation has to have failed for this reason, not for some other one:
 # a base ref it could not diff, for instance.
-if ! grep -q 'the version contract was reported as broken' "$validation_output"; then
+if ! grep -q 'the version sources are inconsistent' "$validation_output"; then
     cat "$validation_output" >&2
     fail 'the validation failed for another reason than the version contract'
 fi
