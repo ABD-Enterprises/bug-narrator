@@ -359,10 +359,17 @@ public sealed class AccessibleNameAuditTests
     /// </summary>
     private static ScrollViewer? FindListScrollViewer(ListBox list)
     {
-        // The list's own scroll viewer is a template part; the visual walk is the fallback for a
-        // theme whose part is named differently.
-        return list.Template?.FindName("PART_ScrollViewer", list) as ScrollViewer
-            ?? FindScrollViewer(list);
+        // The list's own scroll viewer lives in its template. The theme decides what the part is
+        // called, so try the names WPF's ListBox templates use and fall back to the visual tree.
+        foreach (var partName in new[] { "PART_ContentHost", "PART_ScrollViewer" })
+        {
+            if (list.Template?.FindName(partName, list) is ScrollViewer named)
+            {
+                return named;
+            }
+        }
+
+        return FindScrollViewer(list);
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject parent)
