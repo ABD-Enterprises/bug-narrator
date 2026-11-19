@@ -37,7 +37,7 @@ else
     NEW_BUILD=$(( CURRENT_BUILD + 1 ))
 fi
 if ! [[ "$NEW_BUILD" =~ ^[0-9]+$ ]]; then
-    echo "error: build number must be a positive integer, got '$NEW_BUILD'" >&2
+    echo "error: build number must be a number, got '$NEW_BUILD'" >&2
     exit 2
 fi
 
