@@ -92,6 +92,17 @@ if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
   fi
 fi
 
+# The version bump must refuse to run on a dirty tree and must replace the
+# files it writes rather than truncate them in place. The gate runs the real
+# script against a throwaway tree, so the behaviour cannot rot back.
+if [[ ! -x "$ROOT/scripts/check-version-bump-guard.sh" ]]; then
+  printf 'FAIL: scripts/check-version-bump-guard.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-version-bump-guard.sh"; then
+  exit 1
+fi
+
 # The release environment gate and the `environment:` key of the release jobs
 # have to name the same environment: a drifted name would check one
 # environment while the release deployed to another. The check is required,
