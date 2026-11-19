@@ -55,16 +55,17 @@ TODAY="$(date +%Y-%m-%d)"
 # replaced whole.
 # The git environment is cleared for these calls. An inherited GIT_DIR or
 # GIT_WORK_TREE would make the guard consult another repository, and a clean
-# one would let a dirty tree through. The answer is read from the output as
-# well as the exit status, because "true" is what says the tree is a work tree.
-if [[ "$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]]; then
+# one would let a dirty tree through; the rest of the GIT_ family is cleared
+# for the same reason. The answer is read from the output as well as the exit
+# status, because "true" is what says the tree is a work tree.
+if [[ "$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]]; then
     echo "error: the bump needs a git checkout so it can tell whether the tree is clean." >&2
     exit 1
 fi
 # The exit status is checked, not swallowed: a git status that fails must not
 # read as a clean tree.
 status="$(mktemp)"
-if ! env -u GIT_DIR -u GIT_WORK_TREE git status --porcelain --untracked-files=no >"$status"; then
+if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE git status --porcelain --untracked-files=no >"$status"; then
     rm -f "$status"
     echo "error: git status failed, so the bump cannot tell whether the tree is clean." >&2
     exit 1

@@ -121,6 +121,24 @@ if ! grep -qi 'git status failed' "$workspace/broken.out"; then
     fail 'the bump did not say that git status failed'
 fi
 
+# ── 2c. an inherited git environment must not let a dirty tree through ────
+# The guard has to consult the tree the script is in. With another repository
+# pointed at, a clean one would report a clean tree and the bump would run on
+# a dirty tree.
+hostile="$workspace/hostile"
+make_tree "$hostile"
+printf 'a local edit that is not the version bump\n' >>"$hostile/VERSION"
+other="$workspace/other"
+mkdir -p "$other"
+env -u GIT_DIR -u GIT_WORK_TREE git -C "$other" init --quiet
+if env GIT_DIR="$other/.git" GIT_WORK_TREE="$other" \
+    "$hostile/scripts/bump_version.sh" 1.2.0 >"$workspace/hostile.out" 2>&1; then
+    fail 'the bump ran on a dirty tree when another repository was pointed at'
+fi
+if ! grep -q 'a local edit that is not the version bump' "$hostile/VERSION"; then
+    fail 'the bump wrote VERSION although the tree was dirty'
+fi
+
 # ── 3. every file the bump changes is replaced, not truncated in place ─────
 # A file that is truncated and rewritten keeps its identity; a file that is
 # written through a temporary file and renamed does not. That difference is
