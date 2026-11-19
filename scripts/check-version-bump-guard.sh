@@ -112,17 +112,35 @@ inode_of() {
 }
 replaced="$workspace/replaced"
 make_tree "$replaced"
-before_version_inode="$(inode_of "$replaced/VERSION")"
-before_changelog_inode="$(inode_of "$replaced/CHANGELOG.md")"
+# Every file the bump changes, not one per implementation: the scope is all
+# four.
+before_inodes=()
+for file in VERSION project.yml CHANGELOG.md CHANGELOG-archive.md; do
+    before_inodes+=("$(inode_of "$replaced/$file")")
+done
 if ! "$replaced/scripts/bump_version.sh" 1.2.0 >"$workspace/replaced.out" 2>&1; then
     cat "$workspace/replaced.out" >&2
     fail 'the bump refused to run on a clean tree'
 fi
-if [[ "$(inode_of "$replaced/VERSION")" == "$before_version_inode" ]]; then
-    fail 'the bump rewrote VERSION in place instead of replacing it'
+index=0
+for file in VERSION project.yml CHANGELOG.md CHANGELOG-archive.md; do
+    if [[ "$(inode_of "$replaced/$file")" == "${before_inodes[$index]}" ]]; then
+        fail "the bump rewrote $file in place instead of replacing it"
+    fi
+    index=$((index + 1))
+done
+
+# ── 3b. the mode of a replaced file is kept ────────────────────────────────
+mode_tree="$workspace/mode"
+make_tree "$mode_tree"
+chmod 600 "$mode_tree/VERSION"
+if ! "$mode_tree/scripts/bump_version.sh" 1.2.0 >"$workspace/mode.out" 2>&1; then
+    cat "$workspace/mode.out" >&2
+    fail 'the bump refused to run on a clean tree'
 fi
-if [[ "$(inode_of "$replaced/CHANGELOG.md")" == "$before_changelog_inode" ]]; then
-    fail 'the bump rewrote CHANGELOG.md in place instead of replacing it'
+mode="$(stat -c '%a' "$mode_tree/VERSION" 2>/dev/null || stat -f '%Lp' "$mode_tree/VERSION" 2>/dev/null || echo '')"
+if [[ -n "$mode" && "$mode" != "600" ]]; then
+    fail "the bump changed the mode of VERSION to $mode"
 fi
 
 # ── 4. the bump leaves no temporary files behind ───────────────────────────
