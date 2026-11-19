@@ -669,6 +669,9 @@ final class SettingsStoreTests: XCTestCase {
             from: Data(contentsOf: fixtureURL)
         )
         XCTAssertFalse(hosts.isEmpty, "the shared host table is empty")
+        // The row count is pinned so that a deleted row fails here and not
+        // only on the port that happens to read the table.
+        XCTAssertEqual(hosts.count, 73, "the shared host table lost or gained a row")
 
         for entry in hosts {
             XCTAssertEqual(
@@ -701,6 +704,7 @@ final class SettingsStoreTests: XCTestCase {
             from: Data(contentsOf: fixtureURL)
         )
         XCTAssertFalse(urls.isEmpty, "the shared URL table is empty")
+        XCTAssertEqual(urls.count, 21, "the shared URL table lost or gained a row")
 
         for entry in urls {
             // The host is read out of the URL as it was written: Foundation
