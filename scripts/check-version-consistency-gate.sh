@@ -22,7 +22,15 @@
 #      that silently stopped running the check would look exactly like a gate
 #      that passes, so the validation is run against a genuinely broken tree —
 #      a clone whose VERSION disagrees with project.yml — and has to fail, and
-#      has to fail because of the version contract.
+#      has to fail with the version gate's own failure line.
+#
+# What question 3 does not establish: that no committed change can make the
+# validation swallow the failure. A validator that prints the version gate's
+# failure line and then fails for its own reason would satisfy the proof, and
+# so would a validator that stopped running the gate. Those are committed
+# changes, visible in the diff that introduced them, and the independent review
+# of that change is what catches them — the same way it catches any other
+# committed change that weakens a check.
 #
 # The third question is answered by running the validation in a clone whose
 # version sources are broken. The clone's own gate then stops at its
@@ -36,6 +44,12 @@
 # Past MAX_PROOF_DEPTH the gate fails loudly: a version check that had rotted
 # into tolerating the clone's drift would otherwise make each clone's
 # validation pass and the gate clone again, without limit.
+#
+# The limit is not tamper-proof either: a validator that rewrites the depth
+# marker can reset the count, and that too is a committed change. The
+# watchdog on the nested validation is the backstop that holds in every case:
+# the nesting cannot spend the runner's time and disk without limit, because
+# the gate stops the whole tree when the watchdog fires.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -63,6 +77,10 @@ CHECK="$ROOT/scripts/check_version_consistency.sh"
 # the limit is also what bounds the cost and the temporary disk a broken
 # version check can cost.
 readonly MAX_PROOF_DEPTH=2
+# How long the nested validation may run before the gate gives up on it. It is
+# the backstop that bounds the nesting when the depth is lost.
+readonly PROOF_TIMEOUT_SECONDS=300
+
 
 # How deep the tree this gate runs in already is. It is carried by a file
 # inside the tree rather than by the environment, because a validator that
@@ -71,10 +89,7 @@ readonly MAX_PROOF_DEPTH=2
 # gitignored artifacts directory, so a clone never inherits one.
 readonly DEPTH_MARKER="artifacts/validation/version-gate-depth"
 
-# Written when this gate finds the version sources inconsistent, so that a
-# nested validation can be attributed to the version contract rather than to
-# whatever else may have failed first.
-readonly BROKEN_MARKER="artifacts/validation/version-contract-broken"
+
 
 
 # ── 1. The real tree must agree right now ─────────────────────────────────
@@ -88,8 +103,6 @@ mkdir -p "$ROOT/artifacts/validation"
 
 if ! "$CHECK"; then
     printf 'FAIL: the version sources are inconsistent\n' >"$VERSION_STATUS_FILE"
-    mkdir -p "$ROOT/$(dirname "$BROKEN_MARKER")"
-    printf 'the version sources are inconsistent\n' >"$ROOT/$BROKEN_MARKER"
     fail 'the version sources are inconsistent'
 fi
 
@@ -170,10 +183,8 @@ fi
 # fails on a broken version contract is a property of running it, not of
 # looking at it.
 #
-# The proof runs the same scripts this gate is running, so it answers the
-# question about the validator that is actually in use. The clone carries the
-# repository, and the working tree's scripts are copied over it, so the clone
-# validates exactly what this gate validates. The working tree's own version
+# The proof runs the COMMITTED validator, because that is the validator CI
+# runs and the one the merge decision is about. The working tree's own version
 # sources are covered by step 1, which runs against them directly.
 depth=0
 depth_file="$ROOT/$DEPTH_MARKER"
@@ -204,6 +215,13 @@ fi
 # reaches the gate quickly. The clone's gate runs one level deeper than this
 # one, so the nesting stays inside the limit above.
 #
+# The nested validation runs under a watchdog as well. The depth limit bounds
+# the nesting in the normal case; the watchdog bounds it in every case,
+# including one in which the depth is lost, so a broken version check cannot
+# spend the runner's time and disk without limit. The watchdog is written with
+# the shell's own facilities rather than with "timeout", which macOS does not
+# provide.
+#
 # The proof costs a clone of the repository and a validation run inside it, so
 # it grows with the size of the tree.
 clone="$workspace/clone"
@@ -216,16 +234,33 @@ fi
 printf '0.0.0\n' >"$clone/VERSION"
 
 validation_output="$workspace/validation-output.txt"
-# The clone has to validate the same scripts this gate is, or the proof would
-# be about a different validator than the one that is running. A clone carries
-# the committed tree, so the working tree's scripts are copied over it.
-cp -a "$ROOT/scripts/." "$clone/scripts/"
-
 mkdir -p "$clone/$(dirname "$DEPTH_MARKER")"
 printf '%s\n' "$((depth + 1))" >"$clone/$DEPTH_MARKER"
 
-if env -u AI_VALIDATOR_BASE_REF \
-    "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1; then
+# Job control gives the nested validation its own process group, so the
+# watchdog can stop the whole tree and not only the process it started: the
+# nested validation spawns its own children, and killing only the parent would
+# leave them running.
+set -m
+env -u AI_VALIDATOR_BASE_REF \
+    "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1 &
+nested_pid=$!
+set +m
+nested_status=0
+deadline=$((SECONDS + PROOF_TIMEOUT_SECONDS))
+while kill -0 "$nested_pid" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+        kill -TERM "-$nested_pid" 2>/dev/null || kill -TERM "$nested_pid" 2>/dev/null || true
+        sleep 1
+        kill -KILL "-$nested_pid" 2>/dev/null || kill -KILL "$nested_pid" 2>/dev/null || true
+        wait "$nested_pid" 2>/dev/null || true
+        fail "the validation did not finish within ${PROOF_TIMEOUT_SECONDS}s; the nesting is not bounded"
+    fi
+    sleep 1
+done
+wait "$nested_pid" 2>/dev/null || nested_status=$?
+
+if (( nested_status == 0 )); then
     fail 'the validation passed although the version contract was broken'
 fi
 
@@ -233,7 +268,11 @@ fi
 # The clone's own gate writes the marker when it finds the contract broken, so
 # the attribution cannot be satisfied by an unrelated failure that happens to
 # print a similar phrase.
-if [[ ! -e "$clone/$BROKEN_MARKER" ]]; then
+# The validation has to have failed for this reason, and not for some other
+# one. The version gate's own failure line is matched exactly: the check's
+# message differs ("error: version sources are inconsistent"), and a failure
+# that merely mentions the phrase in passing does not match either.
+if ! grep -q '^FAIL: the version sources are inconsistent$' "$validation_output"; then
     cat "$validation_output" >&2
     # The nesting limit is a real reason, not an unrelated one, and it is the
     # reason that matters when the version check has rotted.
