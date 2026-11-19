@@ -52,23 +52,54 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "error: the bump needs a git checkout so it can tell whether the tree is clean." >&2
     exit 1
 fi
-if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
-    echo "error: the working tree has uncommitted changes; commit or stash them before bumping." >&2
-    git status --short --untracked-files=no >&2
+# The exit status is checked, not swallowed: a git status that fails must not
+# read as a clean tree.
+status="$(mktemp)"
+if ! git status --porcelain --untracked-files=no >"$status"; then
+    rm -f "$status"
+    echo "error: git status failed, so the bump cannot tell whether the tree is clean." >&2
     exit 1
 fi
+if [[ -s "$status" ]]; then
+    echo "error: the working tree has uncommitted changes; commit or stash them before bumping." >&2
+    cat "$status" >&2
+    rm -f "$status"
+    exit 1
+fi
+rm -f "$status"
 
 # Writes a file through a temporary file in the same directory and renames it
 # over the target, so a reader never sees a half-written file and a failure
 # leaves the previous contents in place.
+# The temporary files are removed when the script is interrupted, so a
+# half-finished bump leaves nothing behind.
+TEMPORARY_FILES=()
+cleanup_temporaries() {
+    local temporary
+    for temporary in "${TEMPORARY_FILES[@]:-}"; do
+        [[ -n "$temporary" ]] && rm -f "$temporary"
+    done
+}
+trap cleanup_temporaries EXIT INT TERM
+
 write_atomically() {
     local target="$1"
     shift
     local temporary
     temporary="$(mktemp "${target}.XXXXXX")"
-    # The temporary file is private to its owner until it is renamed; the
-    # files this script writes are ordinary repository files.
-    chmod 644 "$temporary"
+    TEMPORARY_FILES+=("$temporary")
+    # The temporary file is private to its owner until it is renamed, so it
+    # takes the mode of the file it replaces rather than a fixed one. The mode
+    # is read with the stat spelling of the platform.
+    mode=""
+    if [[ -e "$target" ]]; then
+        mode="$(stat -c '%a' "$target" 2>/dev/null || stat -f '%Lp' "$target" 2>/dev/null || true)"
+    fi
+    if [[ -n "$mode" ]]; then
+        chmod "$mode" "$temporary"
+    else
+        chmod 644 "$temporary"
+    fi
     if ! "$@" >"$temporary"; then
         rm -f "$temporary"
         return 1
@@ -146,10 +177,21 @@ def write_atomically(path: Path, text: str) -> None:
         suffix=".tmp",
         delete=False,
     ) as handle:
-        handle.write(text)
         temporary = handle.name
-    os.chmod(temporary, 0o644)
-    os.replace(temporary, path)
+        try:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        except BaseException:
+            os.unlink(temporary)
+            raise
+    try:
+        # The temporary file keeps the mode of the file it replaces.
+        os.chmod(temporary, path.stat().st_mode & 0o7777 if path.exists() else 0o644)
+        os.replace(temporary, path)
+    except BaseException:
+        os.unlink(temporary)
+        raise
 
 
 write_atomically(archive_path, updated_archive)
