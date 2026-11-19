@@ -241,11 +241,19 @@ printf '%s\n' "$((depth + 1))" >"$clone/$DEPTH_MARKER"
 # watchdog can stop the whole tree and not only the process it started: the
 # nested validation spawns its own children, and killing only the parent would
 # leave them running.
-set -m
+#
+# Only the outermost gate creates that group. Every deeper level stays in it,
+# so one signal reaches the whole tree; a level that created a group of its
+# own would put its children outside the group the level above can signal.
+if (( depth == 0 )); then
+    set -m
+fi
 env -u AI_VALIDATOR_BASE_REF \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1 &
 nested_pid=$!
-set +m
+if (( depth == 0 )); then
+    set +m
+fi
 nested_status=0
 deadline=$((SECONDS + PROOF_TIMEOUT_SECONDS))
 while kill -0 "$nested_pid" 2>/dev/null; do
@@ -264,10 +272,6 @@ if (( nested_status == 0 )); then
     fail 'the validation passed although the version contract was broken'
 fi
 
-# The validation has to have failed for this reason, not for some other one.
-# The clone's own gate writes the marker when it finds the contract broken, so
-# the attribution cannot be satisfied by an unrelated failure that happens to
-# print a similar phrase.
 # The validation has to have failed for this reason, and not for some other
 # one. The version gate's own failure line is matched exactly: the check's
 # message differs ("error: version sources are inconsistent"), and a failure
