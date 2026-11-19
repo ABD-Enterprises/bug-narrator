@@ -72,7 +72,7 @@ MARKDOWN
 # ── 1. a clean tree is bumped ───────────────────────────────────────────────
 clean="$workspace/clean"
 make_tree "$clean"
-if ! "$clean/scripts/bump_version.sh" 1.2.0 >"$workspace/clean.out" 2>&1; then
+if ! env -u GIT_DIR -u GIT_WORK_TREE "$clean/scripts/bump_version.sh" 1.2.0 >"$workspace/clean.out" 2>&1; then
     cat "$workspace/clean.out" >&2
     fail 'the bump refused to run on a clean tree'
 fi
@@ -92,7 +92,7 @@ make_tree "$dirty"
 printf 'a local edit that is not the version bump\n' >>"$dirty/VERSION"
 before_version="$(cat "$dirty/VERSION")"
 before_archive="$(cat "$dirty/CHANGELOG-archive.md")"
-if "$dirty/scripts/bump_version.sh" 1.2.0 >"$workspace/dirty.out" 2>&1; then
+if env -u GIT_DIR -u GIT_WORK_TREE "$dirty/scripts/bump_version.sh" 1.2.0 >"$workspace/dirty.out" 2>&1; then
     fail 'the bump ran on a tree with uncommitted changes'
 fi
 if ! grep -qi 'uncommitted changes' "$workspace/dirty.out"; then
@@ -113,7 +113,7 @@ make_tree "$broken"
 # it, so git status fails.
 rm -f "$broken/.git/index"
 mkdir -p "$broken/.git/index"
-if "$broken/scripts/bump_version.sh" 1.2.0 >"$workspace/broken.out" 2>&1; then
+if env -u GIT_DIR -u GIT_WORK_TREE "$broken/scripts/bump_version.sh" 1.2.0 >"$workspace/broken.out" 2>&1; then
     fail 'the bump ran although git status could not be read'
 fi
 if ! grep -qi 'git status failed' "$workspace/broken.out"; then
@@ -136,7 +136,7 @@ before_inodes=()
 for file in VERSION project.yml CHANGELOG.md CHANGELOG-archive.md; do
     before_inodes+=("$(inode_of "$replaced/$file")")
 done
-if ! "$replaced/scripts/bump_version.sh" 1.2.0 >"$workspace/replaced.out" 2>&1; then
+if ! env -u GIT_DIR -u GIT_WORK_TREE "$replaced/scripts/bump_version.sh" 1.2.0 >"$workspace/replaced.out" 2>&1; then
     cat "$workspace/replaced.out" >&2
     fail 'the bump refused to run on a clean tree'
 fi
@@ -152,7 +152,7 @@ done
 mode_tree="$workspace/mode"
 make_tree "$mode_tree"
 chmod 600 "$mode_tree/VERSION"
-if ! "$mode_tree/scripts/bump_version.sh" 1.2.0 >"$workspace/mode.out" 2>&1; then
+if ! env -u GIT_DIR -u GIT_WORK_TREE "$mode_tree/scripts/bump_version.sh" 1.2.0 >"$workspace/mode.out" 2>&1; then
     cat "$workspace/mode.out" >&2
     fail 'the bump refused to run on a clean tree'
 fi
@@ -164,7 +164,7 @@ fi
 # ── 4. the bump leaves no temporary files behind ───────────────────────────
 # A temporary file is an untracked file, so the tree's own status says so
 # without guessing at the naming of the temporary.
-leftovers="$(git -C "$replaced" status --porcelain | grep '^??' || true)"
+leftovers="$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$replaced" status --porcelain | grep '^??' || true)"
 if [[ -n "$leftovers" ]]; then
     printf '%s\n' "$leftovers" >&2
     fail 'the bump left temporary files behind'

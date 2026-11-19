@@ -53,14 +53,18 @@ TODAY="$(date +%Y-%m-%d)"
 # the sources inconsistent with each other, and that tree has to be brought
 # back by hand. What the writes below do guarantee is that each file is
 # replaced whole.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+# The git environment is cleared for these calls. An inherited GIT_DIR or
+# GIT_WORK_TREE would make the guard consult another repository, and a clean
+# one would let a dirty tree through. The answer is read from the output as
+# well as the exit status, because "true" is what says the tree is a work tree.
+if [[ "$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]]; then
     echo "error: the bump needs a git checkout so it can tell whether the tree is clean." >&2
     exit 1
 fi
 # The exit status is checked, not swallowed: a git status that fails must not
 # read as a clean tree.
 status="$(mktemp)"
-if ! git status --porcelain --untracked-files=no >"$status"; then
+if ! env -u GIT_DIR -u GIT_WORK_TREE git status --porcelain --untracked-files=no >"$status"; then
     rm -f "$status"
     echo "error: git status failed, so the bump cannot tell whether the tree is clean." >&2
     exit 1
@@ -84,8 +88,8 @@ rm -f "$status"
 # not: bash does not run an interrupt trap while it waits for a foreground
 # child, and the bump spends its time waiting for one, so the bump runs to the
 # end and leaves the tree fully bumped. A termination signal (SIGTERM) does
-# stop it, and can leave the tree half bumped — the guard comment above says
-# so, and check_version_consistency.sh catches it.
+# stop it, and can leave the tree half bumped, which the version consistency
+# check catches.
 TEMPORARY_FILES=()
 cleanup_temporaries() {
     local status=$?
