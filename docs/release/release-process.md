@@ -113,12 +113,12 @@ The environment name is not defaulted in the script: each workflow passes the en
 
 ## Current Maintainer Flow
 
-1. Review [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues) for unresolved risks and active release blockers.
+1. Review [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues) for unresolved risks and active release blockers.
 2. Review [Product Spec](../architecture/product-spec.md) for the intended product behavior, terminology, and artifact contract.
 3. Add release entries to `CHANGELOG.md`, then run `scripts/bump_version.sh` to archive them under the release version.
 4. Run `./scripts/release_smoke_test.sh`; this is the headless unit-test and Release-build gate. Confirm the separately gated UI-test target passes in CI or a usable interactive window-server session.
 5. Run `./scripts/accessibility_regression_check.sh`.
-6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python, Actions and C# on every run — C# on a Windows runner — and Swift on the monthly schedule or on an on-demand run with `include_swift` enabled. Confirm the workflow is enabled before reading its silence as a clean result: `gh api repos/ABD-Enterprises/bug-narrator/actions/workflows/codeql.yml --jq .state` must answer `active`. Name the file rather than the workflow, because GitHub's own default CodeQL workflow is also called `CodeQL`.
+6. Review open Dependabot, CodeQL, and secret-scanning alerts; fix or formally document every finding before publishing. The repository's code-scanning workflow (`.github/workflows/codeql.yml`) is enabled and analyzes JavaScript/TypeScript, Python, Actions and C# on every run — C# on a Windows runner — and Swift on the monthly schedule or on an on-demand run with `include_swift` enabled. Confirm the workflow is enabled before reading its silence as a clean result: `gh api repos/SureForgeTech/sureforge-capture/actions/workflows/codeql.yml --jq .state` must answer `active`. Name the file rather than the workflow, because GitHub's own default CodeQL workflow is also called `CodeQL`.
 7. If the local server changed, run `local-transcription/build_standalone.sh`; its packaged speech transcription must pass.
 8. Run any targeted manual QA from [docs/QA_CHECKLIST.md](../QA_CHECKLIST.md).
 9. Generate or review the internal release summary seed before publishing.
@@ -160,7 +160,7 @@ Use:
 - [Product Spec](../architecture/product-spec.md) for intended product behavior and terminology
 - `CHANGELOG.md` for changes awaiting a release
 - `CHANGELOG-archive.md` for shipped change history
-- [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues) for open risks, active release blockers, and task state
+- [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues) for open risks, active release blockers, and task state
 - [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context and completed phase history
 
 Release notes should match the actual implemented changes and should not contradict the canonical product spec.

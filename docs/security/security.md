@@ -83,7 +83,7 @@ That clears the four corresponding Dependabot alerts without applying npm's unsa
 downgrade-based audit fix. The remaining audit output is the documented `image-size`
 build-time exception above.
 
-Track these in [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
+Track these in [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) only for historical roadmap context.
 
 ## Security Validation Expectations
 
