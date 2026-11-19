@@ -86,4 +86,4 @@ There is no live backend today. Infrastructure work is therefore focused on rele
 - Windows WPF runtime behavior has not yet been validated on real Windows hardware
 - accessibility validation for the live macOS UI is still heavily manual
 
-Track active risks in [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context only.
+Track active risks in [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues). Use [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context only.
