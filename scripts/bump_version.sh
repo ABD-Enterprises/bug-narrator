@@ -45,9 +45,14 @@ TODAY="$(date +%Y-%m-%d)"
 
 # The bump rewrites four files that have to agree with each other, so it
 # refuses to run on a tree that already carries changes: the bump would be
-# mixed with somebody else's work, and a failure part-way through would leave
-# a half-bumped tree behind. Untracked files are not a problem — they are not
-# part of what the bump writes.
+# mixed with somebody else's work. Untracked files are not a problem — they
+# are not part of what the bump writes.
+#
+# This guard stops the bump from mixing with existing work. It does not make
+# the four files atomic as a set: a failure part-way through can still leave
+# the sources inconsistent with each other, and that tree has to be brought
+# back by hand. What the writes below do guarantee is that each file is
+# replaced whole.
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "error: the bump needs a git checkout so it can tell whether the tree is clean." >&2
     exit 1
@@ -72,15 +77,22 @@ rm -f "$status"
 # over the target, so a reader never sees a half-written file and a failure
 # leaves the previous contents in place.
 # The temporary files are removed when the script is interrupted, so a
-# half-finished bump leaves nothing behind.
+# half-finished bump leaves nothing behind. The handler keeps the status it
+# was called with: an exit trap's last command would otherwise become the
+# script's exit status.
 TEMPORARY_FILES=()
 cleanup_temporaries() {
+    local status=$?
     local temporary
-    for temporary in "${TEMPORARY_FILES[@]:-}"; do
+    for temporary in "${TEMPORARY_FILES[@]+"${TEMPORARY_FILES[@]}"}"; do
         [[ -n "$temporary" ]] && rm -f "$temporary"
     done
+    return "$status"
 }
-trap cleanup_temporaries EXIT INT TERM
+trap cleanup_temporaries EXIT
+# An interrupt stops the bump rather than letting it run to the end.
+trap 'cleanup_temporaries; exit 130' INT
+trap 'cleanup_temporaries; exit 143' TERM
 
 write_atomically() {
     local target="$1"
@@ -93,9 +105,11 @@ write_atomically() {
     # is read with the stat spelling of the platform.
     mode=""
     if [[ -e "$target" ]]; then
-        mode="$(stat -c '%a' "$target" 2>/dev/null || stat -f '%Lp' "$target" 2>/dev/null || true)"
+        # The mode is read with python, which the script already needs, so it is
+        # the same on every platform and cannot answer with anything but a mode.
+        mode="$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$target" 2>/dev/null || true)"
     fi
-    if [[ -n "$mode" ]]; then
+    if [[ "$mode" =~ ^[0-7]{3,4}$ ]]; then
         chmod "$mode" "$temporary"
     else
         chmod 644 "$temporary"

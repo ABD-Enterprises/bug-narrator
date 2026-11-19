@@ -103,6 +103,21 @@ if [[ "$(cat "$dirty/CHANGELOG-archive.md")" != "$before_archive" ]]; then
     fail 'the refused bump still wrote the changelog archive'
 fi
 
+# ── 2b. a git status that fails must not read as a clean tree ─────────────
+broken="$workspace/broken"
+make_tree "$broken"
+# A directory where the index belongs: git cannot read it and cannot rebuild
+# it, so git status fails.
+rm -f "$broken/.git/index"
+mkdir -p "$broken/.git/index"
+if "$broken/scripts/bump_version.sh" 1.2.0 >"$workspace/broken.out" 2>&1; then
+    fail 'the bump ran although git status could not be read'
+fi
+if ! grep -qi 'git status failed' "$workspace/broken.out"; then
+    cat "$workspace/broken.out" >&2
+    fail 'the bump did not say that git status failed'
+fi
+
 # ── 3. every file the bump changes is replaced, not truncated in place ─────
 # A file that is truncated and rewritten keeps its identity; a file that is
 # written through a temporary file and renamed does not. That difference is
@@ -138,13 +153,15 @@ if ! "$mode_tree/scripts/bump_version.sh" 1.2.0 >"$workspace/mode.out" 2>&1; the
     cat "$workspace/mode.out" >&2
     fail 'the bump refused to run on a clean tree'
 fi
-mode="$(stat -c '%a' "$mode_tree/VERSION" 2>/dev/null || stat -f '%Lp' "$mode_tree/VERSION" 2>/dev/null || echo '')"
-if [[ -n "$mode" && "$mode" != "600" ]]; then
+mode="$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$mode_tree/VERSION")"
+if [[ "$mode" != "600" ]]; then
     fail "the bump changed the mode of VERSION to $mode"
 fi
 
 # ── 4. the bump leaves no temporary files behind ───────────────────────────
-leftovers="$(find "$replaced" -maxdepth 2 \( -name '*.tmp' -o -name '*.??????' \) -not -path '*/.git/*' || true)"
+# A temporary file is an untracked file, so the tree's own status says so
+# without guessing at the naming of the temporary.
+leftovers="$(git -C "$replaced" status --porcelain | grep '^??' || true)"
 if [[ -n "$leftovers" ]]; then
     printf '%s\n' "$leftovers" >&2
     fail 'the bump left temporary files behind'
