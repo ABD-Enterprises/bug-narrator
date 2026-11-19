@@ -76,10 +76,15 @@ rm -f "$status"
 # Writes a file through a temporary file in the same directory and renames it
 # over the target, so a reader never sees a half-written file and a failure
 # leaves the previous contents in place.
-# The temporary files are removed when the script is interrupted, so a
-# half-finished bump leaves nothing behind. The handler keeps the status it
-# was called with: an exit trap's last command would otherwise become the
-# script's exit status.
+# The temporary files are removed when the script exits, so a bump that is
+# interrupted leaves nothing behind. The handler keeps the status it was
+# called with: an exit trap's last command would otherwise become the script's
+# exit status.
+#
+# A signal does not stop the bump. Bash does not run an interrupt trap while
+# it waits for a foreground child, and the bump spends its time waiting for
+# one, so the trap would never fire. The bump therefore runs to the end after
+# an interrupt, and leaves the tree fully bumped rather than half bumped.
 TEMPORARY_FILES=()
 cleanup_temporaries() {
     local status=$?
@@ -90,9 +95,6 @@ cleanup_temporaries() {
     return "$status"
 }
 trap cleanup_temporaries EXIT
-# An interrupt stops the bump rather than letting it run to the end.
-trap 'cleanup_temporaries; exit 130' INT
-trap 'cleanup_temporaries; exit 143' TERM
 
 write_atomically() {
     local target="$1"
@@ -101,8 +103,7 @@ write_atomically() {
     temporary="$(mktemp "${target}.XXXXXX")"
     TEMPORARY_FILES+=("$temporary")
     # The temporary file is private to its owner until it is renamed, so it
-    # takes the mode of the file it replaces rather than a fixed one. The mode
-    # is read with the stat spelling of the platform.
+    # takes the mode of the file it replaces rather than a fixed one.
     mode=""
     if [[ -e "$target" ]]; then
         # The mode is read with python, which the script already needs, so it is
@@ -112,6 +113,9 @@ write_atomically() {
     if [[ "$mode" =~ ^[0-7]{3,4}$ ]]; then
         chmod "$mode" "$temporary"
     else
+        if [[ -e "$target" ]]; then
+            echo "warning: could not read the mode of $target; the new file gets the default mode." >&2
+        fi
         chmod 644 "$temporary"
     fi
     if ! "$@" >"$temporary"; then
