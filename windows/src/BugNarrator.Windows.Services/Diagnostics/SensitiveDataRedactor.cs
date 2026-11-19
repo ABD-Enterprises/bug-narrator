@@ -16,7 +16,11 @@ public static partial class SensitiveDataRedactor
     // to decode to something that contains a colon. The pattern only captures
     // the candidate; whether it is a credential is decided when the match is
     // replaced, so ordinary prose after the word "Basic" is left alone.
-    [GeneratedRegex(@"(?i)\bBasic[ \t]+([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])")]
+    //
+    // The candidate is the whole run of base64-shaped characters, with no
+    // trailing boundary: a credential is often followed by more of them, and a
+    // boundary that rejected those would let the credential through.
+    [GeneratedRegex(@"(?i)\bBasic\s+([A-Za-z0-9+/=]{8,})")]
     private static partial Regex BasicTokenRegex();
 
     [GeneratedRegex(@"\bsk-[A-Za-z0-9_-]{6,}\b")]
@@ -60,12 +64,31 @@ public static partial class SensitiveDataRedactor
     }
 
     /// <summary>
-    /// Whether the candidate decodes to a Basic credential, which is the base64
-    /// of "user:secret" and therefore contains a colon. A candidate that does
-    /// not decode, or that decodes to text without a colon, is ordinary prose
+    /// Whether the candidate holds a Basic credential, which is the base64 of
+    /// "user:secret": text with a colon in it and something on both sides of
+    /// the colon. A candidate that does not decode to that is ordinary prose
     /// and is not redacted.
     /// </summary>
-    private static bool IsBasicCredential(string encoded)
+    private static bool IsBasicCredential(string candidate)
+    {
+        // The candidate may run on into the characters that follow the
+        // credential, so the longest prefix that decodes to a credential is
+        // the one that counts.
+        for (var length = candidate.Length; length >= MinimumCredentialLength; length--)
+        {
+            if (DecodesToCredential(candidate[..length]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The shortest candidate that can hold a credential.</summary>
+    private const int MinimumCredentialLength = 8;
+
+    private static bool DecodesToCredential(string encoded)
     {
         var padded = encoded.PadRight(encoded.Length + ((4 - encoded.Length % 4) % 4), '=');
         Span<byte> decoded = new byte[(padded.Length / 4) * 3];
@@ -74,6 +97,23 @@ public static partial class SensitiveDataRedactor
             return false;
         }
 
-        return decoded[..written].IndexOf((byte)':') >= 0;
+        var text = decoded[..written];
+        var colon = text.IndexOf((byte)':');
+        if (colon <= 0 || colon == text.Length - 1)
+        {
+            return false;
+        }
+
+        // A credential is printable text. An ordinary word decodes to bytes
+        // that are not, which is what tells the two apart.
+        foreach (var value in text)
+        {
+            if (value < 0x20 || value > 0x7e)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
