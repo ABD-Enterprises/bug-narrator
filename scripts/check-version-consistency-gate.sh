@@ -49,7 +49,9 @@
 # marker can reset the count, and that too is a committed change. The
 # watchdog on the nested validation is the backstop that holds in every case:
 # the nesting cannot spend the runner's time and disk without limit, because
-# the gate stops the whole tree when the watchdog fires.
+# the gate stops the whole tree when the watchdog fires. It walks the
+# descendants of the nested validation and stops each of them, so it does not
+# depend on how the nested levels group their processes.
 #
 # What the third step proves is that the validation fails when the version
 # check fails. The validation runs under "set -euo pipefail", so a failing
@@ -92,6 +94,18 @@ readonly DEPTH_MARKER="artifacts/validation/version-gate-depth"
 
 
 
+# Stops a process and everything it started. A process group is not enough:
+# a nested gate may put its own children in a group of their own, so the
+# descendants are walked and signalled one by one.
+kill_tree() {
+    local pid="$1"
+    local child
+    for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+        kill_tree "$child"
+    done
+    kill -KILL "$pid" 2>/dev/null || true
+}
+
 # ── 1. The real tree must agree right now ─────────────────────────────────
 # This is the unconditional step. The check is what the gate exists to
 # enforce, so a missing one is a failure rather than a check that quietly
@@ -109,7 +123,11 @@ fi
 # ── 2. The check must catch drift, not merely agree ───────────────────────
 # The check reads the version sources from the directory above the script, so
 # a throwaway copy of it sees a throwaway set of sources.
-workspace="$(mktemp -d)"
+# The workspace lives inside this tree's artifacts directory rather than in
+# the system temporary directory, so that every nested clone is a descendant of
+# it and this trap reclaims the whole tree, not only the top level.
+mkdir -p "$ROOT/artifacts/validation"
+workspace="$(mktemp -d "$ROOT/artifacts/validation/version-gate-XXXXXX")"
 trap 'rm -rf "$workspace"' EXIT
 mkdir -p "$workspace/scripts"
 cp "$CHECK" "$workspace/scripts/check_version_consistency.sh"
@@ -237,30 +255,16 @@ validation_output="$workspace/validation-output.txt"
 mkdir -p "$clone/$(dirname "$DEPTH_MARKER")"
 printf '%s\n' "$((depth + 1))" >"$clone/$DEPTH_MARKER"
 
-# Job control gives the nested validation its own process group, so the
-# watchdog can stop the whole tree and not only the process it started: the
-# nested validation spawns its own children, and killing only the parent would
-# leave them running.
-#
-# Only the outermost gate creates that group. Every deeper level stays in it,
-# so one signal reaches the whole tree; a level that created a group of its
-# own would put its children outside the group the level above can signal.
-if (( depth == 0 )); then
-    set -m
-fi
 env -u AI_VALIDATOR_BASE_REF \
     "$clone/scripts/validate.sh" HEAD >"$validation_output" 2>&1 &
 nested_pid=$!
-if (( depth == 0 )); then
-    set +m
-fi
 nested_status=0
 deadline=$((SECONDS + PROOF_TIMEOUT_SECONDS))
 while kill -0 "$nested_pid" 2>/dev/null; do
     if (( SECONDS >= deadline )); then
-        kill -TERM "-$nested_pid" 2>/dev/null || kill -TERM "$nested_pid" 2>/dev/null || true
+        kill_tree "$nested_pid"
         sleep 1
-        kill -KILL "-$nested_pid" 2>/dev/null || kill -KILL "$nested_pid" 2>/dev/null || true
+        kill_tree "$nested_pid"
         wait "$nested_pid" 2>/dev/null || true
         fail "the validation did not finish within ${PROOF_TIMEOUT_SECONDS}s; the nesting is not bounded"
     fi
