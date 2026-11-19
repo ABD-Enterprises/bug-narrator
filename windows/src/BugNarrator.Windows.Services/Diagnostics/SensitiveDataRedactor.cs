@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace BugNarrator.Windows.Services.Diagnostics;
 
-internal static partial class SensitiveDataRedactor
+public static partial class SensitiveDataRedactor
 {
     private const string RedactionToken = "[REDACTED]";
 
@@ -12,7 +12,11 @@ internal static partial class SensitiveDataRedactor
     [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+=*")]
     private static partial Regex BearerTokenRegex();
 
-    [GeneratedRegex(@"(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}\b")]
+    // A Basic credential is the base64 of "user:secret", so the candidate has
+    // to decode to something that contains a colon. The pattern only captures
+    // the candidate; whether it is a credential is decided when the match is
+    // replaced, so ordinary prose after the word "Basic" is left alone.
+    [GeneratedRegex(@"(?i)\bBasic[ \t]+([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])")]
     private static partial Regex BasicTokenRegex();
 
     [GeneratedRegex(@"\bsk-[A-Za-z0-9_-]{6,}\b")]
@@ -44,12 +48,32 @@ internal static partial class SensitiveDataRedactor
 
         var redactedValue = AuthorizationHeaderRegex().Replace(value, $"$1{RedactionToken}");
         redactedValue = BearerTokenRegex().Replace(redactedValue, $"Bearer {RedactionToken}");
-        redactedValue = BasicTokenRegex().Replace(redactedValue, $"Basic {RedactionToken}");
+        redactedValue = BasicTokenRegex().Replace(
+            redactedValue,
+            match => IsBasicCredential(match.Groups[1].Value) ? $"Basic {RedactionToken}" : match.Value);
         redactedValue = OpenAiKeyRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubClassicTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubFineGrainedTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = AtlassianApiTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = EmailRegex().Replace(redactedValue, $"{RedactionToken}@$1");
         return redactedValue;
+    }
+
+    /// <summary>
+    /// Whether the candidate decodes to a Basic credential, which is the base64
+    /// of "user:secret" and therefore contains a colon. A candidate that does
+    /// not decode, or that decodes to text without a colon, is ordinary prose
+    /// and is not redacted.
+    /// </summary>
+    private static bool IsBasicCredential(string encoded)
+    {
+        var padded = encoded.PadRight(encoded.Length + ((4 - encoded.Length % 4) % 4), '=');
+        Span<byte> decoded = new byte[(padded.Length / 4) * 3];
+        if (!Convert.TryFromBase64String(padded, decoded, out var written))
+        {
+            return false;
+        }
+
+        return decoded[..written].IndexOf((byte)':') >= 0;
     }
 }
