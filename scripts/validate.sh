@@ -64,6 +64,7 @@ rm -f \
   "$REPO_DOCS_OUTPUT_FILE" \
   "$DOC_IDENTIFIERS_STATUS_FILE" \
   "$DOC_IDENTIFIERS_OUTPUT_FILE" \
+  "${VALIDATION_ARTIFACT_DIR}/plaintext-tables-status.txt" \
   "$SHELLCHECK_STATUS_FILE" \
   "$RUFF_STATUS_FILE"
 
@@ -95,6 +96,22 @@ fi
 # The version bump must refuse to run on a dirty tree and must replace the
 # files it writes rather than truncate them in place. The gate runs the real
 # script against a throwaway tree, so the behaviour cannot rot back.
+# The shared plaintext-endpoint tables are read by both ports. A row that is
+# edited fails on both, but a row that is deleted fails on neither, so the
+# contract that says which rows have to be there lives in one place and runs
+# on every pull request.
+if [[ ! -x "$ROOT/scripts/check-plaintext-endpoint-tables.py" ]]; then
+  printf 'FAIL: scripts/check-plaintext-endpoint-tables.py is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-plaintext-endpoint-tables.py"; then
+  exit 1
+fi
+# Echoed, like the other checks: a check that only writes a status file leaves
+# no trace in the log.
+printf 'PASS: the shared plaintext-endpoint tables keep their rows\n' \
+  | tee "${VALIDATION_ARTIFACT_DIR}/plaintext-tables-status.txt"
+
 if [[ ! -x "$ROOT/scripts/check-version-bump-guard.sh" ]]; then
   printf 'FAIL: scripts/check-version-bump-guard.sh is missing or not executable\n' >&2
   exit 1
