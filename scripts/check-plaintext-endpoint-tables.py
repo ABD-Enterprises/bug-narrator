@@ -104,7 +104,7 @@ def exercise_itself() -> None:
         shutil.copy(REPO_ROOT / "contract-fixtures" / HOST_TABLE, fixtures)
         shutil.copy(REPO_ROOT / "contract-fixtures" / URL_TABLE, fixtures)
 
-        entries = json.loads((fixtures / HOST_TABLE).read_text(encoding="utf-8"))
+        entries = load_table(fixtures, HOST_TABLE)
         entries.pop()
         (fixtures / HOST_TABLE).write_text(json.dumps(entries), encoding="utf-8")
 
@@ -133,9 +133,12 @@ def main() -> int:
     arguments = parser.parse_args()
 
     try:
+        # The real tables are checked first: that way a table that was changed
+        # or damaged is reported with its own message, rather than with the
+        # self-check's.
+        check_directory(arguments.directory / "contract-fixtures")
         if not arguments.skip_self_check:
             exercise_itself()
-        check_directory(arguments.directory / "contract-fixtures")
     except ContractError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

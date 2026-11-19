@@ -229,7 +229,7 @@ public sealed class PlaintextEndpointClassifierTests
         Assert.NotEmpty(entries);
         // The row count is pinned so that a deleted row fails here and not
         // only on the port that happens to read the table.
-        Assert.Equal(73, entries.Count);
+        Assert.Equal(73, entries.Count); // the shared host table lost or gained a row
 
         foreach (var entry in entries)
         {
@@ -267,7 +267,7 @@ public sealed class PlaintextEndpointClassifierTests
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var entries = document.RootElement.EnumerateArray().ToList();
         Assert.NotEmpty(entries);
-        Assert.Equal(21, entries.Count);
+        Assert.Equal(21, entries.Count); // the shared URL table lost or gained a row
 
         foreach (var entry in entries)
         {
