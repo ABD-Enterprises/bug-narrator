@@ -76,15 +76,16 @@ rm -f "$status"
 # Writes a file through a temporary file in the same directory and renames it
 # over the target, so a reader never sees a half-written file and a failure
 # leaves the previous contents in place.
-# The temporary files are removed when the script exits, so a bump that is
-# interrupted leaves nothing behind. The handler keeps the status it was
-# called with: an exit trap's last command would otherwise become the script's
-# exit status.
+# The temporary files this shell creates are removed when the script exits.
+# The handler keeps the status it was called with: an exit trap's last command
+# would otherwise become the script's exit status.
 #
-# A signal does not stop the bump. Bash does not run an interrupt trap while
-# it waits for a foreground child, and the bump spends its time waiting for
-# one, so the trap would never fire. The bump therefore runs to the end after
-# an interrupt, and leaves the tree fully bumped rather than half bumped.
+# A signal does not stop the bump in the same way. An interrupt (SIGINT) does
+# not: bash does not run an interrupt trap while it waits for a foreground
+# child, and the bump spends its time waiting for one, so the bump runs to the
+# end and leaves the tree fully bumped. A termination signal (SIGTERM) does
+# stop it, and can leave the tree half bumped — the guard comment above says
+# so, and check_version_consistency.sh catches it.
 TEMPORARY_FILES=()
 cleanup_temporaries() {
     local status=$?

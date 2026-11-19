@@ -58,9 +58,12 @@ MARKDOWN
 - The released version.
 MARKDOWN
 
-    git -C "$tree" init --quiet
-    git -C "$tree" add --all
-    git -C "$tree" \
+    # The calls are made with the git environment cleared, so an inherited
+    # GIT_DIR or GIT_WORK_TREE cannot make the fixture write into another
+    # repository.
+    env -u GIT_DIR -u GIT_WORK_TREE git -C "$tree" init --quiet
+    env -u GIT_DIR -u GIT_WORK_TREE git -C "$tree" add --all
+    env -u GIT_DIR -u GIT_WORK_TREE git -C "$tree" \
         -c user.name='Version Bump Test' \
         -c user.email='bump@example.invalid' \
         commit --quiet -m 'the tree the bump runs against'
