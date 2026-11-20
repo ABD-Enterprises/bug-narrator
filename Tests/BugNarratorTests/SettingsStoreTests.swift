@@ -638,8 +638,9 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertTrue(SettingsStore.isLocalEndpointHost(local), "expected \(local) to be local")
         }
         for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com",
-                       // A `.local` or single-label name resolves over mDNS, so
-                       // it is not an address the app can check.
+                       // A `.local` or single-label name is answered by the
+                       // network rather than by the app, so it is not an
+                       // address the app can check.
                        "myserver.local", "nas.local", "lmstudio",
                        // An address written in another notation is not parsed as
                        // an address either, so it is not trusted.
@@ -1063,9 +1064,9 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
-    /// A `.local` name and a single-label name are resolved over mDNS, which any
-    /// device on the local network can answer, so they are the names the app
-    /// refuses for plaintext HTTP.
+    /// A `.local` name and a single-label name are answered by the network
+    /// rather than by the app, and any device on the local network can answer
+    /// for either, so they are the names the app refuses for plaintext HTTP.
     func testUnqualifiedLocalNamesAreRecognised() {
         for unqualified in ["myserver.local", "nas.local", "lmstudio", "server"] {
             XCTAssertTrue(

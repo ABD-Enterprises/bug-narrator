@@ -591,13 +591,15 @@ final class SettingsStore: ObservableObject {
     /// Whether `host` denotes a loopback / private / link-local endpoint.
     /// Plaintext HTTP to such a host is acceptable because the traffic stays on
     /// the machine or the trusted local network; plaintext HTTP to any other
-    /// host would send the API key and transcript text over the public
-    /// internet unencrypted.
+    /// host would send the API key and transcript text over the network
+    /// unencrypted.
     ///
     /// A `.local` name and a single-label name are deliberately not trusted.
-    /// Both are resolved over mDNS, which any device on the local network can
-    /// answer, so a name that looks local can point anywhere — and ATS offers
-    /// no protection for them either. A local server is addressed by its IP
+    /// Both are answered by the network rather than by the app: a `.local`
+    /// name over mDNS, a single-label name through the resolver's search
+    /// list. Any device on the local network can answer for either, so a
+    /// name that looks local can point anywhere — and ATS offers no
+    /// protection for them either. A local server is addressed by its IP
     /// address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
         guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
@@ -690,7 +692,7 @@ final class SettingsStore: ObservableObject {
 
         // The value is trimmed of "/" at both ends before the app builds the
         // URL from it, so a leading "/" is not part of the scheme. Reading
-        // the scheme as "/http" would let a public plaintext host through.
+        // the scheme as "/http" would let a remote plaintext host through.
         let scheme = text[..<schemeRange.lowerBound]
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             .lowercased()
@@ -877,17 +879,25 @@ final class SettingsStore: ObservableObject {
     }
 
     /// Whether `host` is an address the app parsed and found to be somewhere
-    /// else — a public address, written the way an address is written.
+    /// it does not trust — an address that is neither loopback, nor private,
+    /// nor link-local, nor one of the ranges that are not addressed to a
+    /// single host. It is written the way an address is written.
+    ///
+    /// The name says "public" and the check does not decide that: the
+    /// special-purpose ranges — the shared address space of RFC 6598, the
+    /// documentation ranges and the reserved range — are not addresses on the
+    /// public internet either, and the app treats them as remote hosts. What
+    /// the app decides here is which addresses it can vouch for.
     ///
     /// A host in another notation (`134744072`, `127.1`) is not parseable, so
-    /// it is neither a local nor a public address as far as the app is
+    /// it is neither a local nor a remote address as far as the app is
     /// concerned: the app cannot say where it points.
     static func isPublicAddress(_ host: String) -> Bool {
         guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
         guard let octets = canonicalDottedQuad(lowered) else { return false }
-        // The unspecified, multicast and broadcast addresses are not a host on
-        // the public internet: the 0.0.0.0/8 range means "this network" rather
+        // The unspecified, multicast and broadcast addresses are not addressed
+        // to a single host: the 0.0.0.0/8 range means "this network" rather
         // than a destination (RFC 1122), and the other two are not addressed to
         // one host. Calling them remote would be a claim the app cannot make.
         if octets.0 == 0 { return false }
@@ -896,10 +906,12 @@ final class SettingsStore: ObservableObject {
         return !isLocalEndpointHost(host)
     }
 
-    /// Whether `host` is a name that resolves over mDNS rather than an address
-    /// the app can check: a `.local` name, or a single-label name such as
-    /// `lmstudio`. Any device on the local network can answer for such a name,
-    /// so it is not a trusted endpoint even though it looks local.
+    /// Whether `host` is a name that is answered by the network rather than by
+    /// the app, instead of an address the app can check: a `.local` name, or a
+    /// single-label name such as `lmstudio`. A `.local` name is answered over
+    /// mDNS and a single-label name through the resolver's search list, and
+    /// any device on the local network can answer for either, so it is not a
+    /// trusted endpoint even though it looks local.
     static func isUnqualifiedLocalName(_ host: String) -> Bool {
         guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
         // A trailing dot makes the name absolute rather than different: a
@@ -961,10 +973,11 @@ final class SettingsStore: ObservableObject {
     ///
     /// A name any device on the local network can claim is neither remote nor
     /// checkable, and its refusal names the fix. A host the app parsed and
-    /// found to be public is a remote host. A host it could not parse is one
-    /// it cannot use as a local address — calling that one remote would be a
-    /// claim the app cannot make. Every refusal says what would cross the
-    /// network, because that is the part the user acts on.
+    /// found to be somewhere it does not trust is a remote host. A host it
+    /// could not parse is one it cannot use as a local address — calling that
+    /// one remote would be a claim the app cannot make. Every refusal says
+    /// what would cross the network, because that is the part the user acts
+    /// on.
     static func plaintextTransportRefusal(
         host: String?,
         subject: String,

@@ -22,8 +22,10 @@ extension SettingsStore {
     /// Rejects a remote `http://` base URL. Loopback, private-range and
     /// link-local hosts stay allowed — that is the whole Parakeet / LM Studio /
     /// Ollama story, and the shipped defaults are themselves `http://localhost`.
-    /// A `.local` or single-label host does not: both resolve over mDNS, which
-    /// any device on the local network can answer. Parakeet is exempt outright
+    /// A `.local` or single-label host does not: both are answered by the
+    /// network rather than by the app — a `.local` name over mDNS, a
+    /// single-label name through the resolver's search list — and any device
+    /// on the local network can answer for either. Parakeet is exempt outright
     /// because `normalizedOpenAIBaseURL` ignores the typed value for that
     /// provider.
     var remotePlaintextEndpointIssue: String? {

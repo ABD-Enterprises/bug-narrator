@@ -39,9 +39,11 @@ public static class OpenAiCompatibleEndpoint
     /// stays on the machine or the trusted local network.
     ///
     /// A <c>.local</c> name and a single-label name such as <c>lmstudio</c> are
-    /// deliberately not trusted. Both are resolved over mDNS, which any device on
-    /// the local network can answer, so a name that looks local can point
-    /// anywhere. A local server is addressed by its IP address instead.
+    /// deliberately not trusted. Both are answered by the network rather than
+    /// by the app: a <c>.local</c> name over mDNS, a single-label name through
+    /// the resolver's search list. Any device on the local network can answer
+    /// for either, so a name that looks local can point anywhere. A local
+    /// server is addressed by its IP address instead.
     /// Mirrors SettingsStore.isLocalEndpointHost in the macOS app (#1268).
     /// </summary>
     public static bool IsLocalEndpointHost(string host)
@@ -342,13 +344,22 @@ public static class OpenAiCompatibleEndpoint
 
     /// <summary>
     /// Whether <paramref name="host"/> is an address the app parsed and found to
-    /// be somewhere else - a public address, written the way an address is
+    /// be somewhere it does not trust - an address that is neither loopback,
+    /// nor private, nor link-local, nor one of the ranges that are not
+    /// addressed to a single host. It is written the way an address is
     /// written.
     /// </summary>
     /// <remarks>
+    /// The name says "public" and the check does not decide that: the
+    /// special-purpose ranges - the shared address space of RFC 6598, the
+    /// documentation ranges and the reserved range - are not addresses on the
+    /// public internet either, and the app treats them as remote hosts. What
+    /// the app decides here is which addresses it can vouch for.
+    /// <para>
     /// A host in another notation (<c>134744072</c>, <c>127.1</c>) is not
-    /// parseable, so it is neither a local nor a public address as far as the app
-    /// is concerned: the app cannot say where it points.
+    /// parseable, so it is neither a local nor a remote address as far as the
+    /// app is concerned: the app cannot say where it points.
+    /// </para>
     /// Mirrors SettingsStore.isPublicAddress in the macOS app.
     /// </remarks>
     public static bool IsPublicAddress(string host)
@@ -360,8 +371,8 @@ public static class OpenAiCompatibleEndpoint
             return false;
         }
 
-        // The unspecified, multicast and broadcast addresses are not a host on
-        // the public internet: the 0.0.0.0/8 range means "this network" rather
+        // The unspecified, multicast and broadcast addresses are not addressed
+        // to a single host: the 0.0.0.0/8 range means "this network" rather
         // than a destination (RFC 1122), and the other two are not addressed to
         // one host. Calling them remote would be a claim the app cannot make.
         if (first == 0)
@@ -383,10 +394,12 @@ public static class OpenAiCompatibleEndpoint
     }
 
     /// <summary>
-    /// Whether <paramref name="host"/> is a name that resolves over mDNS rather
-    /// than an address the app can check: a <c>.local</c> name, or a single-label
-    /// name such as <c>lmstudio</c>. Any device on the local network can answer
-    /// for such a name, so it is not a trusted endpoint even though it looks
+    /// Whether <paramref name="host"/> is a name that is answered by the network
+    /// rather than by the app, instead of an address the app can check: a
+    /// <c>.local</c> name, or a single-label name such as <c>lmstudio</c>. A
+    /// <c>.local</c> name is answered over mDNS and a single-label name through
+    /// the resolver's search list, and any device on the local network can
+    /// answer for either, so it is not a trusted endpoint even though it looks
     /// local. Mirrors SettingsStore.isUnqualifiedLocalName in the macOS app.
     /// </summary>
     public static bool IsUnqualifiedLocalName(string host)
@@ -559,7 +572,7 @@ public static class OpenAiCompatibleEndpoint
         // "/http://example.com" as a file path. A leading "/" is not part of
         // the scheme either - the macOS port trims the value of "/" at both
         // ends before it builds the URL from it, and reading the scheme as
-        // "/http" would let a public plaintext host through on either port.
+        // "/http" would let a remote plaintext host through on either port.
         var schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
         var scheme = schemeEnd > 0
             ? text[..schemeEnd].Trim('/')
