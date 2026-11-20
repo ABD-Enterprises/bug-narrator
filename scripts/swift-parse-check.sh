@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Swift parse-only syntax check for the BugNarrator source tree.
 #
-# Runs `swiftc -parse` on every Sources/**/*.swift file. The `-parse` action
-# only performs lexing + parsing — no type checking, no import resolution — so
-# this catches Swift syntax errors in any environment that has a Swift
-# toolchain (macOS Xcode, Linux swift.org toolchain, cloud sandbox), without
-# needing the macOS-only Foundation/AppKit modules that BugNarrator imports
-# in semantic-checked builds.
+# Runs `swiftc -parse` on every Sources/**/*.swift and Tests/**/*.swift file.
+# The `-parse` action only performs lexing + parsing — no type checking, no
+# import resolution — so this catches Swift syntax errors in any environment
+# that has a Swift toolchain (macOS Xcode, Linux swift.org toolchain, cloud
+# sandbox), without needing the macOS-only Foundation/AppKit modules that
+# BugNarrator imports in semantic-checked builds.
+#
+# The test sources are parsed too. The gate is the fast feedback loop: a
+# syntax error in a test file has to fail it, not only the full build, which
+# is slower and runs in CI.
 #
 # Designed for use from validate.sh and from cloud development sessions
 # (Claude Code on the web/phone) where xcodebuild is unavailable.
@@ -41,19 +45,26 @@ if [[ -z "$SWIFT_BIN" ]]; then
   exit 0
 fi
 
-if [[ ! -d "Sources" ]]; then
-  printf 'NOT RUN: Sources directory not found\n' >"$STATUS_FILE"
+if [[ ! -d "Sources" && ! -d "Tests" ]]; then
+  printf 'NOT RUN: neither Sources/ nor Tests/ found\n' >"$STATUS_FILE"
   exit 0
 fi
 
-# Collect every Swift source file under Sources/.
+# Collect every Swift source file under Sources/ and under Tests/. A
+# directory that is not there is skipped, so the gate still runs in a tree
+# that carries only one of the two.
 SWIFT_FILES=()
-while IFS= read -r -d '' file; do
-  SWIFT_FILES+=("$file")
-done < <(find Sources -type f -name '*.swift' -print0)
+for directory in Sources Tests; do
+  if [[ ! -d "$directory" ]]; then
+    continue
+  fi
+  while IFS= read -r -d '' file; do
+    SWIFT_FILES+=("$file")
+  done < <(find "$directory" -type f -name '*.swift' -print0)
+done
 
 if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
-  printf 'NOT RUN: no Swift source files found under Sources/\n' >"$STATUS_FILE"
+  printf 'NOT RUN: no Swift source files found under Sources/ or Tests/\n' >"$STATUS_FILE"
   exit 0
 fi
 
