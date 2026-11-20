@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace BugNarrator.Windows.Services.Diagnostics;
@@ -5,6 +6,10 @@ namespace BugNarrator.Windows.Services.Diagnostics;
 public static partial class SensitiveDataRedactor
 {
     private const string RedactionToken = "[REDACTED]";
+
+    // A decoder that refuses bytes that are not text, rather than replacing
+    // them with a substitution character.
+    private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
     [GeneratedRegex(@"(?im)(authorization\s*:\s*)([^\r\n]+)")]
     private static partial Regex AuthorizationHeaderRegex();
@@ -83,6 +88,12 @@ public static partial class SensitiveDataRedactor
         // characters around the credential are often more of the same
         // alphabet, so the credential is found by looking at the run from both
         // ends.
+        //
+        // The run is not searched through. A credential with base64 characters
+        // on both sides of it is therefore not found, and a run is not decoded
+        // in every part of it, which is what mangles ordinary words: an
+        // identifier such as "AccessToken" has a part of it that decodes to
+        // bytes with a colon in them.
         for (var length = candidate.Length; length >= MinimumCredentialLength; length--)
         {
             if (DecodesToCredential(candidate[..length]))
@@ -128,12 +139,21 @@ public static partial class SensitiveDataRedactor
             return false;
         }
 
-        // A credential is text. A control character means the decode did not
-        // land on text, which is what tells a credential apart from a word:
-        // an ordinary word decodes to bytes that are not text. A byte above
-        // the printable ASCII range is text in another encoding, and a
-        // credential may well use one.
-        foreach (var value in text)
+        // A credential is text. The bytes have to be text and must not carry a
+        // control character: a decode that did not land on text is what tells
+        // a credential apart from an ordinary word. A byte above the printable
+        // ASCII range is text in another encoding, and a credential may well
+        // use one, so the text has to be valid UTF-8 rather than ASCII.
+        return IsText(text);
+    }
+
+    /// <summary>
+    /// Whether the decoded bytes are text: valid UTF-8 with no control
+    /// character in it.
+    /// </summary>
+    private static bool IsText(ReadOnlySpan<byte> bytes)
+    {
+        foreach (var value in bytes)
         {
             if (value < 0x20 || value == 0x7f)
             {
@@ -141,6 +161,14 @@ public static partial class SensitiveDataRedactor
             }
         }
 
-        return true;
+        try
+        {
+            _ = StrictUtf8.GetString(bytes);
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
     }
 }

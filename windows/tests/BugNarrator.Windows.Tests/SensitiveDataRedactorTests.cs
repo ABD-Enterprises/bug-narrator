@@ -22,6 +22,9 @@ public sealed class SensitiveDataRedactorTests
     [InlineData("Basic configuration missing")]
     [InlineData("Basic Only mode")]
     [InlineData("Basic troubleshooting notes")]
+    [InlineData("Basic AccessToken expired")]
+    [InlineData("Basic StoredTokenAtPath missing")]
+    [InlineData("Basic executeTransaction failed")]
     public void ProseAfterBasicIsNotRedacted(string message)
     {
         Assert.Equal(message, SensitiveDataRedactor.Redact(message));
