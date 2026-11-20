@@ -125,6 +125,9 @@ if ! SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
     cat "$workspace/sources.out" >&2
     fail 'the parse gate failed in a tree that has no test sources'
 fi
+if [[ ! -s "$record" ]]; then
+    fail 'the parse gate did not hand any file to the toolchain'
+fi
 if ! grep -q 'Sources/BugNarrator/Product.swift' "$record"; then
     fail 'the parse gate did not parse the product sources in a tree without tests'
 fi
@@ -157,6 +160,9 @@ if ! SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
     "$tests_only/scripts/swift-parse-check.sh" >"$workspace/tests.out" 2>&1; then
     cat "$workspace/tests.out" >&2
     fail 'the parse gate failed in a tree that has no product sources'
+fi
+if [[ ! -s "$record" ]]; then
+    fail 'the parse gate did not hand any file to the toolchain'
 fi
 if ! grep -q 'Tests/BugNarratorTests/ProductTests.swift' "$record"; then
     fail 'the parse gate did not parse the test sources in a tree without product sources'
