@@ -465,12 +465,14 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://10.0.0.5:8080"))
         XCTAssertNil(SettingsStore.plaintextRemoteBaseURLWarning(from: ""))
 
-        // A name that any device on the local network can claim is not a
-        // trusted local endpoint, so it warns like a remote host does.
+        // A name that the network answers for is not a trusted local
+        // endpoint, so it warns like a remote host does.
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
 
-        // Plaintext HTTP to a public host must warn.
+        // Plaintext HTTP to a host the app does not trust must warn, whether
+        // the address is on the public internet or in one of the ranges that
+        // are not.
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://api.example.com/v1"))
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://203.0.113.10:8080"))
     }
@@ -638,8 +640,9 @@ final class SettingsStoreTests: XCTestCase {
             XCTAssertTrue(SettingsStore.isLocalEndpointHost(local), "expected \(local) to be local")
         }
         for remote in ["api.openai.com", "8.8.8.8", "172.32.0.1", "example.com",
-                       // A `.local` or single-label name resolves over mDNS, so
-                       // it is not an address the app can check.
+                       // A `.local` or single-label name is answered by the
+                       // network rather than by the app, so it is not an
+                       // address the app can check.
                        "myserver.local", "nas.local", "lmstudio",
                        // An address written in another notation is not parsed as
                        // an address either, so it is not trusted.
@@ -1063,9 +1066,9 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
-    /// A `.local` name and a single-label name are resolved over mDNS, which any
-    /// device on the local network can answer, so they are the names the app
-    /// refuses for plaintext HTTP.
+    /// A `.local` name and a single-label name are answered by the network
+    /// rather than by the app, and either answer can come from anywhere, so
+    /// they are the names the app refuses for plaintext HTTP.
     func testUnqualifiedLocalNamesAreRecognised() {
         for unqualified in ["myserver.local", "nas.local", "lmstudio", "server"] {
             XCTAssertTrue(

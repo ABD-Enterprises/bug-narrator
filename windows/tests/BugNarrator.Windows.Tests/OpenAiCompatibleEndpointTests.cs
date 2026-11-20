@@ -105,9 +105,11 @@ public sealed class OpenAiCompatibleEndpointTests
     }
 
     /// <summary>
-    /// A <c>.local</c> name and a single-label name are resolved over mDNS, which
-    /// any device on the local network can answer for, so neither is trusted for
-    /// plaintext HTTP even though it looks local.
+    /// A <c>.local</c> name and a single-label name are answered by the network
+    /// rather than by the app - a <c>.local</c> name over mDNS, a single-label
+    /// name through the resolver's search list - and either answer can come
+    /// from anywhere, so neither is trusted for plaintext HTTP even though it
+    /// looks local.
     /// </summary>
     [Theory]
     [InlineData("myserver.local")]
@@ -247,9 +249,11 @@ public sealed class OpenAiCompatibleEndpointTests
     }
 
     /// <summary>
-    /// A public address is one the app could parse and found to be somewhere
-    /// else. A local address is not public, and a host in another notation is
-    /// not parseable at all, so the app cannot call it public either.
+    /// An address the app could parse and found to be somewhere else is a
+    /// remote host. A local address is not one, and a host in another
+    /// notation is not parseable at all, so the app cannot call it one either.
+    /// The ranges that are not on the public internet are remote hosts too:
+    /// the app cannot vouch for them.
     /// </summary>
     [Theory]
     [InlineData("8.8.8.8")]
@@ -285,8 +289,8 @@ public sealed class OpenAiCompatibleEndpointTests
     }
 
     /// <summary>
-    /// A name that any device on the local network can claim gets the refusal
-    /// that names the fix: point the setting at the machine's IP address.
+    /// A name that the network answers for gets the refusal that names the
+    /// fix: point the setting at the machine's IP address.
     /// </summary>
     [Fact]
     public void PlaintextRemoteWarning_ExplainsAClaimableLocalName()
