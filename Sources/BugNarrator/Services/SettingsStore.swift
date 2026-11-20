@@ -594,7 +594,8 @@ final class SettingsStore: ObservableObject {
     /// host would send the API key and transcript text over the network
     /// unencrypted.
     ///
-    /// A `.local` name and a single-label name are deliberately not trusted.
+    /// A `.local` name and a single-label name — other than the reserved
+    /// `localhost` and the names under it — are deliberately not trusted.
     /// Both are answered by the network rather than by the app: a `.local`
     /// name over mDNS, a single-label name through the resolver's search
     /// list. Either answer can come from anywhere, so a name that looks local

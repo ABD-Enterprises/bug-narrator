@@ -107,9 +107,9 @@ public sealed class OpenAiCompatibleEndpointTests
     /// <summary>
     /// A <c>.local</c> name and a single-label name are answered by the network
     /// rather than by the app - a <c>.local</c> name over mDNS, a single-label
-    /// name through the resolver's search list - and any device on the local
-    /// network can answer for either, so neither is trusted for plaintext HTTP
-    /// even though it looks local.
+    /// name through the resolver's search list - and either answer can come
+    /// from anywhere, so neither is trusted for plaintext HTTP even though it
+    /// looks local.
     /// </summary>
     [Theory]
     [InlineData("myserver.local")]

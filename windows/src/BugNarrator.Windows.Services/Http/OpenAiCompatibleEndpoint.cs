@@ -38,7 +38,8 @@ public static class OpenAiCompatibleEndpoint
     /// endpoint, for which plaintext HTTP is acceptable because the traffic
     /// stays on the machine or the trusted local network.
     ///
-    /// A <c>.local</c> name and a single-label name such as <c>lmstudio</c> are
+    /// A <c>.local</c> name and a single-label name such as <c>lmstudio</c> -
+    /// other than the reserved <c>localhost</c> and the names under it - are
     /// deliberately not trusted. Both are answered by the network rather than
     /// by the app: a <c>.local</c> name over mDNS, a single-label name through
     /// the resolver's search list. Either answer can come from anywhere, so a
