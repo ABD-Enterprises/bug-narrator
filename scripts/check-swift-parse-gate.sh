@@ -71,10 +71,13 @@ make_tool_free_path() {
     done
 }
 
+# The stub toolchain is built once, before the cases, so that every case has
+# one and no case depends on the order the cases run in.
+make_stub "$workspace/stub"
+
 # ── 1. the gate parses the sources and the tests ───────────────────────────
 tree="$workspace/tree"
 make_tree "$tree"
-make_stub "$workspace/stub"
 record="$workspace/recorded.txt"
 
 if ! SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
@@ -139,6 +142,24 @@ if SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
 fi
 if ! grep -q 'FAIL: swift parse reported errors' "$broken_tree/artifacts/validation/swift-parse-status.txt"; then
     fail 'the parse gate did not say that the parse reported errors'
+fi
+
+# ── 5. the gate runs in a tree that has only the test sources ─────────────
+# The other direction of the same rule: a checkout that carries the test
+# sources but no product sources is still a checkout the gate has to run in.
+tests_only="$workspace/tests-only"
+mkdir -p "$tests_only/scripts" "$tests_only/Tests/BugNarratorTests"
+cp "$ROOT_DIR/scripts/swift-parse-check.sh" "$tests_only/scripts/swift-parse-check.sh"
+chmod +x "$tests_only/scripts/swift-parse-check.sh"
+printf 'let test = 2\n' >"$tests_only/Tests/BugNarratorTests/ProductTests.swift"
+record="$workspace/recorded-tests.txt"
+if ! SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
+    "$tests_only/scripts/swift-parse-check.sh" >"$workspace/tests.out" 2>&1; then
+    cat "$workspace/tests.out" >&2
+    fail 'the parse gate failed in a tree that has no product sources'
+fi
+if ! grep -q 'Tests/BugNarratorTests/ProductTests.swift' "$record"; then
+    fail 'the parse gate did not parse the test sources in a tree without product sources'
 fi
 
 printf 'PASS: the Swift parse gate parses the test sources as well as the product sources\n'
