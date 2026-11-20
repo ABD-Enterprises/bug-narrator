@@ -24,10 +24,9 @@ extension SettingsStore {
     /// Ollama story, and the shipped defaults are themselves `http://localhost`.
     /// A `.local` or single-label host does not: both are answered by the
     /// network rather than by the app — a `.local` name over mDNS, a
-    /// single-label name through the resolver's search list — and any device
-    /// on the local network can answer for either. Parakeet is exempt outright
-    /// because `normalizedOpenAIBaseURL` ignores the typed value for that
-    /// provider.
+    /// single-label name through the resolver's search list — and either
+    /// answer can come from anywhere. Parakeet is exempt outright because
+    /// `normalizedOpenAIBaseURL` ignores the typed value for that provider.
     var remotePlaintextEndpointIssue: String? {
         guard aiProvider != .parakeetLocal else {
             return nil

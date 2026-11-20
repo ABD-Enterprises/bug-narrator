@@ -289,8 +289,8 @@ public sealed class OpenAiCompatibleEndpointTests
     }
 
     /// <summary>
-    /// A name that any device on the local network can claim gets the refusal
-    /// that names the fix: point the setting at the machine's IP address.
+    /// A name that the network answers for gets the refusal that names the
+    /// fix: point the setting at the machine's IP address.
     /// </summary>
     [Fact]
     public void PlaintextRemoteWarning_ExplainsAClaimableLocalName()

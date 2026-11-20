@@ -597,10 +597,9 @@ final class SettingsStore: ObservableObject {
     /// A `.local` name and a single-label name are deliberately not trusted.
     /// Both are answered by the network rather than by the app: a `.local`
     /// name over mDNS, a single-label name through the resolver's search
-    /// list. Any device on the local network can answer for either, so a
-    /// name that looks local can point anywhere — and ATS offers no
-    /// protection for them either. A local server is addressed by its IP
-    /// address instead.
+    /// list. Either answer can come from anywhere, so a name that looks local
+    /// can point anywhere — and ATS offers no protection for them either. A
+    /// local server is addressed by its IP address instead.
     static func isLocalEndpointHost(_ host: String) -> Bool {
         guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
 
@@ -880,8 +879,8 @@ final class SettingsStore: ObservableObject {
 
     /// Whether `host` is an address the app parsed and found to be somewhere
     /// it does not trust — an address that is neither loopback, nor private,
-    /// nor link-local, nor one of the ranges that are not addressed to a
-    /// single host. It is written the way an address is written.
+    /// nor link-local, nor in the unspecified, multicast or broadcast range.
+    /// It is written the way an address is written.
     ///
     /// The name says "public" and the check does not decide that: the
     /// special-purpose ranges — the shared address space of RFC 6598, the
@@ -910,8 +909,8 @@ final class SettingsStore: ObservableObject {
     /// the app, instead of an address the app can check: a `.local` name, or a
     /// single-label name such as `lmstudio`. A `.local` name is answered over
     /// mDNS and a single-label name through the resolver's search list, and
-    /// any device on the local network can answer for either, so it is not a
-    /// trusted endpoint even though it looks local.
+    /// either answer can come from anywhere, so it is not a trusted endpoint
+    /// even though it looks local.
     static func isUnqualifiedLocalName(_ host: String) -> Bool {
         guard let lowered = withoutIPv6Brackets(host.lowercased()) else { return false }
         // A trailing dot makes the name absolute rather than different: a
@@ -971,8 +970,8 @@ final class SettingsStore: ObservableObject {
     /// surface uses this one answer, so the settings field and the message
     /// that blocks the request cannot describe the same host differently.
     ///
-    /// A name any device on the local network can claim is neither remote nor
-    /// checkable, and its refusal names the fix. A host the app parsed and
+    /// A name the network answers for is neither remote nor checkable, and
+    /// its refusal names the fix. A host the app parsed and
     /// found to be somewhere it does not trust is a remote host. A host it
     /// could not parse is one it cannot use as a local address — calling that
     /// one remote would be a claim the app cannot make. Every refusal says

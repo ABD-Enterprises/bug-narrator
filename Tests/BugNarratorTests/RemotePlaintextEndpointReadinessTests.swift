@@ -90,9 +90,8 @@ final class RemotePlaintextEndpointReadinessTests: XCTestCase {
     }
 
     /// A `.local` name or a single-label name is answered by the network
-    /// rather than by the app, and any device on the local network can answer
-    /// for either, so it is refused for plaintext HTTP even though it looks
-    /// local.
+    /// rather than by the app, and either answer can come from anywhere, so it
+    /// is refused for plaintext HTTP even though it looks local.
     func testUnqualifiedLocalNamesAreRefused() {
         for baseURL in [
             "http://lmstudio:1234/v1",

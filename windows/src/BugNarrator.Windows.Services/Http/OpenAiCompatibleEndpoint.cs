@@ -41,9 +41,9 @@ public static class OpenAiCompatibleEndpoint
     /// A <c>.local</c> name and a single-label name such as <c>lmstudio</c> are
     /// deliberately not trusted. Both are answered by the network rather than
     /// by the app: a <c>.local</c> name over mDNS, a single-label name through
-    /// the resolver's search list. Any device on the local network can answer
-    /// for either, so a name that looks local can point anywhere. A local
-    /// server is addressed by its IP address instead.
+    /// the resolver's search list. Either answer can come from anywhere, so a
+    /// name that looks local can point anywhere. A local server is addressed
+    /// by its IP address instead.
     /// Mirrors SettingsStore.isLocalEndpointHost in the macOS app (#1268).
     /// </summary>
     public static bool IsLocalEndpointHost(string host)
@@ -345,9 +345,8 @@ public static class OpenAiCompatibleEndpoint
     /// <summary>
     /// Whether <paramref name="host"/> is an address the app parsed and found to
     /// be somewhere it does not trust - an address that is neither loopback,
-    /// nor private, nor link-local, nor one of the ranges that are not
-    /// addressed to a single host. It is written the way an address is
-    /// written.
+    /// nor private, nor link-local, nor in the unspecified, multicast or
+    /// broadcast range. It is written the way an address is written.
     /// </summary>
     /// <remarks>
     /// The name says "public" and the check does not decide that: the
@@ -398,9 +397,9 @@ public static class OpenAiCompatibleEndpoint
     /// rather than by the app, instead of an address the app can check: a
     /// <c>.local</c> name, or a single-label name such as <c>lmstudio</c>. A
     /// <c>.local</c> name is answered over mDNS and a single-label name through
-    /// the resolver's search list, and any device on the local network can
-    /// answer for either, so it is not a trusted endpoint even though it looks
-    /// local. Mirrors SettingsStore.isUnqualifiedLocalName in the macOS app.
+    /// the resolver's search list, and either answer can come from anywhere, so
+    /// it is not a trusted endpoint even though it looks local. Mirrors
+    /// SettingsStore.isUnqualifiedLocalName in the macOS app.
     /// </summary>
     public static bool IsUnqualifiedLocalName(string host)
     {
