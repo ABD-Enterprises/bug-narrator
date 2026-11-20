@@ -8,9 +8,9 @@ SureForge Capture intentionally runs as a single-instance app. If you open it ag
 
 ## Getting Help
 
-- [Download the latest macOS release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest)
-- [Report a Bug](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
-- [Request a Feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
+- [Download the latest macOS release](https://github.com/SureForgeTech/sureforge-capture/releases/latest)
+- [Report a Bug](https://github.com/SureForgeTech/sureforge-capture/issues/new)
+- [Request a Feature](https://github.com/SureForgeTech/sureforge-capture/issues/new)
 - [Support Development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 
 ## What SureForge Capture Is
@@ -31,7 +31,7 @@ It helps you:
 
 ### Install From The DMG
 
-1. Download the latest macOS release from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
+1. Download the latest macOS release from [GitHub Releases](https://github.com/SureForgeTech/sureforge-capture/releases/latest).
 2. Open the downloaded DMG.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
@@ -58,7 +58,7 @@ SureForge Capture releases are signed with a `Developer ID Application` certific
 
 SureForge Capture does not ship with built-in AI access or credits. `OpenAI` is the hosted default provider and requires your own API key. You can also select `OpenAI-Compatible` for an enterprise gateway or hosted compatible provider, `Local-Compatible` for local or self-hosted OpenAI-compatible endpoints, or `Local (Parakeet)` for transcription on this Mac through `http://127.0.0.1:8422`; that local server refuses every request that does not carry the private access token it shares with SureForge Capture — except the health check, which answers a proof challenge instead of the token — so no process that cannot read the user's own token file can drive the model or receive the recording. When an older managed local server needs the authenticated protocol, SureForge Capture updates it before launch, preserving downloaded models and the shared token. Settings also offers Update local server. A compatible download and verification must succeed before replacement; only verified, same-user managed helper processes are stopped. If the previous helper does not stop, the update leaves the installed server unchanged. Open Activity Monitor, find `bugnarrator-transcription`, stop it (Force Quit if needed), then retry **Update local server** in Settings. If another program occupies the server port, stop that program yourself. If you run this repository's `server.py` by hand, update the source and restart it.
 
-`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. Install it by downloading `bugnarrator-transcription-macos-arm64.dmg` from the [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest), verifying the published checksum, opening the disk image, copying `bugnarrator-transcription` to a local folder, and running `./bugnarrator-transcription --preload` in Terminal — it is signed and notarized, and needs no Python or source checkout. Settings > AI Engines has a direct download link. Leave that Terminal process running while you use Parakeet. Long recordings are processed in bounded local chunks and can take several minutes; SureForge Capture waits for the active local inference instead of starting duplicate retries. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
+`Local (Parakeet)` does not use an API key and does not upload audio, but the local server must be installed and running before transcription. Install it by downloading `bugnarrator-transcription-macos-arm64.dmg` from the [latest release](https://github.com/SureForgeTech/sureforge-capture/releases/latest), verifying the published checksum, opening the disk image, copying `bugnarrator-transcription` to a local folder, and running `./bugnarrator-transcription --preload` in Terminal — it is signed and notarized, and needs no Python or source checkout. Settings > AI Engines has a direct download link. Leave that Terminal process running while you use Parakeet. Long recordings are processed in bounded local chunks and can take several minutes; SureForge Capture waits for the active local inference instead of starting duplicate retries. It is transcription-only; review summary and issue extraction still require an OpenAI-compatible chat provider. Hosted provider usage may incur charges on that provider account.
 
 ## Core Workflow
 

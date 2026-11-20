@@ -64,6 +64,7 @@ rm -f \
   "$REPO_DOCS_OUTPUT_FILE" \
   "$DOC_IDENTIFIERS_STATUS_FILE" \
   "$DOC_IDENTIFIERS_OUTPUT_FILE" \
+  "${VALIDATION_ARTIFACT_DIR}/plaintext-tables-status.txt" \
   "$SHELLCHECK_STATUS_FILE" \
   "$RUFF_STATUS_FILE"
 
@@ -90,6 +91,33 @@ if [[ "${VALIDATE_SKIP_CHANGED_FILES_SELF_CHECK:-0}" != "1" ]]; then
   if ! "$ROOT/scripts/check-changed-files.sh"; then
     exit 1
   fi
+fi
+
+# The version bump must refuse to run on a dirty tree and must replace the
+# files it writes rather than truncate them in place. The gate runs the real
+# script against a throwaway tree, so the behaviour cannot rot back.
+# The shared plaintext-endpoint tables are read by both ports. A row that is
+# edited fails on both, but a row that is deleted fails on neither, so the
+# contract that says which rows have to be there lives in one place and runs
+# on every pull request.
+if [[ ! -x "$ROOT/scripts/check-plaintext-endpoint-tables.py" ]]; then
+  printf 'FAIL: scripts/check-plaintext-endpoint-tables.py is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-plaintext-endpoint-tables.py"; then
+  exit 1
+fi
+# Echoed, like the other checks: a check that only writes a status file leaves
+# no trace in the log.
+printf 'PASS: the shared plaintext-endpoint tables keep their rows\n' \
+  | tee "${VALIDATION_ARTIFACT_DIR}/plaintext-tables-status.txt"
+
+if [[ ! -x "$ROOT/scripts/check-version-bump-guard.sh" ]]; then
+  printf 'FAIL: scripts/check-version-bump-guard.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-version-bump-guard.sh"; then
+  exit 1
 fi
 
 # The release environment gate and the `environment:` key of the release jobs
@@ -281,6 +309,18 @@ if [[ ! -x "$ROOT/scripts/check-version-consistency-gate.sh" ]]; then
   exit 1
 fi
 if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
+  exit 1
+fi
+
+# The Swift parse gate has to parse the test sources as well as the product
+# sources. It is the fast feedback loop, and a syntax error in a test file
+# used to pass it and was only found by the full build, which is slower and
+# runs in CI.
+if [[ ! -x "$ROOT/scripts/check-swift-parse-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-swift-parse-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-swift-parse-gate.sh"; then
   exit 1
 fi
 

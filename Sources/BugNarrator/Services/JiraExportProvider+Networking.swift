@@ -240,8 +240,8 @@ extension JiraExportProvider {
             // The refusal is built the same way the settings warning builds
             // it, so the export path and the settings screen cannot describe
             // one host differently. A host the app parsed and found to be
-            // public is a remote host; a host it could not parse is one it
-            // cannot check as a local address.
+            // somewhere it does not trust is a remote host; a host it could
+            // not parse is one it cannot check as a local address.
             throw AppError.exportConfigurationIncompatible(
                 SettingsStore.plaintextTransportRefusal(
                     host: url.host,

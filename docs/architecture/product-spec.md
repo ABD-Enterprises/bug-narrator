@@ -19,7 +19,7 @@ Do not use this document as the source of truth for:
 
 Those live in:
 
-- [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues) for active delivery state, risks, incidents, and planned work
+- [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues) for active delivery state, risks, incidents, and planned work
 - [docs/roadmap/roadmap.md](../roadmap/roadmap.md) for historical roadmap context and completed phase history
 - [CHANGELOG-archive.md](../../CHANGELOG-archive.md) for shipped change history
 - [parity-matrix.md](parity-matrix.md) for deliberate cross-platform parity decisions

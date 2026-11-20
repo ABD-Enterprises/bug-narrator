@@ -15,8 +15,8 @@ SureForge Capture intentionally runs as a single-instance menu bar app. If you l
 
 The app is now called SureForge Capture. The download and the app file (`BugNarrator.app`) keep the old name, so an installed copy keeps its permissions, settings and updates.
 
-- [Download the latest macOS DMG](https://github.com/ABD-Enterprises/bug-narrator/releases/latest/download/BugNarrator-macOS.dmg)
-- [View the latest release page](https://github.com/ABD-Enterprises/bug-narrator/releases/latest)
+- [Download the latest macOS DMG](https://github.com/SureForgeTech/sureforge-capture/releases/latest/download/BugNarrator-macOS.dmg)
+- [View the latest release page](https://github.com/SureForgeTech/sureforge-capture/releases/latest)
 
 If the direct DMG link is not live yet, use the release page and download the newest `BugNarrator-macOS.dmg` or `BugNarrator-vX.Y.Z-macOS.dmg` asset there.
 
@@ -33,11 +33,11 @@ SureForge Capture is free to use. If it helps your workflow, consider supporting
 - [Getting started for maintainers and testers](docs/onboarding/getting-started.md)
 - [Release process](docs/release/release-process.md)
 - [Roadmap history and completed phases](docs/roadmap/roadmap.md)
-- [GitHub issues and active work](https://github.com/ABD-Enterprises/bug-narrator/issues)
+- [GitHub issues and active work](https://github.com/SureForgeTech/sureforge-capture/issues)
 - [Detailed user guide](docs/UserGuide.md)
 - [Tester narration guide](docs/UserGuide.md#tester-narration-guide)
-- [Hosted documentation](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
-- [Report a bug or request a feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
+- [Hosted documentation](https://github.com/SureForgeTech/sureforge-capture/blob/main/docs/UserGuide.md)
+- [Report a bug or request a feature](https://github.com/SureForgeTech/sureforge-capture/issues/new)
 - [View the release history](CHANGELOG-archive.md)
 
 ## What SureForge Capture Does
@@ -81,7 +81,7 @@ The server ships as a signed, notarized download — no source checkout, no
 Python, no build step:
 
 1. Download `bugnarrator-transcription-macos-arm64.dmg` from the
-   [latest release](https://github.com/ABD-Enterprises/bug-narrator/releases/latest),
+   [latest release](https://github.com/SureForgeTech/sureforge-capture/releases/latest),
    and verify it against the published `.sha256` if you want to.
 2. Open the disk image, copy `bugnarrator-transcription` to a local folder, and
    run it in Terminal:
@@ -115,7 +115,7 @@ but the idle cost is the same either way.
 
 ## Install On macOS
 
-1. Download the latest DMG from [GitHub Releases](https://github.com/ABD-Enterprises/bug-narrator/releases/latest).
+1. Download the latest DMG from [GitHub Releases](https://github.com/SureForgeTech/sureforge-capture/releases/latest).
 2. Open the DMG. It should present a drag-to-Applications install window.
 3. Drag `BugNarrator.app` into `Applications`.
 4. Launch `BugNarrator.app` (SureForge Capture) from `Applications`.
@@ -285,13 +285,13 @@ The debug bundle includes version info, macOS info, recent local logs, and safe 
 
 ## Download, Help, And Support Links
 
-- [Latest macOS release page](https://github.com/ABD-Enterprises/bug-narrator/releases/latest)
+- [Latest macOS release page](https://github.com/SureForgeTech/sureforge-capture/releases/latest)
 - [User documentation](docs/UserGuide.md)
-- [Hosted user guide](https://github.com/ABD-Enterprises/bug-narrator/blob/main/docs/UserGuide.md)
-- [Report a bug or request a feature](https://github.com/ABD-Enterprises/bug-narrator/issues/new)
+- [Hosted user guide](https://github.com/SureForgeTech/sureforge-capture/blob/main/docs/UserGuide.md)
+- [Report a bug or request a feature](https://github.com/SureForgeTech/sureforge-capture/issues/new)
 - [Support development](https://www.paypal.com/donate/?hosted_button_id=FWFQ6KCZBWWH8)
 - [Release history](CHANGELOG-archive.md)
-- [GitHub issues](https://github.com/ABD-Enterprises/bug-narrator/issues)
+- [GitHub issues](https://github.com/SureForgeTech/sureforge-capture/issues)
 
 ## Build From Source
 
@@ -363,7 +363,7 @@ For public distribution, use a `Developer ID Application` certificate plus notar
 
 SureForge Capture is not currently accepting outside code contributions or pull requests.
 
-Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/ABD-Enterprises/bug-narrator/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
+Bug reports and focused feature requests are still welcome through [GitHub Issues](https://github.com/SureForgeTech/sureforge-capture/issues/new). See [CONTRIBUTING.md](CONTRIBUTING.md) for the current policy.
 
 ## License
 

@@ -26,7 +26,7 @@ Optional local tools:
 ## Clone And Inspect
 
 ```bash
-git clone https://github.com/ABD-Enterprises/bug-narrator.git
+git clone https://github.com/SureForgeTech/sureforge-capture.git
 cd bug-narrator
 git status
 ```

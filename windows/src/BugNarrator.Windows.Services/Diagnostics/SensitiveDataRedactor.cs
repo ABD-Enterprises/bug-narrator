@@ -1,10 +1,15 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace BugNarrator.Windows.Services.Diagnostics;
 
-internal static partial class SensitiveDataRedactor
+public static partial class SensitiveDataRedactor
 {
     private const string RedactionToken = "[REDACTED]";
+
+    // A decoder that refuses bytes that are not text, rather than replacing
+    // them with a substitution character.
+    private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
     [GeneratedRegex(@"(?im)(authorization\s*:\s*)([^\r\n]+)")]
     private static partial Regex AuthorizationHeaderRegex();
@@ -12,7 +17,15 @@ internal static partial class SensitiveDataRedactor
     [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+=*")]
     private static partial Regex BearerTokenRegex();
 
-    [GeneratedRegex(@"(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}\b")]
+    // A Basic credential is the base64 of "user:secret", so the candidate has
+    // to decode to text with a colon in it. The pattern only captures the
+    // candidate; whether it is a credential is decided when the match is
+    // replaced, so ordinary prose after the word "Basic" is left alone.
+    //
+    // The candidate is the whole run of base64-shaped characters, with no
+    // trailing boundary: a credential is often followed by more of them, and a
+    // boundary that rejected those would let the credential through.
+    [GeneratedRegex(@"(?i)\bBasic\s+([A-Za-z0-9+/=]{8,})")]
     private static partial Regex BasicTokenRegex();
 
     [GeneratedRegex(@"\bsk-[A-Za-z0-9_-]{6,}\b")]
@@ -44,12 +57,118 @@ internal static partial class SensitiveDataRedactor
 
         var redactedValue = AuthorizationHeaderRegex().Replace(value, $"$1{RedactionToken}");
         redactedValue = BearerTokenRegex().Replace(redactedValue, $"Bearer {RedactionToken}");
-        redactedValue = BasicTokenRegex().Replace(redactedValue, $"Basic {RedactionToken}");
+        redactedValue = BasicTokenRegex().Replace(
+            redactedValue,
+            match => IsBasicCredential(match.Groups[1].Value) ? $"Basic {RedactionToken}" : match.Value);
         redactedValue = OpenAiKeyRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubClassicTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = GitHubFineGrainedTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = AtlassianApiTokenRegex().Replace(redactedValue, RedactionToken);
         redactedValue = EmailRegex().Replace(redactedValue, $"{RedactionToken}@$1");
         return redactedValue;
+    }
+
+    /// <summary>
+    /// Whether the candidate holds a Basic credential, which is the base64 of
+    /// "user:secret": text with a colon in it and something on both sides of
+    /// the colon. A candidate that does not decode to that is ordinary prose
+    /// and is not redacted.
+    /// </summary>
+    private static bool IsBasicCredential(string candidate)
+    {
+        // A run this long is not a word. It is data, and redacting it is the
+        // safe answer, so it is not searched through.
+        if (candidate.Length > MaximumCandidateLength)
+        {
+            return true;
+        }
+
+        // The credential may sit at the start of the run or at the end of it.
+        // The run is everything that follows the word "Basic", and the
+        // characters around the credential are often more of the same
+        // alphabet, so the credential is found by looking at the run from both
+        // ends.
+        //
+        // The run is not searched through. A credential with base64 characters
+        // on both sides of it is therefore not found, and a run is not decoded
+        // in every part of it, which is what mangles ordinary words: an
+        // identifier such as "AccessToken" has a part of it that decodes to
+        // bytes with a colon in them.
+        for (var length = candidate.Length; length >= MinimumCredentialLength; length--)
+        {
+            if (DecodesToCredential(candidate[..length]))
+            {
+                return true;
+            }
+        }
+
+        for (var start = 1; start <= candidate.Length - MinimumCredentialLength; start++)
+        {
+            if (DecodesToCredential(candidate[start..]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The shortest candidate that can hold a credential.</summary>
+    private const int MinimumCredentialLength = 8;
+
+    /// <summary>
+    /// The longest candidate that is searched through for a credential. A
+    /// credential is a user name and a password, which are far shorter than
+    /// this, so a longer run is data rather than a credential.
+    /// </summary>
+    private const int MaximumCandidateLength = 512;
+
+    private static bool DecodesToCredential(string encoded)
+    {
+        var padded = encoded.PadRight(encoded.Length + ((4 - encoded.Length % 4) % 4), '=');
+        Span<byte> decoded = new byte[(padded.Length / 4) * 3];
+        if (!Convert.TryFromBase64String(padded, decoded, out var written))
+        {
+            return false;
+        }
+
+        var text = decoded[..written];
+        var colon = text.IndexOf((byte)':');
+        if (colon <= 0 || colon == text.Length - 1)
+        {
+            return false;
+        }
+
+        // A credential is text. The bytes have to be text and must not carry a
+        // control character: a decode that did not land on text is what tells
+        // a credential apart from an ordinary word. A byte above the printable
+        // ASCII range is text in another encoding, and a credential may well
+        // use one, so the text has to be valid UTF-8 rather than ASCII.
+        return IsText(text);
+    }
+
+    /// <summary>
+    /// Whether the decoded bytes are text: valid UTF-8 with no control
+    /// character in it.
+    /// </summary>
+    private static bool IsText(ReadOnlySpan<byte> bytes)
+    {
+        foreach (var value in bytes)
+        {
+            if (value < 0x20 || value == 0x7f)
+            {
+                return false;
+            }
+        }
+
+        try
+        {
+            _ = StrictUtf8.GetString(bytes);
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
     }
 }
