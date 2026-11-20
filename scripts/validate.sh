@@ -312,6 +312,18 @@ if ! "$ROOT/scripts/check-version-consistency-gate.sh"; then
   exit 1
 fi
 
+# The Swift parse gate has to parse the test sources as well as the product
+# sources. It is the fast feedback loop, and a syntax error in a test file
+# used to pass it and was only found by the full build, which is slower and
+# runs in CI.
+if [[ ! -x "$ROOT/scripts/check-swift-parse-gate.sh" ]]; then
+  printf 'FAIL: scripts/check-swift-parse-gate.sh is missing or not executable\n' >&2
+  exit 1
+fi
+if ! "$ROOT/scripts/check-swift-parse-gate.sh"; then
+  exit 1
+fi
+
 # Always run the cloud-portable Swift parse check. It self-skips with a clean
 # exit when no Swift toolchain is available, and fails the build only on
 # syntax errors — never on missing toolchains or missing imports.

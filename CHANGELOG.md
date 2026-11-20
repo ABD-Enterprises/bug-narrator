@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] The fast Swift parse gate now parses the test sources as well as the product sources. It only walked `Sources/`, so a syntax error in a test file passed the local gate and was only found by the full build, which is slower and runs in CI. A new gate pins that the parse gate covers both trees.
 - [FIX] The Windows diagnostics redactor no longer rewrites ordinary prose that follows the word "Basic": a Basic credential is the base64 of "user:secret", so the candidate is decoded and only a decoded text that is text and has a colon in it, with text on both sides of the colon, is redacted, as the macOS redactor already does. A debug bundle is what a user opens to read the error they hit, and the error was the one thing the redaction removed.
 - [FIX] The shared plaintext-endpoint tables are now pinned: the validation checks that the host and URL tables keep their size and keep the rows that pin the security decisions, so deleting a row fails the build on both ports instead of silently weakening the contract the tables exist for.
 - [FIX] The version bump script now refuses to run on a tree with uncommitted changes, and writes every file it changes through a temporary file and a rename, so each file is replaced whole rather than truncated in place and a reader never sees half of one. The bump also no longer needs BSD sed, so it runs the same way on every platform. An interrupt (SIGINT) does not stop the bump: it runs to the end and leaves the tree fully bumped.
