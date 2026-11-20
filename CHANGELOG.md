@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [INTERNAL] Clarify CodeQL documentation across AGENTS.md, docs/RELEASE_CHECKLIST.md, and docs/operations/deployment.md to explicitly name .github/workflows/codeql.yml, describe language/runner matrix coverage (including monthly and on-demand Swift scans), and provide the CLI command to confirm active status (#1287).
+
 - [FIX] The classifier's own documentation now says what the code does. A `.local` name is answered over mDNS and a single-label name through the resolver's search list, so both are answered by the network rather than by the app - the wording the user was already given. A parsed address the app does not trust is called a remote host rather than a public address: the special-purpose ranges, the shared address space and the documentation ranges, are not addresses on the public internet either, and the app treats them as remote hosts. The comments on both ports and in their tests were corrected; no behaviour changes.
 - [FIX] The fast Swift parse gate now parses the test sources as well as the product sources. It only walked `Sources/`, so a syntax error in a test file passed the local gate and was only found by the full build, which is slower and runs in CI. A new gate pins that the parse gate covers both trees.
 - [FIX] The Windows diagnostics redactor no longer rewrites ordinary prose that follows the word "Basic": a Basic credential is the base64 of "user:secret", so the candidate is decoded and only a decoded text that is text and has a colon in it, with text on both sides of the colon, is redacted, as the macOS redactor already does. A debug bundle is what a user opens to read the error they hit, and the error was the one thing the redaction removed.
