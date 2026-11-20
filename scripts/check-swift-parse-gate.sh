@@ -35,17 +35,40 @@ make_tree() {
     printf 'let test = 2\n' >"$tree/Tests/BugNarratorTests/ProductTests.swift"
 }
 
-# A stub toolchain that records the files it was handed and succeeds. The
-# gate looks for swiftc on PATH, so the stub stands in for the toolchain.
+# A stub toolchain that records the files it was handed. The gate looks for
+# swiftc on PATH, so the stub stands in for the toolchain. It fails on a file
+# it cannot parse, the way the real toolchain does.
 make_stub() {
     local stub_dir="$1"
     mkdir -p "$stub_dir"
     cat >"$stub_dir/swiftc" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$SWIFT_STUB_RECORD"
+for argument in "$@"; do
+  if [[ "$argument" == *Broken.swift ]]; then
+    exit 1
+  fi
+done
 exit 0
 STUB
     chmod +x "$stub_dir/swiftc"
+}
+
+# A PATH with no toolchain in it, built rather than assumed: a directory that
+# holds the tools the gate needs and nothing that answers to swiftc or swift.
+# A hard-coded PATH would not do — on macOS the Xcode command line tools put
+# swiftc in /usr/bin, so a path that names /usr/bin is not a path without a
+# toolchain in it.
+make_tool_free_path() {
+    local stub_dir="$1"
+    mkdir -p "$stub_dir"
+    local tool resolved
+    for tool in bash dirname mkdir rm find cat; do
+        resolved="$(command -v "$tool" || true)"
+        if [[ -n "$resolved" ]]; then
+            ln -sf "$resolved" "$stub_dir/$tool"
+        fi
+    done
 }
 
 # ── 1. the gate parses the sources and the tests ───────────────────────────
@@ -75,7 +98,9 @@ fi
 # would fail every checkout that has none.
 skip_tree="$workspace/skip"
 make_tree "$skip_tree"
-if ! PATH="/usr/bin:/bin" "$skip_tree/scripts/swift-parse-check.sh" >"$workspace/skip.out" 2>&1; then
+tool_free="$workspace/tool-free"
+make_tool_free_path "$tool_free"
+if ! PATH="$tool_free" "$skip_tree/scripts/swift-parse-check.sh" >"$workspace/skip.out" 2>&1; then
     cat "$workspace/skip.out" >&2
     fail 'the parse gate failed instead of skipping when there was no toolchain'
 fi
@@ -99,6 +124,21 @@ if ! SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
 fi
 if ! grep -q 'Sources/BugNarrator/Product.swift' "$record"; then
     fail 'the parse gate did not parse the product sources in a tree without tests'
+fi
+
+# ── 4. a toolchain that reports a syntax error fails the gate ─────────────
+# The stub fails on a file it cannot parse, the way the real toolchain does,
+# so the gate has to fail with it.
+broken_tree="$workspace/broken"
+make_tree "$broken_tree"
+printf 'let broken =\n' >"$broken_tree/Tests/BugNarratorTests/Broken.swift"
+record="$workspace/recorded-broken.txt"
+if SWIFT_STUB_RECORD="$record" PATH="$workspace/stub:$PATH" \
+    "$broken_tree/scripts/swift-parse-check.sh" >"$workspace/broken.out" 2>&1; then
+    fail 'the parse gate passed although the toolchain reported a syntax error'
+fi
+if ! grep -q 'FAIL: swift parse reported errors' "$broken_tree/artifacts/validation/swift-parse-status.txt"; then
+    fail 'the parse gate did not say that the parse reported errors'
 fi
 
 printf 'PASS: the Swift parse gate parses the test sources as well as the product sources\n'
