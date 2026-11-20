@@ -13,8 +13,8 @@ public static partial class SensitiveDataRedactor
     private static partial Regex BearerTokenRegex();
 
     // A Basic credential is the base64 of "user:secret", so the candidate has
-    // to decode to something that contains a colon. The pattern only captures
-    // the candidate; whether it is a credential is decided when the match is
+    // to decode to text with a colon in it. The pattern only captures the
+    // candidate; whether it is a credential is decided when the match is
     // replaced, so ordinary prose after the word "Basic" is left alone.
     //
     // The candidate is the whole run of base64-shaped characters, with no
@@ -71,12 +71,29 @@ public static partial class SensitiveDataRedactor
     /// </summary>
     private static bool IsBasicCredential(string candidate)
     {
-        // The candidate may run on into the characters that follow the
-        // credential, so the longest prefix that decodes to a credential is
-        // the one that counts.
+        // A run this long is not a word. It is data, and redacting it is the
+        // safe answer, so it is not searched through.
+        if (candidate.Length > MaximumCandidateLength)
+        {
+            return true;
+        }
+
+        // The credential may sit at the start of the run or at the end of it.
+        // The run is everything that follows the word "Basic", and the
+        // characters around the credential are often more of the same
+        // alphabet, so the credential is found by looking at the run from both
+        // ends.
         for (var length = candidate.Length; length >= MinimumCredentialLength; length--)
         {
             if (DecodesToCredential(candidate[..length]))
+            {
+                return true;
+            }
+        }
+
+        for (var start = 1; start <= candidate.Length - MinimumCredentialLength; start++)
+        {
+            if (DecodesToCredential(candidate[start..]))
             {
                 return true;
             }
@@ -87,6 +104,13 @@ public static partial class SensitiveDataRedactor
 
     /// <summary>The shortest candidate that can hold a credential.</summary>
     private const int MinimumCredentialLength = 8;
+
+    /// <summary>
+    /// The longest candidate that is searched through for a credential. A
+    /// credential is a user name and a password, which are far shorter than
+    /// this, so a longer run is data rather than a credential.
+    /// </summary>
+    private const int MaximumCandidateLength = 512;
 
     private static bool DecodesToCredential(string encoded)
     {
@@ -104,11 +128,14 @@ public static partial class SensitiveDataRedactor
             return false;
         }
 
-        // A credential is printable text. An ordinary word decodes to bytes
-        // that are not, which is what tells the two apart.
+        // A credential is text. A control character means the decode did not
+        // land on text, which is what tells a credential apart from a word:
+        // an ordinary word decodes to bytes that are not text. A byte above
+        // the printable ASCII range is text in another encoding, and a
+        // credential may well use one.
         foreach (var value in text)
         {
-            if (value < 0x20 || value > 0x7e)
+            if (value < 0x20 || value == 0x7f)
             {
                 return false;
             }

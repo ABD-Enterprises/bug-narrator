@@ -53,8 +53,7 @@ public sealed class SensitiveDataRedactorTests
     [Fact]
     public void ABasicCredentialFollowedByMoreBase64CharactersIsRedacted()
     {
-        // A credential is often written next to more of the same alphabet. The
-        // whole run is captured and the credential is found inside it.
+        // A credential is often written next to more of the same alphabet.
         var credential = Credential("agent:secret");
 
         var redacted = SensitiveDataRedactor.Redact($"Basic {credential}XYZ");
@@ -64,13 +63,39 @@ public sealed class SensitiveDataRedactorTests
     }
 
     [Fact]
-    public void ABasicCredentialInAnAuthorizationHeaderIsRedacted()
+    public void ABasicCredentialPrecededByOtherBase64CharactersIsRedacted()
     {
+        // The same, with the extra characters in front of the credential.
         var credential = Credential("agent:secret");
 
-        var redacted = SensitiveDataRedactor.Redact($"Authorization: Basic {credential}");
+        var redacted = SensitiveDataRedactor.Redact($"Basic XYZ{credential}");
 
         Assert.DoesNotContain(credential, redacted, StringComparison.Ordinal);
+        Assert.Contains(RedactionToken, redacted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ABasicCredentialThatIsNotAsciiIsRedacted()
+    {
+        // A user name is not always written in ASCII, and the credential is
+        // still a credential.
+        var credential = Credential("usér:pass");
+
+        var redacted = SensitiveDataRedactor.Redact($"Basic {credential}");
+
+        Assert.DoesNotContain(credential, redacted, StringComparison.Ordinal);
+        Assert.Contains(RedactionToken, redacted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALongRunAfterBasicIsRedacted()
+    {
+        // A run this long is not a word, so it is data and is redacted whole.
+        var run = new string('A', 600);
+
+        var redacted = SensitiveDataRedactor.Redact($"Basic {run}");
+
+        Assert.DoesNotContain(run, redacted, StringComparison.Ordinal);
         Assert.Contains(RedactionToken, redacted, StringComparison.Ordinal);
     }
 
@@ -83,6 +108,19 @@ public sealed class SensitiveDataRedactorTests
 
         Assert.StartsWith($"Basic {RedactionToken}", redacted, StringComparison.Ordinal);
         Assert.EndsWith("could not be verified", redacted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnAuthorizationHeaderIsRedacted()
+    {
+        // The header is redacted as a whole, by the header rule and not by the
+        // Basic rule: everything after the colon goes.
+        var credential = Credential("agent:secret");
+
+        var redacted = SensitiveDataRedactor.Redact($"Authorization: Basic {credential}");
+
+        Assert.DoesNotContain(credential, redacted, StringComparison.Ordinal);
+        Assert.Equal($"Authorization: {RedactionToken}", redacted);
     }
 
     [Fact]
