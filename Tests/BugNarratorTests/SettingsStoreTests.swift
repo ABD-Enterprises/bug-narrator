@@ -470,7 +470,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://lmstudio:1234"))
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://nas.local:1234"))
 
-        // Plaintext HTTP to a public host must warn.
+        // Plaintext HTTP to a host the app does not trust must warn, whether
+        // the address is on the public internet or in one of the ranges that
+        // are not.
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://api.example.com/v1"))
         XCTAssertNotNil(SettingsStore.plaintextRemoteBaseURLWarning(from: "http://203.0.113.10:8080"))
     }
